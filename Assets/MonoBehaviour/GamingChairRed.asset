@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: GamingChairRed
+  m_EditorClassIdentifier:
+  itemName: '{Gaming Chair}'
+  price: 200
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: 2aa6160c7ebf46942b6a53201ed7aed0, type: 2}
+  spawn: {fileID: 1395989161478348, guid: e9d74f9861241eb40b058652dcd02e44, type: 2}
+  large: 1
+  translateDescription: 1
+  description:

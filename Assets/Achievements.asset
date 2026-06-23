@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 857cf75e2451d36409e877b79d237057, type: 3}
+  m_Name: Achievements
+  m_EditorClassIdentifier: 
+  Entries:
+  - Title: Too Hot
+    Description: Burn a processor
+    Icon: {fileID: 21300000, guid: deec528f5bb06664f9fccca27ac09e78, type: 3}
+    Type: 1
+    ID: too_hot
+    Hidden: 0
+  - Title: Forget Yourself
+    Description: Throw yourself inside the dustbin
+    Icon: {fileID: 21300000, guid: cd007f6f1e08d2d4c8a7f43f1c29d9da, type: 3}
+    Type: 1
+    ID: forget_yourself
+    Hidden: 0
+  - Title: Maximum Power
+    Description: Overclock a processor to 10GHZ
+    Icon: {fileID: 21300000, guid: b8ae1aa2b834e444ead0a519814c069b, type: 3}
+    Type: 1
+    ID: maximum_power
+    Hidden: 0
+  - Title: Glass Smasher
+    Description: Smash the glass 50 times
+    Icon: {fileID: 21300000, guid: 7d3474f621b1f53428ea720af4a40328, type: 3}
+    Type: 0
+    ID: glass_smasher
+    Hidden: 0
+  - Title: You Cannot Catch Me
+    Description: Escape from the dustbin in hardcore mode
+    Icon: {fileID: 21300000, guid: 29b00a3c86f778542abe6d2250bd7a36, type: 3}
+    Type: 1
+    ID: you_cannot_catch_me
+    Hidden: 0
+  - Title: Lightspeed
+    Description: Build a computer in under a minute
+    Icon: {fileID: 21300000, guid: 86221e0da03c35f4bae4a50ddf223019, type: 3}
+    Type: 1
+    ID: lightspeed
+    Hidden: 0
+  - Title: Oh no
+    Description: Run the virus program and infect a computer
+    Icon: {fileID: 21300000, guid: d85dc2a831dfb21438b9a9f0d559bc3d, type: 3}
+    Type: 1
+    ID: oh_no
+    Hidden: 0
+  - Title: VR Master
+    Description: Complete the VR mini game
+    Icon: {fileID: 21300000, guid: 7535e5ca08ae1094bacd361646d841c1, type: 3}
+    Type: 1
+    ID: vr_master
+    Hidden: 0
+  - Title: The Hidden Room
+    Description: Find the hidden room in the game
+    Icon: {fileID: 21300000, guid: 5d6e27df4338f6b47ab64c6fd8737d4b, type: 3}
+    Type: 1
+    ID: the_hidden_room
+    Hidden: 1
+  - Title: Print Master
+    Description: Print 100 sheets of paper in total
+    Icon: {fileID: 21300000, guid: 2aedecccf80fcd648bbb62c049e30bad, type: 3}
+    Type: 0
+    ID: print_master
+    Hidden: 0
+  UI: {fileID: 6864323485910738930, guid: cb31a6d14bd9e9a4782808ca7b332522, type: 3}

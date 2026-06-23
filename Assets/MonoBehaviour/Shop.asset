@@ -1,0 +1,130 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e54a11e49d5a55439688ea8694ab5f2a, type: 3}
+  m_Name: Shop
+  m_EditorClassIdentifier: 
+  pages:
+  - pageName: Accessory
+    item:
+    - {fileID: 11400000, guid: 1166012459d3c0540b81b6f89e10ac1d, type: 2}
+    - {fileID: 11400000, guid: c61dbee05a8cb7244ac0af15c709fad9, type: 2}
+  - pageName: Processor
+    item:
+    - {fileID: 11400000, guid: 475ac741b8c9f564aa6750287786d22e, type: 2}
+    - {fileID: 11400000, guid: 7511e6deab685c74a87da6aef825c8cf, type: 2}
+    - {fileID: 11400000, guid: f2f0db3c1271e2a4280aa60c856dbbbd, type: 2}
+    - {fileID: 11400000, guid: b0d82e29affac4645ba4df145d623a09, type: 2}
+    - {fileID: 11400000, guid: 78d4d3ebd35d072458e4f28415829e1f, type: 2}
+    - {fileID: 11400000, guid: fdbebed0589b445408d232191d5aac94, type: 2}
+    - {fileID: 11400000, guid: 3c5093627e416e94cbf6ec2b7ce2967c, type: 2}
+    - {fileID: 11400000, guid: 871f093df2e3b0c4db4f47167f2ff8df, type: 2}
+    - {fileID: 11400000, guid: 38aa861eb196ebd459e5a088c920a416, type: 2}
+    - {fileID: 11400000, guid: 89f370528af6ae248ac14ad9ba24f1e3, type: 2}
+  - pageName: Memory
+    item:
+    - {fileID: 11400000, guid: a7ad191887589ee4bb8ed06dc5881242, type: 2}
+    - {fileID: 11400000, guid: b7d96336115abac4eba0d1f6d0548268, type: 2}
+    - {fileID: 11400000, guid: 32cfa4f00ff3c3044b3588e5cd5481dc, type: 2}
+    - {fileID: 11400000, guid: afe2b4d6ecf5d274391794a84802c64a, type: 2}
+    - {fileID: 11400000, guid: fe8336fa85e7d174abe48cf9ce006cab, type: 2}
+    - {fileID: 11400000, guid: f0b7a20d8cbcd764d92884f612164289, type: 2}
+    - {fileID: 11400000, guid: 9b78dd5bdeb884e41a64c809c26d927e, type: 2}
+    - {fileID: 11400000, guid: f44d10a1868387c43b343a0b6ccfba3a, type: 2}
+    - {fileID: 11400000, guid: 90e8f68a8374de249b4409a79bf8ce0f, type: 2}
+    - {fileID: 11400000, guid: 193a02ac16a550b49a7499be1dfcb5f2, type: 2}
+  - pageName: Cooler
+    item:
+    - {fileID: 11400000, guid: ad5ac894c80199a4d80a31d96e46ad6b, type: 2}
+    - {fileID: 11400000, guid: e8276229ae4c74b4e99b8e65f961c6d8, type: 2}
+    - {fileID: 11400000, guid: 7bbe0297ed39b464cb37188d222e450f, type: 2}
+    - {fileID: 11400000, guid: 54267ecbb7511a6439f1f7b16133afcc, type: 2}
+    - {fileID: 11400000, guid: f84eb9de0ddff82419b19e7472085dd6, type: 2}
+    - {fileID: 11400000, guid: 21a131b51c018ec429c60211c8a1dc36, type: 2}
+    - {fileID: 11400000, guid: 719b67a8d08f29e418a63b263fca7292, type: 2}
+    - {fileID: 11400000, guid: 3aa22ebe1a52e6b4f868e933d361473e, type: 2}
+  - pageName: Graphics Card
+    item:
+    - {fileID: 11400000, guid: cf4cb2407e3fb754abbe20de35eef99e, type: 2}
+    - {fileID: 11400000, guid: 01b5622816daef440ac43d3ee1076ea7, type: 2}
+    - {fileID: 11400000, guid: 03a3cbf60975fc149be6f931d6bdb521, type: 2}
+    - {fileID: 11400000, guid: d602c9c8e4404fd4288475b2564af49a, type: 2}
+    - {fileID: 11400000, guid: d07dfac4df345d64182d039b0a650af9, type: 2}
+    - {fileID: 11400000, guid: 00442b1ecdc36df44b12d7e2fe5e31b3, type: 2}
+    - {fileID: 11400000, guid: c72a80ad004c1b046b875b0679d1f25a, type: 2}
+    - {fileID: 11400000, guid: 7f38bc7cd016fbe4586d544f241c4e2b, type: 2}
+    - {fileID: 11400000, guid: 07553ffaea4069f498a1c4bb26c0ff28, type: 2}
+    - {fileID: 11400000, guid: 6893008077297874c957cc0f0b15fb45, type: 2}
+    - {fileID: 11400000, guid: 44f68bad688b19a4ab443676cf60dbb9, type: 2}
+    - {fileID: 11400000, guid: 540e124af89b73044959481f6bbd9866, type: 2}
+    - {fileID: 11400000, guid: 954d3560155598444bdb293f5179f3b8, type: 2}
+  - pageName: Power Supply
+    item:
+    - {fileID: 11400000, guid: c04e4229eaefdc44381e31c1aee14ca6, type: 2}
+    - {fileID: 11400000, guid: bf17041ce1cf69b409667964bfe12f3f, type: 2}
+    - {fileID: 11400000, guid: ea181a7689f6725409ed831fad52c606, type: 2}
+    - {fileID: 11400000, guid: 2a39aa7c3570c31459a669a2ba5a226a, type: 2}
+  - pageName: Storage
+    item:
+    - {fileID: 11400000, guid: 2d7b30979ba5e8d4e9f7727a158c54b1, type: 2}
+    - {fileID: 11400000, guid: 8cc3f12a4f7558c4bb420dac9eada232, type: 2}
+    - {fileID: 11400000, guid: acec5e209afa8d3449f36743a51b0943, type: 2}
+    - {fileID: 11400000, guid: 9d3bb80abf5743948b6c8b86926242a0, type: 2}
+    - {fileID: 11400000, guid: 0df621b94e4459f418306ba8dd0ac053, type: 2}
+    - {fileID: 11400000, guid: 14193faaf98b53a47a51c0c2e4be3207, type: 2}
+    - {fileID: 11400000, guid: 0a94ddff3cec1d4409dd69ec1d71ae96, type: 2}
+    - {fileID: 11400000, guid: 567e232808be32e47a81f18b5e737be5, type: 2}
+    - {fileID: 11400000, guid: 7dc7239553b8b0a4686de9a3db31429a, type: 2}
+    - {fileID: 11400000, guid: 0768346210bc34c4087a61c30275cff6, type: 2}
+    - {fileID: 11400000, guid: 78f33738fec248a4ab4135f4ebca6538, type: 2}
+    - {fileID: 11400000, guid: f1abbcfb5f953d04aa8e2be6f18e4c3f, type: 2}
+    - {fileID: 11400000, guid: d5034e11a00c6ca4891b6843ec1af837, type: 2}
+  - pageName: Motherboard
+    item:
+    - {fileID: 11400000, guid: cbab8ee0fc5321a448bf49b3864b08be, type: 2}
+    - {fileID: 11400000, guid: d458e5ff662177b419dfe19ef33d6768, type: 2}
+    - {fileID: 11400000, guid: 9a0300fc6a809804d8e7e1e8efe797b4, type: 2}
+    - {fileID: 11400000, guid: cdba4516448b5164fa7e9315cc05aa55, type: 2}
+    - {fileID: 11400000, guid: 1f54e0368c9273246aedd94cff996a3c, type: 2}
+  - pageName: Monitor
+    item:
+    - {fileID: 11400000, guid: fac77265b01945d4dad9522f0654c12d, type: 2}
+    - {fileID: 11400000, guid: de0183c8fba63834e94511e1470737ce, type: 2}
+    - {fileID: 11400000, guid: f1dd6a67e5f3b964b9ac1f38c30194bf, type: 2}
+    - {fileID: 11400000, guid: 91ceff89ea3e8b94895e660364b42d15, type: 2}
+    - {fileID: 11400000, guid: e26fdfa4969836c4993c1d2116312b04, type: 2}
+    - {fileID: 11400000, guid: c9d1557f85fed514faf270b5f56da301, type: 2}
+    - {fileID: 11400000, guid: 38286e5c2780dd740bc60c8fe13795ae, type: 2}
+    - {fileID: 11400000, guid: 5450ac46f287305499555779df7242f4, type: 2}
+    - {fileID: 11400000, guid: 0eac233bf1d382848a6ceff452d6d03d, type: 2}
+    - {fileID: 11400000, guid: 732f1c5e168c7e84eb8d00b6de9a5c83, type: 2}
+    - {fileID: 11400000, guid: abd1e47e0fd62da4fa2cdd80999d3ad6, type: 2}
+    - {fileID: 11400000, guid: 0e8a1a9fe856d674b9b96e93ece489b7, type: 2}
+  - pageName: Case
+    item:
+    - {fileID: 11400000, guid: e38b1e1ed025a0f4b981166acfeeee5a, type: 2}
+    - {fileID: 11400000, guid: f082cbbc5561c83448479014b201988c, type: 2}
+    - {fileID: 11400000, guid: 9b14a3a587c6d6449a4f722480b4970f, type: 2}
+    - {fileID: 11400000, guid: 2b908f2f67ead8a40b15fb4b42b0c9a2, type: 2}
+    - {fileID: 11400000, guid: 4967bd9d7aef0f84cac8e64070a6a1f3, type: 2}
+    - {fileID: 11400000, guid: 71df56b4de7c3a946b4f3a3b8c5bf78c, type: 2}
+    - {fileID: 11400000, guid: c0e1ef40ad3da5f4aa52152e7cb1940d, type: 2}
+    - {fileID: 11400000, guid: a65f95e38eb180f40b3752f417efaa4a, type: 2}
+    - {fileID: 11400000, guid: 8c53e6751a3bf6f4e8e2bd06de58483a, type: 2}
+    - {fileID: 11400000, guid: f083a3b9b6526ac49bb36b94743a1dea, type: 2}
+    - {fileID: 11400000, guid: e8e2026b19c972d4b9aa99c509719708, type: 2}
+    - {fileID: 11400000, guid: 6b3bdeb89fd22e542b50d42ca230fbcc, type: 2}
+    - {fileID: 11400000, guid: 8b6e57d67f4705443b5ce97cc2ef9757, type: 2}
+    - {fileID: 11400000, guid: a1f5fc3d1decd3340863322e652669d7, type: 2}
+    - {fileID: 11400000, guid: b8f85232db21173419493a4d5523e2e3, type: 2}
+    - {fileID: 11400000, guid: 9a10f167eb7308747aa2c931a5360b67, type: 2}
+    - {fileID: 11400000, guid: 140454d517a8f434698d43f7d2502215, type: 2}
+    - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}

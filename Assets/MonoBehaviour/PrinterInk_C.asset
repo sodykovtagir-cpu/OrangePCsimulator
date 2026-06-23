@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: PrinterInk_C
+  m_EditorClassIdentifier:
+  itemName: '{Printer Ink} (C)'
+  price: 50
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: fa75c455048331b40bc5e00e63f97016, type: 2}
+  spawn: {fileID: 1516038339435302, guid: 9e7f007b1d8bb9e47be915a77120f475, type: 2}
+  large: 0
+  translateDescription: 1
+  description:

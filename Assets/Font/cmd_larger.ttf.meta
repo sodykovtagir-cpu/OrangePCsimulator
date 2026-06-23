@@ -1,0 +1,28 @@
+fileFormatVersion: 2
+guid: f81d08ae9d632bb44950f71a970b8d47
+timeCreated: 1753801753
+licenseType: Free
+TrueTypeFontImporter:
+  serializedVersion: 4
+  externalObjects: {}
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Windows Command Prompt
+  fallbackFontReferences:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 12800000, guid: a079ffe6f7bf78f4da440dc49e546c76, type: 3}
+  customCharacters:
+  fontRenderingMode: 0
+  output:
+    hasEmptyFontData: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData:
+  assetBundleName:
+  assetBundleVariant:

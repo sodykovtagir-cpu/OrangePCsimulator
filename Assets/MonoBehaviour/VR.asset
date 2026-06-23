@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: VR
+  m_EditorClassIdentifier:
+  itemName: '{VR Glasses}'
+  price: 300
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: 24eac29f91307444584edaaa33ed0c38, type: 2}
+  spawn: {fileID: 1193621038879405, guid: db244dac569128d4f9ecaeec97f945ed, type: 2}
+  large: 0
+  translateDescription: 1
+  description:

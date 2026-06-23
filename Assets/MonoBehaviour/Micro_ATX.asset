@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: Micro_ATX
+  m_EditorClassIdentifier:
+  itemName: Micro-ATX
+  price: 120
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 9b5f9fad35d6126459cf534a09f9fcc0, type: 2}
+  spawn: {fileID: 1521552208014502, guid: 18b76a523b0d6ad49a0be8c03eaa7ce2, type: 2}
+  large: 1
+  translateDescription: 1
+  description:

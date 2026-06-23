@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: Monitor 2(Yellow)
+  m_EditorClassIdentifier:
+  itemName: '{Monitor}'
+  price: 200
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: 0992994c9d9b5114f86d4593e6ea4d9b, type: 2}
+  spawn: {fileID: 1183028289441426, guid: cd35343a333311846b8b241d2c20443a, type: 2}
+  large: 1
+  translateDescription: 1
+  description:

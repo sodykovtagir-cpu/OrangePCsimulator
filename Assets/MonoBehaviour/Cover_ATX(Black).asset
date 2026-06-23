@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: Cover_ATX(Black)
+  m_EditorClassIdentifier:
+  itemName: '{Cover} (ATX)'
+  price: 40
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 79150f869439a9542a61bb7dafff7593, type: 2}
+  spawn: {fileID: 1259261443996259, guid: acbc07b4fa7706c4d8654fb6f99fc24b, type: 2}
+  large: 1
+  translateDescription: 1
+  description:

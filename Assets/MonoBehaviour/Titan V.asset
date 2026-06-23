@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: Titan V
+  m_EditorClassIdentifier:
+  itemName: Titan V
+  price: 3000
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 7c03a4d9b43492949bb3ed4aee1f1a09, type: 2}
+  spawn: {fileID: 1899066116835069, guid: 12393459111e7f847ad13b5d287e5050, type: 2}
+  large: 0
+  translateDescription: 1
+  description:

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: 16GB (RGB)
+  m_EditorClassIdentifier:
+  itemName: 16GB (RGB)
+  price: 200
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 7baab3291cbe0e944bd1cb7dde17cb16, type: 2}
+  spawn: {fileID: 1388978929424778, guid: ddbe6b9c79928f1499be4be59530f528, type: 2}
+  large: 0
+  translateDescription: 1
+  description:

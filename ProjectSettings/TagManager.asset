@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags:
+  - GPU
+  - RAM
+  - CPU
+  - Supply
+  - Motherboard
+  - Cover
+  - Cooler
+  - Box
+  - Case
+  - Monitor
+  - Crate
+  - Drive
+  - Hammer
+  - Wall
+  - Fan
+  - Pillow
+  - USB
+  - Ink
+  - Paper
+  - Glue
+  - LiquidNitrogenTank
+  - Radiator
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - 
+  - 
+  - Fixed
+  - Cross
+  - Player
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
