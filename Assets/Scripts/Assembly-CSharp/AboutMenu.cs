@@ -36,7 +36,7 @@ public class AboutMenu : MonoBehaviour
 	{
 		version.text = Localization.GetText("Version") + "\n" + Application.version;
 		score.text = Localization.GetText("Highest Benchmark") + " : <color=lime>" + PlayerPrefs.GetInt("Score", 0).ToString() + "</color>";
-		creatorText.text = string.Format(Localization.GetText("Made By {0}"), "<color=orange>@orangePCsimu</color>");
+		creatorText.text = string.Format(Localization.GetText("Made By {0}"), "Yiming <color=orange>@orangePCsimu</color>");
 		bitcoinText.text = BitcoinManager.Bitcoin.ToString() + " BTC";
 	}
 }

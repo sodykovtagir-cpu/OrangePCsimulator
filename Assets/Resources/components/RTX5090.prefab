@@ -152,5 +152,5 @@ MonoBehaviour:
   slotOffset: {x: -0.2, y: 0.072, z: -0.09}
   glue: 0
   capacity: 0
-  score: 0
-  wattage: 320
+  score: 13000
+  wattage: 450

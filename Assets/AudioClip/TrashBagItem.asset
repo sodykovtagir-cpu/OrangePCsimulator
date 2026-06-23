@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: TrashBagItem
+  m_EditorClassIdentifier: 
+  itemName: Trash bag
+  price: 50
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 243821005e1075448a13c54dbcc0cca8, type: 3}
+  spawn: {fileID: 1172905954065532, guid: f5e430480f2a78649a66ae3d1a123f92, type: 3}
+  large: 1
+  translateDescription: 0
+  description: Trash bag for boxes
