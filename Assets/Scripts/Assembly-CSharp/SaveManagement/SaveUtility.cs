@@ -8,7 +8,7 @@ namespace SaveManagement
 {
 	public static class SaveUtility
 	{
-		public static readonly string extension = ".pc";
+		public static string extension = ".opc";
 
 		public static int key = 129;
 
