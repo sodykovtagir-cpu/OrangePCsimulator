@@ -1,66 +1,53 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class TouchPad : MonoBehaviour, IPointerDownHandler, IEventSystemHandler, IPointerUpHandler
+public class TouchPad : MonoBehaviour,
+    IPointerDownHandler,
+    IPointerUpHandler,
+    IDragHandler           // ← добавлено
 {
-	public string horizontalAxisName;
+    public string horizontalAxisName;
+    public string verticalAxisName;
+    public float sensitivity;
+    public bool firstTouch;
 
-	public string verticalAxisName;
+    private bool dragging;
+    private int id = int.MinValue;  // ← безопасное начальное значение
 
-	public float sensitivity;
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (!gameObject.activeInHierarchy) return;
+        if (!firstTouch || !dragging)
+        {
+            dragging = true;
+            id = eventData.pointerId;
+        }
+    }
 
-	public bool firstTouch;
+    // Вызывается EventSystem'ом при каждом движении пальца/мыши
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!dragging || eventData.pointerId != id) return;
 
-	private bool dragging;
+        Vector2 delta = eventData.delta;  // ← delta из EventSystem, работает везде
+        InputManager.UpdateAxis(horizontalAxisName, delta.x * sensitivity);
+        InputManager.UpdateAxis(verticalAxisName, delta.y * sensitivity);
+    }
 
-	private int id;
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (dragging && eventData.pointerId == id)
+        {
+            dragging = false;
+            InputManager.UpdateAxis(horizontalAxisName, 0f);
+            InputManager.UpdateAxis(verticalAxisName, 0f);
+        }
+    }
 
-	public void OnPointerDown(PointerEventData eventData)
-	{
-		if (gameObject != null && gameObject.activeInHierarchy)
-		{
-			if (!firstTouch || !dragging)
-			{
-				dragging = true;
-				if (eventData != null) id = eventData.pointerId;
-			}
-		}
-	}
-
-	private void Update()
-	{
-		if (!dragging || id == -1) return;
-
-		int touchCount = Input.touchCount;
-		if (touchCount <= 0) return;
-
-		for (int i = 0; i < touchCount; i++)
-		{
-			Touch touch = Input.GetTouch(i);
-			if (touch.fingerId == id)
-			{
-				Vector2 delta = touch.deltaPosition;
-				InputManager.UpdateAxis(horizontalAxisName, delta.x * sensitivity);
-				InputManager.UpdateAxis(verticalAxisName, delta.y * sensitivity);
-				return;
-			}
-		}
-	}
-
-	public void OnPointerUp(PointerEventData eventData)
-	{
-		if (dragging && eventData != null && eventData.pointerId == id)
-		{
-			dragging = false;
-			InputManager.UpdateAxis(horizontalAxisName, 0f);
-			InputManager.UpdateAxis(verticalAxisName, 0f);
-		}
-	}
-
-	private void OnDisable()
-	{
-		dragging = false;
-		InputManager.UnregisterAxis(horizontalAxisName);
-		InputManager.UnregisterAxis(verticalAxisName);
-	}
+    private void OnDisable()
+    {
+        dragging = false;
+        InputManager.UnregisterAxis(horizontalAxisName);
+        InputManager.UnregisterAxis(verticalAxisName);
+    }
 }
