@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: RTX4080Ti
   m_EditorClassIdentifier: 
-  itemName: RTX4080
+  itemName: RTX4080Ti
   price: 2100
   bitcoin: 5
-  sprite: {fileID: 21300000, guid: c2570800167f7e74594e184ac7f2a93c, type: 3}
+  sprite: {fileID: 21300000, guid: 92c0af8abbe427445a4194af4d09b297, type: 3}
   spawn: {fileID: 1117393110551348, guid: a8f2c909ab2b9f745836f91b1387ec8b, type: 3}
   large: 0
   translateDescription: 1
