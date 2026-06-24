@@ -67,6 +67,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 07553ffaea4069f498a1c4bb26c0ff28, type: 2}
     - {fileID: 11400000, guid: 6893008077297874c957cc0f0b15fb45, type: 2}
     - {fileID: 11400000, guid: 44f68bad688b19a4ab443676cf60dbb9, type: 2}
+    - {fileID: 11400000, guid: 298ae43390f91bd49829a42b2c289892, type: 2}
+    - {fileID: 11400000, guid: fe6788ed8c1f264418bab592f343c8a2, type: 2}
     - {fileID: 11400000, guid: 540e124af89b73044959481f6bbd9866, type: 2}
     - {fileID: 11400000, guid: 954d3560155598444bdb293f5179f3b8, type: 2}
   - pageName: Power Supply

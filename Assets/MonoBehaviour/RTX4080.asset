@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: RTX4080
   price: 2100
   bitcoin: 5
-  sprite: {fileID: 21300000, guid: c2570800167f7e74594e184ac7f2a93c, type: 3}
+  sprite: {fileID: 21300000, guid: 14960559712cbd3429d98811ce9cd9cb, type: 3}
   spawn: {fileID: 1117393110551348, guid: a8f2c909ab2b9f745836f91b1387ec8b, type: 3}
   large: 0
   translateDescription: 1
