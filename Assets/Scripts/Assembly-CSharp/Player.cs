@@ -86,7 +86,8 @@ public class Player : MonoBehaviour
 
 private void Update()
 {
-    if (pauseControls) return;
+    if (pauseControls)
+        return;
 
     Cursor.lockState = CursorLockMode.Locked;
     Cursor.visible = false;
@@ -95,8 +96,13 @@ private void Update()
     float mouseY = InputManager.GetAxis("Mouse Y");
 
     float newClampY = clampY - mouseY * sensitivity;
-    if (newClampY > viewAngle) newClampY = viewAngle;
-    if (newClampY < -viewAngle) newClampY = -viewAngle;
+
+    if (newClampY > viewAngle)
+        newClampY = viewAngle;
+
+    if (newClampY < -viewAngle)
+        newClampY = -viewAngle;
+
     clampY = newClampY;
 
     transform.Rotate(0f, mouseX * sensitivity, 0f);
@@ -105,16 +111,6 @@ private void Update()
     {
         cam.localRotation = Quaternion.Euler(clampY, 0f, 0f);
     }
-
-    transform.Rotate(
-        (Input.GetKey(KeyCode.UpArrow) ? -1f :
-         Input.GetKey(KeyCode.DownArrow) ? 1f : 0f) * 15f * Time.deltaTime,
-
-        (Input.GetKey(KeyCode.RightArrow) ? 1f :
-         Input.GetKey(KeyCode.LeftArrow) ? -1f : 0f) * 15f * Time.deltaTime,
-
-        0f,
-        Space.Self);
 }
 
 	private void FixedUpdate()

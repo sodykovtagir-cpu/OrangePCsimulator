@@ -1,10 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class TouchPad : MonoBehaviour,
-    IPointerDownHandler,
-    IPointerUpHandler,
-    IDragHandler           // ← добавлено
+public class TouchPad : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     public string horizontalAxisName;
     public string verticalAxisName;
@@ -12,31 +9,42 @@ public class TouchPad : MonoBehaviour,
     public bool firstTouch;
 
     private bool dragging;
-    private int id = int.MinValue;  // ← безопасное начальное значение
+    private int id = -1;
 
     public void OnPointerDown(PointerEventData eventData)
     {
         if (!gameObject.activeInHierarchy) return;
-        if (!firstTouch || !dragging)
-        {
-            dragging = true;
-            id = eventData.pointerId;
-        }
+
+        dragging = true;
+        id = eventData.pointerId;
     }
 
-    // Вызывается EventSystem'ом при каждом движении пальца/мыши
-    public void OnDrag(PointerEventData eventData)
+    private void Update()
     {
-        if (!dragging || eventData.pointerId != id) return;
+        if (!dragging)
+            return;
 
-        Vector2 delta = eventData.delta;  // ← delta из EventSystem, работает везде
-        InputManager.UpdateAxis(horizontalAxisName, delta.x * sensitivity);
-        InputManager.UpdateAxis(verticalAxisName, delta.y * sensitivity);
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+
+            if (touch.fingerId == id)
+            {
+                Vector2 delta = touch.deltaPosition;
+
+                InputManager.UpdateAxis(horizontalAxisName, delta.x * sensitivity);
+                InputManager.UpdateAxis(verticalAxisName, delta.y * sensitivity);
+                return;
+            }
+        }
+
+        InputManager.UpdateAxis(horizontalAxisName, 0f);
+        InputManager.UpdateAxis(verticalAxisName, 0f);
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        if (dragging && eventData.pointerId == id)
+        if (eventData.pointerId == id)
         {
             dragging = false;
             InputManager.UpdateAxis(horizontalAxisName, 0f);
