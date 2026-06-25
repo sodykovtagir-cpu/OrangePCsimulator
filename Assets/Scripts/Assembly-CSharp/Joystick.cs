@@ -72,6 +72,9 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
 
     public void OnDrag(PointerEventData eventData)
     {
+
+        Debug.Log("JOYSTICK " + eventData.pointerId);
+
         cam = null;
         if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
             cam = canvas.worldCamera;
@@ -81,6 +84,10 @@ public class Joystick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPoint
         input = (eventData.position - position) / (radius * canvas.scaleFactor);
         FormatInput();
         HandleInput(input.magnitude, input.normalized, radius, cam);
+        Debug.Log(
+    "H=" + input.x +
+    " V=" + input.y
+        );
         handle.anchoredPosition = input * radius * handleRange;
         InputManager.UpdateAxis(verticalAxisName, input.y);
         InputManager.UpdateAxis(horizontalAxisName, input.x);
