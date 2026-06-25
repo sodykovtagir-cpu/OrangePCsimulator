@@ -295,6 +295,7 @@ GameObject:
   - component: {fileID: 224290659101917463}
   - component: {fileID: 222479757406466009}
   - component: {fileID: 114379079410259300}
+  - component: {fileID: 6575450428057554448}
   m_Layer: 5
   m_Name: Image
   m_TagString: Untagged
@@ -313,7 +314,8 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 224908680519238313}
   m_Father: {fileID: 224607870607963087}
   m_LocalEulerAnglesHint: {x: 0, y: -0, z: -0}
   m_AnchorMin: {x: 0, y: 1}
@@ -359,6 +361,18 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &6575450428057554448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1680120905849172}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0450bed449d406439621f6405243e67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1683826242437630
 GameObject:
   m_ObjectHideFlags: 0
@@ -482,7 +496,6 @@ RectTransform:
   m_Children:
   - {fileID: 224290659101917463}
   - {fileID: 224460399061438465}
-  - {fileID: 224908680519238313}
   - {fileID: 224417074620503865}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -0, z: -0}
@@ -788,7 +801,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 224607870607963087}
+  m_Father: {fileID: 224290659101917463}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}

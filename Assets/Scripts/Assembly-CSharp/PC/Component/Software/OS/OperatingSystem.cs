@@ -118,8 +118,6 @@ namespace PC.Component.Software.OS
 
 		private bool running;
 
-		private App runningApp;
-
 		private int storageScore;
 
 		private CoverImage background;
@@ -266,14 +264,13 @@ namespace PC.Component.Software.OS
 			if (animator != null) animator.SetTrigger("Enter");
 			if (desktop != null) desktop.blocksRaycasts = true;
 
-			if (iconParent != null)
-			{
-				var rl = iconParent.GetComponent<ReorderableList>();
-				if (rl != null) rl.IsDraggable = true;
-			}
-
 			Ready = true;
-		}
+
+            if (taskbar != null)
+                taskbar.SetActive(true);
+
+            InitializeTaskbar();
+        }
 
 		public void Login()
 		{
@@ -349,9 +346,6 @@ namespace PC.Component.Software.OS
 			running = false;
 			Ready = false;
 
-			var app = runningApp;
-			if (app != null) app.Close();
-
 			if (desktop != null) desktop.blocksRaycasts = false;
 
 			if (iconParent != null)
@@ -361,25 +355,30 @@ namespace PC.Component.Software.OS
 			}
 		}
 
-		public void InstallApp(App app)
-		{
-			if (app == null || FileManager == null) return;
+        public void InstallApp(App app)
+        {
+            if (app == null || FileManager == null) return;
 
-			var path = app.AppName + ".exe";
-			var file = new File(path, "", false, app.size);
+            var path = app.AppName + ".exe";
+            var file = new File(path, "", false, app.size);
 
-			if (FileManager.Create(0, file))
-			{
-				AddApp(app.AppName);
-			}
-		}
+            if (FileManager.Create(0, file))
+            {
+                AddApp(app.AppName);
 
-		public void UninstallApp(string softwareName)
+                // ✅ ВОТ ЭТОГО НЕ ХВАТАЛО
+                RefreshDesktopIcon();
+            }
+        }
+
+        public void UninstallApp(string softwareName)
 		{
 			var path = softwareName + ".exe";
 			if (FileManager != null) FileManager.Delete(0, path);
 			if (installedApps != null) installedApps.Remove(softwareName);
-		}
+
+            RefreshDesktopIcon();
+        }
 
 		public bool IsAppInstalled(string name)
 		{
@@ -460,17 +459,17 @@ namespace PC.Component.Software.OS
 
             iconInstance.Init(file, f =>
             {
-                // ✅ Если это папка
+                // ✅ ПАПКА
                 if (f.isFolder)
                 {
-                    if (runningApp != null) return;
-
                     if (IsAppInstalled("File Manager", out var prefab))
                     {
                         var app = Instantiate(prefab, appParent);
-                        app.Init(this);
-                        app.AppClosed += ResetAppState;
+                        if (app == null) return;
 
+                        app.Init(this);
+                        RegisterRunningApp(app);
+                        app.AppClosed += ResetAppState;
                         app.Open("");
 
                         var fm = app as PC.Component.Software.FileManager;
@@ -478,13 +477,12 @@ namespace PC.Component.Software.OS
                             fm.OpenFolderFromPath(f.path);
 
                         FocusApp(true);
-                        runningApp = app;
                     }
 
                     return;
                 }
 
-                // ✅ Обычные файлы
+                // ✅ ОБЫЧНЫЕ ФАЙЛЫ
                 var ext = f.Extension();
 
                 foreach (var name in installedApps)
@@ -506,23 +504,23 @@ namespace PC.Component.Software.OS
 
                     if (!match) continue;
 
-                    if (runningApp == null)
-                    {
-                        var app = Instantiate(prefab, appParent);
-                        app.Init(this);
-                        app.AppClosed += ResetAppState;
-                        app.Open(f.content);
-                        FocusApp(true);
-                        runningApp = app;
-                    }
+                    // ✅ ВОТ ЧЕГО НЕ ХВАТАЛО — создание приложения
+                    var app = Instantiate(prefab, appParent);
+                    if (app == null) return;
 
+                    app.Init(this);
+                    RegisterRunningApp(app);
+                    app.AppClosed += ResetAppState;
+                    app.Open(f.content);
+
+                    FocusApp(true);
                     break;
                 }
             });
 
-            // ✅ Ставим правильную иконку
+            // ✅ Иконка
             if (file.isFolder)
-                iconInstance.Sprite = folderSprite;   // добавь поле в классе
+                iconInstance.Sprite = folderSprite;
             else
                 iconInstance.Sprite = GetFileSprite(file.path);
 
@@ -573,8 +571,6 @@ namespace PC.Component.Software.OS
 
 				if (!match) continue;
 
-				if (runningApp != null) return false;
-
 				var instance = Instantiate(prefab, appParent);
 				if (instance == null) return false;
 
@@ -582,7 +578,6 @@ namespace PC.Component.Software.OS
 				instance.AppClosed += ResetAppState;
 				instance.Open(file.content);
 				FocusApp(true);
-				runningApp = instance;
 				return true;
 			}
 
@@ -617,26 +612,14 @@ namespace PC.Component.Software.OS
 			if (go != null) go.SetActive(true);
 		}
 
-		private void ResetAppState()
-		{
-			runningApp = null;
-			FocusApp(false);
-			var t = menuBar;
-			if (t != null)
-			{
-				var go = t.gameObject;
-				if (go != null) go.SetActive(false);
-				RefreshDesktopIcon();
-			}
-		}
+        private void ResetAppState()
+        {
+            FocusApp(false);
+        }
 
-		private void FocusApp(bool focus)
+        private void FocusApp(bool focus)
 		{
-			if (iconParent == null) return;
-			var go = iconParent.gameObject;
-			if (go != null) go.SetActive(!focus);
-			var rl = iconParent.GetComponent<ReorderableList>();
-			if (rl != null) rl.IsDraggable = !focus;
+
 		}
 
 		public void OnFileIconDropped(ReorderableList.ReorderableListEventStruct reorderableListEventStruct)
@@ -797,5 +780,159 @@ namespace PC.Component.Software.OS
 			if (tr != null) tr.SetAsFirstSibling();
 			svc.Show(this, picture);
 		}
-	}
+
+        // ================= TASKBAR & START MENU =================
+
+        [Header("TASKBAR")]
+        [SerializeField] private GameObject taskbar;
+        [SerializeField] private Button startButton;
+        [SerializeField] private Text clockText;
+        [SerializeField] private Transform runningAppsContainer;
+        [SerializeField] private Button runningAppButtonPrefab;
+
+        [Header("START MENU")]
+        [SerializeField] private GameObject startMenu;
+        [SerializeField] private UnityEngine.Animator startMenuAnimator;
+        [SerializeField] private RawImage startUserAvatar;
+        [SerializeField] private Text startUserName;
+        [SerializeField] private Transform installedAppsContainer;
+        [SerializeField] private Button installedAppButtonPrefab;
+        [SerializeField] private Button shutdownButton;
+
+        private List<App> runningApps = new List<App>();
+        private float gameTime;
+
+        private void InitializeTaskbar()
+        {
+            if (startButton != null)
+                startButton.onClick.AddListener(ToggleStartMenu);
+
+            if (shutdownButton != null)
+                shutdownButton.onClick.AddListener(() => PowerClicked());
+        }
+
+        private void Update()
+        {
+            if (!Ready) return;
+
+            gameTime += Time.deltaTime;
+
+            if (clockText != null)
+            {
+                int h = Mathf.FloorToInt(gameTime / 3600);
+                int m = Mathf.FloorToInt((gameTime % 3600) / 60);
+                int s = Mathf.FloorToInt(gameTime % 60);
+
+                clockText.text = $"{h:00}:{m:00}:{s:00}";
+            }
+        }
+
+        private void ToggleStartMenu()
+        {
+            if (startMenu == null) return;
+
+            bool open = !startMenu.activeSelf;
+
+            startMenu.SetActive(true);
+
+            if (startMenuAnimator != null)
+                startMenuAnimator.SetBool("Open", open);
+
+            if (!open)
+                StartCoroutine(HideStartAfterAnim());
+            else
+                RefreshStartMenu();
+        }
+
+        private IEnumerator HideStartAfterAnim()
+        {
+            yield return new WaitForSeconds(0.25f);
+            if (startMenu != null)
+                startMenu.SetActive(false);
+        }
+
+        private void RefreshStartMenu()
+        {
+            if (startUserAvatar != null)
+                startUserAvatar.texture = UserPicture();
+
+            if (startUserName != null)
+                startUserName.text = UserName;
+
+            if (installedAppsContainer == null) return;
+
+            for (int i = installedAppsContainer.childCount - 1; i >= 0; i--)
+                Destroy(installedAppsContainer.GetChild(i).gameObject);
+
+            foreach (var appName in installedApps)
+            {
+                if (!appPrefabs.TryGetValue(appName, out var prefab))
+                    continue;
+
+                var btn = Instantiate(installedAppButtonPrefab, installedAppsContainer);
+
+                var img = btn.transform.GetChild(0).GetComponent<Image>();
+                if (img != null)
+                    img.sprite = prefab.Icon;
+
+                var txt = btn.transform.GetChild(1).GetComponent<Text>();
+                if (txt != null)
+                    txt.text = appName;
+
+                btn.onClick.AddListener(() =>
+                {
+                    var app = Instantiate(prefab, appParent);
+                    app.Init(this);
+                    RegisterRunningApp(app);
+                    ToggleStartMenu();
+                });
+            }
+        }
+
+        private void RegisterRunningApp(App app)
+        {
+            if (app == null) return;
+
+            runningApps.Add(app);
+
+            app.AppClosed += () =>
+            {
+                runningApps.Remove(app);
+                RefreshRunningAppsUI();
+            };
+
+            RefreshRunningAppsUI();
+        }
+
+        private void RefreshRunningAppsUI()
+        {
+            if (runningAppsContainer == null) return;
+
+            for (int i = runningAppsContainer.childCount - 1; i >= 0; i--)
+                Destroy(runningAppsContainer.GetChild(i).gameObject);
+
+            foreach (var app in runningApps)
+            {
+                var btn = Instantiate(runningAppButtonPrefab, runningAppsContainer);
+
+                var img = btn.GetComponent<Image>();
+                if (img != null)
+                    img.sprite = app.Icon;
+
+                btn.onClick.AddListener(() =>
+                {
+                    if (app != null)
+                        app.transform.SetAsLastSibling();
+                });
+            }
+        }
+
+        private void EnableTaskbar()
+        {
+            if (taskbar != null)
+                taskbar.SetActive(true);
+
+            InitializeTaskbar();
+        }
+    }
 }

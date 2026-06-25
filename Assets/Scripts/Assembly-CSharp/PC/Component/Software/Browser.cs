@@ -1,169 +1,258 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace PC.Component.Software
 {
-	public class Browser : App
-	{
-		[Serializable]
-		private class WebsiteItem
-		{
-			public string url;
+    public class Browser : App
+    {
+        [Serializable]
+        private class WebsiteItem
+        {
+            public string url;
+            public Website page;
+            public bool visible;
+        }
 
-			public Website page;
+        [Header("UI")]
+        [SerializeField] private GameObject home;
+        [SerializeField] private WebsiteItem[] websites;
+        [SerializeField] private InputField addressBar;
+        [SerializeField] private Transform quickAccessPrefab;
+        [SerializeField] private Transform quickAccessParent;
+        [SerializeField] private Transform content;
+        [SerializeField] private GameObject loading;
 
-			public bool visible;
-		}
+        [Header("Navigation Buttons")]
+        [SerializeField] private Button backButton;
+        [SerializeField] private Button forwardButton;
+        [SerializeField] private Button refreshButton;
 
-		[SerializeField]
-		private GameObject home;
+        [Header("Loading Bar")]
+        [SerializeField] private GameObject loadingBar;
 
-		[SerializeField]
-		private WebsiteItem[] websites;
+        private Coroutine loadingCoroutine;
+        private Website web;
+        private Image background;
 
-		[SerializeField]
-		private InputField addressBar;
+        // ✅ Реальный WebView
+        private WebViewObject realWebView;
+        private bool usingRealWeb;
+        private string currentUrl;
 
-		[SerializeField]
-		private Transform quickAccessPrefab;
+        protected override void Start()
+        {
+            base.Start();
 
-		[SerializeField]
-		private Transform quickAccessParent;
+            if (content != null)
+                background = content.GetComponent<Image>();
 
-		[SerializeField]
-		private Transform content;
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
 
-		[SerializeField]
-		private GameObject loading;
+            realWebView = gameObject.AddComponent<WebViewObject>();
 
-		private Coroutine loadingCoroutine;
+            realWebView.Init(
+                cb: (msg) => { },
+                err: (msg) => { Debug.Log("WebView Error: " + msg); },
+                started: (msg) =>
+                {
+                    if (loadingBar != null)
+                        loadingBar.SetActive(true);
+                },
+                hooked: (msg) => { },
+                ld: (msg) =>
+                {
+                    if (loadingBar != null)
+                        loadingBar.SetActive(false);
+                }
+            );
 
-		private Website web;
+            realWebView.SetVisibility(false);
 
-		private Image background;
+#endif
 
-		protected override void Start()
-		{
-			base.Start();
+            if (backButton != null)
+                backButton.onClick.AddListener(GoBack);
 
-			if (content != null) background = content.GetComponent<UnityEngine.UI.Image>();
+            if (forwardButton != null)
+                forwardButton.onClick.AddListener(GoForward);
 
-			var ws = websites;
-			if (ws == null) return;
+            if (refreshButton != null)
+                refreshButton.onClick.AddListener(RefreshPage);
 
-			for (int i = 0; i < ws.Length; i++)
-			{
-				var w = ws[i];
-				if (w == null || !w.visible) continue;
+            CreateQuickAccess();
+        }
 
-				var t = Instantiate(quickAccessPrefab, quickAccessParent);
-				if (t == null) continue;
+        private void CreateQuickAccess()
+        {
+            if (websites == null) return;
 
-				var iconT = t.GetChild(0);
-				if (iconT != null)
-				{
-					var img = iconT.GetComponent<Image>();
-					if (img != null && w.page.icon != null) img.sprite = w.page.icon;
-				}
+            for (int i = 0; i < websites.Length; i++)
+            {
+                var w = websites[i];
+                if (w == null || !w.visible) continue;
 
-				var textT = t.GetChild(1);
-				if (textT != null)
-				{
-					var txt = textT.GetComponent<Text>();
-					if (txt != null && w.page != null) txt.text = w.page.websiteName;
-				}
+                var t = Instantiate(quickAccessPrefab, quickAccessParent);
+                if (t == null) continue;
 
-				var btn = t.GetComponent<Button>();
-				if (btn != null)
-				{
-					int idx = i;
-					btn.onClick.AddListener(() => QuickAccess(idx));
-				}
-			}
-		}
+                var icon = t.GetChild(0)?.GetComponent<Image>();
+                if (icon != null && w.page != null)
+                    icon.sprite = w.page.icon;
 
-		public void Home()
-		{
-			if (addressBar != null) addressBar.text = "";
-			if (home != null) home.SetActive(true);
-			if (background != null) background.enabled = true;
+                var txt = t.GetChild(1)?.GetComponent<Text>();
+                if (txt != null && w.page != null)
+                    txt.text = w.page.websiteName;
 
-			var l = loading;
-			if (l != null)
-			{
-				if (l.activeSelf)
-				{
-					StopCoroutine(loadingCoroutine);
-					l.SetActive(false);
-				}
+                int index = i;
+                t.GetComponent<Button>()?.onClick.AddListener(() => QuickAccess(index));
+            }
+        }
 
-				var w = web;
-				if (w != null)
-				{
-					var obj = w.gameObject;
-					Destroy(obj);
-					web = null;
-				}
-			}
-		}
+        public void Home()
+        {
+            if (addressBar != null)
+                addressBar.text = "";
 
-		private void QuickAccess(int index)
-		{
-			var ws = websites;
-			if (ws == null || index < 0 || index >= ws.Length) return;
-			var i = addressBar;
-			if (i == null) return;
-			var item = ws[index];
-			if (item == null) return;
-			i.text = item.url;
-			Search();
-		}
+            if (home != null)
+                home.SetActive(true);
 
-		public void Search()
-		{
-			var l = loading;
-			if (l == null) return;
-			if (l.activeSelf) StopCoroutine(loadingCoroutine);
-			var routine = LoadingAnimation();
-			loadingCoroutine = StartCoroutine(routine);
-		}
+            if (background != null)
+                background.enabled = true;
 
-		private IEnumerator LoadingAnimation()
-		{
-			if (home != null) home.SetActive(false);
-			if (loading != null) loading.SetActive(true);
-			if (background != null) background.enabled = true;
+            if (web != null)
+            {
+                Destroy(web.gameObject);
+                web = null;
+            }
 
-			if (web != null)
-			{
-				Destroy(web.gameObject);
-				web = null;
-			}
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+            if (realWebView != null)
+            {
+                realWebView.SetVisibility(false);
+                realWebView.LoadURL("about:blank");
+            }
+            usingRealWeb = false;
+#endif
+        }
 
-			var url = addressBar != null ? addressBar.text : null;
-			yield return new WaitForSeconds(2f);
+        private void QuickAccess(int index)
+        {
+            if (websites == null || index < 0 || index >= websites.Length) return;
 
-			var ws = websites;
-			if (ws != null)
-			{
-				for (int i = 0; i < ws.Length; i++)
-				{
-					var item = ws[i];
-					if (item == null) continue;
-					if (item.url == url)
-					{
-						var instance = Instantiate(item.page, content);
-						web = instance;
-						if (web != null) web.Init(system);
-						if (background != null) background.enabled = false;
-						break;
-					}
-				}
-			}
+            addressBar.text = websites[index].url;
+            Search();
+        }
 
-			if (loading != null) loading.SetActive(false);
-		}
-	}
+        public void Search()
+        {
+            if (loadingCoroutine != null)
+                StopCoroutine(loadingCoroutine);
+
+            loadingCoroutine = StartCoroutine(LoadingAnimation());
+        }
+
+        private IEnumerator LoadingAnimation()
+        {
+            if (home != null)
+                home.SetActive(false);
+
+            if (loading != null)
+                loading.SetActive(true);
+
+            if (background != null)
+                background.enabled = true;
+
+            if (web != null)
+            {
+                Destroy(web.gameObject);
+                web = null;
+            }
+
+            string url = addressBar != null ? addressBar.text : "";
+
+            yield return new WaitForSeconds(1f);
+
+            bool found = false;
+
+            if (websites != null)
+            {
+                foreach (var item in websites)
+                {
+                    if (item == null) continue;
+
+                    if (item.url == url)
+                    {
+                        var instance = Instantiate(item.page, content);
+                        web = instance;
+                        web.Init(system);
+
+                        if (background != null)
+                            background.enabled = false;
+
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            // ✅ Если сайт не внутриигровой → открываем реальный
+            if (!found && !string.IsNullOrEmpty(url))
+            {
+                if (!url.StartsWith("http"))
+                    url = "https://" + url;
+
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+
+                usingRealWeb = true;
+                currentUrl = url;
+
+                if (background != null)
+                    background.enabled = false;
+
+                realWebView.SetMargins(0, 120, 0, 0);
+                realWebView.SetVisibility(true);
+                realWebView.LoadURL(url);
+
+#else
+                Application.OpenURL(url);
+#endif
+            }
+
+            if (loading != null)
+                loading.SetActive(false);
+        }
+
+        private void GoBack()
+        {
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+            if (usingRealWeb && realWebView != null)
+                realWebView.GoBack();
+#endif
+        }
+
+        private void GoForward()
+        {
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+            if (usingRealWeb && realWebView != null)
+                realWebView.GoForward();
+#endif
+        }
+
+        private void RefreshPage()
+        {
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+            if (usingRealWeb && realWebView != null)
+                realWebView.Reload();
+#endif
+        }
+
+        private void OnDestroy()
+        {
+#if UNITY_STANDALONE_WIN || UNITY_ANDROID
+            if (realWebView != null)
+                Destroy(realWebView);
+#endif
+        }
+    }
 }
