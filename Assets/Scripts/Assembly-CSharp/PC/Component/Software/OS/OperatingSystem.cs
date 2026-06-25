@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -28,7 +28,10 @@ namespace PC.Component.Software.OS
 		[SerializeField]
 		private AudioClip shutdownSound;
 
-		[SerializeField]
+        [SerializeField]
+        private Sprite folderSprite;
+
+        [SerializeField]
 		private AudioClip errorSound;
 
 		[SerializeField]
@@ -444,61 +447,89 @@ namespace PC.Component.Software.OS
 			installedApps.Add(name);
 		}
 
-		private void AddFileIcon(File file)
-		{
-			if (file == null || fileIcons == null) return;
+        private void AddFileIcon(File file)
+        {
+            if (file == null || fileIcons == null) return;
 
-			var key = file.path;
-			if (fileIcons.ContainsKey(key))
-			{
-				UnityEngine.Debug.LogError(key + " has been added to the list!");
-				return;
-			}
+            var key = file.path;
+            if (fileIcons.ContainsKey(key))
+                return;
 
-			var icon = Instantiate(fileIconPrefab, iconParent);
-			if (icon == null) return;
+            var iconInstance = Instantiate(fileIconPrefab, iconParent);
+            if (iconInstance == null) return;
 
-			icon.Init(file, f =>
-				{
-					var ext = f.Extension();
-					if (installedApps == null || appPrefabs == null) return;
+            iconInstance.Init(file, f =>
+            {
+                // ✅ Если это папка
+                if (f.isFolder)
+                {
+                    if (runningApp != null) return;
 
-					foreach (var name in installedApps)
-					{
-						if (!appPrefabs.TryGetValue(name, out var prefab) || prefab == null) continue;
+                    if (IsAppInstalled("File Manager", out var prefab))
+                    {
+                        var app = Instantiate(prefab, appParent);
+                        app.Init(this);
+                        app.AppClosed += ResetAppState;
 
-						bool match = false;
-						if (ext == ".exe")
-						{
-							var noExt = f.NameWithoutExtension();
-							match = noExt == prefab.AppName;
-						}
-						else if (!string.IsNullOrEmpty(ext))
-						{
-							match = prefab.FileName == ext;
-						}
+                        app.Open("");
 
-						if (!match) continue;
+                        var fm = app as PC.Component.Software.FileManager;
+                        if (fm != null)
+                            fm.OpenFolderFromPath(f.path);
 
-						if (runningApp == null)
-						{
-							var app = Instantiate(prefab, appParent);
-							app.Init(this);
-							app.AppClosed += ResetAppState;
-							app.Open(f.content);
-							FocusApp(true);
-							runningApp = app;
-						}
-						break;
-					}
-				});
-			var sprite = GetFileSprite(file.path);
-			icon.Sprite = sprite;
+                        FocusApp(true);
+                        runningApp = app;
+                    }
 
-			fileIcons.Add(key, icon);
-		}
+                    return;
+                }
 
-		public Sprite GetFileSprite(string fileName)
+                // ✅ Обычные файлы
+                var ext = f.Extension();
+
+                foreach (var name in installedApps)
+                {
+                    if (!appPrefabs.TryGetValue(name, out var prefab) || prefab == null)
+                        continue;
+
+                    bool match = false;
+
+                    if (ext == ".exe")
+                    {
+                        var noExt = f.NameWithoutExtension();
+                        match = noExt == prefab.AppName;
+                    }
+                    else if (!string.IsNullOrEmpty(ext))
+                    {
+                        match = prefab.FileName == ext;
+                    }
+
+                    if (!match) continue;
+
+                    if (runningApp == null)
+                    {
+                        var app = Instantiate(prefab, appParent);
+                        app.Init(this);
+                        app.AppClosed += ResetAppState;
+                        app.Open(f.content);
+                        FocusApp(true);
+                        runningApp = app;
+                    }
+
+                    break;
+                }
+            });
+
+            // ✅ Ставим правильную иконку
+            if (file.isFolder)
+                iconInstance.Sprite = folderSprite;   // добавь поле в классе
+            else
+                iconInstance.Sprite = GetFileSprite(file.path);
+
+            fileIcons.Add(key, iconInstance);
+        }
+
+        public Sprite GetFileSprite(string fileName)
 		{
 			var ext = File.Extension(fileName);
 			if (installedApps == null || appPrefabs == null) return unknownFileSprite;
@@ -657,12 +688,20 @@ namespace PC.Component.Software.OS
 			var files = storage != null ? storage.files : null;
 			if (files == null) return;
 
-			for (int i = 0; i < files.Count; i++)
-			{
-				var f = files[i];
-				if (f != null) AddFileIcon(f);
-			}
-		}
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                if (f == null) continue;
+
+                // Только корень
+                if (f.path.Contains("/")) continue;
+
+                // Скрываем System
+                if (f.isFolder && f.path == "System") continue;
+
+                AddFileIcon(f);
+            }
+        }
 
 		public List<DeviceDetail> ListInstalledDevices()
 		{

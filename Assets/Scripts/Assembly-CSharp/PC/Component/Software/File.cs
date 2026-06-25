@@ -13,7 +13,9 @@ namespace PC.Component.Software
 
 		public bool hidden;
 
-		public int size;
+        public bool isFolder;
+
+        public int size;
 
 		public int StorageSize {
 		    get

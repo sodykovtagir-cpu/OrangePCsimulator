@@ -14,6 +14,13 @@ namespace PC.Component.Software
             public bool isFolder;
         }
 
+        private float lastClickTime;
+        private int lastClickedIndex = -1;
+        private const float doubleClickDelay = 0.3f;
+
+        [SerializeField]
+        private Button createFolderButton;
+
         [SerializeField]
         private Button storagePrefab;
 
@@ -68,6 +75,8 @@ namespace PC.Component.Software
 
         private Storage sourceStorage;
 
+        private string startFolderPath;
+
         private string sourceFolder;
 
         private int selectedFile = -1;
@@ -81,10 +90,12 @@ namespace PC.Component.Software
         private string currentFolder = "";
 
         // Системные папки
-        private readonly string[] systemFolders = new string[] { "Desktop", "Downloads", "System" };
+        private readonly string[] systemFolders = new string[] { "System" };
 
         protected override void Start()
         {
+            if (createFolderButton != null)
+                createFolderButton.onClick.AddListener(CreateFolder);
             base.Start();
 
             var os = system;
@@ -117,6 +128,42 @@ namespace PC.Component.Software
 
             SelectStorage(0);
             InitializeSystemFolders();
+            
+            if (!string.IsNullOrEmpty(startFolderPath))
+            {
+                currentFolder = startFolderPath;
+                UpdatePathText();
+                RefreshItem();
+            }
+        }
+
+        private void CreateFolder()
+        {
+            if (selectedStorage == null) return;
+
+            string baseName = "New Folder";
+            string folderName = baseName;
+            int counter = 1;
+
+            while (selectedStorage.files.Any(f => f != null &&
+                   f.path == (string.IsNullOrEmpty(currentFolder)
+                   ? folderName
+                   : currentFolder + "/" + folderName)))
+            {
+                folderName = baseName + " (" + counter + ")";
+                counter++;
+            }
+
+            string newPath = string.IsNullOrEmpty(currentFolder)
+                ? folderName
+                : currentFolder + "/" + folderName;
+
+            var folder = new File(newPath, "", false, 0);
+            folder.isFolder = true;
+
+            selectedStorage.AddFile(folder);
+
+            RefreshItem();
         }
 
         private void InitializeSystemFolders()
@@ -182,7 +229,7 @@ namespace PC.Component.Software
 
                 if (file.isFolder)
                 {
-                    button.onClick.AddListener(() => OpenFolder(capturedIndex));
+                    button.onClick.AddListener(() => OnItemClicked(capturedIndex));
                 }
                 else
                 {
@@ -221,6 +268,25 @@ namespace PC.Component.Software
 
             SelectFile(-1);
             UpdateBackButton();
+        }
+
+        private void OnItemClicked(int index)
+        {
+            if (lastClickedIndex == index && Time.time - lastClickTime < doubleClickDelay)
+            {
+                var file = GetFilesInCurrentFolder()[index];
+                if (file != null && file.isFolder)
+                {
+                    OpenFolder(index);
+                    lastClickedIndex = -1;
+                    return;
+                }
+            }
+
+            SelectFile(index);
+
+            lastClickedIndex = index;
+            lastClickTime = Time.time;
         }
 
         private List<File> GetFilesInCurrentFolder()
@@ -429,7 +495,21 @@ namespace PC.Component.Software
                 if (actualFile != null)
                 {
                     srcStorage.files.Remove(actualFile);
+                    string oldPath = actualFile.path;
                     actualFile.path = newPath;
+
+                    // Если папка — обновляем пути вложенных файлов
+                    if (actualFile.isFolder)
+                    {
+                        foreach (var f in srcStorage.files)
+                        {
+                            if (f == null) continue;
+                            if (f.path.StartsWith(oldPath + "/"))
+                            {
+                                f.path = newPath + f.path.Substring(oldPath.Length);
+                            }
+                        }
+                    }
                     target.AddFile(actualFile);
                 }
 
@@ -505,34 +585,36 @@ namespace PC.Component.Software
             var file = GetSelectedFile();
             if (file == null) return;
 
-            var newName = fileNameInput.text + extension;
-            var storage = selectedStorage;
+            Storage storage = selectedStorage;   // ✅ ОБЯЗАТЕЛЬНО
             if (storage == null || storage.files == null) return;
+
+            var newName = fileNameInput.text + extension;
 
             string newPath = string.IsNullOrEmpty(currentFolder)
                 ? newName
                 : currentFolder + "/" + newName;
 
-            // Проверка на дубликаты
-            for (int i = 0; i < storage.files.Count; i++)
-            {
-                var f = storage.files[i];
-                if (f == null) continue;
-                if (string.Equals(f.path, newPath)) return;
-            }
-
             var actualFile = storage.files.FirstOrDefault(f => f != null && f.path == file.path);
             if (actualFile == null) return;
 
+            string oldPath = actualFile.path;
             actualFile.path = newPath;
 
-            if (fileBlocks == null || selectedFile < 0 || selectedFile >= fileBlocks.Count) return;
-
-            var block = fileBlocks[selectedFile];
-            if (block.text != null)
+            // ✅ если папка — обновляем вложенные пути
+            if (actualFile.isFolder)
             {
-                block.text.text = block.isFolder ? "📁 " + newName : newName;
+                foreach (var f in storage.files)
+                {
+                    if (f == null) continue;
+
+                    if (f.path.StartsWith(oldPath + "/"))
+                    {
+                        f.path = newPath + f.path.Substring(oldPath.Length);
+                    }
+                }
             }
+
+            RefreshItem();
         }
 
         public void Delete()
@@ -574,6 +656,11 @@ namespace PC.Component.Software
             var files = GetFilesInCurrentFolder();
             if (selectedFile < 0 || selectedFile >= files.Count) return null;
             return files[selectedFile];
+        }
+
+        public void OpenFolderFromPath(string path)
+        {
+            startFolderPath = path;
         }
 
         public override void Close()
