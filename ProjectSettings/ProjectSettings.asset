@@ -163,7 +163,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
     Android: com.Yiming.PCSimulator
-    Standalone: com.Yiming.PC-Simulator
+    Standalone: com.OrangePCsimu.Orange-PC-Simulator
     iPhone: com.Yiming.PC-Simulator
   buildNumber:
     Standalone: 0
@@ -910,7 +910,7 @@ PlayerSettings:
   useDeterministicCompilation: 0
   additionalIl2CppArgs: 
   scriptingRuntimeVersion: 1
-  gcIncremental: 0
+  gcIncremental: 1
   gcWBarrierValidation: 0
   apiCompatibilityLevelPerPlatform: {}
   m_RenderingPath: 0

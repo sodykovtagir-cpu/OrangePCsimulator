@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,251 +7,154 @@ namespace PC.Component.Software
     public class Browser : App
     {
         [Serializable]
-        private class WebsiteItem
+        public class WebsiteItem
         {
             public string url;
             public Website page;
             public bool visible;
+
+            [TextArea(2, 4)]
+            public string description;
+
+            [TextArea(1, 3)]
+            public string[] keywords;
         }
 
         [Header("UI")]
-        [SerializeField] private GameObject home;
         [SerializeField] private WebsiteItem[] websites;
         [SerializeField] private InputField addressBar;
-        [SerializeField] private Transform quickAccessPrefab;
-        [SerializeField] private Transform quickAccessParent;
-        [SerializeField] private Transform content;
-        [SerializeField] private GameObject loading;
 
-        [Header("Navigation Buttons")]
-        [SerializeField] private Button backButton;
-        [SerializeField] private Button forwardButton;
-        [SerializeField] private Button refreshButton;
+        [SerializeField] private GameObject oggleHome;
+        [SerializeField] private Transform resultsContainer;
+        [SerializeField] private Transform pageContainer;
+        [SerializeField] private GameObject oggleResultPrefab;
 
-        [Header("Loading Bar")]
-        [SerializeField] private GameObject loadingBar;
+        [SerializeField] private InputField homeSearchInput;
 
-        private Coroutine loadingCoroutine;
-        private Website web;
-        private Image background;
+        [SerializeField] private GameObject resultsPage;
+        [SerializeField] private InputField resultsSearchInput;
 
-        // ✅ Реальный WebView
-        private WebViewObject realWebView;
-        private bool usingRealWeb;
-        private string currentUrl;
+        public void SearchFromResults()
+        {
+            if (resultsSearchInput == null) return;
+
+            addressBar.text = resultsSearchInput.text;  // синхронизируем верхнюю строку
+            Search();
+        }
+
+        private Website currentPage;
 
         protected override void Start()
         {
             base.Start();
-
-            if (content != null)
-                background = content.GetComponent<Image>();
-
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-
-            realWebView = gameObject.AddComponent<WebViewObject>();
-
-            realWebView.Init(
-                cb: (msg) => { },
-                err: (msg) => { Debug.Log("WebView Error: " + msg); },
-                started: (msg) =>
-                {
-                    if (loadingBar != null)
-                        loadingBar.SetActive(true);
-                },
-                hooked: (msg) => { },
-                ld: (msg) =>
-                {
-                    if (loadingBar != null)
-                        loadingBar.SetActive(false);
-                }
-            );
-
-            realWebView.SetVisibility(false);
-
-#endif
-
-            if (backButton != null)
-                backButton.onClick.AddListener(GoBack);
-
-            if (forwardButton != null)
-                forwardButton.onClick.AddListener(GoForward);
-
-            if (refreshButton != null)
-                refreshButton.onClick.AddListener(RefreshPage);
-
-            CreateQuickAccess();
+            ShowHome();
         }
 
-        private void CreateQuickAccess()
+        // ================= HOME =================
+
+        public void ShowHome()
         {
-            if (websites == null) return;
-
-            for (int i = 0; i < websites.Length; i++)
-            {
-                var w = websites[i];
-                if (w == null || !w.visible) continue;
-
-                var t = Instantiate(quickAccessPrefab, quickAccessParent);
-                if (t == null) continue;
-
-                var icon = t.GetChild(0)?.GetComponent<Image>();
-                if (icon != null && w.page != null)
-                    icon.sprite = w.page.icon;
-
-                var txt = t.GetChild(1)?.GetComponent<Text>();
-                if (txt != null && w.page != null)
-                    txt.text = w.page.websiteName;
-
-                int index = i;
-                t.GetComponent<Button>()?.onClick.AddListener(() => QuickAccess(index));
-            }
+            ClearPage();
+            oggleHome.SetActive(true);
         }
 
-        public void Home()
-        {
-            if (addressBar != null)
-                addressBar.text = "";
-
-            if (home != null)
-                home.SetActive(true);
-
-            if (background != null)
-                background.enabled = true;
-
-            if (web != null)
-            {
-                Destroy(web.gameObject);
-                web = null;
-            }
-
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-            if (realWebView != null)
-            {
-                realWebView.SetVisibility(false);
-                realWebView.LoadURL("about:blank");
-            }
-            usingRealWeb = false;
-#endif
-        }
-
-        private void QuickAccess(int index)
-        {
-            if (websites == null || index < 0 || index >= websites.Length) return;
-
-            addressBar.text = websites[index].url;
-            Search();
-        }
+        // ================= SEARCH =================
 
         public void Search()
         {
-            if (loadingCoroutine != null)
-                StopCoroutine(loadingCoroutine);
+            string query = addressBar.text.ToLower();
 
-            loadingCoroutine = StartCoroutine(LoadingAnimation());
+            if (string.IsNullOrEmpty(query))
+                return;
+
+            ShowResults(query);
         }
 
-        private IEnumerator LoadingAnimation()
+        public void SearchFromHome()
         {
-            if (home != null)
-                home.SetActive(false);
+            if (homeSearchInput == null) return;
 
-            if (loading != null)
-                loading.SetActive(true);
+            addressBar.text = homeSearchInput.text;
+            Search();
+        }
 
-            if (background != null)
-                background.enabled = true;
+        private void ShowResults(string query)
+        {
+            ClearPage();
 
-            if (web != null)
+            oggleHome.SetActive(false);
+            resultsPage.SetActive(true);
+
+            resultsSearchInput.text = query; // показываем текст запроса
+
+            for (int i = resultsContainer.childCount - 1; i >= 0; i--)
+                Destroy(resultsContainer.GetChild(i).gameObject);
+
+            foreach (var site in websites)
             {
-                Destroy(web.gameObject);
-                web = null;
-            }
+                if (!site.visible) continue;
 
-            string url = addressBar != null ? addressBar.text : "";
-
-            yield return new WaitForSeconds(1f);
-
-            bool found = false;
-
-            if (websites != null)
-            {
-                foreach (var item in websites)
+                if (Matches(site, query))
                 {
-                    if (item == null) continue;
+                    var capturedSite = site;
 
-                    if (item.url == url)
+                    var result = Instantiate(oggleResultPrefab, resultsContainer);
+
+                    var item = result.GetComponent<OggleResultItem>();
+                    item.title.text = site.url;
+                    item.description.text = site.description;
+
+                    result.GetComponent<Button>().onClick.AddListener(() =>
                     {
-                        var instance = Instantiate(item.page, content);
-                        web = instance;
-                        web.Init(system);
+                        OpenSite(capturedSite);
+                    });
+                }
+            }
+        }
 
-                        if (background != null)
-                            background.enabled = false;
+        // ================= OPEN SITE =================
 
-                        found = true;
-                        break;
-                    }
+        private void OpenSite(WebsiteItem site)
+        {
+            ClearPage();
+
+            oggleHome.SetActive(false);
+
+            var instance = Instantiate(site.page, pageContainer);
+            currentPage = instance;
+            currentPage.Init(system);
+        }
+
+        // ================= CLEAR =================
+
+        private void ClearPage()
+        {
+            resultsPage.SetActive(false);
+
+            if (currentPage != null)
+            {
+                Destroy(currentPage.gameObject);
+                currentPage = null;
+            }
+        }
+
+        // ================= MATCH =================
+
+        private bool Matches(WebsiteItem site, string query)
+        {
+            if (site.url.ToLower().Contains(query))
+                return true;
+
+            if (site.keywords != null)
+            {
+                foreach (var word in site.keywords)
+                {
+                    if (word.ToLower().Contains(query))
+                        return true;
                 }
             }
 
-            // ✅ Если сайт не внутриигровой → открываем реальный
-            if (!found && !string.IsNullOrEmpty(url))
-            {
-                if (!url.StartsWith("http"))
-                    url = "https://" + url;
-
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-
-                usingRealWeb = true;
-                currentUrl = url;
-
-                if (background != null)
-                    background.enabled = false;
-
-                realWebView.SetMargins(0, 120, 0, 0);
-                realWebView.SetVisibility(true);
-                realWebView.LoadURL(url);
-
-#else
-                Application.OpenURL(url);
-#endif
-            }
-
-            if (loading != null)
-                loading.SetActive(false);
-        }
-
-        private void GoBack()
-        {
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-            if (usingRealWeb && realWebView != null)
-                realWebView.GoBack();
-#endif
-        }
-
-        private void GoForward()
-        {
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-            if (usingRealWeb && realWebView != null)
-                realWebView.GoForward();
-#endif
-        }
-
-        private void RefreshPage()
-        {
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-            if (usingRealWeb && realWebView != null)
-                realWebView.Reload();
-#endif
-        }
-
-        private void OnDestroy()
-        {
-#if UNITY_STANDALONE_WIN || UNITY_ANDROID
-            if (realWebView != null)
-                Destroy(realWebView);
-#endif
+            return false;
         }
     }
 }
