@@ -10,6 +10,7 @@ namespace PC.Component.Software.OS
 {
     public class OperatingSystem : ComputerSystem
     {
+        [Serializable]
         private class User
         {
             public string userPicturePath;
@@ -60,6 +61,7 @@ namespace PC.Component.Software.OS
 
         private bool busy;
         private bool error;
+        private bool startMenuOpened;
         private bool running;
         private int storageScore;
         private CoverImage background;
@@ -175,6 +177,7 @@ namespace PC.Component.Software.OS
 
         private void Desktop()
         {
+            Debug.Log("customBackgroundPath = " + userData.customBackgroundPath);
             if (userData == null || texDesktop == null) return;
 
             // Логика загрузки обоев (стандартные или кастомные)
@@ -211,6 +214,18 @@ namespace PC.Component.Software.OS
                 taskbar.SetActive(true);
 
             InitializeTaskbar();
+            
+            startMenuOpened = false;
+
+            if (startMenu != null)
+            {
+                startMenu.SetActive(false);
+            }
+
+            if (startMenuAnimator != null)
+            {
+                startMenuAnimator.SetBool("Open", false);
+            }
         }
 
         // Установка внутриигровой картинки как обои
@@ -726,6 +741,7 @@ namespace PC.Component.Software.OS
 
         private void SaveUserData()
         {
+            Debug.Log(JsonUtility.ToJson(userData));
             var fm = FileManager;
             var content = JsonUtility.ToJson(userData);
             if (fm == null) return;
@@ -771,8 +787,15 @@ namespace PC.Component.Software.OS
         private List<App> runningApps = new List<App>();
         private float gameTime;
 
+        private bool taskbarInitialized;
+
         private void InitializeTaskbar()
         {
+            if (taskbarInitialized)
+                return;
+
+            taskbarInitialized = true;
+
             if (startButton != null)
                 startButton.onClick.AddListener(ToggleStartMenu);
 
@@ -798,25 +821,40 @@ namespace PC.Component.Software.OS
 
         private void ToggleStartMenu()
         {
-            if (startMenu == null) return;
+            Debug.Log("StartMenu Animator = " + startMenuAnimator);
+            Debug.Log("Controller = " +
+                (startMenuAnimator != null
+                    ? startMenuAnimator.runtimeAnimatorController
+                    : null));
+            if (startMenu == null)
+                return;
 
-            bool open = !startMenu.activeSelf;
+            startMenuOpened = !startMenuOpened;
 
-            startMenu.SetActive(true);
+            if (startMenuOpened)
+            {
+                startMenu.SetActive(true);
+                startMenu.transform.SetAsLastSibling();
 
-            if (startMenuAnimator != null)
-                startMenuAnimator.SetBool("Open", open);
+                if (startMenuAnimator != null)
+                    startMenuAnimator.SetBool("Open", true);
 
-            if (!open)
-                StartCoroutine(HideStartAfterAnim());
-            else
                 RefreshStartMenu();
+            }
+            else
+            {
+                if (startMenuAnimator != null)
+                    startMenuAnimator.SetBool("Open", false);
+
+                StartCoroutine(HideStartAfterAnim());
+            }
         }
 
         private IEnumerator HideStartAfterAnim()
         {
-            yield return new WaitForSeconds(0.25f);
-            if (startMenu != null)
+            yield return new WaitForSeconds(0.3f);
+
+            if (!startMenuOpened && startMenu != null)
                 startMenu.SetActive(false);
         }
 
@@ -894,6 +932,20 @@ namespace PC.Component.Software.OS
                         app.transform.SetAsLastSibling();
                 });
             }
+        }
+
+        public void ImportWallpaperFromDevice(byte[] imageBytes)
+        {
+            if (FileManager == null || imageBytes == null)
+                return;
+
+            string content = Convert.ToBase64String(imageBytes);
+
+            FileManager.Write(0, "System/Wallpaper.pic", content);
+
+            userData.customBackgroundPath = "System/Wallpaper.pic";
+            SaveUserData();
+            Desktop();
         }
 
         private void EnableTaskbar()

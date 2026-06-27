@@ -104,20 +104,26 @@ public class CoverImage : MaskableGraphic
 		return new UnityEngine.Vector4(xMin, yMin, xMax, yMax);
 	}
 
-	private Vector4 CalculateAspectRatio(UnityEngine.Rect rect, UnityEngine.Vector2 spriteSize)
-	{
-		float spriteAspect = spriteSize.x / spriteSize.y;
-		float rectAspect = rect.width / rect.height;
+    private Vector4 CalculateAspectRatio(Rect rect, Vector2 spriteSize)
+    {
+        float spriteAspect = spriteSize.x / spriteSize.y;
+        float rectAspect = rect.width / rect.height;
 
-		if (spriteAspect < rectAspect)
-		{
-			float half = (rectAspect / spriteAspect) * 0.5f;
-			return new UnityEngine.Vector4(0.5f - half, 0f, 0.5f + half, 1f);
-		}
-		else
-		{
-			float half = (spriteAspect / rectAspect) * 0.5f;
-			return new UnityEngine.Vector4(0f, 0.5f - half, 1f, 0.5f + half);
-		}
-	}
+        // Картинка шире экрана - обрезаем слева и справа
+        if (spriteAspect > rectAspect)
+        {
+            float visibleWidth = rectAspect / spriteAspect;
+            float x = (1f - visibleWidth) * 0.5f;
+
+            return new Vector4(x, 0f, x + visibleWidth, 1f);
+        }
+        // Картинка выше экрана - обрезаем сверху и снизу
+        else
+        {
+            float visibleHeight = spriteAspect / rectAspect;
+            float y = (1f - visibleHeight) * 0.5f;
+
+            return new Vector4(0f, y, 1f, y + visibleHeight);
+        }
+    }
 }

@@ -17,6 +17,9 @@ namespace PC.Component.Software
         [SerializeField]
         private RawImage userPicture;
 
+        [SerializeField] 
+        private GameObject wallpaperDialog;
+
         [SerializeField]
         private InputField userNameInput;
 
@@ -115,6 +118,34 @@ namespace PC.Component.Software
             i.ActivateInputField();
         }
 
+        public void OpenWallpaperDialog()
+        {
+            if (wallpaperDialog != null)
+                wallpaperDialog.SetActive(true);
+        }
+
+        public void SelectWallpaperFromSystem()
+        {
+            var os = system as GameOS;
+            if (os == null) return;
+
+            os.SelectFile(".pic", file =>
+            {
+                if (file == null) return;
+
+                os.SetCustomBackgroundPath(file.path);
+
+                if (wallpaperDialog != null)
+                    wallpaperDialog.SetActive(false);
+            });
+        }
+
+        public void CloseWallpaperDialog()
+        {
+            if (wallpaperDialog != null)
+                wallpaperDialog.SetActive(false);
+        }
+
         public void OnEndEditUserName(string name)
         {
             var os = system as GameOS;
@@ -151,6 +182,24 @@ namespace PC.Component.Software
             if (st == null) return;
             st.password = password;
             StartCoroutine(DisableInput(passwordInput));
+        }
+
+        public void SelectWallpaperFromDevice()
+        {
+            var os = system as GameOS;
+            if (os == null)
+                return;
+
+            NativeGallery.GetImageFromGallery(path =>
+            {
+                if (string.IsNullOrEmpty(path))
+                    return;
+
+                byte[] bytes = System.IO.File.ReadAllBytes(path);
+
+                os.ImportWallpaperFromDevice(bytes);
+
+            }, "Выберите изображение", "image/*");
         }
 
         private IEnumerator DisableInput(InputField input)

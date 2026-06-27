@@ -1,57 +1,35 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System.Collections.Generic;
+using System.IO;
 
 namespace PC.Component.Software
 {
     public class Paint : App
     {
-        [SerializeField]
-        private InputField canvasWidthInput;
+        [Header("UI References")]
+        [SerializeField] private InputField canvasWidthInput;
+        [SerializeField] private InputField canvasHeightInput;
+        [SerializeField] private GameObject newDocument;
+        [SerializeField] private GameObject workspace;
+        [SerializeField] private Button createButton;
+        [SerializeField] private RawImage display;
+        [SerializeField] private RectTransform canvasTransform;
+        [SerializeField] private Button colorPrefab;
+        [SerializeField] private Transform colorParent;
+        [SerializeField] private ColorPicker colorPicker;
 
-        [SerializeField]
-        private InputField canvasHeightInput;
-
-        [SerializeField]
-        private GameObject newDocument;
-
-        [SerializeField]
-        private GameObject workspace;
-
-        [SerializeField]
-        private Button createButton;
-
-        [SerializeField]
-        private EventTrigger canvas;
-
-        [SerializeField]
-        private RawImage display;
-
-        [SerializeField]
-        private RectTransform canvasTransform;
-
-        [SerializeField]
-        private Button colorPrefab;
-
-        [SerializeField]
-        private Transform colorParent;
-
-        [SerializeField]
-        private Color[] allColors;
-
-        [SerializeField]
-        private ColorPicker colorPicker;
-
-        [SerializeField]
-        private Vector2Int minCanvasSize = new Vector2Int(1, 1);
-
-        [SerializeField]
-        private Vector2Int maxCanvasSize = new Vector2Int(70, 70);
+        [Header("Settings")]
+        [SerializeField] private Color[] allColors;
+        [SerializeField] private Vector2Int minCanvasSize = new Vector2Int(1, 1);
+        [SerializeField] private Vector2Int maxCanvasSize = new Vector2Int(70, 70);
 
         private Vector2Int canvasSize;
         private Texture2D texture;
         private Vector2 lastPoint;
         private bool first;
+        private bool isDrawing; // Флаг рисования
         private Color drawColor = new Color(0, 0, 0, 1);
         private Image[] colorImages;
 
@@ -61,13 +39,36 @@ namespace PC.Component.Software
         {
             base.Open(content);
             if (string.IsNullOrEmpty(content)) return;
+
             var bytes = System.Convert.FromBase64String(content);
             LoadTexture(bytes);
             var t = texture;
-            var w = t.width;
-            var h = t.height;
-            SetCanvasSize(w, h);
+            if (t != null) SetCanvasSize(t.width, t.height);
             InitWorkspace();
+        }
+
+        private void Update()
+        {
+            // Логика рисования мышью/тачем
+            if (texture == null || canvasTransform == null || workspace == null || !workspace.activeSelf) return;
+
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (IsOverCanvas())
+                {
+                    first = true;
+                    isDrawing = true;
+                    Draw(Input.mousePosition);
+                }
+            }
+            else if (Input.GetMouseButton(0) && isDrawing)
+            {
+                Draw(Input.mousePosition);
+            }
+            else if (Input.GetMouseButtonUp(0))
+            {
+                isDrawing = false;
+            }
         }
 
         public void ApplyPreset(int i)
@@ -136,21 +137,8 @@ namespace PC.Component.Software
             if (newDocument != null) newDocument.SetActive(false);
             if (workspace != null) workspace.SetActive(true);
 
-            var et = canvas;
-            if (et != null)
-            {
-                et.triggers.Clear(); // Очищаем старые триггеры для безопасности
-
-                var down = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
-                down.callback.AddListener(_ => PointerDown(_));
-                var drag = new EventTrigger.Entry { eventID = EventTriggerType.Drag };
-                drag.callback.AddListener(_ => Drag(_));
-
-                et.triggers.Add(down);
-                et.triggers.Add(drag);
-            }
-
-            if (allColors != null)
+            // Создаем кнопки цветов (один раз при инициализации)
+            if (allColors != null && (colorImages == null || colorImages.Length == 0))
             {
                 colorImages = new Image[allColors.Length];
                 for (int i = 0; i < allColors.Length; i++)
@@ -161,8 +149,8 @@ namespace PC.Component.Software
                     int idx = i;
                     if (btn != null) btn.onClick.AddListener(() => SelectColor(idx));
                 }
-                RefreshColors();
             }
+            RefreshColors();
 
             var os = system;
             if (os != null) os.ShowMenuBar(this);
@@ -173,9 +161,9 @@ namespace PC.Component.Software
             int w = canvasSize.x;
             int h = canvasSize.y;
 
-            var tex = new UnityEngine.Texture2D(w, h, UnityEngine.TextureFormat.RGBA32, false);
-            var pixels = new UnityEngine.Color[w * h];
-            var white = UnityEngine.Color.white;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            var pixels = new Color[w * h];
+            var white = Color.white;
             for (int i = 0; i < pixels.Length; i++) pixels[i] = white;
             tex.SetPixels(pixels);
             tex.Apply();
@@ -196,31 +184,51 @@ namespace PC.Component.Software
             }
         }
 
-        private void PointerDown(BaseEventData eventData)
+        // ПРОВЕРКА: Можно ли рисовать в этой точке?
+        private bool IsOverCanvas()
         {
-            first = true;
-            var ped = eventData as PointerEventData;
-            if (ped != null) Draw(ped.position);
+            if (canvasTransform == null) return false;
+
+            Camera cam = GetCanvasCamera();
+
+            // Не попали в прямоугольник холста
+            if (!RectTransformUtility.RectangleContainsScreenPoint(canvasTransform, Input.mousePosition, cam))
+                return false;
+
+            // Попали в другой UI элемент (кнопка, панель с инструментами)
+            if (EventSystem.current != null)
+            {
+                var ped = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
+                var results = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(ped, results);
+
+                foreach (var r in results)
+                {
+                    // Если элемент является кнопкой, инпутом и т.д. — блокируем рисование
+                    if (r.gameObject.GetComponent<Selectable>() || r.gameObject.GetComponentInParent<Selectable>())
+                        return false;
+                }
+            }
+
+            return true;
         }
 
-        private void Drag(BaseEventData eventData)
-        {
-            var ped = eventData as PointerEventData;
-            if (ped == null) return;
-            Draw(ped.position);
-        }
-
-        // ОРИГИНАЛЬНАЯ ЛОГИКА РИСОВАНИЯ
-        private void Draw(Vector2 position)
+        private void Draw(Vector2 screenPosition)
         {
             if (canvasTransform == null || texture == null) return;
 
+            Camera cam = GetCanvasCamera();
+
             Vector2 local;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasTransform, position, null, out local);
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasTransform, screenPosition, cam, out local))
+                return;
 
             var rect = canvasTransform.rect;
             var size = rect.size;
-            var pos = local + size * 0.5f;
+            if (size.x <= 0f || size.y <= 0f) return;
+
+            // Правильная конвертация независимо от Pivot
+            var pos = local - rect.min;
 
             float px = pos.x / size.x * canvasSize.x;
             float py = pos.y / size.y * canvasSize.y;
@@ -228,36 +236,38 @@ namespace PC.Component.Software
             if (first)
             {
                 lastPoint = new Vector2(px, py);
-                texture.SetPixel(Mathf.RoundToInt(px), Mathf.RoundToInt(py), drawColor);
+                SetPixelSafe(Mathf.RoundToInt(px), Mathf.RoundToInt(py));
                 first = false;
             }
             else
             {
                 var current = new Vector2(px, py);
-                DrawLine(texture, lastPoint, current, drawColor);
+                DrawLine(lastPoint, current);
                 lastPoint = current;
             }
 
             texture.Apply();
         }
 
-        private void DrawLine(Texture2D tex, Vector2 p1, Vector2 p2, Color col)
+        private void DrawLine(Vector2 p1, Vector2 p2)
         {
-            if (tex == null) return;
-
             float dx = p2.x - p1.x;
             float dy = p2.y - p1.y;
-            int steps = Mathf.Max(1, Mathf.CeilToInt(
-                Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy))
-            ));
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy))));
 
             for (int i = 0; i <= steps; i++)
             {
                 float t = i / (float)steps;
-                int x = (int)(p1.x + dx * t);
-                int y = (int)(p1.y + dy * t);
-                tex.SetPixel(x, y, col);
+                int x = Mathf.RoundToInt(p1.x + dx * t);
+                int y = Mathf.RoundToInt(p1.y + dy * t);
+                SetPixelSafe(x, y);
             }
+        }
+
+        private void SetPixelSafe(int x, int y)
+        {
+            if (texture != null && x >= 0 && x < canvasSize.x && y >= 0 && y < canvasSize.y)
+                texture.SetPixel(x, y, drawColor);
         }
 
         private void SelectColor(int index)
@@ -282,7 +292,6 @@ namespace PC.Component.Software
                 colors[0] = c;
                 RefreshColors();
 
-                // ИСПРАВЛЕНИЕ: Прячем колесо цветов после выбора, чтобы не блокировало экран
                 if (picker != null) picker.gameObject.SetActive(false);
             });
         }
@@ -349,20 +358,29 @@ namespace PC.Component.Software
             var source = new Rect(0f, 0f, targetX, targetY);
             texture2D.ReadPixels(source, 0, 0);
             texture2D.Apply();
+            RenderTexture.active = null; // Очистка во избежание утечек памяти
+            rt.Release();
         }
 
         public override void Close()
         {
-            // ИСПРАВЛЕНИЕ: Удаляем колесо цветов с рабочего стола при закрытии Paint
             if (colorPicker != null && colorPicker.gameObject.activeSelf)
-            {
                 colorPicker.gameObject.SetActive(false);
-            }
 
             if (display != null) display.texture = null;
             var tex = texture;
             if (tex != null) Destroy(tex);
+
             base.Close();
+        }
+
+        // Вспомогательный метод для определения камеры Canvas
+        private Camera GetCanvasCamera()
+        {
+            var c = canvasTransform != null ? canvasTransform.GetComponentInParent<Canvas>() : null;
+            if (c != null && c.renderMode != RenderMode.ScreenSpaceOverlay)
+                return c.worldCamera;
+            return null;
         }
     }
 }

@@ -46,12 +46,19 @@ public class Item : MonoBehaviour, ISave
 
 	public event Action SlotDisconnected;
 
-	protected virtual void Start()
-	{
-		if (Id == 0) Id = Main.Instance.GetNewId(this);
-	}
+    protected virtual void Start()
+    {
+        if (Main.Instance == null)
+        {
+            Debug.LogWarning($"Main.Instance == null для {name}");
+            return;
+        }
 
-	public virtual string GetInfo()
+        if (Id == 0)
+            Id = Main.Instance.GetNewId(this);
+    }
+
+    public virtual string GetInfo()
 	{
 		if (string.IsNullOrEmpty(info))
 			return info;
