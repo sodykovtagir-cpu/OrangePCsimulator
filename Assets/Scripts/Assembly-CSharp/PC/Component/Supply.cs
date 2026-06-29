@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,7 +16,23 @@ namespace PC.Component
 		[SerializeField]
 		private bool sound;
 
-		private AudioSource source;
+        [Header("=== Burn Settings ===")]
+        [SerializeField] private Color burnedColor = Color.black;
+        [SerializeField] private GameObject burnParticle;
+        [SerializeField] private float burnTime = 3f;
+
+        [Header("=== Explosion Settings ===")]
+        [SerializeField] private bool canExplode = false;
+        [SerializeField] private GameObject explodeEffect;
+
+        [Header("Explosion Physics")]
+        [SerializeField] private float explosionForce = 800f;
+        [SerializeField] private float explosionRadius = 3f;
+        [SerializeField] private float upwardsModifier = 0.5f;
+
+        private bool burning = false;
+
+        private AudioSource source;
 
 		private FanSpin fan;
 
@@ -67,17 +83,99 @@ namespace PC.Component
 			}
 		}
 
-		public void Overload()
-		{
-			base.Damage();
+        public void Overload()
+        {
+            if (Damaged || burning)
+                return;
 
-			var t = transform;
-			if (t == null || spark == null)
-				return;
+            burning = true;
 
-			var rotation = spark.transform != null ? spark.transform.rotation : Quaternion.identity;
-			var obj = Instantiate(spark, t.position, rotation, t);
-			Destroy(obj, 4f);
-		}
-	}
+            base.Damage(); // ставит Broken статус
+
+            if (spark != null)
+            {
+                var obj = Instantiate(spark, transform.position, transform.rotation, transform);
+                Destroy(obj, 4f);
+            }
+
+            StartCoroutine(BurnRoutine());
+        }
+
+        public override void Damage()
+        {
+            base.Damage();
+            StartCoroutine(RenderBurn());
+        }
+
+        private IEnumerator BurnRoutine()
+        {
+            // просто останавливаем звук
+            if (source != null)
+                source.Stop();
+
+            GameObject burnObj = null;
+
+            if (burnParticle != null)
+                burnObj = Instantiate(burnParticle, transform);
+
+            yield return new WaitForSeconds(burnTime);
+
+            if (canExplode)
+            {
+                Explode();
+            }
+        }
+
+        private void Explode()
+        {
+            // визуальный эффект
+            if (explodeEffect != null)
+                Instantiate(explodeEffect, transform.position, transform.rotation);
+
+            // физический взрыв
+            Collider[] colliders = Physics.OverlapSphere(transform.position, explosionRadius);
+
+            foreach (Collider col in colliders)
+            {
+                // толкаем rigidbody
+                Rigidbody rb = col.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.AddExplosionForce(
+                        explosionForce,
+                        transform.position,
+                        explosionRadius,
+                        upwardsModifier,
+                        ForceMode.Impulse
+                    );
+                }
+
+                // если рядом другой Hardware — ломаем его
+                Hardware hw = col.GetComponent<Hardware>();
+                if (hw != null && !hw.Damaged)
+                {
+                    hw.Damage();
+                }
+            }
+        }
+
+        private IEnumerator RenderBurn()
+        {
+            var renderer = GetComponent<Renderer>();
+            if (renderer == null)
+                yield break;
+
+            var mat = renderer.material;
+            Color startColor = mat.color;
+
+            float t = 0f;
+
+            while (t < 1f)
+            {
+                t += Time.deltaTime;
+                mat.color = Color.Lerp(startColor, burnedColor, t);
+                yield return null;
+            }
+        }
+    }
 }

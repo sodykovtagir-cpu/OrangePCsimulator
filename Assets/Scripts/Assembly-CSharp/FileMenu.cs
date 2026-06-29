@@ -116,9 +116,9 @@ public class FileMenu : MonoBehaviour
 
 public void Import()
 {
-	string[] exts = new string[] { ".opc", ".pc" };
+        string[] exts = new string[] { "*/*" };
 
-	bool CanReadFile(string path)
+        bool CanReadFile(string path)
 	{
 		try
 		{

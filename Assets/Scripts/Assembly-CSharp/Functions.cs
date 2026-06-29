@@ -84,35 +84,38 @@ public class Functions : MonoBehaviour
 
 	private void Update() {}
 
-	public void Zoom()
-	{
-		var wasZoom = isZoom;
-		isZoom = !isZoom;
+    public void Zoom()
+    {
+        isZoom = !isZoom;
 
-		var cam = UnityEngine.Camera.main;
-		if (cam == null) return;
+        var cam = Camera.main;
+        if (cam == null)
+            return;
 
-		if (!wasZoom)
-		{
-			cam.fieldOfView = 20f;
-			if (zoomImage != null)
-			{
-				zoomImage.sprite = zoomOutSprite;
-				zoomImage.color = new UnityEngine.Color(1f, 0f, 0f, 1f);
-			}
-		}
-		else
-		{
-			cam.fieldOfView = 60f;
-			if (zoomImage != null)
-			{
-				zoomImage.sprite = zoomInSprite;
-				zoomImage.color = UnityEngine.Color.white;
-			}
-		}
-	}
+        if (isZoom)
+        {
+            cam.fieldOfView = 20f;
 
-	public void LockRotation()
+            if (zoomImage != null)
+            {
+                zoomImage.sprite = zoomOutSprite;
+                zoomImage.color = Color.red;
+            }
+        }
+        else
+        {
+            float savedFov = PlayerPrefs.GetFloat("FOV", 60f);
+            cam.fieldOfView = savedFov;
+
+            if (zoomImage != null)
+            {
+                zoomImage.sprite = zoomInSprite;
+                zoomImage.color = Color.white;
+            }
+        }
+    }
+
+    public void LockRotation()
 	{
 		var rc = raycast;
 		if (rc == null) return;

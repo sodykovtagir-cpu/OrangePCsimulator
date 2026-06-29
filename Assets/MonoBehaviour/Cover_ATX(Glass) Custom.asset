@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: Apson A3
+  m_Name: Cover_ATX(Glass) Custom
   m_EditorClassIdentifier: 
-  itemName: Apson A3
-  price: 1100
-  bitcoin: 5
-  sprite: {fileID: 21300000, guid: 9277d4e5958ccd244abef715fe4595cc, type: 2}
-  spawn: {fileID: 1384044390745990, guid: 532183b4ad5ec6d41beb152726f7c35e, type: 3}
+  itemName: '{Glass} (ATX)'
+  price: 60
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 9120fa10d2182ef479bea4aa09d8b70a, type: 2}
+  spawn: {fileID: 1883777072470156, guid: 0bd7f325f7c3ab148bd437fbeff45c2c, type: 2}
   large: 1
   translateDescription: 1
-  description: Can print 64x64 max
+  description: 

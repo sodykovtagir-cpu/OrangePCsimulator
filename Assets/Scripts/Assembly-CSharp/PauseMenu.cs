@@ -28,33 +28,50 @@ public class PauseMenu : MonoBehaviour
 
 	private static int videoCount;
 
-	private void Start()
-	{
-		if (volumeSlider != null) volumeSlider.value = PlayerPrefs.GetFloat("Volume", 1f);
+    private void Start()
+    {
+        if (volumeSlider != null)
+            volumeSlider.value = PlayerPrefs.GetFloat("Volume", 1f);
 
-		if (sensitivitySlider != null)
-		{
-			var p = Player.Instance;
-			if (p != null) sensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", p.Sensitivity);
-		}
+        if (sensitivitySlider != null)
+        {
+            var p = Player.Instance;
+            if (p != null)
+                sensitivitySlider.value = PlayerPrefs.GetFloat("Sensitivity", p.Sensitivity);
+        }
 
         if (fovSlider != null)
         {
             Camera cam = Camera.main;
+
             if (cam != null)
-                fovSlider.value = PlayerPrefs.GetFloat("FOV", cam.fieldOfView);
+            {
+                float fov = PlayerPrefs.GetFloat("FOV", cam.fieldOfView);
+                cam.fieldOfView = fov;
+                fovSlider.value = fov;
+            }
         }
 
-        if (volumeSlider != null) OnVolumeChanged(volumeSlider.value);
-		if (sensitivitySlider != null) OnSensitivityChanged(sensitivitySlider.value);
-        if (fovSlider != null) OnFOVChanged(fovSlider.value);
+        if (volumeSlider != null)
+            OnVolumeChanged(volumeSlider.value);
 
-        if (volumeSlider != null) volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
-		if (sensitivitySlider != null) sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
-        if (fovSlider != null) fovSlider.onValueChanged.AddListener(OnFOVChanged);
+        if (sensitivitySlider != null)
+            OnSensitivityChanged(sensitivitySlider.value);
+
+        if (fovSlider != null)
+            OnFOVChanged(fovSlider.value);
+
+        if (volumeSlider != null)
+            volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+
+        if (sensitivitySlider != null)
+            sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
+
+        if (fovSlider != null)
+            fovSlider.onValueChanged.AddListener(OnFOVChanged);
     }
 
-	public void ExitWithoutSave()
+    public void ExitWithoutSave()
 	{
 		warningDialog.Show(() =>
 		{
@@ -97,6 +114,9 @@ public class PauseMenu : MonoBehaviour
 
         if (cam != null)
             cam.fieldOfView = value;
+
+        PlayerPrefs.SetFloat("FOV", value);
+        PlayerPrefs.Save();
 
         var t = Localization.GetText("FOV");
         fovText.text = t + ": " + value.ToString("0");

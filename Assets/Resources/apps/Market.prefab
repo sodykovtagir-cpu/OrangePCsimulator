@@ -568,6 +568,7 @@ MonoBehaviour:
   randomSelectionPrefab: {fileID: 114172331224449144, guid: aeab0cadced5ed944963662417d1a13b, type: 3}
   items:
   - {fileID: 11400000, guid: 2cbe603d32f833943a8c31d35ce50883, type: 2}
+  - {fileID: 11400000, guid: b8b1eed59d35b484fa53db836ef8516e, type: 2}
   - {fileID: 11400000, guid: 2b78665034750de4b8ce8959121e5c80, type: 2}
   - {fileID: 11400000, guid: 97d94a7bc67fd85408621cc4792534b7, type: 2}
   - {fileID: 11400000, guid: 22d75e8ff23c4ab48aff15f100d1fb70, type: 2}

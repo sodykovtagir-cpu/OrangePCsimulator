@@ -23,7 +23,7 @@ namespace PC.Component.Software
         [Header("Settings")]
         [SerializeField] private Color[] allColors;
         [SerializeField] private Vector2Int minCanvasSize = new Vector2Int(1, 1);
-        [SerializeField] private Vector2Int maxCanvasSize = new Vector2Int(70, 70);
+        [SerializeField] private Vector2Int maxCanvasSize = new Vector2Int(1024, 1024);
 
         private Vector2Int canvasSize;
         private Texture2D texture;

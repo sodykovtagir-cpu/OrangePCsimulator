@@ -142,9 +142,18 @@ namespace PC.Component.Software.OS
             User ud;
 
             if (fm != null && fm.TryGetFile(0, "System/user", out uf) && uf != null)
+            {
                 ud = JsonUtility.FromJson<User>(uf.content);
+
+                Debug.Log("Содержимое System/user:");
+                Debug.Log(uf.content);
+
+                Debug.Log("После загрузки customBackgroundPath = " + ud.customBackgroundPath);
+            }
             else
+            {
                 ud = new User { userName = "User" };
+            }
 
             userData = ud;
 

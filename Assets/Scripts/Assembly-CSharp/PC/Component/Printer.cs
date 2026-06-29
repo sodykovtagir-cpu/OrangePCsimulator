@@ -30,7 +30,15 @@ namespace PC.Component
 		[SerializeField]
 		private Transform pivot;
 
-		[SerializeField]
+        [SerializeField]
+        private int maxResolution = 64;
+
+        public int MaxResolution => maxResolution;
+
+        [SerializeField]
+        private float printSpeed = 1f;
+
+        [SerializeField]
 		private float[] printStepIntervals;
 
 		[SerializeField]
