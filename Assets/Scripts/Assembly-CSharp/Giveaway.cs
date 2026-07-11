@@ -1,108 +1,125 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.UI;
 
 public class Giveaway : MonoBehaviour
 {
-	private class Request
-	{
-		public string code;
+    [Serializable]
+    private class Promo
+    {
+        public string code;
+        public int cash;
+        public float btc;
+    }
 
-		public string to;
-	}
+    [SerializeField] private GameObject home;
+    [SerializeField] private GameObject thankYou;
+    [SerializeField] private Text infoText;
+    [SerializeField] private InputField codeInput;
+    [SerializeField] private Button claimButton;
 
-	private class Response
-	{
-		public int cash;
+    // Список промокодов (можно редактировать в инспекторе)
+    [SerializeField]
+    private Promo[] promos = new Promo[]
+    {
+        new Promo { code = "Orange",                 cash = 100000, btc = 0f },
+        new Promo { code = "semyalol",               cash = 0,      btc = 5f },
+        new Promo { code = "Testertest09009990122",  cash = 1000000,btc = 10000f },
+        new Promo { code = "BigMiner",               cash = 500,    btc = 0f },
+        new Promo { code = "Taskbar",                cash = 5000,   btc = 1f },
+        new Promo { code = "Gallery",                cash = 0,      btc = 10f },
+    };
 
-		public float btc;
-	}
+    private static List<string> claimedCodes;
 
-	[SerializeField]
-	private GameObject home;
+    public void Claim()
+    {
+        var input = codeInput;
+        if (input == null) return;
 
-	[SerializeField]
-	private GameObject thankYou;
+        string text = input.text?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            ShowMessage("Enter a code");
+            return;
+        }
 
-	[SerializeField]
-	private Text infoText;
+        // Уже активирован?
+        if (IsClaimed(text))
+        {
+            ShowMessage("You already claimed this code");
+            return;
+        }
 
-	[SerializeField]
-	private InputField codeInput;
+        // Ищем промокод (с игнорированием регистра)
+        Promo found = null;
+        for (int i = 0; i < promos.Length; i++)
+        {
+            if (promos[i] != null &&
+                string.Equals(promos[i].code, text, StringComparison.OrdinalIgnoreCase))
+            {
+                found = promos[i];
+                break;
+            }
+        }
 
-	[SerializeField]
-	private Button claimButton;
+        if (found == null)
+        {
+            ShowMessage("Invalid code");
+            return;
+        }
 
-	[SerializeField]
-	private string url;
+        // Активируем
+        ApplyReward(found);
+        SaveClaimed(found.code);
+        ShowMessage($"Reward: +{found.cash}$   +{found.btc} BTC");
+    }
 
-	private static List<string> claimedCodes;
+    private void ApplyReward(Promo promo)
+    {
+        var main = Main.Instance;
+        if (main != null && promo.cash != 0)
+            main.SetMoney(main.Money + promo.cash, false);
 
-	public void Claim()
-	{
-		var input = codeInput;
-		if (input == null) return;
-		var text = input.text;
-		if (IsClaimed(text))
-		{
-			if (infoText != null) infoText.text = "You already claimed this code";
-			if (home != null) home.SetActive(false);
-			if (thankYou != null) thankYou.SetActive(true);
-			return;
-		}
-		var routine = RequestGiveaway(text);
-		StartCoroutine(routine);
-	}
+        if (promo.btc != 0f)
+            BitcoinManager.Bitcoin = BitcoinManager.Bitcoin + promo.btc;
+    }
 
-	private IEnumerator RequestGiveaway(string code)
-	{
-		if (claimButton != null) claimButton.interactable = false;
-		var fullUrl = url + "/" + code;
-		var www = UnityWebRequest.Get(fullUrl);
-		yield return www.SendWebRequest();
-		if (www.result == UnityWebRequest.Result.Success)
-		{
-			var text = www.downloadHandler.text;
-			if (!string.IsNullOrEmpty(text))
-			{
-				var resp = JsonUtility.FromJson<Response>(text);
-				var input = codeInput;
-				Claim(input.text, resp);
-			}
-		}
-		else
-		{
-			UnityEngine.Debug.Log(www.error);
-		}
-		if (home != null) home.SetActive(false);
-		if (thankYou != null) thankYou.SetActive(true);
-	}
+    private void ShowMessage(string message)
+    {
+        if (infoText != null) infoText.text = message;
+        if (home != null) home.SetActive(false);
+        if (thankYou != null) thankYou.SetActive(true);
+    }
 
-	public bool IsClaimed(string code)
-	{
-		if (claimedCodes == null)
-		{
-			var saved = PlayerPrefs.GetString("Giveaway");
-			if (!string.IsNullOrEmpty(saved))
-				claimedCodes = new List<string>(saved.Split(','));
-			else
-				claimedCodes = new List<string>();
-		}
-		return claimedCodes.Contains(code);
-	}
+    public bool IsClaimed(string code)
+    {
+        LoadClaimed();
+        // сравниваем без учёта регистра
+        for (int i = 0; i < claimedCodes.Count; i++)
+        {
+            if (string.Equals(claimedCodes[i], code, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
 
-	private void Claim(string code, Response response)
-	{
-		if (claimedCodes == null) claimedCodes = new List<string>();
-		claimedCodes.Add(code);
-		var value = string.Join(",", claimedCodes);
-		PlayerPrefs.SetString("Giveaway", value);
-		if (response == null) return;
-		var main = Main.Instance;
-		if (main == null) return;
-		main.SetMoney(main.Money + response.cash, false);
-		BitcoinManager.Bitcoin = BitcoinManager.Bitcoin + response.btc;
-	}
+    private void SaveClaimed(string code)
+    {
+        LoadClaimed();
+        claimedCodes.Add(code);
+        PlayerPrefs.SetString("Giveaway", string.Join(",", claimedCodes));
+        PlayerPrefs.Save();
+    }
+
+    private static void LoadClaimed()
+    {
+        if (claimedCodes != null) return;
+
+        var saved = PlayerPrefs.GetString("Giveaway", "");
+        claimedCodes = !string.IsNullOrEmpty(saved)
+            ? new List<string>(saved.Split(','))
+            : new List<string>();
+    }
 }

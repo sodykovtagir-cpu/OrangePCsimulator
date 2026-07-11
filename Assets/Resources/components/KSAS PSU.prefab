@@ -408,14 +408,17 @@ MonoBehaviour:
   glue: 0
   capacity: 0
   score: 0
-  wattage: 1
+  wattage: 1000
   spark: {fileID: 1827473056350119, guid: 102e9a071a1040548b0357bb97263ee1, type: 3}
   sound: 0
   burnedColor: {r: 0, g: 0, b: 0, a: 1}
-  burnParticle: {fileID: 1110576726967799, guid: 9fe34d6be09f849439e6b5f061816e5d, type: 3}
+  burnParticle: {fileID: 0}
   burnTime: 3
   canExplode: 1
   explodeEffect: {fileID: 1113817031430673, guid: 873b928a4371c4d42be417737bf13464, type: 3}
+  explosionForce: 800
+  explosionRadius: 4
+  upwardsModifier: 0.5
 --- !u!1 &1696191377697693
 GameObject:
   m_ObjectHideFlags: 0

@@ -4541,11 +4541,11 @@ MonoBehaviour:
   newDocument: {fileID: 1936016679759016}
   workspace: {fileID: 1201522764295089}
   createButton: {fileID: 114336134949353685}
-  canvas: {fileID: 0}
   display: {fileID: 114733243468427251}
   canvasTransform: {fileID: 224713117681002080}
   colorPrefab: {fileID: 114025857829534027, guid: e0fe3ddad068a7f4c8c199bc94d41345, type: 3}
   colorParent: {fileID: 224661215461018283}
+  colorPicker: {fileID: 114856678608357936}
   allColors:
   - {r: 1, g: 0, b: 0, a: 1}
   - {r: 1, g: 1, b: 0, a: 1}
@@ -4553,9 +4553,8 @@ MonoBehaviour:
   - {r: 0, g: 1, b: 1, a: 1}
   - {r: 0, g: 0, b: 1, a: 1}
   - {r: 1, g: 0, b: 1, a: 1}
-  colorPicker: {fileID: 114856678608357936}
   minCanvasSize: {x: 1, y: 1}
-  maxCanvasSize: {x: 70, y: 70}
+  maxCanvasSize: {x: 1024, y: 1024}
 --- !u!1 &1897286636024456
 GameObject:
   m_ObjectHideFlags: 0

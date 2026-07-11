@@ -1,3 +1,5 @@
+﻿using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 public class TrashBag : Item
@@ -5,52 +7,68 @@ public class TrashBag : Item
     [Header("Trash Bag")]
     public int capacity = 10;
 
+    [SerializeField]
     private int currentAmount = 0;
 
-    protected override void Start()
-    {
-        base.Start();
-        UpdateName();
-    }
+    private HashSet<GameObject> collectedRoots = new HashSet<GameObject>();
+
+    public int CurrentAmount => currentAmount;
+    public bool IsFull => currentAmount >= capacity;
 
     private void OnTriggerEnter(Collider other)
     {
-        if (currentAmount >= capacity)
-            return;
+        if (IsFull) return;
 
-        if (other.CompareTag("Box"))
-        {
-            currentAmount++;
+        GameObject root = FindBoxRoot(other);
+        if (root == null) return;
 
-            Destroy(other.gameObject);
+        if (collectedRoots.Contains(root)) return;
 
-            UpdateName();
+        collectedRoots.Add(root);
+        currentAmount++;
 
-            Debug.Log($"Trash collected: {currentAmount}/{capacity}");
-        }
+        Destroy(root);
+
+        Debug.Log($"Trash collected: {currentAmount}/{capacity}");
     }
 
-    private void UpdateName()
+    private GameObject FindBoxRoot(Collider col)
     {
-        if (currentAmount >= capacity)
-            gameObject.name = "Trash Bag (FULL)";
-        else
-            gameObject.name = $"Trash Bag ({currentAmount}/{capacity})";
+        Transform t = col.transform;
+        while (t != null)
+        {
+            if (t.CompareTag("Box")) return t.gameObject;
+            t = t.parent;
+        }
+        return null;
     }
 
     public override string GetInfo()
     {
         string status;
 
-        if (currentAmount >= capacity)
-            status = "<color=lime>FULL</color>";
+        if (IsFull)
+            status = "<color=lime>" + Localization.GetText("Full") + "</color>";
         else
             status = $"{currentAmount}/{capacity}";
 
-        return
-            "<size=24><b>Trash Bag</b></size>\n\n" +
-            $"<b>Stored Trash:</b> {status}\n" +
-            $"<b>Capacity:</b> {capacity}\n\n" +
-            "<color=grey>Used to collect boxes and debris.</color>";
+        string title = Localization.GetText("Trash Bag");   // ← большая B
+        string collected = Localization.GetText("Collected");
+
+        return $"{title}\n{collected}: {status}";
+    }
+
+    public override void ToData(JObject jObject)
+    {
+        jObject["currentAmount"] = currentAmount;
+        base.ToData(jObject);
+    }
+
+    public override void FromData(JObject jObject)
+    {
+        if (jObject.TryGetValue("currentAmount", out var val))
+            currentAmount = val.Value<int>();
+
+        base.FromData(jObject);
     }
 }

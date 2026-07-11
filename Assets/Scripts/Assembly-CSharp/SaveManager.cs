@@ -143,7 +143,8 @@ public class SaveManager : MonoBehaviour
 
         Player.Instance.LoadPlayer(cdat.playerData);
 
-        if (cdat.scene != null) {
+        if (cdat.scene != null)
+        {
             foreach (var sce in sceneObjects)
             {
                 sce.FromData(cdat.scene);
@@ -154,12 +155,22 @@ public class SaveManager : MonoBehaviour
 
         if (cdat.itemData != null && cdat.itemData.Length > 0)
         {
+            // ====== ФИКС: удаляем все стартовые предметы перед загрузкой ======
+            var existingItems = FindObjectsOfType<Item>();
+            foreach (var existing in existingItems)
+            {
+                if (existing != null && existing.gameObject != null)
+                    Destroy(existing.gameObject);
+            }
+            // =================================================================
+
             foreach (var it in cdat.itemData)
             {
-                var path   = $"Components/{it.spawnId}";
+                var path = $"Components/{it.spawnId}";
                 var exists = Resources.Load(path);
 
-                if (exists) {
+                if (exists)
+                {
                     var prefab = Instantiate((GameObject)exists);
                     prefab.transform.position = it.pos;
                     prefab.transform.rotation = it.rot;
@@ -174,7 +185,7 @@ public class SaveManager : MonoBehaviour
                     JObject savePayload = null;
                     if (it.data != null)
                         savePayload = JObject.FromObject(it.data);
-                
+
                     scObj.Add(Tuple.Create(saves, savePayload));
                 }
                 else
@@ -190,9 +201,12 @@ public class SaveManager : MonoBehaviour
             if (savers == null) continue;
             foreach (var saver in savers)
             {
-                try {
-                if (saver == null) throw new NullReferenceException(nameof(ISave));
-                if (data != null) saver.FromData(data);} catch
+                try
+                {
+                    if (saver == null) throw new NullReferenceException(nameof(ISave));
+                    if (data != null) saver.FromData(data);
+                }
+                catch
                 {
                     failCount++;
                 }
@@ -201,7 +215,7 @@ public class SaveManager : MonoBehaviour
         return failCount;
     }
 
-	private void OnDestroy()
+    private void OnDestroy()
 	{
 		Physics.gravity = new Vector3(0f, -9.81f, 0f);
 		AirConditioner.temperature = AirConditioner.NormalTemperature;

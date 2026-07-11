@@ -2567,8 +2567,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9b819df0994a58cece03a6c09fa7092, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: EATX
-  info: EATX
+  spawnId: EXATX
+  info: EXATX
   match: 1
   slotOffset: {x: -0.1, y: 0, z: 0}
   glue: 0

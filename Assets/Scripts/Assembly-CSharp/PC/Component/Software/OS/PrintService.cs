@@ -4,190 +4,177 @@ using UnityEngine.UI;
 
 namespace PC.Component.Software.OS
 {
-	public class PrintService : MonoBehaviour
-	{
-		[SerializeField]
-		private GameObject general;
+    public class PrintService : MonoBehaviour
+    {
+        [SerializeField] private GameObject general;
+        [SerializeField] private GameObject supplyLevels;
+        [SerializeField] private Text alertText;
+        [SerializeField] private ListView printerListView;
+        [SerializeField] private Text copiesText;
+        [SerializeField] private Slider inkY;
+        [SerializeField] private Slider inkM;
+        [SerializeField] private Slider inkC;
+        [SerializeField] private Slider inkK;
+        [SerializeField] private Button printButton;
+        [SerializeField] private Button supplyButton;
+        [SerializeField] private Image colorImage;
+        [SerializeField] private Image grayscaleImage;
 
-		[SerializeField]
-		private GameObject supplyLevels;
+        private Texture2D tex;
+        private int copies = 1;
+        private bool grayscale;
+        private OperatingSystem os;
+        private List<DeviceDetail> devices;
 
-		[SerializeField]
-		private Text alertText;
+        private const int deviceType = 1;
 
-		[SerializeField]
-		private ListView printerListView;
+        public void Show(OperatingSystem os, Texture2D tex)
+        {
+            this.os = os;
+            this.tex = tex;
 
-		[SerializeField]
-		private Text copiesText;
+            if (os == null) return;
 
-		[SerializeField]
-		private Slider inkY;
+            var allDevices = os.ListInstalledDevices();
+            devices = new List<DeviceDetail>();
 
-		[SerializeField]
-		private Slider inkM;
+            foreach (var d in allDevices)
+            {
+                if (d != null && d.type == deviceType) devices.Add(d);
+            }
 
-		[SerializeField]
-		private Slider inkC;
+            foreach (var d in devices)
+            {
+                var item = new ListViewItem(d.name);
+                printerListView.Add(item);
+            }
 
-		[SerializeField]
-		private Slider inkK;
+            printerListView.SelectedIndexChanged += SelectIndexChanged;
+        }
 
-		[SerializeField]
-		private Button printButton;
+        private void SelectIndexChanged(int index)
+        {
+            if (supplyButton != null) supplyButton.interactable = index != -1;
 
-		[SerializeField]
-		private Button supplyButton;
+            var t = tex;
+            if (t == null || index < 0 || devices == null || index >= devices.Count)
+            {
+                if (printButton != null) printButton.interactable = false;
+                if (alertText != null) alertText.text = "";
+                return;
+            }
 
-		[SerializeField]
-		private Image colorImage;
+            // Берём максимальное разрешение из выбранного принтера
+            var detail = devices[index];
+            var printer = os != null ? os.ConnectDevice<Printer>(detail.id) : null;
+            int maxRes = printer != null ? printer.MaxResolution : 32;
 
-		[SerializeField]
-		private Image grayscaleImage;
+            bool fits = t.width <= maxRes && t.height <= maxRes;
 
-		private Texture2D tex;
+            if (fits)
+            {
+                if (printButton != null) printButton.interactable = true;
+                if (alertText != null) alertText.text = "";
+            }
+            else
+            {
+                if (printButton != null) printButton.interactable = false;
+                var msg = string.Format(
+                    Localization.GetText("Only supports {0}x{1} resolution"),
+                    maxRes, maxRes);
+                if (alertText != null) alertText.text = msg;
+            }
+        }
 
-		private int copies = 1;
+        public void SetGrayscale(bool grayscale)
+        {
+            this.grayscale = grayscale;
+            var color = colorImage;
+            if (color != null)
+            {
+                color.enabled = !grayscale;
+                var gs = grayscaleImage;
+                if (gs != null) gs.enabled = grayscale;
+            }
+        }
 
-		private bool grayscale;
+        public void IncreasePaper()
+        {
+            copies++;
+            if (copiesText != null) copiesText.text = copies.ToString();
+        }
 
-		private OperatingSystem os;
+        public void DecreasePaper()
+        {
+            if (copies > 1) copies--;
+            if (copiesText != null) copiesText.text = copies.ToString();
+        }
 
-		private List<DeviceDetail> devices;
+        public void Print()
+        {
+            var list = printerListView;
+            var devs = devices;
+            var system = os;
+            if (list == null || devs == null || system == null) return;
 
-		private const int deviceType = 1;
+            int index = list.SelectedIndex;
+            if (index < 0 || index >= devs.Count) return;
 
-		public void Show(OperatingSystem os, Texture2D tex)
-		{
-			this.os = os;
-			this.tex = tex;
+            var detail = devs[index];
+            var printer = system.ConnectDevice<Printer>(detail.id);
+            if (printer != null)
+            {
+                printer.PrintPicture(tex, grayscale, copies);
+                Destroy(gameObject);
+                return;
+            }
 
-			if (os == null) return;
+            var title = Localization.GetText("Error");
+            var message = Localization.GetText("Unable to connect to device");
+            system.ShowMessageBox(title, message);
+        }
 
-			var allDevices = os.ListInstalledDevices();
-			devices = new List<DeviceDetail>();
+        public void Cancel()
+        {
+            Destroy(gameObject);
+        }
 
-			foreach (var d in allDevices)
-			{
-				if (d != null && d.type == deviceType) devices.Add(d);
-			}
+        public void ViewSupply()
+        {
+            var lv = printerListView;
+            var list = devices;
+            var system = os;
+            if (lv == null || list == null || system == null) return;
 
-			foreach (var d in devices)
-			{
-				var item = new ListViewItem(d.name);
-				printerListView.Add(item);
-			}
+            int index = lv.SelectedIndex;
+            if (index < 0 || index >= list.Count) return;
 
-			printerListView.SelectedIndexChanged += SelectIndexChanged;
-		}
+            var detail = list[index];
+            var printer = system.ConnectDevice<Printer>(detail.id);
+            if (printer != null)
+            {
+                var r = printer.remainingInk;
+                var t = printer.totalInk;
 
-		private void SelectIndexChanged(int index)
-		{
-			if (supplyButton != null) supplyButton.interactable = index != -1;
+                if (inkY != null) inkY.value = t.y > 0f ? r.y / t.y : 0f;
+                if (inkM != null) inkM.value = t.m > 0f ? r.m / t.m : 0f;
+                if (inkC != null) inkC.value = t.c > 0f ? r.c / t.c : 0f;
+                if (inkK != null) inkK.value = t.k > 0f ? r.k / t.k : 0f;
 
-			var t = tex;
-			if (t != null)
-			{
-				if (t.width == 32 && t.height == 32)
-				{
-					if (printButton != null) printButton.interactable = index != -1;
-					return;
-				}
+                if (general != null) general.SetActive(false);
+                if (supplyLevels != null) supplyLevels.SetActive(true);
+                return;
+            }
 
-				var msg = string.Format(Localization.GetText("Only supports {0}x{1} resolution"), "32", "32");
-				if (alertText != null) alertText.text = msg;
-			}
-		}
+            var title = Localization.GetText("Error");
+            var message = Localization.GetText("Unable to connect to device");
+            system.ShowMessageBox(title, message);
+        }
 
-		public void SetGrayscale(bool grayscale)
-		{
-			this.grayscale = grayscale;
-			var color = colorImage;
-			if (color != null)
-			{
-				color.enabled = !grayscale;
-				var gs = grayscaleImage;
-				if (gs != null) gs.enabled = grayscale;
-			}
-		}
-
-		public void IncreasePaper()
-		{
-			copies++;
-			if (copiesText != null) copiesText.text = copies.ToString();
-		}
-
-		public void DecreasePaper()
-		{
-			if (copies > 1) copies--;
-			if (copiesText != null) copiesText.text = copies.ToString();
-		}
-
-		public void Print()
-		{
-			var list = printerListView;
-			var devs = devices;
-			var system = os;
-			if (list == null || devs == null || system == null) return;
-
-			int index = list.SelectedIndex;
-			if (index < 0 || index >= devs.Count) return;
-
-			var detail = devs[index];
-			var printer = system.ConnectDevice<Printer>(detail.id);
-			if (printer != null)
-			{
-				printer.PrintPicture(tex, grayscale, copies);
-				Destroy(gameObject);
-				return;
-			}
-
-			var title = Localization.GetText("Error");
-			var message = Localization.GetText("Unable to connect to device");
-			system.ShowMessageBox(title, message);
-		}
-
-		public void Cancel()
-		{
-			Destroy(gameObject);
-		}
-
-		public void ViewSupply()
-		{
-			var lv = printerListView;
-			var list = devices;
-			var system = os;
-			if (lv == null || list == null || system == null) return;
-
-			int index = lv.SelectedIndex;
-			if (index < 0 || index >= list.Count) return;
-
-			var detail = list[index];
-			var printer = system.ConnectDevice<Printer>(detail.id);
-			if (printer != null)
-			{
-				var r = printer.remainingInk;
-				var t = printer.totalInk;
-
-				if (inkY != null) inkY.value = t.y > 0f ? r.y / t.y : 0f;
-				if (inkM != null) inkM.value = t.m > 0f ? r.m / t.m : 0f;
-				if (inkC != null) inkC.value = t.c > 0f ? r.c / t.c : 0f;
-				if (inkK != null) inkK.value = t.k > 0f ? r.k / t.k : 0f;
-
-				if (general != null) general.SetActive(false);
-				if (supplyLevels != null) supplyLevels.SetActive(true);
-				return;
-			}
-
-			var title = Localization.GetText("Error");
-			var message = Localization.GetText("Unable to connect to device");
-			system.ShowMessageBox(title, message);
-		}
-
-		public void Back()
-		{
-			if (general != null) general.SetActive(true);
-			if (supplyLevels != null) supplyLevels.SetActive(false);
-		}
-	}
+        public void Back()
+        {
+            if (general != null) general.SetActive(true);
+            if (supplyLevels != null) supplyLevels.SetActive(false);
+        }
+    }
 }

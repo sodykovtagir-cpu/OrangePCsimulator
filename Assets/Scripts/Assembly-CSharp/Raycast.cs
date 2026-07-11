@@ -111,47 +111,47 @@ public class Raycast : MonoBehaviour
 
     private void Update()
     {
-        // Вся логика кликов мышкой работает ТОЛЬКО на ПК и в редакторе Unity.
-        // На телефонах этот блок игнорируется, и предметы берутся кнопкой "Touch".
 #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
-        
-        // Взять предмет
-        if (Input.GetMouseButtonDown(0))
+
+    if (Input.GetMouseButtonDown(0))
+    {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        pointer = null;
+
+        ShootRaycast(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
+    }
+
+    if (Input.GetMouseButtonUp(0))
+    {
+        End();
+    }
+
+    if (currentDrag != null)
+    {
+        float wheel = Input.GetAxis("Mouse ScrollWheel");
+
+        if (wheel != 0f)
         {
-            // Защита от клика сквозь UI (меню паузы и т.д.)
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                return;
+            currentDrag.distance += wheel * 3f;
+            currentDrag.distance = Mathf.Clamp(currentDrag.distance, 2f, maxDistance);
 
-            pointer = null;
-
-            ShootRaycast(
-                new Vector3(
-                    Screen.width * 0.5f,
-                    Screen.height * 0.5f,
-                    0f
-                )
-            );
+            UpdateDistanceUI(currentDrag.distance);
         }
-
-        // Бросить предмет
-        if (Input.GetMouseButtonUp(0))
-        {
-            End();
-        }
-
-        // Колесо мыши
-        if (currentDrag != null)
-        {
-            float wheel = Input.GetAxis("Mouse ScrollWheel");
-
-            if (wheel != 0f)
-            {
-                currentDrag.distance += wheel * 3f;
-                currentDrag.distance =
-                    Mathf.Clamp(currentDrag.distance, 2f, maxDistance);
-            }
-        }
+    }
 #endif
+    }
+
+    private void UpdateDistanceUI(float distance)
+    {
+        float normalized = Conversion.Map(distance, 2f, maxDistance, 0f, 1f);
+
+        if (distanceSlider != null)
+            distanceSlider.value = normalized;
+
+        if (distanceScroll != null)
+            distanceScroll.verticalNormalizedPosition = 1f - normalized;
     }
 
     public void CalculateHit(BaseEventData data)
@@ -190,6 +190,19 @@ public class Raycast : MonoBehaviour
         if (dragRigidbody)
         {
             var hitRb = hit.rigidbody;
+
+            // ====== РАЗБЛОКИРУЕМ ДВЕРЬ ЕСЛИ ОНА LATCH ======
+            if (hitRb != null)
+            {
+                var latch = hitRb.GetComponent<DoorLatch>();
+                if (latch != null && latch.IsLatched)
+                {
+                    latch.Unlatch();
+                    hitRb = latch.GetComponent<Rigidbody>(); // обновить ссылку
+                }
+            }
+            // ===============================================
+
             if (hitRb && !hitRb.isKinematic && !hitRb.freezeRotation)
             {
                 if (!spring)
@@ -441,6 +454,14 @@ public class Raycast : MonoBehaviour
                 rb.constraints = d.oldConstrains;
                 rb.drag = d.oldDrag;
                 rb.angularDrag = d.oldAngularDrag;
+                // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
+                var latch = rb.GetComponent<DoorLatch>();
+                if (latch != null)
+                {
+                    latch.Latch();
+                }
+                // ============================================
+
                 spring.connectedBody = null;
             }
 

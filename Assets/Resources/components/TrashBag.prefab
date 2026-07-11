@@ -13,7 +13,6 @@ GameObject:
   - component: {fileID: 23674090387802035}
   - component: {fileID: 54127825655607378}
   - component: {fileID: 65492258178607169}
-  - component: {fileID: 114199597051567337}
   - component: {fileID: -9091464515230792554}
   m_Layer: 0
   m_Name: TrashBag
@@ -136,23 +135,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.74322903, y: 0.99731064, z: 0.41753653}
   m_Center: {x: -0.018042011, y: -0.020669142, z: -0.009794499}
---- !u!114 &114199597051567337
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1172905954065532}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnId: TrashBag
-  info: Trash Bag
-  match: 0
-  slotOffset: {x: 0, y: 0, z: 0}
-  glue: 0
 --- !u!114 &-9091464515230792554
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -165,12 +147,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6c6624137c39ed44ca2f61ac2f8bdf81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: 
+  spawnId: TrashBag
   info: 
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 10
+  currentAmount: 0
 --- !u!1 &5506487509568454205
 GameObject:
   m_ObjectHideFlags: 0

@@ -182,6 +182,7 @@ GameObject:
   m_Component:
   - component: {fileID: 190}
   - component: {fileID: 336}
+  - component: {fileID: 954645537}
   m_Layer: 0
   m_Name: Reflection Probe
   m_TagString: Untagged
@@ -3343,7 +3344,7 @@ Transform:
   m_GameObject: {fileID: 59}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.24547659, z: 0, w: 0.96940255}
-  m_LocalPosition: {x: -17.12, y: -0.5, z: -10.54}
+  m_LocalPosition: {x: -15.04, y: 2.25, z: -13.15}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3960,7 +3961,7 @@ MeshRenderer:
   m_ProbeAnchor: {fileID: 0}
   m_LightProbeVolumeOverride: {fileID: 0}
   m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
+  m_ReceiveGI: 2
   m_PreserveUVs: 0
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
@@ -13307,7 +13308,7 @@ ReflectionProbe:
   serializedVersion: 2
   m_Type: 0
   m_Mode: 0
-  m_RefreshMode: 0
+  m_RefreshMode: 1
   m_TimeSlicingMode: 0
   m_Resolution: 128
   m_UpdateFrequency: 0
@@ -16227,7 +16228,6 @@ MonoBehaviour:
   gravity: -19.6
   pushForce: 10
   sit: 0
-  pauseControls: 0
 --- !u!114 &590
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16610,6 +16610,7 @@ MonoBehaviour:
   turnOn: {fileID: 8300000, guid: c3f1872f84d47334ab511742bc5acb94, type: 3}
   turnOff: {fileID: 8300000, guid: c3f1872f84d47334ab511742bc5acb94, type: 3}
   turnSnow: {fileID: 8300000, guid: e9dbdae82a50f024090ba1a42f5e1b70, type: 3}
+  scrollSensitivity: 0.5
 --- !u!114 &602
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23180,6 +23181,18 @@ MonoBehaviour:
     callback:
       m_PersistentCalls:
         m_Calls: []
+--- !u!114 &954645537
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 12}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c022b97dec6cd90458345437c1028b11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1035333245
 GameObject:
   m_ObjectHideFlags: 0

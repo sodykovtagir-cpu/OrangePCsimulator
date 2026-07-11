@@ -8,181 +8,152 @@ using UnityEngine.UI;
 
 public class AirConditioner : MonoBehaviour
 {
-	[SerializeField]
-	private ParticleSystem snowParticle;
+    [SerializeField] private ParticleSystem snowParticle;
+    [SerializeField] private ParticleSystem smoke;
+    [SerializeField] private Transform snow;
+    [SerializeField] private float moveSpeed;
+    [SerializeField] private float maxHeight;
+    [SerializeField] private float minHeight;
+    [SerializeField] private float maxTemperature;
+    [SerializeField] private float minTemperature;
+    [SerializeField] private float minSlider;
+    [SerializeField] private float maxSlider;
+    [SerializeField] private Renderer button;
+    [SerializeField] private Transform sliderTransform;
+    [SerializeField] private Slider slider;
+    [SerializeField] private float targetTemperature;
+    [SerializeField] private AudioSource source;
+    [SerializeField] private AudioClip turnOn;
+    [SerializeField] private AudioClip turnOff;
+    [SerializeField] private AudioClip turnSnow;
 
-	[SerializeField]
-	private ParticleSystem smoke;
+    [Header("PC Scroll Control")]
+    [SerializeField] private float scrollSensitivity = 0.5f;
 
-	[SerializeField]
-	private Transform snow;
+    public static readonly float NormalTemperature;
 
-	[SerializeField]
-	private float moveSpeed;
+    private bool snowing;
+    private bool soundPlayed;
+    private bool isOn;
+    private bool hasSnow;
+    private float time;
+    private Material mat;
 
-	[SerializeField]
-	private float maxHeight;
+    public static float temperature;
+    public static AirConditioner instance;
 
-	[SerializeField]
-	private float minHeight;
+    public float TargetTemperature { get => targetTemperature; set => targetTemperature = value; }
 
-	[SerializeField]
-	private float maxTemperature;
+    public bool Power
+    {
+        get => isOn;
+        set
+        {
+            isOn = value;
+            var m = mat;
+            var s = smoke;
+            if (value)
+            {
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", new UnityEngine.Color(1f, 0f, 0f, 1f));
+                s.Play();
+                UpdateSnow();
+            }
+            else
+            {
+                m.DisableKeyword("_EMISSION");
+                s.Stop();
+                UpdateSnow();
+            }
+        }
+    }
 
-	[SerializeField]
-	private float minTemperature;
-
-	[SerializeField]
-	private float minSlider;
-
-	[SerializeField]
-	private float maxSlider;
-
-	[SerializeField]
-	private Renderer button;
-
-	[SerializeField]
-	private Transform sliderTransform;
-
-	[SerializeField]
-	private Slider slider;
-
-	[SerializeField]
-	private float targetTemperature;
-
-	[SerializeField]
-	private AudioSource source;
-
-	[SerializeField]
-	private AudioClip turnOn;
-
-	[SerializeField]
-	private AudioClip turnOff;
-
-	[SerializeField]
-	private AudioClip turnSnow;
-
-	public static readonly float NormalTemperature;
-
-	private bool snowing;
-
-	private bool soundPlayed;
-
-	private bool isOn;
-
-	private bool hasSnow;
-
-	private float time;
-
-	private Material mat;
-
-	public static float temperature;
-
-	public static AirConditioner instance;
-
-	public float TargetTemperature
-	{
-		get => targetTemperature;
-		set => targetTemperature = value;
-	}
-
-	public bool Power
-	{
-		get => isOn;
-		set
-		{
-			isOn = value;
-
-			var m = mat;
-			var s = smoke;
-
-			if (value)
-			{
-				m.EnableKeyword("_EMISSION");
-				m.SetColor("_EmissionColor", new UnityEngine.Color(1f, 0f, 0f, 1f));
-				s.Play();
-				UpdateSnow();
-			}
-			else
-			{
-				m.DisableKeyword("_EMISSION");
-				s.Stop();
-				UpdateSnow();
-			}
-		}
-	}
-
-	private void Awake()
+    private void Awake()
     {
         instance = this;
         if (button != null) mat = button.material;
     }
 
-	private IEnumerator Start()
-	{
-		yield return new WaitForEndOfFrame();
-		float normalized = Conversion.Map(targetTemperature, minTemperature, maxTemperature, 0f, 1f);
-		if (slider != null) slider.value = normalized;
-	}
-
-	public void Switch()
-	{
-		Power = !Power;
-		if (source != null) source.PlayOneShot(Power ? turnOn : turnOff);
-	}
-
-	private void UpdateSnow()
-	{
-		float currentTemp = isOn ? targetTemperature : NormalTemperature;
-		temperature = currentTemp;
-		bool shouldSnow = currentTemp <= -10f;
-		if (shouldSnow != snowing)
-		{
-			snowing = shouldSnow;
-			if (snowing)
-			{
-				hasSnow = true;
-				soundPlayed = false;
-				if (snowParticle != null) snowParticle.Play();
-				if (snow != null && snow.gameObject != null) snow.gameObject.SetActive(true);
-			}
-			else
-			{
-				if (snowParticle != null) snowParticle.Stop();
-			}
-		}
-	}
-
-	public void ChangeTemperature(float f)
-	{
-		if (sliderTransform == null) return;
-		f = Mathf.Clamp01(f);
-		Vector3 pos = sliderTransform.localPosition;
-		pos.y = minSlider + f * (maxSlider - minSlider);
-		sliderTransform.localPosition = pos;
-		targetTemperature = minTemperature + f * (maxTemperature - minTemperature);
-		if (smoke != null)
-		{
-			var main = smoke.main;
-			float alpha = (50f - f * 50f) / 255f;
-			main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 1f, 1f, alpha));
-		}
-		UpdateSnow();
-	}
-
-	private void Update()
+    private IEnumerator Start()
     {
+        yield return new WaitForEndOfFrame();
+        float normalized = Conversion.Map(targetTemperature, minTemperature, maxTemperature, 0f, 1f);
+        if (slider != null) slider.value = normalized;
+    }
+
+    public void Switch()
+    {
+        Power = !Power;
+        if (source != null) source.PlayOneShot(Power ? turnOn : turnOff);
+    }
+
+    private void UpdateSnow()
+    {
+        float currentTemp = isOn ? targetTemperature : NormalTemperature;
+        temperature = currentTemp;
+        bool shouldSnow = currentTemp <= -10f;
+        if (shouldSnow != snowing)
+        {
+            snowing = shouldSnow;
+            if (snowing)
+            {
+                hasSnow = true;
+                soundPlayed = false;
+                if (snowParticle != null) snowParticle.Play();
+                if (snow != null && snow.gameObject != null) snow.gameObject.SetActive(true);
+            }
+            else
+            {
+                if (snowParticle != null) snowParticle.Stop();
+            }
+        }
+    }
+
+    public void ChangeTemperature(float f)
+    {
+        if (sliderTransform == null) return;
+        f = Mathf.Clamp01(f);
+        Vector3 pos = sliderTransform.localPosition;
+        pos.y = minSlider + f * (maxSlider - minSlider);
+        sliderTransform.localPosition = pos;
+        targetTemperature = minTemperature + f * (maxTemperature - minTemperature);
+        if (smoke != null)
+        {
+            var main = smoke.main;
+            float alpha = (50f - f * 50f) / 255f;
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 1f, 1f, alpha));
+        }
+        UpdateSnow();
+    }
+
+    private void HandleScrollInput()
+    {
+        // работаем только если слайдер существует и активен
+        if (slider == null || !slider.gameObject.activeInHierarchy) return;
+
+        float scroll = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(scroll, 0f)) return;
+
+        float current = slider.value;
+        float newValue = Mathf.Clamp01(current + scroll * scrollSensitivity * 0.1f);
+
+        slider.value = newValue;
+        ChangeTemperature(newValue);
+
+        UnityEngine.Debug.Log($"[AC] scroll={scroll}, value={newValue}");
+    }
+
+    private void Update()
+    {
+        HandleScrollInput();
+
         if (!snowing)
         {
-            if (time > 0f)
-            {
-                time -= Time.deltaTime * moveSpeed;
-            }
+            if (time > 0f) time -= Time.deltaTime * moveSpeed;
             else if (hasSnow)
             {
                 hasSnow = false;
-                if (snow != null && snow.gameObject != null)
-                    snow.gameObject.SetActive(false);
+                if (snow != null && snow.gameObject != null) snow.gameObject.SetActive(false);
             }
         }
         else
@@ -192,10 +163,7 @@ public class AirConditioner : MonoBehaviour
                 soundPlayed = true;
                 SoundManager.Instance?.PlayOneShot(turnSnow);
             }
-            else if (time < 1f)
-            {
-                time += Time.deltaTime * moveSpeed;
-            }
+            else if (time < 1f) time += Time.deltaTime * moveSpeed;
         }
 
         if (snow != null)

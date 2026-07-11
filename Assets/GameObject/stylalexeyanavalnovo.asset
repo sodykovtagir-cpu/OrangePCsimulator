@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: stylalexeyanavalnovo
   m_EditorClassIdentifier: 
-  itemName: Figurine
+  itemName: '{Figure}'
   price: 500
   bitcoin: 5
   sprite: {fileID: 21300000, guid: 531d6cf01cdf72f4caa5d7cd45db4343, type: 3}

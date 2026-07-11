@@ -532,7 +532,7 @@ MonoBehaviour:
   remainingPaper: 0
   pivot: {fileID: 4110421778474291}
   maxResolution: 1024
-  printSpeed: 8
+  printSpeed: 4
   printStepIntervals:
   - 6.72
   - 7.26
@@ -555,8 +555,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: Apson_A3
-  info: '{Printer}'
+  spawnId: Apson_A3_HD
+  info: '{Printer} HD'
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0

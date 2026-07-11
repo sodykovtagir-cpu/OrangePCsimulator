@@ -99,8 +99,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: stylnavalnovo
-  info: Figurine
+  spawnId: stylalexeyanavalnovo
+  info: '{Figure}'
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0

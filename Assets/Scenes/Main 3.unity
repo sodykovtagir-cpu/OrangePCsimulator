@@ -159,6 +159,7 @@ GameObject:
   m_Component:
   - component: {fileID: 194}
   - component: {fileID: 347}
+  - component: {fileID: 957956326}
   m_Layer: 0
   m_Name: Reflection Probe
   m_TagString: Untagged
@@ -16553,6 +16554,7 @@ MonoBehaviour:
   turnOn: {fileID: 8300000, guid: c3f1872f84d47334ab511742bc5acb94, type: 3}
   turnOff: {fileID: 8300000, guid: c3f1872f84d47334ab511742bc5acb94, type: 3}
   turnSnow: {fileID: 8300000, guid: e9dbdae82a50f024090ba1a42f5e1b70, type: 3}
+  scrollSensitivity: 0.5
 --- !u!114 &603
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18275,7 +18277,6 @@ MonoBehaviour:
   gravity: -19.6
   pushForce: 10
   sit: 0
-  pauseControls: 0
 --- !u!114 &664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22982,6 +22983,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 951359229}
   m_CullTransparentMesh: 0
+--- !u!114 &957956326
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 11}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c022b97dec6cd90458345437c1028b11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &967532958
 GameObject:
   m_ObjectHideFlags: 0

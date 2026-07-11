@@ -223,7 +223,7 @@ namespace PC.Component.Software.OS
                 taskbar.SetActive(true);
 
             InitializeTaskbar();
-            
+
             startMenuOpened = false;
 
             if (startMenu != null)
@@ -471,15 +471,10 @@ namespace PC.Component.Software.OS
                 {
                     if (IsAppInstalled("File Manager", out var prefab))
                     {
-                        var app = Instantiate(prefab, appParent);
-                        if (app == null) return;
+                        LaunchApp(prefab, "");
 
-                        app.Init(this);
-                        RegisterRunningApp(app);
-                        app.AppClosed += ResetAppState;
-                        app.Open("");
-
-                        var fm = app as PC.Component.Software.FileManager;
+                        var existing = GetRunningApp(prefab.AppName);
+                        var fm = existing as PC.Component.Software.FileManager;
                         if (fm != null)
                             fm.OpenFolderFromPath(f.path);
 
@@ -509,15 +504,7 @@ namespace PC.Component.Software.OS
 
                     if (!match) continue;
 
-                    var app = Instantiate(prefab, appParent);
-                    if (app == null) return;
-
-                    app.Init(this);
-                    RegisterRunningApp(app);
-                    app.AppClosed += ResetAppState;
-                    app.Open(f.content);
-
-                    FocusApp(true);
+                    LaunchApp(prefab, f.content);
                     break;
                 }
             });
@@ -570,17 +557,14 @@ namespace PC.Component.Software.OS
                     var name = file.NameWithoutExtension();
                     if (string.Equals(name, prefab.AppName)) match = true;
                 }
-                else if (!string.IsNullOrEmpty(ext) && string.Equals(".exe", ext)) match = true;
+                else if (!string.IsNullOrEmpty(ext))
+                {
+                    match = prefab.FileName == ext;
+                }
 
                 if (!match) continue;
 
-                var instance = Instantiate(prefab, appParent);
-                if (instance == null) return false;
-
-                instance.Init(this);
-                instance.AppClosed += ResetAppState;
-                instance.Open(file.content);
-                FocusApp(true);
+                LaunchApp(prefab, file.content);
                 return true;
             }
 
@@ -897,9 +881,7 @@ namespace PC.Component.Software.OS
 
                 btn.onClick.AddListener(() =>
                 {
-                    var app = Instantiate(prefab, appParent);
-                    app.Init(this);
-                    RegisterRunningApp(app);
+                    LaunchApp(prefab);
                     ToggleStartMenu();
                 });
             }
@@ -941,6 +923,40 @@ namespace PC.Component.Software.OS
                         app.transform.SetAsLastSibling();
                 });
             }
+        }
+
+        private App GetRunningApp(string appName)
+        {
+            foreach (var app in runningApps)
+            {
+                if (app != null && app.AppName == appName)
+                    return app;
+            }
+            return null;
+        }
+
+        private void LaunchApp(App prefab, string content = "")
+        {
+            if (prefab == null) return;
+
+            var existing = GetRunningApp(prefab.AppName);
+
+            if (existing != null)
+            {
+                existing.transform.SetAsLastSibling();
+                FocusApp(true);
+                return;
+            }
+
+            var app = Instantiate(prefab, appParent);
+            if (app == null) return;
+
+            app.Init(this);
+            RegisterRunningApp(app);
+            app.AppClosed += ResetAppState;
+            app.Open(content);
+
+            FocusApp(true);
         }
 
         public void ImportWallpaperFromDevice(byte[] imageBytes)

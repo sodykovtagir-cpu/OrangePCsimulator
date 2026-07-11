@@ -4,43 +4,46 @@ using UnityEngine.EventSystems;
 public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
 {
     private RectTransform window;
-    private Vector2 offset;
+    private RectTransform parentRect;
+    private Canvas canvas;
+    private Camera uiCamera;
+    private Vector2 pointerOffset;
 
     void Awake()
     {
-        // Находим родительское окно (где висит App)
         var app = GetComponentInParent<PC.Component.Software.App>();
         if (app != null)
             window = app.GetComponent<RectTransform>();
+
+        if (window != null)
+        {
+            parentRect = window.parent as RectTransform;
+            canvas = window.GetComponentInParent<Canvas>();
+
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                uiCamera = canvas.worldCamera;
+        }
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
         if (window == null) return;
 
-        window.SetAsLastSibling(); // выводим окно поверх других
+        window.SetAsLastSibling();
 
-        // вычисляем смещение курсора
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            window,
-            eventData.position,
-            null,
-            out offset);
+            window, eventData.position, uiCamera, out pointerOffset);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (window == null) return;
+        if (window == null || parentRect == null) return;
 
-        Vector2 pos;
+        Vector2 localPointerPos;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect, eventData.position, uiCamera, out localPointerPos))
+            return;
 
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            window.parent as RectTransform,
-            eventData.position,
-            null,
-            out pos);
-
-        window.localPosition = pos - offset;
+        window.anchoredPosition = localPointerPos - pointerOffset;
     }
-
 }

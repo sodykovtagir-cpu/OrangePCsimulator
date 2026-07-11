@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: 1100W
   m_EditorClassIdentifier: 
-  itemName: 1100W
-  price: 180
+  itemName: 1200W
+  price: 200
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 340f7c75c2872bc44871e5f95a7bee27, type: 3}
   spawn: {fileID: 1237095893359166, guid: 5775f8714a5f4c24e906d7a38e057ed9, type: 3}
