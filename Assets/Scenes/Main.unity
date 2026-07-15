@@ -1063,8 +1063,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 499}
-  - component: {fileID: 319}
-  - component: {fileID: 788}
   m_Layer: 5
   m_Name: Functions
   m_TagString: Untagged
@@ -1306,6 +1304,7 @@ GameObject:
   - component: {fileID: 689}
   - component: {fileID: 585}
   - component: {fileID: 784}
+  - component: {fileID: 787}
   m_Layer: 5
   m_Name: Panel
   m_TagString: Untagged
@@ -1564,6 +1563,7 @@ GameObject:
   - component: {fileID: 717}
   - component: {fileID: 716}
   - component: {fileID: 736}
+  - component: {fileID: 1314121949}
   m_Layer: 5
   m_Name: Fixed Joystick
   m_TagString: Untagged
@@ -2023,6 +2023,7 @@ GameObject:
   - component: {fileID: 550}
   - component: {fileID: 339}
   - component: {fileID: 598}
+  - component: {fileID: 207081467}
   m_Layer: 5
   m_Name: Pause
   m_TagString: Untagged
@@ -2230,6 +2231,7 @@ GameObject:
   - component: {fileID: 551}
   - component: {fileID: 428}
   - component: {fileID: 763}
+  - component: {fileID: 764}
   m_Layer: 5
   m_Name: Icon
   m_TagString: Untagged
@@ -2574,6 +2576,7 @@ GameObject:
   - component: {fileID: 390}
   - component: {fileID: 715}
   - component: {fileID: 700}
+  - component: {fileID: 1684926288}
   m_Layer: 5
   m_Name: Run
   m_TagString: Untagged
@@ -6143,27 +6146,6 @@ Animator:
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
---- !u!95 &319
-Animator:
-  serializedVersion: 5
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 70}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: aacee4228bd0eb24593d0e68c6f53523, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 1
   m_WriteDefaultValuesOnDisable: 0
 --- !u!95 &321
 Animator:
@@ -14157,9 +14139,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 450, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &452
@@ -14254,9 +14236,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 380, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &467
@@ -14350,9 +14332,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 310, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &476
@@ -14496,9 +14478,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 110, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &488
@@ -14612,9 +14594,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 175, y: -40}
   m_SizeDelta: {x: 50, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &496
@@ -14719,7 +14701,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: 0, y: -80}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 490, y: 80}
   m_Pivot: {x: 1, y: 0}
 --- !u!224 &507
 RectTransform:
@@ -15627,9 +15609,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 240, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &556
@@ -15748,9 +15730,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 505}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 40, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &565
@@ -18164,9 +18146,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 788}
-        m_TargetAssemblyTypeName: DoAnimation, Assembly-CSharp
-        m_MethodName: Play
+      - m_Target: {fileID: 787}
+        m_TargetAssemblyTypeName: MobileAdaptiveSlidePanel, Assembly-CSharp
+        m_MethodName: Toggle
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -20484,6 +20466,20 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 154}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: PanelOpen
+  parentRect: {fileID: 573}
 --- !u!114 &766
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21033,20 +21029,36 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &788
+--- !u!114 &787
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 70}
+  m_GameObject: {fileID: 99}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b180f235caaa22645a1c264dfb31a5a5, type: 3}
+  m_Script: {fileID: 11500000, guid: cbd220f3b69a76948884b9ca424b868b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  animator: {fileID: 319}
-  parameter: Open
+  controlId: FunctionsPanel
+  parentRect: {fileID: 499}
+  horizontalLayout: {fileID: 675}
+  verticalLayout: {fileID: 0}
+  switchLayoutByEdge: 1
+  edgePadding: 8
+  animationTime: 0.2
+  startOpened: 0
+  forceOpenedInEditMode: 1
+  useManualResetPosition: 1
+  resetEdge: 1
+  resetT: 0.5
+  disableRaycastWhenClosed: 1
+  itemSize: {x: 80, y: 80}
+  itemSpacing: 4
+  itemCount: 7
+  panelPadding: {x: 0, y: 0}
+  fadeWhenClosed: 1
 --- !u!114 &789
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21879,6 +21891,20 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -30}
   m_SizeDelta: {x: 480, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &207081467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 141}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: MenuButton
+  parentRect: {fileID: 0}
 --- !u!1 &243806009
 GameObject:
   m_ObjectHideFlags: 0
@@ -23021,6 +23047,7 @@ MonoBehaviour:
   functions: {fileID: 729}
   menuManager: {fileID: 612}
   shopMenuName: Shop
+  earnMenuName: Earn
 --- !u!1 &889525775
 GameObject:
   m_ObjectHideFlags: 0
@@ -23598,6 +23625,20 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1314121949
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Joystick
+  parentRect: {fileID: 573}
 --- !u!1 &1325730437
 GameObject:
   m_ObjectHideFlags: 0
@@ -24355,6 +24396,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1568930514}
   m_CullTransparentMesh: 0
+--- !u!114 &1684926288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 175}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Run
+  parentRect: {fileID: 573}
 --- !u!1 &1739822433
 GameObject:
   m_ObjectHideFlags: 0

@@ -113,7 +113,7 @@ public class Raycast : MonoBehaviour
     {
 #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
 
-    if (Input.GetMouseButtonDown(0))
+    if (InputManager.GetButtonDown("Fire"))
     {
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
@@ -123,14 +123,14 @@ public class Raycast : MonoBehaviour
         ShootRaycast(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
     }
 
-    if (Input.GetMouseButtonUp(0))
+    if (InputManager.GetButtonUp("Fire"))
     {
         End();
     }
 
     if (currentDrag != null)
     {
-        float wheel = Input.GetAxis("Mouse ScrollWheel");
+        float wheel = InputManager.GetAxis("Mouse ScrollWheel");
 
         if (wheel != 0f)
         {
@@ -140,6 +140,7 @@ public class Raycast : MonoBehaviour
             UpdateDistanceUI(currentDrag.distance);
         }
     }
+
 #endif
     }
 

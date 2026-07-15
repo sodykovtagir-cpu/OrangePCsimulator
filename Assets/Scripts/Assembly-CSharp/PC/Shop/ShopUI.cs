@@ -21,46 +21,76 @@ namespace PC.Shop
             add => onBuy += value;
             remove => onBuy -= value;
         }
+
         private Action<ShopItem> onBuy;
 
         public void Init(ShopItem item)
         {
             this.item = item;
-			if (button != null)
-			{
-				button.onClick.AddListener(ButtonDown);
-				button.GetComponentInChildren<Text>().text = Localization.GetText("Purchase");
+
+            if (button != null)
+            {
+                button.onClick.AddListener(ButtonDown);
+
+                Text text = button.GetComponentInChildren<Text>();
+
+                if (text != null)
+                    text.text = Localization.GetText("Purchase");
             }
+
             if (icon != null)
             {
                 icon.sprite = item.sprite;
             }
+
             string displayName = item.itemName;
+
             if (!string.IsNullOrEmpty(displayName))
             {
                 int start = displayName.IndexOf('{');
                 int end = displayName.LastIndexOf('}');
+
                 if (start != -1 && end != -1 && end > start)
                 {
                     string key = displayName.Substring(start + 1, end - start - 1);
                     string value = Localization.GetText(key);
-                    displayName = displayName.Remove(end, 1).Remove(start, 1).Replace(key, value);
+
+                    displayName = displayName
+                        .Remove(end, 1)
+                        .Remove(start, 1)
+                        .Replace(key, value);
                 }
             }
-            if (nameText != null) nameText.text = displayName;
-            if (priceText != null) priceText.text = $"{item.price}$";
-            if (bitcoinText != null) bitcoinText.text = $"{item.bitcoin} BTC";
+
+            if (nameText != null)
+                nameText.text = displayName;
+
+            if (priceText != null)
+                priceText.text = $"{item.price}$";
+
+            if (bitcoinText != null)
+                bitcoinText.text = $"{item.bitcoin} BTC";
+
             if (string.IsNullOrEmpty(item.description))
             {
-                if (more != null) more.SetActive(false);
+                if (more != null)
+                    more.SetActive(false);
             }
+
             UpdateButton();
         }
 
         private void ButtonDown()
         {
+#if UNITY_ANDROID
+            if (MobileCustomizeManager.EditMode)
+                return;
+#endif
+
             var item = this.item;
-            if (item == null) return;
+
+            if (item == null)
+                return;
 
             if (item.IsUnlocked())
             {
@@ -69,20 +99,27 @@ namespace PC.Shop
             }
 
             float bitcoin = BitcoinManager.Bitcoin;
+
             if (item.bitcoin <= bitcoin)
             {
                 BitcoinManager.Bitcoin = bitcoin - item.bitcoin;
+
                 BitcoinManager.Save();
+
                 item.Unlock();
+
                 UpdateButton();
+
                 return;
             }
 
             var main = Main.Instance;
+
             if (main != null)
             {
                 var msg = Localization.GetText("Not enough Bitcoin");
                 msg = "<color=red>" + msg + "</color>";
+
                 main.FadeText(msg);
             }
         }
@@ -90,10 +127,14 @@ namespace PC.Shop
         public void UpdateButton()
         {
             var item = this.item;
-            if (item == null) return;
+
+            if (item == null)
+                return;
 
             var priceLabel = priceText;
-            if (priceLabel == null || priceLabel.gameObject == null) return;
+
+            if (priceLabel == null || priceLabel.gameObject == null)
+                return;
 
             bool unlocked = item.IsUnlocked();
 
@@ -107,15 +148,22 @@ namespace PC.Shop
                     bitcoinText.gameObject.SetActive(false);
 
                 var spawn = item.spawn;
+
                 if (spawn == null)
                 {
-                    if (button != null) button.interactable = false;
-                    if (buttonLabel != null) buttonLabel.text = Localization.GetText("Sold Out");
+                    if (button != null)
+                        button.interactable = false;
+
+                    if (buttonLabel != null)
+                        buttonLabel.text = Localization.GetText("Sold Out");
                 }
                 else
                 {
-                    if (button != null) button.interactable = true;
-                    if (buttonLabel != null) buttonLabel.text = Localization.GetText("Purchase");
+                    if (button != null)
+                        button.interactable = true;
+
+                    if (buttonLabel != null)
+                        buttonLabel.text = Localization.GetText("Purchase");
                 }
             }
             else
@@ -125,8 +173,11 @@ namespace PC.Shop
                 if (bitcoinText != null && bitcoinText.gameObject != null)
                     bitcoinText.gameObject.SetActive(true);
 
-                if (button != null) button.interactable = true;
-                if (buttonLabel != null) buttonLabel.text = Localization.GetText("Unlock");
+                if (button != null)
+                    button.interactable = true;
+
+                if (buttonLabel != null)
+                    buttonLabel.text = Localization.GetText("Unlock");
             }
         }
 
@@ -139,11 +190,15 @@ namespace PC.Shop
                 if (price != null)
                 {
                     price.color = new Color(0f, 0f, 0f, 1f);
+
                     var i = item;
+
                     if (i != null && i.spawn != null)
                     {
                         var btn = button;
-                        if (btn != null) btn.interactable = true;
+
+                        if (btn != null)
+                            btn.interactable = true;
                     }
                 }
             }
@@ -152,22 +207,36 @@ namespace PC.Shop
                 if (price != null)
                 {
                     price.color = new Color(1f, 0f, 0f, 1f);
+
                     var btn = button;
-                    if (btn != null) btn.interactable = false;
+
+                    if (btn != null)
+                        btn.interactable = false;
                 }
             }
         }
 
         public void ShowMore()
         {
+#if UNITY_ANDROID
+            if (MobileCustomizeManager.EditMode)
+                return;
+#endif
+
             var i = item;
-            if (i == null) return;
+
+            if (i == null)
+                return;
 
             var text = i.description;
-            if (i.translateDescription) text = Localization.GetText(text);
+
+            if (i.translateDescription)
+                text = Localization.GetText(text);
 
             var main = Main.Instance;
-            if (main != null) main.FadeText(text);
+
+            if (main != null)
+                main.FadeText(text);
         }
     }
 }
