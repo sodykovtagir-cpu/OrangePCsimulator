@@ -1,112 +1,142 @@
-using System.Globalization;
+﻿using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
-using System.IO;
-using PC.Component.Software;
+
+#if UNITY_STANDALONE || UNITY_EDITOR
+using UnityEditor;
+#endif
+
 public class FileInformation : MonoBehaviour
 {
-	[SerializeField]
-	private InputField nameInput;
+    [Header("Room Name")]
+    [SerializeField] private InputField nameInput;
 
-	[SerializeField]
-	private Button applyButton;
+    [Header("Sign")]
+    [SerializeField] private GameObject sign;
+    [SerializeField] private Text signNameText;
+    [SerializeField] private InputField signInput;   // ✅ Новый input
 
-	[SerializeField]
-	private AudioSource source;
+    [SerializeField] private Button applyButton;
+    [SerializeField] private AudioSource source;
+    [SerializeField] private AudioClip warningSound;
+    [SerializeField] private Text playtimeText;
+    [SerializeField] private Text fileLocationText;
 
-	[SerializeField]
-	private AudioClip warningSound;
+    [SerializeField] private MessageBox messageBox;
+    [SerializeField] private FileMenu fileMenu;
+    [SerializeField] private GameObject exportButton;
+    [SerializeField] private ConfirmationDialog deleteConfirmationDialog;
 
-	[SerializeField]
-	private Text playtimeText;
+    private FileMenu.Load load;
+    private MenuManager menuManager;
 
-	[SerializeField]
-	private Text fileLocationText;
+    private void Start()
+    {
+        menuManager = GetComponentInParent<MenuManager>();
 
-	[SerializeField]
-	private GameObject sign;
+#if UNITY_ANDROID || UNITY_IOS
+        if (!NativeFilePicker.CanExportFiles())
+            exportButton.SetActive(false);
+#else
+        exportButton.SetActive(true);
+#endif
+    }
 
-	[SerializeField]
-	private Text signNameText;
+    public void Show(FileMenu.Load load)
+    {
+        this.load = load;
 
-	[SerializeField]
-	private MessageBox messageBox;
+        if (load == null || load.loader == null)
+            return;
 
-	[SerializeField]
-	private FileMenu fileMenu;
+        sign.SetActive(true);
 
-	[SerializeField]
-	private GameObject exportButton;
+        // ✅ Если в старом сохранении sign null — создаём пустую строку
+        if (load.loader.GameData.sign == null)
+            load.loader.GameData.sign = "";
 
-	[SerializeField]
-	private ConfirmationDialog deleteConfirmationDialog;
+        // Показываем значения
+        nameInput.text = load.loader.GameData.roomName;
+        signInput.text = load.loader.GameData.sign;
+        signNameText.text = string.IsNullOrEmpty(load.loader.GameData.sign)
+            ? "No Sign"
+            : load.loader.GameData.sign;
 
-	private FileMenu.Load load;
+        playtimeText.text =
+            Localization.GetText("Playing Time") + ":\n" +
+            (load.loader.GameData.playtime / 60f).ToString("0.00") + " min";
 
-	private string oldName;
+        fileLocationText.text = Path.GetFileName(load.loader.Path);
+    }
 
-	private MenuManager menuManager;
+    // ✅ Сохранение изменений
+    public void ApplyEdit()
+    {
+        if (load == null || load.loader == null)
+            return;
 
-	private void Start()
-	{
-		menuManager = GetComponentInParent<MenuManager>();
-		if (!NativeFilePicker.CanExportFiles())
-			exportButton.gameObject.SetActive(false); 
-	}
+        load.loader.GameData.roomName = nameInput.text;
+        load.loader.GameData.sign = signInput.text;  // ✅ Сохраняем sign
 
-	public void Show(FileMenu.Load load)
-	{
-		this.load = load;
-		sign.SetActive(load.loader.GameData.sign != "");
-		signNameText.text = load.loader.GameData.sign != "" ? load.loader.GameData.sign : "-";
-		nameInput.text = load.loader.GameData.roomName;
-		// playtime
-		playtimeText.text = string.Format("{0}:\n{1}", Localization.GetText("Playing Time"), (load.loader.GameData.playtime / 60f).ToString("0.00") + " min");
-		fileLocationText.text = Path.GetFileName(load.loader.Path);
-	}
+        load.loader.WriteToFile();
 
-	public void Export()
-	{
-		var l = load;
-		if (l == null || l.loader == null) return;
+        fileMenu.RefreshLoadButton(load);
+        menuManager.Back();
+    }
 
-		NativeFilePicker.FilesExportedCallback cb = success =>
-		{
-			if (success) return;
-			var mb = messageBox;
-			if (mb != null) mb.Show("No permission to open the file.");
-		};
+    // ✅ Обновление текста таблички в реальном времени
+    public void OnSignValueChanged(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            signNameText.text = "No Sign";
+        else
+            signNameText.text = value;
+    }
 
-		NativeFilePicker.ExportFile(l.loader.Path, cb);
-	}
+    // ✅ EXPORT
+    public void Export()
+    {
+        if (load == null || load.loader == null)
+            return;
 
-	public void ApplyEdit()
-	{
-		
-		load.loader.GameData.roomName = nameInput.text;
-		load.loader.WriteToFile();
-		fileMenu.RefreshLoadButton(load);
-		menuManager.Back();
-	}
+#if UNITY_STANDALONE || UNITY_EDITOR
 
-	public void OnValueChangedName(string name)
-	{
-		nameInput.text = SceneSettings.CheckName(name);
-		applyButton.interactable = load.loader.GameData.roomName != name || !string.IsNullOrEmpty(name) ? true : false;
-	}
+        string savePath = EditorUtility.SaveFilePanel(
+            "Export Save File",
+            "",
+            Path.GetFileName(load.loader.Path),
+            "sav");
 
-	public void AskDeleteMessage()
-	{
-		source.PlayOneShot(warningSound);
-		deleteConfirmationDialog.Show(() =>
-		{
-			Delete();
-		});
-	}
+        if (!string.IsNullOrEmpty(savePath))
+        {
+            File.Copy(load.loader.Path, savePath, true);
+            Debug.Log("File exported to: " + savePath);
+        }
 
-	private void Delete()
-	{
-		fileMenu.DeleteLoadButton(load);
-		menuManager.Back();
-	}
+#else
+
+        NativeFilePicker.ExportFile(load.loader.Path, (success) =>
+        {
+            if (!success)
+                messageBox?.Show("No permission to export the file.");
+        });
+
+#endif
+    }
+
+    public void AskDeleteMessage()
+    {
+        source?.PlayOneShot(warningSound);
+
+        deleteConfirmationDialog.Show(() =>
+        {
+            Delete();
+        });
+    }
+
+    private void Delete()
+    {
+        fileMenu.DeleteLoadButton(load);
+        menuManager.Back();
+    }
 }
