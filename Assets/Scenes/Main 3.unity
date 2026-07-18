@@ -22509,6 +22509,7 @@ MonoBehaviour:
   functions: {fileID: 798}
   menuManager: {fileID: 789}
   shopMenuName: Shop
+  earnMenuName: Earn
 --- !u!1 &693313878
 GameObject:
   m_ObjectHideFlags: 0

@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: MTS
+  m_Name: CapretFull
   m_EditorClassIdentifier: 
-  itemName: MTS HD 5870
-  price: 200
+  itemName: Capret Full
+  price: 250
   bitcoin: 5
-  sprite: {fileID: 21300000, guid: 384cb7394fb0c474182cc66cd31d0202, type: 3}
-  spawn: {fileID: 1438329104793688, guid: d8f57662b8c313647b188bc7a4ef154b, type: 3}
-  large: 0
+  sprite: {fileID: 0}
+  spawn: {fileID: 0}
+  large: 1
   translateDescription: 1
   description: 
