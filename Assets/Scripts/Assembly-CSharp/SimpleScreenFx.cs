@@ -13,13 +13,16 @@ public class SimpleScreenFx : MonoBehaviour
 
 	private void OnDestroy()
 	{
-		if (prev != null)
-		{
-			prev.Release();
-			Destroy(prev);
-			prev = null;
-		}
+		ReleasePrev();
 		if (mat != null) Destroy(mat);
+	}
+
+	private void ReleasePrev()
+	{
+		if (prev == null) return;
+		prev.Release();
+		Destroy(prev);
+		prev = null;
 	}
 
 	private Material Mat()
@@ -41,19 +44,23 @@ public class SimpleScreenFx : MonoBehaviour
 	{
 		var m = Mat();
 		bool any = bloom || vignette || chromatic || motionBlur;
-		if (m == null || !any)
+		if (m == null || !any || src == null)
 		{
 			Graphics.Blit(src, dest);
 			return;
 		}
 
+		int w = src.width;
+		int h = src.height;
+		var fmt = src.format;
+
 		RenderTexture bloomTex = null;
 		if (bloom)
 		{
-			int w = Mathf.Max(8, src.width / 4);
-			int h = Mathf.Max(8, src.height / 4);
-			var rt0 = RenderTexture.GetTemporary(w, h, 0, src.format);
-			var rt1 = RenderTexture.GetTemporary(w, h, 0, src.format);
+			int bw = Mathf.Max(8, w / 4);
+			int bh = Mathf.Max(8, h / 4);
+			var rt0 = RenderTexture.GetTemporary(bw, bh, 0, fmt);
+			var rt1 = RenderTexture.GetTemporary(bw, bh, 0, fmt);
 			m.SetFloat("_Threshold", 0.72f);
 			Graphics.Blit(src, rt0, m, 0);
 			Graphics.Blit(rt0, rt1, m, 1);
@@ -74,28 +81,27 @@ public class SimpleScreenFx : MonoBehaviour
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
 		m.SetFloat("_Motion", motionBlur ? 1f : 0f);
 
-		if (prev != null)
+		if (prev != null && prev.IsCreated())
 			m.SetTexture("_PrevTex", prev);
 		else
 			m.SetTexture("_PrevTex", src);
 
-		Graphics.Blit(src, dest, m, 3);
+		var composed = RenderTexture.GetTemporary(w, h, 0, fmt);
+		Graphics.Blit(src, composed, m, 3);
+		Graphics.Blit(composed, dest);
 
 		if (motionBlur)
 		{
-			if (prev == null || prev.width != dest.width || prev.height != dest.height)
+			if (prev == null || !prev.IsCreated() || prev.width != w || prev.height != h)
 			{
-				if (prev != null)
-				{
-					prev.Release();
-					Destroy(prev);
-				}
-				prev = new RenderTexture(dest.width, dest.height, 0, src.format);
+				ReleasePrev();
+				prev = new RenderTexture(w, h, 0, fmt);
 				prev.Create();
 			}
-			Graphics.Blit(dest, prev);
+			Graphics.Blit(composed, prev);
 		}
 
+		RenderTexture.ReleaseTemporary(composed);
 		if (bloomTex != null)
 			RenderTexture.ReleaseTemporary(bloomTex);
 	}
