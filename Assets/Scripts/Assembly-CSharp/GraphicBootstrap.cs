@@ -218,7 +218,6 @@ public static class GraphicsBootstrap
 		{
 			bloom.intensity.Override(on ? 2.5f : 0f);
 		});
-		SetFx(ao, "PP_AO", 0, null);
 		SetFx(vignette, "PP_Vignette", 0, on =>
 		{
 			vignette.intensity.Override(on ? 0.35f : 0f);
