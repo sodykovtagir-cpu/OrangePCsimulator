@@ -31,14 +31,20 @@ public class FileMenu : MonoBehaviour
 	[SerializeField]
 	private MessageBox messageBox;
 
+	public static FileMenu Instance { get; private set; }
+
 	private List<Load> loads;
 
 	[SerializeField]
 	private FileInformation fileInformation;
 
+	private void Awake()
+	{
+		Instance = this;
+	}
+
 	private void Start()
 	{
-		// init
 		loads = new List<Load>();
 		string fpath = SaveUtility.GetFolderPath();
 		string pattern = "*" + SaveUtility.extension;
@@ -93,6 +99,28 @@ public class FileMenu : MonoBehaviour
 	{
 		menuManager.ShowMenu("FileInformation");
 		fileInformation.Show(load);
+	}
+
+	public void RebuildList()
+	{
+		if (loads == null) loads = new List<Load>();
+		loads.Clear();
+		if (slotParent != null)
+		{
+			for (int i = slotParent.childCount - 1; i >= 0; i--)
+				Destroy(slotParent.GetChild(i).gameObject);
+		}
+		string fpath = SaveUtility.GetFolderPath();
+		string pattern = "*" + SaveUtility.extension;
+		var nList = new Dictionary<string, DateTime>();
+		if (Directory.Exists(fpath))
+		{
+			foreach (var b in Directory.GetFiles(fpath, pattern))
+				nList[b] = File.GetLastWriteTime(b);
+		}
+		foreach (var x in nList.OrderByDescending(kvp => kvp.Value))
+			AddSlot(x.Key);
+		if (empty != null) empty.SetActive(loads.Count == 0);
 	}
 
 	public void RefreshLoadButton(Load load)

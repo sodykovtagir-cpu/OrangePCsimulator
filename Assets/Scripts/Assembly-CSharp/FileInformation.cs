@@ -68,6 +68,12 @@ public class FileInformation : MonoBehaviour
 		signNameText.text = string.IsNullOrEmpty(load.loader.GameData.sign) ? "No Sign" : load.loader.GameData.sign;
 		playtimeText.text = Localization.GetText("Playing Time") + ":\n" + (load.loader.GameData.playtime / 60f).ToString("0.00") + " min";
 		fileLocationText.text = Path.GetFileName(load.loader.Path);
+		if (load.loader.GameData.workshopId > 0 && !string.IsNullOrEmpty(load.loader.GameData.workshopKey))
+		{
+			WorkshopLocal.Put(load.loader.Path, load.loader.GameData.workshopId, load.loader.GameData.workshopKey);
+			load.loader.GameData.workshopKey = "";
+			load.loader.WriteToFile();
+		}
 		coverJpg = null;
 		RefreshWorkshopButtons();
 		if (publishPanel != null) publishPanel.SetActive(false);
@@ -80,10 +86,10 @@ public class FileInformation : MonoBehaviour
 		if (publishPanel != null) publishPanel.SetActive(true);
 		ShowPublishFields();
 		FillPublishForm(null);
-		SetWsStatus(IsPublished() ? "Loading listing..." : "New upload");
-		if (!IsPublished()) return;
+		SetWsStatus(IsOwner() ? "Loading listing..." : "New upload");
+		if (!IsOwner()) return;
 		EnsureWorkshopClient();
-		int id = load.loader.GameData.workshopId;
+		int id = OwnerId();
 		WorkshopClient.Instance.ListSaves((list, err) =>
 		{
 			if (err != null) { SetWsStatus(err); return; }
@@ -192,12 +198,21 @@ public class FileInformation : MonoBehaviour
 		load.loader.GameData.workshopAuthor = author;
 		load.loader.GameData.workshopDesc = desc;
 		SetWsStatus("Uploading...");
-		if (IsPublished())
+		if (IsOwner())
 		{
-			WorkshopClient.Instance.UpdateSave(load.loader.GameData.workshopId, load.loader.GameData.workshopKey,
+			WorkshopLocalRec rec;
+			WorkshopLocal.TryGet(load.loader.Path, out rec);
+			int wid = rec != null ? rec.id : load.loader.GameData.workshopId;
+			string wkey = rec != null ? rec.key : load.loader.GameData.workshopKey;
+			WorkshopClient.Instance.UpdateSave(wid, wkey,
 				load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
 				{
 					if (err != null) { SetWsStatus(err); return; }
+					if (!string.IsNullOrEmpty(key))
+						WorkshopLocal.Put(load.loader.Path, id > 0 ? id : wid, key);
+					load.loader.GameData.workshopId = id > 0 ? id : wid;
+					load.loader.GameData.workshopKey = "";
+					load.loader.WriteToFile();
 					SetWsStatus("Updated");
 					RefreshWorkshopButtons();
 				});
@@ -207,8 +222,9 @@ public class FileInformation : MonoBehaviour
 			WorkshopClient.Instance.Upload(load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
 			{
 				if (err != null) { SetWsStatus(err); return; }
+				WorkshopLocal.Put(load.loader.Path, id, key);
 				load.loader.GameData.workshopId = id;
-				load.loader.GameData.workshopKey = key;
+				load.loader.GameData.workshopKey = "";
 				load.loader.WriteToFile();
 				SetWsStatus("Published #" + id);
 				RefreshWorkshopButtons();
@@ -218,12 +234,17 @@ public class FileInformation : MonoBehaviour
 
 	public void DeleteFromWorkshop()
 	{
-		if (!IsPublished()) return;
+		if (!IsOwner()) return;
 		EnsureWorkshopClient();
 		SetWsStatus("Deleting...");
-		WorkshopClient.Instance.DeleteSave(load.loader.GameData.workshopId, load.loader.GameData.workshopKey, err =>
+		WorkshopLocalRec rec;
+		WorkshopLocal.TryGet(load.loader.Path, out rec);
+		int wid = rec != null ? rec.id : load.loader.GameData.workshopId;
+		string wkey = rec != null ? rec.key : load.loader.GameData.workshopKey;
+		WorkshopClient.Instance.DeleteSave(wid, wkey, err =>
 		{
 			if (err != null) { SetWsStatus(err); return; }
+			WorkshopLocal.Remove(load.loader.Path);
 			load.loader.GameData.workshopId = 0;
 			load.loader.GameData.workshopKey = "";
 			load.loader.WriteToFile();
