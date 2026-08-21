@@ -87,8 +87,8 @@ public class SimpleScreenFx : MonoBehaviour
 		{
 			// Same trail length on 30fps phone and 120fps PC (~55ms persistence).
 			float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.008f, 0.05f);
-			motionKeep = Mathf.Exp(-dt / 0.055f);
-			motionKeep = Mathf.Clamp(motionKeep, 0.40f, 0.82f);
+			motionKeep = Mathf.Exp(-dt / 0.018f);
+			motionKeep = Mathf.Clamp(motionKeep, 0.18f, 0.38f);
 		}
 		m.SetFloat("_Motion", motionKeep);
 
