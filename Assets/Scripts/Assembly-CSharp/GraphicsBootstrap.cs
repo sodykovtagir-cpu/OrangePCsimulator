@@ -65,7 +65,8 @@ public static class GraphicsBootstrap
 	public static void ApplyRTX()
 	{
 		bool enabled = PlayerPrefs.GetInt("RTXMode", 0) == 1;
-		// MSAA kills Post Processing motion blur / AO. Use FXAA on the PP layer instead.
+		// MSAA (в т.ч. 8x в RTX-режиме) конфликтует с OnRenderImage-эффектами,
+		// поэтому SimpleScreenFx отрабатывает на уже зарезолвленном кадре.
 		QualitySettings.antiAliasing = enabled ? 8 : 4;
 		if (enabled)
 		{
@@ -119,6 +120,10 @@ public static class GraphicsBootstrap
 	private static void SetupCamera(Camera cam)
 	{
 		if (cam == null) return;
+		// Пропускаем камеры, которые рендерят в RenderTexture (экраны внутриигровых
+		// мониторов из DisplayManager): пост-эффекты там не нужны — это портит
+		// картинку на мониторах и жжёт производительность лишними blit-проходами.
+		if (cam.targetTexture != null) return;
 		cam.allowHDR = true;
 		cam.allowMSAA = true;
 		if (PlayerPrefs.GetInt("PP_AO", 0) == 1)
