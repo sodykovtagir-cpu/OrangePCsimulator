@@ -93,6 +93,9 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			float _Vignette;
 			float _Chromatic;
 			float _Motion;
+			float _AO;
+			float4 _MainTex_TexelSize;
+			UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
 			struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 			v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
 			fixed4 frag(v2f i) : SV_Target
@@ -101,6 +104,21 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				float2 n = uv * 2.0 - 1.0;
 
 				float3 col = tex2D(_MainTex, uv).rgb;
+
+				if (_AO > 0.001)
+				{
+					float d = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
+					float2 t = _MainTex_TexelSize.xy * 2.5;
+					float occ = 0;
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(t.x, 0)))) * 2.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(-t.x, 0)))) * 2.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, t.y)))) * 2.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, -t.y)))) * 2.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + t))) * 2.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv - t))) * 2.0);
+					occ = saturate(occ / 6.0);
+					col *= 1.0 - occ * _AO;
+				}
 
 				if (_Chromatic > 0.001)
 				{

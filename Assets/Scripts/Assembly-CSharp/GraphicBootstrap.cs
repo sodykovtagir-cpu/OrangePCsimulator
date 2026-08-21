@@ -121,6 +121,8 @@ public static class GraphicsBootstrap
 		if (cam == null) return;
 		cam.allowHDR = true;
 		cam.allowMSAA = false;
+		if (PlayerPrefs.GetInt("PP_AO", 0) == 1)
+			cam.depthTextureMode |= DepthTextureMode.Depth;
 
 		var fx = cam.GetComponent<SimpleScreenFx>();
 		if (fx == null)
@@ -130,6 +132,7 @@ public static class GraphicsBootstrap
 		fx.vignette = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
 		fx.chromatic = PlayerPrefs.GetInt("PP_Chromatic", 0) == 1;
 		fx.motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
+		fx.ao = PlayerPrefs.GetInt("PP_AO", 0) == 1;
 		fx.enabled = true;
 	}
 

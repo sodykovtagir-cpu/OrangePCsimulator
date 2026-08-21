@@ -7,6 +7,7 @@ public class SimpleScreenFx : MonoBehaviour
 	public bool vignette;
 	public bool chromatic;
 	public bool motionBlur;
+	public bool ao;
 
 	private Material mat;
 	private RenderTexture prev;
@@ -43,7 +44,7 @@ public class SimpleScreenFx : MonoBehaviour
 	private void OnRenderImage(RenderTexture src, RenderTexture dest)
 	{
 		var m = Mat();
-		bool any = bloom || vignette || chromatic || motionBlur;
+		bool any = bloom || vignette || chromatic || motionBlur || ao;
 		if (m == null || !any || src == null)
 		{
 			Graphics.Blit(src, dest);
@@ -61,7 +62,7 @@ public class SimpleScreenFx : MonoBehaviour
 			int bh = Mathf.Max(8, h / 4);
 			var rt0 = RenderTexture.GetTemporary(bw, bh, 0, fmt);
 			var rt1 = RenderTexture.GetTemporary(bw, bh, 0, fmt);
-			m.SetFloat("_Threshold", 0.72f);
+			m.SetFloat("_Threshold", 0.82f);
 			Graphics.Blit(src, rt0, m, 0);
 			Graphics.Blit(rt0, rt1, m, 1);
 			Graphics.Blit(rt1, rt0, m, 2);
@@ -70,7 +71,7 @@ public class SimpleScreenFx : MonoBehaviour
 			bloomTex = rt0;
 			RenderTexture.ReleaseTemporary(rt1);
 			m.SetTexture("_BloomTex", bloomTex);
-			m.SetFloat("_Bloom", 0.85f);
+			m.SetFloat("_Bloom", 0.32f);
 		}
 		else
 		{
@@ -80,6 +81,7 @@ public class SimpleScreenFx : MonoBehaviour
 		m.SetFloat("_Vignette", vignette ? 0.38f : 0f);
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
 		m.SetFloat("_Motion", motionBlur ? 1f : 0f);
+		m.SetFloat("_AO", ao ? 0.55f : 0f);
 
 		if (prev != null && prev.IsCreated())
 			m.SetTexture("_PrevTex", prev);
