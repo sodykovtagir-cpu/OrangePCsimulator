@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -21,6 +21,10 @@ public class TrashBag : Item
 
         GameObject root = FindBoxRoot(other);
         if (root == null) return;
+
+        // Чистим ссылки на уничтоженные объекты, чтобы набор не рос вечно.
+        if (collectedRoots.Count > 0)
+            collectedRoots.RemoveWhere(r => r == null);
 
         if (collectedRoots.Contains(root)) return;
 
