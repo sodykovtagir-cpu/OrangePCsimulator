@@ -64,7 +64,7 @@ namespace PC.Component.Software.OS
                 return;
             }
 
-            // Берём максимальное разрешение из выбранного принтера
+            // Р‘РµСЂС‘Рј РјР°РєСЃРёРјР°Р»СЊРЅРѕРµ СЂР°Р·СЂРµС€РµРЅРёРµ РёР· РІС‹Р±СЂР°РЅРЅРѕРіРѕ РїСЂРёРЅС‚РµСЂР°
             var detail = devices[index];
             var printer = os != null ? os.ConnectDevice<Printer>(detail.id) : null;
             int maxRes = printer != null ? printer.MaxResolution : 32;

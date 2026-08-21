@@ -5,19 +5,19 @@ public class MobileCustomizeManager : MonoBehaviour
 {
     public static bool EditMode { get; private set; }
 
-    [Header("Превью раскладки, которое двигаем")]
+    [Header("РџСЂРµРІСЊСЋ СЂР°СЃРєР»Р°РґРєРё, РєРѕС‚РѕСЂРѕРµ РґРІРёРіР°РµРј")]
     [SerializeField]
     private GameObject previewPanel;
 
-    [Header("Root, внутри которого лежат draggable preview-кнопки")]
+    [Header("Root, РІРЅСѓС‚СЂРё РєРѕС‚РѕСЂРѕРіРѕ Р»РµР¶Р°С‚ draggable preview-РєРЅРѕРїРєРё")]
     [SerializeField]
     private RectTransform controlsRoot;
 
-    [Header("Обычная панель: Редактировать / Назад")]
+    [Header("РћР±С‹С‡РЅР°СЏ РїР°РЅРµР»СЊ: Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ / РќР°Р·Р°Рґ")]
     [SerializeField]
     private GameObject normalPanel;
 
-    [Header("Панель редактирования: Сохранить / Отмена / Reset")]
+    [Header("РџР°РЅРµР»СЊ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ: РЎРѕС…СЂР°РЅРёС‚СЊ / РћС‚РјРµРЅР° / Reset")]
     [SerializeField]
     private GameObject editPanel;
 
@@ -65,7 +65,7 @@ public class MobileCustomizeManager : MonoBehaviour
     {
         if (controlsRoot == null)
         {
-            Debug.LogError("MobileCustomizeManager: Controls Root не указан.");
+            Debug.LogError("MobileCustomizeManager: Controls Root РЅРµ СѓРєР°Р·Р°РЅ.");
             controls = new MobileFreeDraggable[0];
             adaptivePanels = new MobileAdaptiveSlidePanel[0];
             return;
@@ -84,7 +84,7 @@ public class MobileCustomizeManager : MonoBehaviour
 
         RefreshControls();
 
-        // Не вызываем ApplySavedLayout тут, чтобы не откатить уже передвинутые элементы.
+        // РќРµ РІС‹Р·С‹РІР°РµРј ApplySavedLayout С‚СѓС‚, С‡С‚РѕР±С‹ РЅРµ РѕС‚РєР°С‚РёС‚СЊ СѓР¶Рµ РїРµСЂРµРґРІРёРЅСѓС‚С‹Рµ СЌР»РµРјРµРЅС‚С‹.
         SetEditMode(true);
     }
 
@@ -97,7 +97,7 @@ public class MobileCustomizeManager : MonoBehaviour
 
         SetEditMode(false);
 
-        // Превью оставляем видимым.
+        // РџСЂРµРІСЊСЋ РѕСЃС‚Р°РІР»СЏРµРј РІРёРґРёРјС‹Рј.
         if (previewPanel != null)
             previewPanel.SetActive(true);
     }
@@ -182,8 +182,8 @@ public class MobileCustomizeManager : MonoBehaviour
         if (editPanel != null)
             editPanel.SetActive(value);
 
-        // ВАЖНО:
-        // previewPanel не выключаем тут.
-        // Она должна быть видна и в обычном режиме, и в режиме редактирования.
+        // Р’РђР–РќРћ:
+        // previewPanel РЅРµ РІС‹РєР»СЋС‡Р°РµРј С‚СѓС‚.
+        // РћРЅР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РІРёРґРЅР° Рё РІ РѕР±С‹С‡РЅРѕРј СЂРµР¶РёРјРµ, Рё РІ СЂРµР¶РёРјРµ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ.
     }
 }

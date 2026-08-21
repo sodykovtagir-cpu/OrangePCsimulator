@@ -46,8 +46,8 @@ public class MainMenu : MonoBehaviour
     {
         FpsSetting.RestoreSetting();
 
-        // Настройки разрешения/RTX/отражений применяются автоматически
-        // через GraphicsBootstrap при старте игры и при загрузке сцен.
+        // РќР°СЃС‚СЂРѕР№РєРё СЂР°Р·СЂРµС€РµРЅРёСЏ/RTX/РѕС‚СЂР°Р¶РµРЅРёР№ РїСЂРёРјРµРЅСЏСЋС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё
+        // С‡РµСЂРµР· GraphicsBootstrap РїСЂРё СЃС‚Р°СЂС‚Рµ РёРіСЂС‹ Рё РїСЂРё Р·Р°РіСЂСѓР·РєРµ СЃС†РµРЅ.
 
         if (PlayerPrefs.GetInt("TutorialVersion", -1) < tutorialVersion)
         {

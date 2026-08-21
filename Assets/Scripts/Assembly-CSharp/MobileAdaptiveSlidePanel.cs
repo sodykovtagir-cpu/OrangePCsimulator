@@ -21,15 +21,15 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
         EndCorner = 2
     }
 
-    [Header("ID сохранения")]
+    [Header("ID СЃРѕС…СЂР°РЅРµРЅРёСЏ")]
     [SerializeField]
     private string controlId = "FunctionsPanel";
 
-    [Header("Родительская область")]
+    [Header("Р РѕРґРёС‚РµР»СЊСЃРєР°СЏ РѕР±Р»Р°СЃС‚СЊ")]
     [SerializeField]
     private RectTransform parentRect;
 
-    [Header("Настройки панели")]
+    [Header("РќР°СЃС‚СЂРѕР№РєРё РїР°РЅРµР»Рё")]
     [SerializeField]
     private float edgePadding = 8f;
 
@@ -42,7 +42,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [SerializeField]
     private bool forceOpenedInEditMode = true;
 
-    [Header("Reset позиция")]
+    [Header("Reset РїРѕР·РёС†РёСЏ")]
     [SerializeField]
     private bool useManualResetPosition = true;
 
@@ -53,7 +53,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [Range(0f, 1f)]
     private float resetT = 0.5f;
 
-    [Header("Умная привязка панели к углам")]
+    [Header("РЈРјРЅР°СЏ РїСЂРёРІСЏР·РєР° РїР°РЅРµР»Рё Рє СѓРіР»Р°Рј")]
     [SerializeField]
     private bool useSmartEdgeAnchors = true;
 
@@ -61,7 +61,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [Range(0.02f, 0.35f)]
     private float cornerSnapZone = 0.16f;
 
-    [Header("Визуал")]
+    [Header("Р’РёР·СѓР°Р»")]
     [SerializeField]
     private bool counterRotateIcons = true;
 
@@ -71,7 +71,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [SerializeField]
     private bool disableRaycastWhenClosed = true;
 
-    [Header("Если не заполнить, скрипт сам найдёт Button внутри панели")]
+    [Header("Р•СЃР»Рё РЅРµ Р·Р°РїРѕР»РЅРёС‚СЊ, СЃРєСЂРёРїС‚ СЃР°Рј РЅР°Р№РґС‘С‚ Button РІРЅСѓС‚СЂРё РїР°РЅРµР»Рё")]
     [SerializeField]
     private RectTransform[] iconRects;
 
@@ -147,7 +147,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
 
         if (rect == null)
         {
-            Debug.LogError(name + ": MobileAdaptiveSlidePanel должен висеть на UI объекте с RectTransform.");
+            Debug.LogError(name + ": MobileAdaptiveSlidePanel РґРѕР»Р¶РµРЅ РІРёСЃРµС‚СЊ РЅР° UI РѕР±СЉРµРєС‚Рµ СЃ RectTransform.");
             return false;
         }
 
@@ -453,16 +453,16 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     private Vector2 GetPivotForEdge()
     {
         /*
-         * Панель поворачивается целиком.
-         * Чтобы она нормально стояла в углах, pivot должен меняться.
+         * РџР°РЅРµР»СЊ РїРѕРІРѕСЂР°С‡РёРІР°РµС‚СЃСЏ С†РµР»РёРєРѕРј.
+         * Р§С‚РѕР±С‹ РѕРЅР° РЅРѕСЂРјР°Р»СЊРЅРѕ СЃС‚РѕСЏР»Р° РІ СѓРіР»Р°С…, pivot РґРѕР»Р¶РµРЅ РјРµРЅСЏС‚СЊСЃСЏ.
          *
          * StartCorner:
-         * Left/Right = низ края.
-         * Top/Bottom = левый край.
+         * Left/Right = РЅРёР· РєСЂР°СЏ.
+         * Top/Bottom = Р»РµРІС‹Р№ РєСЂР°Р№.
          *
          * EndCorner:
-         * Left/Right = верх края.
-         * Top/Bottom = правый край.
+         * Left/Right = РІРµСЂС… РєСЂР°СЏ.
+         * Top/Bottom = РїСЂР°РІС‹Р№ РєСЂР°Р№.
          */
 
         if (!useSmartEdgeAnchors || edgeAnchorSlot == EdgeAnchorSlot.Free)

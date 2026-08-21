@@ -109,7 +109,7 @@ public class CoverImage : MaskableGraphic
         float spriteAspect = spriteSize.x / spriteSize.y;
         float rectAspect = rect.width / rect.height;
 
-        // Картинка шире экрана - обрезаем слева и справа
+        // РљР°СЂС‚РёРЅРєР° С€РёСЂРµ СЌРєСЂР°РЅР° - РѕР±СЂРµР·Р°РµРј СЃР»РµРІР° Рё СЃРїСЂР°РІР°
         if (spriteAspect > rectAspect)
         {
             float visibleWidth = rectAspect / spriteAspect;
@@ -117,7 +117,7 @@ public class CoverImage : MaskableGraphic
 
             return new Vector4(x, 0f, x + visibleWidth, 1f);
         }
-        // Картинка выше экрана - обрезаем сверху и снизу
+        // РљР°СЂС‚РёРЅРєР° РІС‹С€Рµ СЌРєСЂР°РЅР° - РѕР±СЂРµР·Р°РµРј СЃРІРµСЂС…Сѓ Рё СЃРЅРёР·Сѓ
         else
         {
             float visibleHeight = spriteAspect / rectAspect;

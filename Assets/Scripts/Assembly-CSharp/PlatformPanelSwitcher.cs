@@ -2,15 +2,15 @@ using UnityEngine;
 
 public class PlatformPanelsSwitcher : MonoBehaviour
 {
-    [Header("Панель ПК-биндов")]
+    [Header("РџР°РЅРµР»СЊ РџРљ-Р±РёРЅРґРѕРІ")]
     [SerializeField]
     private GameObject pcPanel;
 
-    [Header("Панель мобильной настройки")]
+    [Header("РџР°РЅРµР»СЊ РјРѕР±РёР»СЊРЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРё")]
     [SerializeField]
     private GameObject mobilePanel;
 
-    [Header("Для теста в Editor показывать mobile")]
+    [Header("Р”Р»СЏ С‚РµСЃС‚Р° РІ Editor РїРѕРєР°Р·С‹РІР°С‚СЊ mobile")]
     [SerializeField]
     private bool showMobileInEditor;
 

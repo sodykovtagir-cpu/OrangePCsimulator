@@ -128,7 +128,7 @@ public class AirConditioner : MonoBehaviour
 
     private void HandleScrollInput()
     {
-        // работаем только если слайдер существует и активен
+        // СЂР°Р±РѕС‚Р°РµРј С‚РѕР»СЊРєРѕ РµСЃР»Рё СЃР»Р°Р№РґРµСЂ СЃСѓС‰РµСЃС‚РІСѓРµС‚ Рё Р°РєС‚РёРІРµРЅ
         if (slider == null || !slider.gameObject.activeInHierarchy) return;
 
         float scroll = Input.mouseScrollDelta.y;

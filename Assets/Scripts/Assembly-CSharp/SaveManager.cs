@@ -155,7 +155,7 @@ public class SaveManager : MonoBehaviour
 
         if (cdat.itemData != null && cdat.itemData.Length > 0)
         {
-            // ====== ФИКС: удаляем все стартовые предметы перед загрузкой ======
+            // ====== Р¤РРљРЎ: СѓРґР°Р»СЏРµРј РІСЃРµ СЃС‚Р°СЂС‚РѕРІС‹Рµ РїСЂРµРґРјРµС‚С‹ РїРµСЂРµРґ Р·Р°РіСЂСѓР·РєРѕР№ ======
             var existingItems = FindObjectsOfType<Item>();
             foreach (var existing in existingItems)
             {

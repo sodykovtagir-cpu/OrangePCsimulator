@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Даем псевдоним GameOS, чтобы Unity не путала игровую ОС со стандартной системной
+// Р”Р°РµРј РїСЃРµРІРґРѕРЅРёРј GameOS, С‡С‚РѕР±С‹ Unity РЅРµ РїСѓС‚Р°Р»Р° РёРіСЂРѕРІСѓСЋ РћРЎ СЃРѕ СЃС‚Р°РЅРґР°СЂС‚РЅРѕР№ СЃРёСЃС‚РµРјРЅРѕР№
 using GameOS = PC.Component.Software.OS.OperatingSystem;
 
 namespace PC.Component.Software
@@ -56,10 +56,10 @@ namespace PC.Component.Software
         }
 
         // ==========================================
-        // ЛОГИКА ОБОЕВ
+        // Р›РћР“РРљРђ РћР‘РћР•Р’
         // ==========================================
 
-        // ЭТУ ФУНКЦИЮ ПОВЕСИТЬ НА КНОПКУ "Set" РЯДОМ С "Custom background"
+        // Р­РўРЈ Р¤РЈРќРљР¦РР® РџРћР’Р•РЎРРўР¬ РќРђ РљРќРћРџРљРЈ "Set" Р РЇР”РћРњ РЎ "Custom background"
         public void SelectCustomBackground()
         {
             var os = system as GameOS;
@@ -68,15 +68,15 @@ namespace PC.Component.Software
             Action<File> cb = file =>
             {
                 if (file == null) return;
-                // Сохраняем в систему новые обои
+                // РЎРѕС…СЂР°РЅСЏРµРј РІ СЃРёСЃС‚РµРјСѓ РЅРѕРІС‹Рµ РѕР±РѕРё
                 os.SetCustomBackgroundPath(file.path);
             };
 
-            // Открываем проводник для поиска картинок
+            // РћС‚РєСЂС‹РІР°РµРј РїСЂРѕРІРѕРґРЅРёРє РґР»СЏ РїРѕРёСЃРєР° РєР°СЂС‚РёРЅРѕРє
             os.SelectFile(".pic", cb);
         }
 
-        // Стандартная смена обоев (кликаем по квадратикам внизу)
+        // РЎС‚Р°РЅРґР°СЂС‚РЅР°СЏ СЃРјРµРЅР° РѕР±РѕРµРІ (РєР»РёРєР°РµРј РїРѕ РєРІР°РґСЂР°С‚РёРєР°Рј РІРЅРёР·Сѓ)
         public void ChangeBackground(int index)
         {
             var os = system as GameOS;
@@ -199,7 +199,7 @@ namespace PC.Component.Software
 
                 os.ImportWallpaperFromDevice(bytes);
 
-            }, "Выберите изображение", "image/*");
+            }, "Р’С‹Р±РµСЂРёС‚Рµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ", "image/*");
         }
 
         private IEnumerator DisableInput(InputField input)

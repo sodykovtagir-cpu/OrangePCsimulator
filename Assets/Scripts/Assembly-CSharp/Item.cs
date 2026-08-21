@@ -50,7 +50,7 @@ public class Item : MonoBehaviour, ISave
     {
         if (Main.Instance == null)
         {
-            Debug.LogWarning($"Main.Instance == null для {name}");
+            Debug.LogWarning($"Main.Instance == null РґР»СЏ {name}");
             return;
         }
 

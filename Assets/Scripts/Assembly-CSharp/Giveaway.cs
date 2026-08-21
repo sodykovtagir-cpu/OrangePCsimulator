@@ -19,7 +19,7 @@ public class Giveaway : MonoBehaviour
     [SerializeField] private InputField codeInput;
     [SerializeField] private Button claimButton;
 
-    // Список промокодов (можно редактировать в инспекторе)
+    // РЎРїРёСЃРѕРє РїСЂРѕРјРѕРєРѕРґРѕРІ (РјРѕР¶РЅРѕ СЂРµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ)
     [SerializeField]
     private Promo[] promos = new Promo[]
     {
@@ -45,14 +45,14 @@ public class Giveaway : MonoBehaviour
             return;
         }
 
-        // Уже активирован?
+        // РЈР¶Рµ Р°РєС‚РёРІРёСЂРѕРІР°РЅ?
         if (IsClaimed(text))
         {
             ShowMessage("You already claimed this code");
             return;
         }
 
-        // Ищем промокод (с игнорированием регистра)
+        // РС‰РµРј РїСЂРѕРјРѕРєРѕРґ (СЃ РёРіРЅРѕСЂРёСЂРѕРІР°РЅРёРµРј СЂРµРіРёСЃС‚СЂР°)
         Promo found = null;
         for (int i = 0; i < promos.Length; i++)
         {
@@ -70,7 +70,7 @@ public class Giveaway : MonoBehaviour
             return;
         }
 
-        // Активируем
+        // РђРєС‚РёРІРёСЂСѓРµРј
         ApplyReward(found);
         SaveClaimed(found.code);
         ShowMessage($"Reward: +{found.cash}$   +{found.btc} BTC");
@@ -96,7 +96,7 @@ public class Giveaway : MonoBehaviour
     public bool IsClaimed(string code)
     {
         LoadClaimed();
-        // сравниваем без учёта регистра
+        // СЃСЂР°РІРЅРёРІР°РµРј Р±РµР· СѓС‡С‘С‚Р° СЂРµРіРёСЃС‚СЂР°
         for (int i = 0; i < claimedCodes.Count; i++)
         {
             if (string.Equals(claimedCodes[i], code, StringComparison.OrdinalIgnoreCase))
