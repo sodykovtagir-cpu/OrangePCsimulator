@@ -140,6 +140,23 @@ public class WorkshopClient : MonoBehaviour
 		return baseUrl + "?action=cover&id=" + id + "&i=1";
 	}
 
+	public void DownloadCover(int id, Action<Texture2D, string> done)
+	{
+		StartCoroutine(DownloadCoverCo(id, done));
+	}
+
+	private IEnumerator DownloadCoverCo(int id, Action<Texture2D, string> done)
+	{
+		byte[] bytes = null;
+		string err = null;
+		yield return RequestBytes("?action=cover&id=" + id + "&i=1", (b, e) => { bytes = b; err = e; });
+		if (err != null) { done(null, err); yield break; }
+		if (bytes == null || bytes.Length < 16) { done(null, "no cover"); yield break; }
+		var tex = new Texture2D(2, 2);
+		if (!tex.LoadImage(bytes)) { done(null, "bad cover"); yield break; }
+		done(tex, null);
+	}
+
 	public void Upload(string localPath, string title, string author, string description, byte[] coverJpg, Action<int, string, string> done)
 	{
 		StartCoroutine(PostSave("upload", 0, null, localPath, title, author, description, coverJpg, done));

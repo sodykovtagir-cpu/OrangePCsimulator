@@ -52,10 +52,9 @@ function save_cover($id) {
     if (!isset($_FILES['cover']) || $_FILES['cover']['error'] !== UPLOAD_ERR_OK) return '';
     if ($_FILES['cover']['size'] > MAX_COVER) return '';
     $tmp = $_FILES['cover']['tmp_name'];
-    $info = @getimagesize($tmp);
-    if (!$info) return '';
     $name = 'c' . $id . '.jpg';
     $dest = UPLOADS_DIR . '/' . $name;
+    if (!is_uploaded_file($tmp)) return '';
     if (!move_uploaded_file($tmp, $dest)) return '';
     return $name;
 }

@@ -212,7 +212,12 @@ public class WorkshopMenu : MonoBehaviour
 		{
 			var raw = cover.GetComponent<RawImage>();
 			if (raw != null)
-				StartCoroutine(LoadCover(raw, it.id));
+			{
+				WorkshopClient.Instance.DownloadCover(it.id, (tex, err) =>
+				{
+					if (tex != null) raw.texture = tex;
+				});
+			}
 		}
 	}
 

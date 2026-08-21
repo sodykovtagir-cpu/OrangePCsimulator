@@ -111,9 +111,12 @@ public class FileInformation : MonoBehaviour
             FillPublishForm(found);
             SetWsStatus("Edit and press Update");
             if (found != null && found.has_cover && wsCover != null)
-                StartCoroutine(LoadWsCover(id));
-        });
-    }
+            {
+                WorkshopClient.Instance.DownloadCover(id, (tex, e) =>
+                {
+                    if (tex != null && wsCover != null) wsCover.texture = tex;
+                });
+            }
 
     private void ShowPublishFields()
     {
@@ -161,23 +164,39 @@ public class FileInformation : MonoBehaviour
 
     public void PickCover()
     {
-        NativeFilePicker.PickFile(path =>
+#if UNITY_EDITOR
+        string path = UnityEditor.EditorUtility.OpenFilePanel("Cover", "", "png,jpg,jpeg,webp");
+        ApplyCoverPath(path);
+#else
+        NativeFilePicker.PickFile(ApplyCoverPath, new[] { "image/*", ".png", ".jpg", ".jpeg" });
+#endif
+    }
+
+    private void ApplyCoverPath(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+        try
         {
-            if (string.IsNullOrEmpty(path)) return;
-            try
-            {
-                var tex = new Texture2D(2, 2);
-                tex.LoadImage(File.ReadAllBytes(path));
-                if (wsCover != null) wsCover.texture = tex;
-                coverJpg = tex.EncodeToJPG(70);
-                if (coverJpg != null && coverJpg.Length > 300000)
-                    coverJpg = tex.EncodeToJPG(40);
-            }
-            catch
+            var tex = new Texture2D(2, 2);
+            if (!tex.LoadImage(File.ReadAllBytes(path)))
             {
                 SetWsStatus("Bad image");
+                return;
             }
-        }, new[] { "image/*" });
+            if (wsCover != null)
+            {
+                wsCover.texture = tex;
+                wsCover.gameObject.SetActive(true);
+            }
+            coverJpg = tex.EncodeToJPG(70);
+            if (coverJpg != null && coverJpg.Length > 300000)
+                coverJpg = tex.EncodeToJPG(40);
+            SetWsStatus("Cover ready (" + (coverJpg != null ? coverJpg.Length / 1024 : 0) + " KB)");
+        }
+        catch
+        {
+            SetWsStatus("Bad image");
+        }
     }
 
     public void ConfirmPublish()
