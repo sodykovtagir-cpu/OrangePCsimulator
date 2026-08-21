@@ -79,6 +79,123 @@ public class FileInformation : MonoBehaviour
             (load.loader.GameData.playtime / 60f).ToString("0.00") + " min";
 
         fileLocationText.text = Path.GetFileName(load.loader.Path);
+        coverJpg = null;
+        RefreshWorkshopButtons();
+        if (publishPanel != null) publishPanel.SetActive(false);
+        if (wsTitle != null) wsTitle.text = load.loader.GameData.roomName;
+        if (wsAuthor != null) wsAuthor.text = string.IsNullOrEmpty(load.loader.GameData.sign) ? "Player" : load.loader.GameData.sign;
+        if (wsDesc != null) wsDesc.text = "";
+        EnsureWorkshopClient();
+    }
+
+    public void OpenPublishPanel()
+    {
+        if (publishPanel != null) publishPanel.SetActive(true);
+        SetWsStatus(IsPublished() ? "Update listing" : "Upload to workshop");
+    }
+
+    public void ClosePublishPanel()
+    {
+        if (publishPanel != null) publishPanel.SetActive(false);
+    }
+
+    public void PickCover()
+    {
+        NativeFilePicker.PickFile(path =>
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            try
+            {
+                var tex = new Texture2D(2, 2);
+                tex.LoadImage(File.ReadAllBytes(path));
+                if (wsCover != null) wsCover.texture = tex;
+                coverJpg = tex.EncodeToJPG(70);
+                if (coverJpg != null && coverJpg.Length > 300000)
+                    coverJpg = tex.EncodeToJPG(40);
+            }
+            catch
+            {
+                SetWsStatus("Bad image");
+            }
+        }, new[] { "image/*" });
+    }
+
+    public void ConfirmPublish()
+    {
+        if (load == null || load.loader == null) return;
+        EnsureWorkshopClient();
+        string title = wsTitle != null ? wsTitle.text : load.loader.GameData.roomName;
+        string author = wsAuthor != null ? wsAuthor.text : "Player";
+        string desc = wsDesc != null ? wsDesc.text : "";
+        SetWsStatus("Uploading...");
+        if (IsPublished())
+        {
+            WorkshopClient.Instance.UpdateSave(load.loader.GameData.workshopId, load.loader.GameData.workshopKey,
+                load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
+                {
+                    if (err != null) { SetWsStatus(err); return; }
+                    SetWsStatus("Updated");
+                    RefreshWorkshopButtons();
+                });
+        }
+        else
+        {
+            WorkshopClient.Instance.Upload(load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
+            {
+                if (err != null) { SetWsStatus(err); return; }
+                load.loader.GameData.workshopId = id;
+                load.loader.GameData.workshopKey = key;
+                load.loader.WriteToFile();
+                SetWsStatus("Published #" + id);
+                RefreshWorkshopButtons();
+            });
+        }
+    }
+
+    public void DeleteFromWorkshop()
+    {
+        if (!IsPublished()) return;
+        EnsureWorkshopClient();
+        SetWsStatus("Deleting...");
+        WorkshopClient.Instance.DeleteSave(load.loader.GameData.workshopId, load.loader.GameData.workshopKey, err =>
+        {
+            if (err != null) { SetWsStatus(err); return; }
+            load.loader.GameData.workshopId = 0;
+            load.loader.GameData.workshopKey = "";
+            load.loader.WriteToFile();
+            SetWsStatus("Removed from workshop");
+            RefreshWorkshopButtons();
+        });
+    }
+
+    private void EnsureWorkshopClient()
+    {
+        if (WorkshopClient.Instance == null)
+        {
+            var go = new GameObject("WorkshopClient");
+            go.AddComponent<WorkshopClient>();
+        }
+    }
+
+    private bool IsPublished()
+    {
+        return load != null && load.loader != null && load.loader.GameData != null
+            && load.loader.GameData.workshopId > 0
+            && !string.IsNullOrEmpty(load.loader.GameData.workshopKey);
+    }
+
+    private void RefreshWorkshopButtons()
+    {
+        bool pub = IsPublished();
+        if (uploadButton != null) uploadButton.SetActive(!pub);
+        if (updateButton != null) updateButton.SetActive(pub);
+        if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(pub);
+    }
+
+    private void SetWsStatus(string s)
+    {
+        if (wsStatus != null) wsStatus.text = s;
+        Debug.Log("[Workshop] " + s);
     }
 
     // ✅ Сохранение изменений
