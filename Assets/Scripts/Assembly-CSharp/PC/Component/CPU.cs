@@ -30,79 +30,106 @@ namespace PC.Component
 		private bool cooling;
 
 		private float delay;
+
+		private const float CoolerSearchRadius = 0.28f;
+
 		private void Update()
-        {
-			if (delay >= 0.5f)
-            {
+		{
+			if (delay >= 0.25f)
+			{
 				delay = 0f;
-				bool cool = HasCooling(out cooler);
-				cooling = cool;
-            } else
-            {
+				cooling = HasCooling(out cooler);
+			}
+			else
+			{
 				delay += Time.deltaTime;
-            }
-        }
+			}
+		}
 
 		private void FixedUpdate()
 		{
+			float dt = Time.fixedDeltaTime;
+			float ambient = AirConditioner.temperature;
+
 			if (Power && !Damaged)
 			{
-				if (burnTemp <= temperature)
-				{
-					OverHeat();
-				}
-				else
-				{
-					temperature += Time.fixedDeltaTime * frequency * heat;
-				}
+				// Heat scales with clock vs stock, not raw GHz * 10 (that cooked even a Celeron).
+				float stock = Mathf.Max(defaultFrequency, 0.5f);
+				float load = Mathf.Clamp(frequency / stock, 0.25f, 4f);
+				float heatPerSecond = heat * load * 1.35f;
+				temperature += dt * heatPerSecond;
 			}
 
-			if (!cooling && temperature != AirConditioner.temperature)
+			if (cooling && cooler != null)
 			{
-				temperature -= (temperature - AirConditioner.temperature) / 10f * Time.fixedDeltaTime;
-				return;
-			}
-
-			if (temperature != cooler.Temperature)
-            {
-                float dtemp = (temperature - cooler.Temperature) * 5f * Time.fixedDeltaTime;
+				float dtemp = (temperature - cooler.Temperature) * 8f * dt;
 				temperature -= dtemp;
 				cooler.Temperature += dtemp;
-            }
-		}
-
-		private bool HasCooling(out ICooler cooler)
-		{
-			var t = transform;
-
-			var origin = t.position;
-			var direction = t.up;
-			var ray = new Ray(origin, direction);
-			int mask = layer;
-
-			if (Physics.Raycast(ray, out RaycastHit hit, 0.1f, mask))
+			}
+			else
 			{
-				if (hit.transform != null &&
-					hit.transform.TryGetComponent(out cooler))
-				{
-					return true;
-				}
+				temperature -= (temperature - ambient) * 2.5f * dt;
 			}
 
-			cooler = null;
+			if (Power && !Damaged && temperature >= burnTemp)
+			{
+				OverHeat();
+			}
+		}
+
+		private bool HasCooling(out ICooler found)
+		{
+			found = null;
+			var t = transform;
+			var origin = t.position;
+
+			if (TryGetCooler(t, out found))
+				return true;
+
+			var ray = new Ray(origin, t.up);
+			int mask = layer.value != 0 ? layer.value : Physics.DefaultRaycastLayers;
+			if (Physics.Raycast(ray, out RaycastHit hit, 0.35f, mask, QueryTriggerInteraction.Collide))
+			{
+				if (TryGetCooler(hit.transform, out found))
+					return true;
+			}
+
+			var hits = Physics.OverlapSphere(origin, CoolerSearchRadius, mask, QueryTriggerInteraction.Collide);
+			for (int i = 0; i < hits.Length; i++)
+			{
+				if (hits[i] == null) continue;
+				if (hits[i].transform.IsChildOf(t)) continue;
+				if (TryGetCooler(hits[i].transform, out found))
+					return true;
+			}
+
 			return false;
+		}
+
+		private static bool TryGetCooler(Transform tr, out ICooler found)
+		{
+			found = null;
+			if (tr == null) return false;
+			if (tr.TryGetComponent(out found) && found != null)
+				return true;
+			found = tr.GetComponentInParent<ICooler>();
+			if (found != null) return true;
+			found = tr.GetComponentInChildren<ICooler>();
+			return found != null;
 		}
 
 		public void OverHeat()
 		{
 			Damage();
-		    var achievement = CloudOnceManager.Instance.GetAchievementFromId("too_hot");
-		    achievement?.Unlock(null);
+			var achievement = CloudOnceManager.Instance.GetAchievementFromId("too_hot");
+			achievement?.Unlock(null);
 			var t = transform;
 			var original = particle;
-
-			var obj = Instantiate(original, t);
-			Destroy(obj, 6f);
+			if (original != null)
+			{
+				var obj = Instantiate(original, t);
+				Destroy(obj, 6f);
+			}
 		}
 
 		public override string GetInfo()
@@ -111,15 +138,16 @@ namespace PC.Component
 		}
 
 		public override void Damage()
-        {
+		{
 			base.Damage();
 			StartCoroutine(nameof(Render));
-        }
+		}
 
 		private IEnumerator Render()
 		{
 			var t = transform;
 			var renderer = t.GetComponent<Renderer>();
+			if (renderer == null) yield break;
 			var mat = renderer.material;
 
 			var from = mat.color;
