@@ -52,29 +52,27 @@ public static class GraphicsBootstrap
 		if (nativeResolution.width == 0)
 			nativeResolution = Screen.currentResolution;
 
+		// Always render 1:1. FPS is changed by picking a real output resolution, not a scale.
+		QualitySettings.resolutionScalingFixedDPIFactor = 1f;
+		ScalableBufferManager.ResizeBuffers(1f, 1f);
+
+		int w = PlayerPrefs.GetInt("ResWidth", 0);
+		int h = PlayerPrefs.GetInt("ResHeight", 0);
+		if (w <= 0 || h <= 0)
+		{
+			w = nativeResolution.width;
+			h = nativeResolution.height;
+		}
+
 #if UNITY_ANDROID || UNITY_IOS
-		float scale = PlayerPrefs.GetFloat("TargetResolution", 1f);
-		scale = Mathf.Clamp(scale, 0.35f, 1f);
-		int w = Mathf.Max(320, Mathf.RoundToInt(nativeResolution.width * scale));
-		int h = Mathf.Max(240, Mathf.RoundToInt(nativeResolution.height * scale));
 		Screen.SetResolution(w, h, true);
 #else
 		bool fullscreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
-		int w = PlayerPrefs.GetInt("ResWidth", 0);
-		int h = PlayerPrefs.GetInt("ResHeight", 0);
-
-		if (w <= 0 || h <= 0)
-		{
-			float scale = PlayerPrefs.GetFloat("TargetResolution", 1f);
-			w = Mathf.RoundToInt(nativeResolution.width * Mathf.Clamp(scale, 0.25f, 2f));
-			h = Mathf.RoundToInt(nativeResolution.height * Mathf.Clamp(scale, 0.25f, 2f));
-		}
-
 		var mode = fullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
 		int refresh = nativeResolution.refreshRate;
 		Screen.SetResolution(w, h, mode, refresh);
 #endif
-		Debug.Log($"[GraphicsBootstrap] Resolution applied {Screen.width}x{Screen.height}");
+		Debug.Log($"[GraphicsBootstrap] Resolution applied {w}x{h} (1x scale, screen now {Screen.width}x{Screen.height})");
 	}
 
 	public static void ApplyRTX()

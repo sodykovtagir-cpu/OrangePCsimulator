@@ -37,7 +37,7 @@ public class ResolutionSetting : MonoBehaviour
 	private void Awake()
 	{
 		AutoFindControls();
-		BindLegacyScales();
+		HideLegacyScaleButtons();
 		BindToggle(rtxToggle, "RTXMode", 0, SetRTXMode);
 		BindToggle(reflectionsToggle, "Reflections", 1, SetReflections);
 		BindToggle(fullscreenToggle, "Fullscreen", 1, SetFullscreen);
@@ -107,27 +107,13 @@ public class ResolutionSetting : MonoBehaviour
 		return parts.ToLowerInvariant();
 	}
 
-	private void BindLegacyScales()
+	private void HideLegacyScaleButtons()
 	{
 		if (scales == null) return;
-		float saved = PlayerPrefs.GetFloat("TargetResolution", 1f);
 		for (int i = 0; i < scales.Length; i++)
 		{
-			var c = scales[i];
-			var evt = c.toggle;
-			float scale = c.scale;
-			var t = evt != null ? evt.GetComponent<Toggle>() : null;
-			if (t != null)
-			{
-				if (Mathf.Approximately(scale, saved))
-					t.SetIsOnWithoutNotify(true);
-				t.onValueChanged.AddListener(isOn =>
-				{
-					if (isOn) SetScaleResolution(scale);
-				});
-			}
-			if (evt != null && evt.selected != null)
-				evt.selected.AddListener(() => SetScaleResolution(scale));
+			if (scales[i].toggle != null)
+				scales[i].toggle.gameObject.SetActive(false);
 		}
 	}
 
@@ -151,7 +137,12 @@ public class ResolutionSetting : MonoBehaviour
 		UpdateMobileLabel(saved);
 		mobileScaleSlider.onValueChanged.AddListener(v =>
 		{
-			PlayerPrefs.SetFloat("TargetResolution", v);
+			var native = Screen.currentResolution;
+			int w = Mathf.Max(320, Mathf.RoundToInt(native.width * v));
+			int h = Mathf.Max(240, Mathf.RoundToInt(native.height * v));
+			PlayerPrefs.SetInt("ResWidth", w);
+			PlayerPrefs.SetInt("ResHeight", h);
+			PlayerPrefs.SetFloat("TargetResolution", 1f);
 			PlayerPrefs.Save();
 			UpdateMobileLabel(v);
 			GraphicsBootstrap.ApplyResolution();
