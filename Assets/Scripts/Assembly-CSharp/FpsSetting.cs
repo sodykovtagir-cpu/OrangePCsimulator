@@ -21,15 +21,15 @@ public class FpsSetting : MonoBehaviour
 			int maxRefreshRate = 60;
 			try { maxRefreshRate = Screen.currentResolution.refreshRate; } catch { }
 
-			if (maxRefreshRate > 0 && 60 > maxRefreshRate + 1)
-			{
-				PlayerPrefs.SetInt("TargetFps", 30);
-				Application.targetFrameRate = 30;
-			}
+			// Дефолт для экранов, где 60 FPS недостижимо (например, 50 Гц).
+			// ВАЖНО: не пишем в PlayerPrefs — выбор игрока важнее, чем авто-дефолт.
+			int defaultFps = (maxRefreshRate > 0 && 60 > maxRefreshRate + 1) ? 30 : 60;
+			if (defaultFps == 30)
+				Application.targetFrameRate = PlayerPrefs.GetInt("TargetFps", 30);
 
 			if (settings == null || settings.Length == 0) return;
 
-			int saved = PlayerPrefs.GetInt("TargetFps", 60);
+			int saved = PlayerPrefs.GetInt("TargetFps", defaultFps);
 
 			for (int i = 0; i < settings.Length; i++)
 			{

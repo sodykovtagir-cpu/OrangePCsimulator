@@ -8,16 +8,20 @@ public static class InputManager
     private static Dictionary<string, float> axis;
     private static Dictionary<string, bool> virtualButtons;
 
-    private static Dictionary<string, bool> virtualButtonsDown;
-    private static Dictionary<string, bool> virtualButtonsUp;
+    // Метка кадра, в котором кнопка была нажата/отпущена.
+    // Один "Down" теперь виден ВСЕМ читателям в этом кадре (раньше первый
+    // читатель "съедал" нажатие), а после конца кадра автоматически гаснет —
+    // нажатие, сделанное в паузе, не выстрелит позже.
+    private static Dictionary<string, int> virtualButtonsDown;
+    private static Dictionary<string, int> virtualButtonsUp;
 
     static InputManager()
     {
         axis = new Dictionary<string, float>();
         virtualButtons = new Dictionary<string, bool>();
 
-        virtualButtonsDown = new Dictionary<string, bool>();
-        virtualButtonsUp = new Dictionary<string, bool>();
+        virtualButtonsDown = new Dictionary<string, int>();
+        virtualButtonsUp = new Dictionary<string, int>();
     }
 
     public static void ShowCursor(bool show)
@@ -115,15 +119,8 @@ public static class InputManager
     public static bool GetButtonDown(string name)
     {
 #if UNITY_ANDROID
-        bool value;
-
-        if (virtualButtonsDown.TryGetValue(name, out value) && value)
-        {
-            virtualButtonsDown[name] = false;
-            return true;
-        }
-
-        return false;
+        return virtualButtonsDown.TryGetValue(name, out int downFrame)
+            && downFrame == Time.frameCount;
 #else
         switch (name)
         {
@@ -140,30 +137,16 @@ public static class InputManager
                 return PcKeybinds.GetDown(PcBindAction.Fire2);
         }
 
-        bool value;
-
-        if (virtualButtonsDown.TryGetValue(name, out value) && value)
-        {
-            virtualButtonsDown[name] = false;
-            return true;
-        }
-
-        return false;
+        return virtualButtonsDown.TryGetValue(name, out int downFrame)
+            && downFrame == Time.frameCount;
 #endif
     }
 
     public static bool GetButtonUp(string name)
     {
 #if UNITY_ANDROID
-        bool value;
-
-        if (virtualButtonsUp.TryGetValue(name, out value) && value)
-        {
-            virtualButtonsUp[name] = false;
-            return true;
-        }
-
-        return false;
+        return virtualButtonsUp.TryGetValue(name, out int upFrame)
+            && upFrame == Time.frameCount;
 #else
         switch (name)
         {
@@ -180,15 +163,8 @@ public static class InputManager
                 return PcKeybinds.GetUp(PcBindAction.Fire2);
         }
 
-        bool value;
-
-        if (virtualButtonsUp.TryGetValue(name, out value) && value)
-        {
-            virtualButtonsUp[name] = false;
-            return true;
-        }
-
-        return false;
+        return virtualButtonsUp.TryGetValue(name, out int upFrame)
+            && upFrame == Time.frameCount;
 #endif
     }
 
@@ -198,8 +174,8 @@ public static class InputManager
             return;
 
         virtualButtons[name] = true;
-        virtualButtonsDown[name] = true;
-        virtualButtonsUp[name] = false;
+        virtualButtonsDown[name] = Time.frameCount;
+        virtualButtonsUp.Remove(name);
     }
 
     public static void SetButtonUp(string name)
@@ -208,7 +184,7 @@ public static class InputManager
             return;
 
         virtualButtons[name] = false;
-        virtualButtonsUp[name] = true;
-        virtualButtonsDown[name] = false;
+        virtualButtonsUp[name] = Time.frameCount;
+        virtualButtonsDown.Remove(name);
     }
 }
