@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class CustomGlass : MonoBehaviour
 {
-    [Tooltip("Материал стекла (должен поддерживать прозрачность и текстуру)")]
+    [Tooltip("РњР°С‚РµСЂРёР°Р» СЃС‚РµРєР»Р° (РґРѕР»Р¶РµРЅ РїРѕРґРґРµСЂР¶РёРІР°С‚СЊ РїСЂРѕР·СЂР°С‡РЅРѕСЃС‚СЊ Рё С‚РµРєСЃС‚СѓСЂСѓ)")]
     public Material glassMaterialPrefab;
 
     private Material runtimeMaterial;
@@ -11,27 +11,40 @@ public class CustomGlass : MonoBehaviour
     private void Awake()
     {
         objectRenderer = GetComponent<Renderer>();
-        // Создаем инстанс материала, чтобы не менять материал у всех стекол в игре сразу
+        if (objectRenderer == null || glassMaterialPrefab == null)
+        {
+            Debug.LogWarning($"{name}: CustomGlass С‚СЂРµР±СѓРµС‚ Renderer Рё РЅР°Р·РЅР°С‡РµРЅРЅС‹Р№ Glass Material Prefab.");
+            enabled = false;
+            return;
+        }
+        // РЎРѕР·РґР°РµРј РёРЅСЃС‚Р°РЅСЃ РјР°С‚РµСЂРёР°Р»Р°, С‡С‚РѕР±С‹ РЅРµ РјРµРЅСЏС‚СЊ РјР°С‚РµСЂРёР°Р» Сѓ РІСЃРµС… СЃС‚РµРєРѕР» РІ РёРіСЂРµ СЃСЂР°Р·Сѓ
         runtimeMaterial = new Material(glassMaterialPrefab);
         objectRenderer.material = runtimeMaterial;
     }
 
+    private void OnDestroy()
+    {
+        // РРЅСЃС‚Р°РЅСЃ РјР°С‚РµСЂРёР°Р»Р° РЅРёРєС‚Рѕ РЅРµ РѕСЃРІРѕР±РѕР¶РґР°РµС‚ Р·Р° РЅР°СЃ вЂ” РёРЅР°С‡Рµ СѓС‚РµС‡РєР° РЅР° РєР°Р¶РґРѕР№ Р·Р°РіСЂСѓР·РєРµ СЃС†РµРЅС‹.
+        if (runtimeMaterial != null)
+            Destroy(runtimeMaterial);
+    }
+
     /// <summary>
-    /// Вызывается, когда игрок заказывает стекло на сайте
+    /// Р’С‹Р·С‹РІР°РµС‚СЃСЏ, РєРѕРіРґР° РёРіСЂРѕРє Р·Р°РєР°Р·С‹РІР°РµС‚ СЃС‚РµРєР»Рѕ РЅР° СЃР°Р№С‚Рµ
     /// </summary>
-    /// <param name="designTexture">Текстура из Пейнта (.pic)</param>
-    /// <param name="tintColor">Выбранный цвет стекла</param>
+    /// <param name="designTexture">РўРµРєСЃС‚СѓСЂР° РёР· РџРµР№РЅС‚Р° (.pic)</param>
+    /// <param name="tintColor">Р’С‹Р±СЂР°РЅРЅС‹Р№ С†РІРµС‚ СЃС‚РµРєР»Р°</param>
     public void ApplyDesign(Texture2D designTexture, Color tintColor)
     {
         if (runtimeMaterial == null) return;
 
-        // Применяем картинку (наклейку)
+        // РџСЂРёРјРµРЅСЏРµРј РєР°СЂС‚РёРЅРєСѓ (РЅР°РєР»РµР№РєСѓ)
         if (designTexture != null)
         {
-            runtimeMaterial.SetTexture("_MainTex", designTexture); // Или _Albedo, _BaseMap в зависимости от шейдера
+            runtimeMaterial.SetTexture("_MainTex", designTexture); // РР»Рё _Albedo, _BaseMap РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ С€РµР№РґРµСЂР°
         }
 
-        // Применяем цвет (тонировка)
-        runtimeMaterial.SetColor("_Color", tintColor); // Или _Tint, _BaseColor
+        // РџСЂРёРјРµРЅСЏРµРј С†РІРµС‚ (С‚РѕРЅРёСЂРѕРІРєР°)
+        runtimeMaterial.SetColor("_Color", tintColor); // РР»Рё _Tint, _BaseColor
     }
 }

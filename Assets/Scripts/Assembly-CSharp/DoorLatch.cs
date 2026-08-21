@@ -11,7 +11,6 @@ public class DoorLatch : MonoBehaviour
     private AudioClip unlatchSound;
 
     private Rigidbody rb;
-    private HingeJoint hinge;
     private AudioSource source;
     private bool isLatched = true;
 
@@ -20,7 +19,6 @@ public class DoorLatch : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-        hinge = GetComponent<HingeJoint>();
         source = GetComponent<AudioSource>();
 
         Latch();
@@ -32,7 +30,7 @@ public class DoorLatch : MonoBehaviour
         rb.velocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
-        // Заморозить все вращения
+        // Р—Р°РјРѕСЂРѕР·РёС‚СЊ РІСЃРµ РІСЂР°С‰РµРЅРёСЏ
         rb.constraints = RigidbodyConstraints.FreezeAll;
 
         if (latchSound != null && source != null)
@@ -43,7 +41,7 @@ public class DoorLatch : MonoBehaviour
     {
         isLatched = false;
 
-        // Разморозить
+        // Р Р°Р·РјРѕСЂРѕР·РёС‚СЊ
         rb.constraints = RigidbodyConstraints.None;
 
         if (unlatchSound != null && source != null)

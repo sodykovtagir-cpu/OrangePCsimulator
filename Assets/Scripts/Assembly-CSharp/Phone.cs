@@ -23,6 +23,9 @@ public class Phone : MonoBehaviour
     {
         yield return new WaitForSeconds(ringDelay);
 
+        if (audioSource == null || ringingSound == null)
+            yield break;
+
         isRinging = true;
 
         audioSource.clip = ringingSound;
@@ -32,6 +35,8 @@ public class Phone : MonoBehaviour
 
     private void OnMouseDown()
     {
+        if (audioSource == null) return;
+
         if (isRinging)
         {
             isRinging = false;
@@ -40,11 +45,12 @@ public class Phone : MonoBehaviour
             audioSource.Stop();
             audioSource.loop = false;
 
-            audioSource.PlayOneShot(beforeAnswerSound);
+            if (beforeAnswerSound != null)
+                audioSource.PlayOneShot(beforeAnswerSound);
             return;
         }
 
-        if (answered)
+        if (answered && afterAnswerSound != null)
         {
             audioSource.PlayOneShot(afterAnswerSound);
         }

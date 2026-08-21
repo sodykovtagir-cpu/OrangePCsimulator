@@ -58,6 +58,20 @@ public class MenuManager : MonoBehaviour
 			return;
 		}
 
+		// Если это меню уже есть глубже в стеке — убираем старый экземпляр,
+		// иначе переход A -> B -> A порождал дубликаты и Back зацикливался.
+		if (menuStack.Contains(menuToShow))
+		{
+			var rest = new Stack<GameObject>();
+			foreach (var m in menuStack)
+				if (m != menuToShow)
+					rest.Push(m);
+			var reordered = new Stack<GameObject>();
+			while (rest.Count > 0)
+				reordered.Push(rest.Pop());
+			menuStack = reordered;
+		}
+
 		if (menuStack.Count > 0)
 		{
 			GameObject current = menuStack.Peek();
