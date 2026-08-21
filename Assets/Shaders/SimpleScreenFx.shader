@@ -4,6 +4,7 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 	{
 		_MainTex ("Texture", 2D) = "white" {}
 		_BloomTex ("Bloom", 2D) = "black" {}
+		_PrevTex ("Prev", 2D) = "black" {}
 	}
 	SubShader
 	{
@@ -87,11 +88,11 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			#include "UnityCG.cginc"
 			sampler2D _MainTex;
 			sampler2D _BloomTex;
+			sampler2D _PrevTex;
 			float _Bloom;
 			float _Vignette;
 			float _Chromatic;
 			float _Motion;
-			float2 _MotionDir;
 			struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 			v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
 			fixed4 frag(v2f i) : SV_Target
@@ -100,16 +101,6 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				float2 n = uv * 2.0 - 1.0;
 
 				float3 col = tex2D(_MainTex, uv).rgb;
-
-				if (_Motion > 0.001)
-				{
-					float2 dir = _MotionDir;
-					float3 acc = col;
-					acc += tex2D(_MainTex, uv - dir).rgb;
-					acc += tex2D(_MainTex, uv - dir * 2).rgb;
-					acc += tex2D(_MainTex, uv - dir * 3).rgb;
-					col = acc * 0.25;
-				}
 
 				if (_Chromatic > 0.001)
 				{
@@ -125,6 +116,12 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				{
 					float vig = saturate(1.0 - dot(n, n) * _Vignette);
 					col *= vig;
+				}
+
+				if (_Motion > 0.001)
+				{
+					float3 prev = tex2D(_PrevTex, uv).rgb;
+					col = lerp(col, prev, 0.45 * _Motion);
 				}
 
 				return float4(col, 1);

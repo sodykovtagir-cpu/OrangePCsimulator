@@ -1,7 +1,6 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Camera))]
-[ImageEffectAllowedInSceneView]
 public class SimpleScreenFx : MonoBehaviour
 {
 	public bool bloom;
@@ -10,18 +9,16 @@ public class SimpleScreenFx : MonoBehaviour
 	public bool motionBlur;
 
 	private Material mat;
-	private Camera cam;
-	private Vector3 lastPos;
-	private Quaternion lastRot;
-	private bool hasLast;
-
-	private void Awake()
-	{
-		cam = GetComponent<Camera>();
-	}
+	private RenderTexture prev;
 
 	private void OnDestroy()
 	{
+		if (prev != null)
+		{
+			prev.Release();
+			Destroy(prev);
+			prev = null;
+		}
 		if (mat != null) Destroy(mat);
 	}
 
@@ -75,41 +72,29 @@ public class SimpleScreenFx : MonoBehaviour
 
 		m.SetFloat("_Vignette", vignette ? 0.38f : 0f);
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
+		m.SetFloat("_Motion", motionBlur ? 1f : 0f);
 
-		float motionAmt = 0f;
-		Vector2 motionDir = Vector2.zero;
-		if (motionBlur && cam != null)
-		{
-			if (!hasLast)
-			{
-				lastPos = cam.transform.position;
-				lastRot = cam.transform.rotation;
-				hasLast = true;
-			}
-			else
-			{
-				Vector3 dp = cam.transform.position - lastPos;
-				float ang = Quaternion.Angle(lastRot, cam.transform.rotation);
-				float speed = dp.magnitude * 8f + ang * 0.04f;
-				if (speed > 0.015f)
-				{
-					motionAmt = Mathf.Clamp01(speed);
-					Vector3 local = cam.transform.InverseTransformDirection(dp.sqrMagnitude > 1e-8f ? dp.normalized : cam.transform.forward);
-					motionDir = new Vector2(-local.x, -local.y) * (0.012f * motionAmt);
-				}
-				lastPos = cam.transform.position;
-				lastRot = cam.transform.rotation;
-			}
-		}
+		if (prev != null)
+			m.SetTexture("_PrevTex", prev);
 		else
-		{
-			hasLast = false;
-		}
-
-		m.SetFloat("_Motion", motionAmt);
-		m.SetVector("_MotionDir", motionDir);
+			m.SetTexture("_PrevTex", src);
 
 		Graphics.Blit(src, dest, m, 3);
+
+		if (motionBlur)
+		{
+			if (prev == null || prev.width != dest.width || prev.height != dest.height)
+			{
+				if (prev != null)
+				{
+					prev.Release();
+					Destroy(prev);
+				}
+				prev = new RenderTexture(dest.width, dest.height, 0, src.format);
+				prev.Create();
+			}
+			Graphics.Blit(dest, prev);
+		}
 
 		if (bloomTex != null)
 			RenderTexture.ReleaseTemporary(bloomTex);
