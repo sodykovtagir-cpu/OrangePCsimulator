@@ -32,6 +32,10 @@ public class ResolutionSetting : MonoBehaviour
 	[SerializeField] private Slider mobileScaleSlider;
 	[SerializeField] private Text mobileScaleLabel;
 
+	[Header("FPS")]
+	[SerializeField] private Slider fpsSlider;
+	[SerializeField] private Text fpsLabel;
+
 	private readonly List<Resolution> uniqueResolutions = new List<Resolution>();
 	private bool bound;
 
@@ -87,6 +91,7 @@ public class ResolutionSetting : MonoBehaviour
 			SetupPcResolutions();
 			if (mobileScaleSlider != null) mobileScaleSlider.gameObject.SetActive(false);
 		}
+		SetupFpsSlider();
 		bound = true;
 	}
 
@@ -118,8 +123,18 @@ public class ResolutionSetting : MonoBehaviour
 
 		if (resolutionDropdown == null)
 			resolutionDropdown = root.GetComponentInChildren<Dropdown>(true);
-		if (mobileScaleSlider == null)
-			mobileScaleSlider = root.GetComponentInChildren<Slider>(true);
+
+		var sliders = root.GetComponentsInChildren<Slider>(true);
+		for (int i = 0; i < sliders.Length; i++)
+		{
+			var sl = sliders[i];
+			if (sl == null) continue;
+			string id = IdentifySlider(sl);
+			if (id.Contains("fps") || id.Contains("frame") || id.Contains("кадр"))
+				AssignSlider(ref fpsSlider, sl);
+			else if (id.Contains("scale") || id.Contains("resol") || id.Contains("разреш") || id.Contains("mobile"))
+				AssignSlider(ref mobileScaleSlider, sl);
+		}
 	}
 
 	private static void Assign(ref Toggle field, Toggle found)
@@ -212,10 +227,55 @@ public class ResolutionSetting : MonoBehaviour
 		});
 	}
 
-	private void UpdateMobileLabel(float scale)
+	private void SetupFpsSlider()
 	{
-		if (mobileScaleLabel == null) return;
-		mobileScaleLabel.text = Mathf.RoundToInt(scale * 100f) + "%";
+		if (fpsSlider == null) return;
+
+		int maxHz = Screen.currentResolution.refreshRate;
+		if (maxHz < 30) maxHz = 60;
+		int maxFps = Mathf.Clamp(maxHz, 30, 240);
+
+		fpsSlider.minValue = 30;
+		fpsSlider.maxValue = maxFps;
+		fpsSlider.wholeNumbers = true;
+
+		int saved = PlayerPrefs.GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", 60));
+		saved = Mathf.Clamp(saved, 30, maxFps);
+		fpsSlider.SetValueWithoutNotify(saved);
+		UpdateFpsLabel(saved);
+
+		if (fpsLabel == null)
+		{
+			var texts = fpsSlider.GetComponentsInChildren<Text>(true);
+			if (texts != null && texts.Length > 0) fpsLabel = texts[0];
+			if (fpsSlider.transform.parent != null)
+			{
+				var ptexts = fpsSlider.transform.parent.GetComponentsInChildren<Text>(true);
+				for (int i = 0; i < ptexts.Length; i++)
+				{
+					if (ptexts[i] == null) continue;
+					string s = ptexts[i].text.ToLowerInvariant();
+					if (s.Contains("fps") || s.Contains("кадр")) { fpsLabel = ptexts[i]; break; }
+				}
+			}
+		}
+
+		fpsSlider.onValueChanged.AddListener(v =>
+		{
+			int fps = Mathf.RoundToInt(v);
+			PlayerPrefs.SetInt("TargetFps", fps);
+			PlayerPrefs.SetInt("TargetFPS", fps);
+			PlayerPrefs.Save();
+			Application.targetFrameRate = fps;
+			QualitySettings.vSyncCount = 0;
+			UpdateFpsLabel(fps);
+		});
+	}
+
+	private void UpdateFpsLabel(int fps)
+	{
+		if (fpsLabel == null) return;
+		fpsLabel.text = fps + " FPS";
 	}
 
 	private void SetupPcResolutions()

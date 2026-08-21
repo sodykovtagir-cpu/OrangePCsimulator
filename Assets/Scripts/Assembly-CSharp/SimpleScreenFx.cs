@@ -78,7 +78,7 @@ public class SimpleScreenFx : MonoBehaviour
 			m.SetFloat("_Bloom", 0f);
 		}
 
-		m.SetFloat("_Vignette", vignette ? 0.38f : 0f);
+		m.SetFloat("_Vignette", vignette ? 0.16f : 0f);
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
 		m.SetFloat("_AO", ao ? 0.28f : 0f);
 
