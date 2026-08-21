@@ -30,7 +30,11 @@ public class SimpleScreenFx : MonoBehaviour
 	{
 		if (mat == null)
 		{
-			var sh = Shader.Find("Hidden/OrangePC/SimpleScreenFx");
+			// Шейдер лежит в Assets/Resources, чтобы гарантированно попасть в билд.
+			// Shader.Find в билде работает только для включённых в сборку шейдеров.
+			var sh = Resources.Load<Shader>("SimpleScreenFx");
+			if (sh == null)
+				sh = Shader.Find("Hidden/OrangePC/SimpleScreenFx");
 			if (sh == null)
 			{
 				Debug.LogWarning("[SimpleScreenFx] shader missing");
@@ -85,10 +89,10 @@ public class SimpleScreenFx : MonoBehaviour
 		float motionKeep = 0f;
 		if (motionBlur)
 		{
-			// Same trail length on 30fps phone and 120fps PC (~55ms persistence).
-			float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.008f, 0.05f);
-			motionKeep = Mathf.Exp(-dt / 0.032f);
-			motionKeep = Mathf.Clamp(motionKeep, 0.40f, 0.50f);
+			// Постоянная времени затухания шлейфа (~32мс) не зависит от FPS:
+			// keep = exp(-dt / tau) даёт одинаковую длину следа и на 30fps, и на 120fps.
+			float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.0001f, 0.25f);
+			motionKeep = Mathf.Clamp(Mathf.Exp(-dt / 0.032f), 0f, 0.85f);
 		}
 		m.SetFloat("_Motion", motionKeep);
 
