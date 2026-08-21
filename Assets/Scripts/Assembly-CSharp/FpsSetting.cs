@@ -16,43 +16,54 @@ public class FpsSetting : MonoBehaviour
 
 	private void Awake()
 	{
-		int maxRefreshRate = Screen.currentResolution.refreshRate;
-		if (maxRefreshRate > 0 && 60 > maxRefreshRate + 1)
+		try
 		{
-			PlayerPrefs.SetInt("TargetFps", 30);
-			Application.targetFrameRate = 30;
-		}
+			int maxRefreshRate = 60;
+			try { maxRefreshRate = Screen.currentResolution.refreshRate; } catch { }
 
-		if (settings == null) return;
-
-		int saved = PlayerPrefs.GetInt("TargetFps", 60);
-
-		foreach (var x in settings)
-		{
-			if (x.button == null) continue;
-
-			var toggle = x.button.GetComponent<Toggle>();
-			if (toggle != null)
+			if (maxRefreshRate > 0 && 60 > maxRefreshRate + 1)
 			{
-				int fps = x.fps;
-				toggle.onValueChanged.AddListener(v => { if (v) SetFps(fps); });
+				PlayerPrefs.SetInt("TargetFps", 30);
+				Application.targetFrameRate = 30;
 			}
 
-			if (x.fps == saved)
+			if (settings == null || settings.Length == 0) return;
+
+			int saved = PlayerPrefs.GetInt("TargetFps", 60);
+
+			for (int i = 0; i < settings.Length; i++)
 			{
-				var effect = x.button.GetComponent<ToggleEffect>();
-				if (effect != null)
-					effect.SetIsOn(true, false);
-				else if (toggle != null)
-					toggle.SetIsOnWithoutNotify(true);
+				var x = settings[i];
+				if (x.button == null) continue;
+
+				var toggle = x.button.GetComponent<Toggle>();
+				if (toggle != null)
+				{
+					int fps = x.fps;
+					toggle.onValueChanged.AddListener(v => { if (v) SetFps(fps); });
+				}
+
+				if (x.fps == saved)
+				{
+					var effect = x.button.GetComponent<ToggleEffect>();
+					if (effect != null)
+						effect.SetIsOn(true, false);
+					else if (toggle != null)
+						toggle.SetIsOnWithoutNotify(true);
+				}
+			}
+
+			for (int i = 0; i < settings.Length; i++)
+			{
+				var f = settings[i];
+				if (f.button == null) continue;
+				if (maxRefreshRate > 0 && f.fps > maxRefreshRate + 1)
+					f.button.SetActive(false);
 			}
 		}
-
-		foreach (var f in settings)
+		catch (Exception e)
 		{
-			if (f.button == null) continue;
-			if (maxRefreshRate > 0 && f.fps > maxRefreshRate + 1)
-				f.button.SetActive(false);
+			Debug.LogWarning("[FpsSetting] " + e.Message);
 		}
 	}
 

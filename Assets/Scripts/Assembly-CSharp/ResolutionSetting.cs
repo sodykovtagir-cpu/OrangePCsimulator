@@ -358,7 +358,8 @@ public class ResolutionSetting : MonoBehaviour
 	public void SetBloom(bool enabled) { SetPP("PP_Bloom", enabled); }
 	public void SetAO(bool enabled) { SetPP("PP_AO", enabled); }
 	public void SetVignette(bool enabled) { SetPP("PP_Vignette", enabled); }
-	public void SetChromatic(bool enabled) { SetPP("PP_Chromatic", enabled); }
+	public void SetGrain(bool enabled) { SetPP("PP_Grain", enabled); }
+	public void SetChromatic(bool enabled) { SetGrain(enabled); }
 
 	private void SetPP(string key, bool enabled)
 	{
