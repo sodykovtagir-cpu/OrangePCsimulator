@@ -9,10 +9,10 @@ public static class GraphicsBootstrap
 	private static PostProcessProfile profile;
 	private static MotionBlur motionBlur;
 	private static Bloom bloom;
-	private static AmbientOcclusion ao;
 	private static ColorGrading colorGrading;
 	private static Vignette vignette;
 	private static ChromaticAberration chromatic;
+	private static PostProcessResources ppResources;
 
 	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 	private static void OnGameStart()
@@ -152,11 +152,6 @@ public static class GraphicsBootstrap
 		bloom.threshold.Override(0.9f);
 		bloom.softKnee.Override(0.5f);
 
-		ao = profile.AddSettings<AmbientOcclusion>();
-		ao.enabled.Override(false);
-		ao.intensity.Override(0.7f);
-		ao.mode.Override(AmbientOcclusionMode.ScalableAmbientObscurance);
-
 		vignette = profile.AddSettings<Vignette>();
 		vignette.enabled.Override(false);
 		vignette.intensity.Override(0.35f);
@@ -176,6 +171,15 @@ public static class GraphicsBootstrap
 			SetupCamera(cams[i]);
 	}
 
+	private static PostProcessResources GetResources()
+	{
+		if (ppResources != null) return ppResources;
+		var found = Resources.FindObjectsOfTypeAll<PostProcessResources>();
+		if (found != null && found.Length > 0)
+			ppResources = found[0];
+		return ppResources;
+	}
+
 	private static void SetupCamera(Camera cam)
 	{
 		if (cam == null) return;
@@ -183,10 +187,18 @@ public static class GraphicsBootstrap
 		cam.allowMSAA = false;
 		cam.depthTextureMode |= DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
+		var res = GetResources();
+		if (res == null)
+		{
+			Debug.LogWarning("[GraphicsBootstrap] PostProcessResources not found; skip PP layer.");
+			return;
+		}
+
 		var layerComp = cam.GetComponent<PostProcessLayer>();
 		if (layerComp == null)
 			layerComp = cam.gameObject.AddComponent<PostProcessLayer>();
 
+		layerComp.Init(res);
 		layerComp.volumeTrigger = cam.transform;
 		layerComp.volumeLayer = ~0;
 		layerComp.enabled = true;
