@@ -5066,8 +5066,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 19.999998, y: 3.9999998, z: 5.9999995}
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Size: {x: 19.999998, y: 14.213736, z: 5.9999995}
+  m_Center: {x: -1.6899465e-10, y: -1.0132473, z: -0.00000023841858}
 --- !u!65 &292
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -20480,6 +20480,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controlId: PanelOpen
   parentRect: {fileID: 573}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!114 &766
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21043,9 +21045,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controlId: FunctionsPanel
   parentRect: {fileID: 499}
-  horizontalLayout: {fileID: 675}
-  verticalLayout: {fileID: 0}
-  switchLayoutByEdge: 1
   edgePadding: 8
   animationTime: 0.2
   startOpened: 0
@@ -21053,12 +21052,12 @@ MonoBehaviour:
   useManualResetPosition: 1
   resetEdge: 1
   resetT: 0.5
-  disableRaycastWhenClosed: 1
-  itemSize: {x: 80, y: 80}
-  itemSpacing: 4
-  itemCount: 7
-  panelPadding: {x: 0, y: 0}
+  useSmartEdgeAnchors: 1
+  cornerSnapZone: 0.16
+  counterRotateIcons: 1
   fadeWhenClosed: 1
+  disableRaycastWhenClosed: 1
+  iconRects: []
 --- !u!114 &789
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21905,6 +21904,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controlId: MenuButton
   parentRect: {fileID: 0}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!1 &243806009
 GameObject:
   m_ObjectHideFlags: 0
@@ -23639,6 +23640,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controlId: Joystick
   parentRect: {fileID: 573}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!1 &1325730437
 GameObject:
   m_ObjectHideFlags: 0
@@ -24410,6 +24413,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   controlId: Run
   parentRect: {fileID: 573}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!1 &1739822433
 GameObject:
   m_ObjectHideFlags: 0

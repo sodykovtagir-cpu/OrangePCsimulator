@@ -50,23 +50,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7209420444613088609, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
       propertyPath: m_Name
-      value: RTX5080
+      value: RTX5090
       objectReference: {fileID: 0}
+    - target: {fileID: 7230637175698833633, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 9bf41feb34a393e4a9c7e4a80f3f2d36, type: 2}
     - target: {fileID: 7321752213938027313, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
       propertyPath: info
-      value: RTX5080
+      value: RTX5090
       objectReference: {fileID: 0}
     - target: {fileID: 7321752213938027313, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
       propertyPath: score
-      value: 13000
+      value: 13500
       objectReference: {fileID: 0}
     - target: {fileID: 7321752213938027313, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
       propertyPath: spawnId
-      value: RTX5080
+      value: RTX5090
       objectReference: {fileID: 0}
     - target: {fileID: 7321752213938027313, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
       propertyPath: wattage
-      value: 450
+      value: 455
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
