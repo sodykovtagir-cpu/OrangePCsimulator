@@ -14,16 +14,18 @@ public class MenuManager : MonoBehaviour
 	private bool addSoundToButtons;
 
 	private AudioSource source;
-	private Stack<GameObject> menuStack;
+	private Stack<GameObject> menuStack = new Stack<GameObject>();
 
-	private void Start()
+	private void Awake()
 	{
 		source = GetComponent<AudioSource>();
-		menuStack = new Stack<GameObject>();
+		if (menuStack == null)
+			menuStack = new Stack<GameObject>();
 
+		if (menus == null) return;
 		foreach (var menu in menus)
 		{
-			if (menu.activeSelf)
+			if (menu != null && menu.activeSelf)
 			{
 				menuStack.Push(menu);
 				break;
@@ -34,14 +36,16 @@ public class MenuManager : MonoBehaviour
 	public void ShowMenu(string pageName)
 	{
 		if (addSoundToButtons)
-		{
 			PlayClickSound();
-		}
+
+		if (menus == null) return;
+		if (menuStack == null)
+			menuStack = new Stack<GameObject>();
 
 		GameObject menuToShow = null;
 		foreach (var menu in menus)
 		{
-			if (menu.name == pageName)
+			if (menu != null && menu.name == pageName)
 			{
 				menuToShow = menu;
 				break;
@@ -57,12 +61,11 @@ public class MenuManager : MonoBehaviour
 		if (menuStack.Count > 0)
 		{
 			GameObject current = menuStack.Peek();
-			if (current != menuToShow)
-			{
+			if (current != null && current != menuToShow)
 				current.SetActive(false);
+			if (current != menuToShow)
 				menuStack.Push(menuToShow);
-				menuToShow.SetActive(true);
-			}
+			menuToShow.SetActive(true);
 		}
 		else
 		{
@@ -74,34 +77,33 @@ public class MenuManager : MonoBehaviour
 	public void Back()
 	{
 		if (addSoundToButtons)
-		{
 			PlayClickSound();
-		}
 
-		if (menuStack.Count <= 1)
+		if (menuStack == null || menuStack.Count <= 1)
 			return;
 
 		GameObject current = menuStack.Pop();
-		current.SetActive(false);
+		if (current != null)
+			current.SetActive(false);
 
 		GameObject previous = menuStack.Peek();
-		previous.SetActive(true);
+		if (previous != null)
+			previous.SetActive(true);
 	}
 
 	public void HideMenu(bool hide)
 	{
-		if (menuStack.Count == 0)
+		if (menuStack == null || menuStack.Count == 0)
 			return;
 
 		GameObject top = menuStack.Peek();
-		top.SetActive(!hide);
+		if (top != null)
+			top.SetActive(!hide);
 	}
 
 	public void PlayClickSound()
 	{
 		if (clickSound != null && source != null)
-		{
 			source.PlayOneShot(clickSound);
-		}
 	}
 }
