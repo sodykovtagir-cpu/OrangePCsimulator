@@ -44,7 +44,6 @@ public class WorkshopClient : MonoBehaviour
 {
 	public static readonly string[] ApiUrls =
 	{
-		"http://orangepcsimu.byethost4.com/workshop/api.php",
 		"https://orangepcsimu.byethost4.com/workshop/api.php"
 	};
 
@@ -225,7 +224,10 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 25;
-				yield return req.SendWebRequest();
+				req.certificateHandler = new BypassCert();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				yield return op;
 				if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
 				{
 					workingUrl = baseUrl;
@@ -253,7 +255,10 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
-				yield return req.SendWebRequest();
+				req.certificateHandler = new BypassCert();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				yield return op;
 				if (req.result == UnityWebRequest.Result.Success && req.downloadHandler.data != null && req.downloadHandler.data.Length > 0)
 				{
 					workingUrl = baseUrl;
@@ -274,7 +279,10 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
-				yield return req.SendWebRequest();
+				req.certificateHandler = new BypassCert();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				yield return op;
 				if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
 				{
 					workingUrl = baseUrl;
@@ -320,7 +328,10 @@ public class WorkshopClient : MonoBehaviour
 			{
 				req.timeout = 15;
 				req.SetRequestHeader("User-Agent", "Mozilla/5.0 OrangePCSimulator");
-				yield return req.SendWebRequest();
+				req.certificateHandler = new BypassCert();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				yield return op;
 				var html = req.downloadHandler != null ? req.downloadHandler.text : "";
 				if (string.IsNullOrEmpty(html)) continue;
 				if (html.IndexOf('{') >= 0 && html.IndexOf("toNumbers") < 0)
