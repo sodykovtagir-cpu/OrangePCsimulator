@@ -72,14 +72,21 @@ public class ResolutionSetting : MonoBehaviour
 			+ " RTX=" + (rtxToggle != null)
 			+ " Refl=" + (reflectionsToggle != null));
 
+		bool mobile = Application.isMobilePlatform;
 #if UNITY_ANDROID || UNITY_IOS
-		SetupMobileSlider();
-		if (resolutionDropdown != null) resolutionDropdown.gameObject.SetActive(false);
-		if (fullscreenToggle != null) fullscreenToggle.gameObject.SetActive(false);
-#else
-		SetupPcResolutions();
-		if (mobileScaleSlider != null) mobileScaleSlider.gameObject.SetActive(false);
+		mobile = true;
 #endif
+		if (mobile)
+		{
+			SetupMobileSlider();
+			if (resolutionDropdown != null) resolutionDropdown.gameObject.SetActive(false);
+			HideFullscreenRow();
+		}
+		else
+		{
+			SetupPcResolutions();
+			if (mobileScaleSlider != null) mobileScaleSlider.gameObject.SetActive(false);
+		}
 		bound = true;
 	}
 
@@ -136,6 +143,31 @@ public class ResolutionSetting : MonoBehaviour
 			tr = tr.parent;
 		}
 		return parts.ToLowerInvariant();
+	}
+
+	private void HideFullscreenRow()
+	{
+		if (fullscreenToggle != null)
+		{
+			var p = fullscreenToggle.transform.parent;
+			if (p != null && p.GetComponent<Canvas>() == null && p.childCount <= 5)
+				p.gameObject.SetActive(false);
+			else
+				fullscreenToggle.gameObject.SetActive(false);
+		}
+
+		var root = SearchRoot();
+		if (root == null) return;
+		var labels = root.GetComponentsInChildren<Text>(true);
+		for (int i = 0; i < labels.Length; i++)
+		{
+			var t = labels[i];
+			if (t == null || string.IsNullOrEmpty(t.text)) continue;
+			string s = t.text.ToLowerInvariant();
+			if (s.Contains("fullscreen") || s.Contains("full screen")
+				|| s.Contains("полный экран") || s.Contains("полноэкран"))
+				t.gameObject.SetActive(false);
+		}
 	}
 
 	private void HideLegacyScaleButtons()

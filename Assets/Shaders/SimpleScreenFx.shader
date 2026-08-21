@@ -142,7 +142,7 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				if (_Motion > 0.001)
 				{
 					float3 prev = tex2D(_PrevTex, uv).rgb;
-					col = lerp(col, prev, 0.45 * _Motion);
+					col = lerp(col, prev, _Motion);
 				}
 
 				return float4(col, 1);

@@ -80,8 +80,17 @@ public class SimpleScreenFx : MonoBehaviour
 
 		m.SetFloat("_Vignette", vignette ? 0.38f : 0f);
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
-		m.SetFloat("_Motion", motionBlur ? 1f : 0f);
 		m.SetFloat("_AO", ao ? 0.28f : 0f);
+
+		float motionKeep = 0f;
+		if (motionBlur)
+		{
+			// Same trail length on 30fps phone and 120fps PC (~55ms persistence).
+			float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.008f, 0.05f);
+			motionKeep = Mathf.Exp(-dt / 0.055f);
+			motionKeep = Mathf.Clamp(motionKeep, 0.40f, 0.82f);
+		}
+		m.SetFloat("_Motion", motionKeep);
 
 		if (prev != null && prev.IsCreated())
 			m.SetTexture("_PrevTex", prev);
@@ -98,6 +107,8 @@ public class SimpleScreenFx : MonoBehaviour
 			{
 				ReleasePrev();
 				prev = new RenderTexture(w, h, 0, fmt);
+				prev.filterMode = FilterMode.Bilinear;
+				prev.wrapMode = TextureWrapMode.Clamp;
 				prev.Create();
 			}
 			Graphics.Blit(composed, prev);
