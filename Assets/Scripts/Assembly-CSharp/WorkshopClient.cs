@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using SaveManagement;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -39,6 +41,7 @@ public class WorkshopClient : MonoBehaviour
 {
 	public static string ApiUrl = "https://orangepcsimu.byethost4.com/workshop/api.php";
 	public static string UploadKey = "";
+	private static string byetCookie;
 
 	public static WorkshopClient Instance { get; private set; }
 
@@ -60,8 +63,10 @@ public class WorkshopClient : MonoBehaviour
 
 	private IEnumerator GetList(Action<List<WorkshopItem>, string> done)
 	{
-		using (var req = UnityWebRequest.Get(ApiUrl + "?action=list"))
+		yield return BypassByethost();
+		using (var req = UnityWebRequest.Get(ApiUrl + "?action=list&i=1"))
 		{
+			ApplyCookie(req);
 			req.timeout = 20;
 			yield return req.SendWebRequest();
 			if (req.result != UnityWebRequest.Result.Success)
@@ -93,8 +98,10 @@ public class WorkshopClient : MonoBehaviour
 
 	private IEnumerator DownloadCo(WorkshopItem item, Action<string, string> done)
 	{
-		using (var req = UnityWebRequest.Get(ApiUrl + "?action=download&id=" + item.id))
+		yield return BypassByethost();
+		using (var req = UnityWebRequest.Get(ApiUrl + "?action=download&id=" + item.id + "&i=1"))
 		{
+			ApplyCookie(req);
 			req.timeout = 60;
 			yield return req.SendWebRequest();
 			if (req.result != UnityWebRequest.Result.Success)
@@ -186,5 +193,57 @@ public class WorkshopClient : MonoBehaviour
 		int b = raw.LastIndexOf('}');
 		if (a >= 0 && b > a) return raw.Substring(a, b - a + 1);
 		return raw;
+	}
+
+	private static void ApplyCookie(UnityWebRequest req)
+	{
+		if (!string.IsNullOrEmpty(byetCookie))
+			req.SetRequestHeader("Cookie", byetCookie);
+	}
+
+	private IEnumerator BypassByethost()
+	{
+		if (!string.IsNullOrEmpty(byetCookie)) yield break;
+		using (var req = UnityWebRequest.Get(ApiUrl + "?action=list"))
+		{
+			req.timeout = 15;
+			yield return req.SendWebRequest();
+			var html = req.downloadHandler != null ? req.downloadHandler.text : "";
+			if (string.IsNullOrEmpty(html) || html.IndexOf("toNumbers") < 0)
+			{
+				if (!string.IsNullOrEmpty(html) && html.IndexOf('{') >= 0)
+					yield break;
+				yield break;
+			}
+			var ms = Regex.Matches(html, "toNumbers\\(\"([0-9a-fA-F]+)\"\\)");
+			if (ms.Count < 3) yield break;
+			try
+			{
+				byte[] key = Hex(ms[0].Groups[1].Value);
+				byte[] iv = Hex(ms[1].Groups[1].Value);
+				byte[] ct = Hex(ms[2].Groups[1].Value);
+				using (var aes = Aes.Create())
+				{
+					aes.Mode = CipherMode.CBC;
+					aes.Padding = PaddingMode.None;
+					aes.Key = key;
+					aes.IV = iv;
+					var dec = aes.CreateDecryptor().TransformFinalBlock(ct, 0, ct.Length);
+					byetCookie = "__test=" + BitConverter.ToString(dec).Replace("-", "").ToLowerInvariant();
+				}
+			}
+			catch (Exception e)
+			{
+				Debug.LogWarning("[Workshop] byethost cookie: " + e.Message);
+			}
+		}
+	}
+
+	private static byte[] Hex(string s)
+	{
+		var b = new byte[s.Length / 2];
+		for (int i = 0; i < b.Length; i++)
+			b[i] = Convert.ToByte(s.Substring(i * 2, 2), 16);
+		return b;
 	}
 }
