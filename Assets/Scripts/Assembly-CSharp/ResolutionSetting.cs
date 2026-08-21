@@ -142,6 +142,27 @@ public class ResolutionSetting : MonoBehaviour
 		if (field == null) field = found;
 	}
 
+	private static void AssignSlider(ref Slider field, Slider found)
+	{
+		if (field == null) field = found;
+	}
+
+	private static string IdentifySlider(Slider sl)
+	{
+		if (sl == null) return "";
+		var parts = sl.name;
+		var tr = sl.transform;
+		for (int d = 0; d < 3 && tr != null; d++)
+		{
+			parts += " " + tr.name;
+			var labels = tr.GetComponentsInChildren<Text>(true);
+			for (int i = 0; i < labels.Length && i < 3; i++)
+				if (labels[i] != null) parts += " " + labels[i].text;
+			tr = tr.parent;
+		}
+		return parts.ToLowerInvariant();
+	}
+
 	private static string Identify(Toggle t)
 	{
 		if (t == null) return "";
