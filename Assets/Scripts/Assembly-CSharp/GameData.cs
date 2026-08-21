@@ -28,4 +28,10 @@ public class GameData
 	public int workshopId;
 
 	public string workshopKey;
+
+	public string workshopTitle;
+
+	public string workshopAuthor;
+
+	public string workshopDesc;
 }
