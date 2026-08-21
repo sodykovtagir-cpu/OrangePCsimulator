@@ -20405,7 +20405,7 @@ MonoBehaviour:
   bloomToggle: {fileID: 334000697}
   aoToggle: {fileID: 656476023}
   vignetteToggle: {fileID: 1102654656}
-  chromaticToggle: {fileID: 839099174}
+  grainToggle: {fileID: 839099174}
   resolutionDropdown: {fileID: 781242834}
   mobileScaleSlider: {fileID: 341119712}
   mobileScaleLabel: {fileID: 518386767}
