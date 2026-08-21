@@ -53,6 +53,21 @@ public class WorkshopClient : MonoBehaviour
 
 	public static WorkshopClient Instance { get; private set; }
 
+	private class AcceptAllCerts : CertificateHandler
+	{
+		protected override bool ValidateCertificate(byte[] certificateData) { return true; }
+	}
+
+	private static UnityWebRequestAsyncOperation SafeSend(UnityWebRequest req)
+	{
+		try { return req.SendWebRequest(); }
+		catch (InvalidOperationException e)
+		{
+			Debug.LogWarning("[Workshop] " + e.Message);
+			return null;
+		}
+	}
+
 	private void Awake()
 	{
 		if (Instance != null && Instance != this)
@@ -224,7 +239,7 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 25;
-				req.certificateHandler = new BypassCert();
+				req.certificateHandler = new AcceptAllCerts();
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
@@ -255,7 +270,7 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
-				req.certificateHandler = new BypassCert();
+				req.certificateHandler = new AcceptAllCerts();
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
@@ -279,7 +294,7 @@ public class WorkshopClient : MonoBehaviour
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
-				req.certificateHandler = new BypassCert();
+				req.certificateHandler = new AcceptAllCerts();
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
@@ -328,7 +343,7 @@ public class WorkshopClient : MonoBehaviour
 			{
 				req.timeout = 15;
 				req.SetRequestHeader("User-Agent", "Mozilla/5.0 OrangePCSimulator");
-				req.certificateHandler = new BypassCert();
+				req.certificateHandler = new AcceptAllCerts();
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
