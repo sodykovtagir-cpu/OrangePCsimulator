@@ -5,7 +5,7 @@ public class SimpleScreenFx : MonoBehaviour
 {
 	public bool bloom;
 	public bool vignette;
-	public bool chromatic;
+	public bool grain;
 	public bool motionBlur;
 	public bool ao;
 
@@ -44,7 +44,7 @@ public class SimpleScreenFx : MonoBehaviour
 	private void OnRenderImage(RenderTexture src, RenderTexture dest)
 	{
 		var m = Mat();
-		bool any = bloom || vignette || chromatic || motionBlur || ao;
+		bool any = bloom || vignette || grain || motionBlur || ao;
 		if (m == null || !any || src == null)
 		{
 			Graphics.Blit(src, dest);
@@ -79,7 +79,7 @@ public class SimpleScreenFx : MonoBehaviour
 		}
 
 		m.SetFloat("_Vignette", vignette ? 0.16f : 0f);
-		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
+		m.SetFloat("_Grain", grain ? 0.08f : 0f);
 		m.SetFloat("_AO", ao ? 0.28f : 0f);
 
 		float motionKeep = 0f;

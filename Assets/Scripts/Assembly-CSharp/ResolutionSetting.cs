@@ -23,7 +23,7 @@ public class ResolutionSetting : MonoBehaviour
 	[SerializeField] private Toggle bloomToggle;
 	[SerializeField] private Toggle aoToggle;
 	[SerializeField] private Toggle vignetteToggle;
-	[SerializeField] private Toggle chromaticToggle;
+	[SerializeField] private Toggle grainToggle;
 
 	[Header("PC resolution")]
 	[SerializeField] private Dropdown resolutionDropdown;
@@ -67,7 +67,7 @@ public class ResolutionSetting : MonoBehaviour
 		BindToggle(bloomToggle, "PP_Bloom", 0, SetBloom);
 		BindToggle(aoToggle, "PP_AO", 0, SetAO);
 		BindToggle(vignetteToggle, "PP_Vignette", 0, SetVignette);
-		BindToggle(chromaticToggle, "PP_Chromatic", 0, SetChromatic);
+		BindToggle(grainToggle, "PP_Grain", 0, SetGrain);
 
 		bool mobile = Application.isMobilePlatform;
 #if UNITY_ANDROID || UNITY_IOS
@@ -107,7 +107,7 @@ public class ResolutionSetting : MonoBehaviour
 			if (id.Contains("motion") || id.Contains("blur")) Assign(ref motionBlurToggle, t);
 			else if (id.Contains("bloom")) Assign(ref bloomToggle, t);
 			else if (id.Contains("vignette")) Assign(ref vignetteToggle, t);
-			else if (id.Contains("chromatic") || id.Contains("aberr")) Assign(ref chromaticToggle, t);
+			else if (id.Contains("grain") || id.Contains("шум") || id.Contains("зерн") || id.Contains("chromatic") || id.Contains("aberr")) Assign(ref grainToggle, t);
 			else if (id.Contains("occlusion") || id.Contains("ssao")) Assign(ref aoToggle, t);
 			else if (id.Contains("full")) Assign(ref fullscreenToggle, t);
 			else if (id.Contains("rtx") || id.Contains("высок")) Assign(ref rtxToggle, t);

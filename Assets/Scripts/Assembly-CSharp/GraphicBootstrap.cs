@@ -130,7 +130,7 @@ public static class GraphicsBootstrap
 
 		fx.bloom = PlayerPrefs.GetInt("PP_Bloom", 0) == 1;
 		fx.vignette = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
-		fx.chromatic = PlayerPrefs.GetInt("PP_Chromatic", 0) == 1;
+		fx.grain = PlayerPrefs.GetInt("PP_Grain", PlayerPrefs.GetInt("PP_Chromatic", 0)) == 1;
 		fx.motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
 		fx.ao = PlayerPrefs.GetInt("PP_AO", 0) == 1;
 		fx.enabled = true;
