@@ -24,4 +24,8 @@ public class GameData
 	public bool light = true;
 
 	public string sign;
+
+	public int workshopId;
+
+	public string workshopKey;
 }

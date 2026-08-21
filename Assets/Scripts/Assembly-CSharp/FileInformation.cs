@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,6 +27,18 @@ public class FileInformation : MonoBehaviour
     [SerializeField] private GameObject exportButton;
     [SerializeField] private ConfirmationDialog deleteConfirmationDialog;
 
+    [Header("Workshop")]
+    [SerializeField] private GameObject uploadButton;
+    [SerializeField] private GameObject updateButton;
+    [SerializeField] private GameObject deleteWorkshopButton;
+    [SerializeField] private GameObject publishPanel;
+    [SerializeField] private InputField wsTitle;
+    [SerializeField] private InputField wsAuthor;
+    [SerializeField] private InputField wsDesc;
+    [SerializeField] private RawImage wsCover;
+    [SerializeField] private Text wsStatus;
+
+    private byte[] coverJpg;
     private FileMenu.Load load;
     private MenuManager menuManager;
 

@@ -95,7 +95,7 @@ public class WorkshopMenu : MonoBehaviour
 		string author = authorField != null ? authorField.text : "Player";
 		string desc = descField != null ? descField.text : "";
 		SetStatus("Uploading...");
-		WorkshopClient.Instance.Upload(localPaths[i], title, author, desc, (id, err) =>
+		WorkshopClient.Instance.Upload(localPaths[i], title, author, desc, null, (id, key, err) =>
 		{
 			if (err != null) { SetStatus("Upload: " + err); return; }
 			SetStatus("Uploaded #" + id);
@@ -173,14 +173,11 @@ public class WorkshopMenu : MonoBehaviour
 
 	private void WireRow(Transform t, WorkshopItem it)
 	{
-		var name = t.Find("Name");
-		if (name != null)
-		{
-			var tx = name.GetComponent<Text>();
-			if (tx != null) tx.text = it.title + " — " + it.author;
-			var nb = name.GetComponent<Button>();
-			if (nb != null) nb.onClick.AddListener(() => DownloadAndPlay(it));
-		}
+		SetChildText(t, "Name", it.title + " — " + it.author);
+		SetChildText(t, "Downloads", it.downloads.ToString());
+		SetChildText(t, "Likes", it.likes.ToString());
+		SetChildText(t, "Description", it.description ?? "");
+
 		var play = t.Find("Play");
 		if (play != null)
 		{
@@ -192,6 +189,48 @@ public class WorkshopMenu : MonoBehaviour
 		{
 			var b = save.GetComponent<Button>();
 			if (b != null) b.onClick.AddListener(() => DownloadOnly(it));
+		}
+		var like = t.Find("Like");
+		if (like != null)
+		{
+			var b = like.GetComponent<Button>();
+			if (b != null)
+			{
+				int captured = it.id;
+				b.onClick.AddListener(() =>
+				{
+					WorkshopClient.Instance.Like(captured, (n, err) =>
+					{
+						if (err != null) { SetStatus(err); return; }
+						SetChildText(t, "Likes", n.ToString());
+					});
+				});
+			}
+		}
+		var cover = t.Find("Cover");
+		if (cover != null && it.has_cover)
+		{
+			var raw = cover.GetComponent<RawImage>();
+			if (raw != null)
+				StartCoroutine(LoadCover(raw, it.id));
+		}
+	}
+
+	private static void SetChildText(Transform t, string child, string value)
+	{
+		var c = t.Find(child);
+		if (c == null) return;
+		var tx = c.GetComponent<Text>();
+		if (tx != null) tx.text = value;
+	}
+
+	private System.Collections.IEnumerator LoadCover(RawImage raw, int id)
+	{
+		using (var req = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(WorkshopClient.CoverUrl(id)))
+		{
+			yield return req.SendWebRequest();
+			if (req.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+				raw.texture = UnityEngine.Networking.DownloadHandlerTexture.GetContent(req);
 		}
 	}
 

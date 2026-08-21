@@ -18,6 +18,8 @@ public class WorkshopItem
 	public int size_bytes;
 	public string created_at;
 	public int downloads;
+	public int likes;
+	public bool has_cover;
 }
 
 [Serializable]
@@ -34,6 +36,8 @@ public class WorkshopUploadResponse
 	public bool ok;
 	public string error;
 	public int id;
+	public string owner_key;
+	public int likes;
 }
 
 public class WorkshopClient : MonoBehaviour
@@ -104,41 +108,112 @@ public class WorkshopClient : MonoBehaviour
 		done(path, null);
 	}
 
-	public void Upload(string localPath, string title, string author, string description, Action<int, string> done)
+	public static string ClientId()
 	{
-		StartCoroutine(UploadCo(localPath, title, author, description, done));
+		var id = PlayerPrefs.GetString("WorkshopClientId", "");
+		if (string.IsNullOrEmpty(id))
+		{
+			id = Guid.NewGuid().ToString("N");
+			PlayerPrefs.SetString("WorkshopClientId", id);
+			PlayerPrefs.Save();
+		}
+		return id;
 	}
 
-	private IEnumerator UploadCo(string localPath, string title, string author, string description, Action<int, string> done)
+	public static string CoverUrl(int id)
 	{
-		if (!File.Exists(localPath)) { done(0, "no file"); yield break; }
-		var bytes = File.ReadAllBytes(localPath);
-		if (bytes.Length > 1048576) { done(0, "file > 1MB"); yield break; }
+		var baseUrl = !string.IsNullOrEmpty(workingUrl) ? workingUrl : ApiUrls[0];
+		return baseUrl + "?action=cover&id=" + id + "&i=1";
+	}
+
+	public void Upload(string localPath, string title, string author, string description, byte[] coverJpg, Action<int, string, string> done)
+	{
+		StartCoroutine(PostSave("upload", 0, null, localPath, title, author, description, coverJpg, done));
+	}
+
+	public void UpdateSave(int id, string ownerKey, string localPath, string title, string author, string description, byte[] coverJpg, Action<int, string, string> done)
+	{
+		StartCoroutine(PostSave("update", id, ownerKey, localPath, title, author, description, coverJpg, done));
+	}
+
+	public void DeleteSave(int id, string ownerKey, Action<string> done)
+	{
+		StartCoroutine(SimplePost("?action=delete&i=1", new List<IMultipartFormSection>
+		{
+			new MultipartFormDataSection("id", id.ToString()),
+			new MultipartFormDataSection("owner_key", ownerKey ?? "")
+		}, (body, err) =>
+		{
+			if (err != null) { done(err); return; }
+			var p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body));
+			done(p != null && p.ok ? null : (p != null ? p.error : "delete fail"));
+		}));
+	}
+
+	public void Like(int id, Action<int, string> done)
+	{
+		StartCoroutine(SimplePost("?action=like&i=1", new List<IMultipartFormSection>
+		{
+			new MultipartFormDataSection("id", id.ToString()),
+			new MultipartFormDataSection("client", ClientId())
+		}, (body, err) =>
+		{
+			if (err != null) { done(0, err); return; }
+			var p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body));
+			if (p == null || !p.ok) { done(0, p != null ? p.error : "like fail"); return; }
+			done(p.likes, null);
+		}));
+	}
+
+	private IEnumerator SimplePost(string query, List<IMultipartFormSection> form, Action<string, string> done)
+	{
+		string body = null, err = null;
+		yield return RequestPost(query, form, (t, e) => { body = t; err = e; });
+		done(body, err);
+	}
+
+	private IEnumerator PostSave(string action, int id, string ownerKey, string localPath, string title, string author, string description, byte[] coverJpg, Action<int, string, string> done)
+	{
+		if (action == "upload" && (string.IsNullOrEmpty(localPath) || !File.Exists(localPath)))
+		{
+			done(0, null, "no file");
+			yield break;
+		}
 
 		var form = new List<IMultipartFormSection>
 		{
-			new MultipartFormFileSection("file", bytes, Path.GetFileName(localPath), "application/octet-stream"),
 			new MultipartFormDataSection("title", title ?? ""),
 			new MultipartFormDataSection("author", author ?? "Player"),
 			new MultipartFormDataSection("description", description ?? "")
 		};
+		if (id > 0)
+		{
+			form.Add(new MultipartFormDataSection("id", id.ToString()));
+			form.Add(new MultipartFormDataSection("owner_key", ownerKey ?? ""));
+		}
+		if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
+		{
+			var bytes = File.ReadAllBytes(localPath);
+			if (bytes.Length > 1048576) { done(0, null, "file > 1MB"); yield break; }
+			form.Add(new MultipartFormFileSection("file", bytes, Path.GetFileName(localPath), "application/octet-stream"));
+		}
+		if (coverJpg != null && coverJpg.Length > 0)
+			form.Add(new MultipartFormFileSection("cover", coverJpg, "cover.jpg", "image/jpeg"));
 		if (!string.IsNullOrEmpty(UploadKey))
 			form.Add(new MultipartFormDataSection("key", UploadKey));
 
-		string body = null;
-		string err = null;
-		yield return RequestPost("?action=upload&i=1", form, (t, e) => { body = t; err = e; });
-		if (err != null) { done(0, err); yield break; }
-		var json = StripJunk(body);
+		string body = null, err = null;
+		yield return RequestPost("?action=" + action + "&i=1", form, (t, e) => { body = t; err = e; });
+		if (err != null) { done(0, null, err); yield break; }
 		WorkshopUploadResponse parsed = null;
-		try { parsed = JsonUtility.FromJson<WorkshopUploadResponse>(json); }
-		catch (Exception e) { done(0, e.Message); yield break; }
+		try { parsed = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body)); }
+		catch (Exception e) { done(0, null, e.Message); yield break; }
 		if (parsed == null || !parsed.ok)
 		{
-			done(0, parsed != null ? parsed.error : "upload fail");
+			done(0, null, parsed != null ? parsed.error : "fail");
 			yield break;
 		}
-		done(parsed.id, null);
+		done(parsed.id, parsed.owner_key, null);
 	}
 
 	private IEnumerator RequestGet(string query, Action<string, string> done)
