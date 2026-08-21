@@ -69,13 +69,6 @@ public class ResolutionSetting : MonoBehaviour
 		BindToggle(vignetteToggle, "PP_Vignette", 0, SetVignette);
 		BindToggle(chromaticToggle, "PP_Chromatic", 0, SetChromatic);
 
-		Debug.Log("[Settings] Wired toggles"
-			+ " MB=" + (motionBlurToggle != null)
-			+ " Bloom=" + (bloomToggle != null)
-			+ " FS=" + (fullscreenToggle != null)
-			+ " RTX=" + (rtxToggle != null)
-			+ " Refl=" + (reflectionsToggle != null));
-
 		bool mobile = Application.isMobilePlatform;
 #if UNITY_ANDROID || UNITY_IOS
 		mobile = true;
@@ -131,18 +124,17 @@ public class ResolutionSetting : MonoBehaviour
 			if (sl == null) continue;
 			string id = IdentifySlider(sl);
 			if (id.Contains("fps") || id.Contains("frame") || id.Contains("кадр"))
-				AssignSlider(ref fpsSlider, sl);
+			{
+				if (fpsSlider == null) fpsSlider = sl;
+			}
 			else if (id.Contains("scale") || id.Contains("resol") || id.Contains("разреш") || id.Contains("mobile"))
-				AssignSlider(ref mobileScaleSlider, sl);
+			{
+				if (mobileScaleSlider == null) mobileScaleSlider = sl;
+			}
 		}
 	}
 
 	private static void Assign(ref Toggle field, Toggle found)
-	{
-		if (field == null) field = found;
-	}
-
-	private static void AssignSlider(ref Slider field, Slider found)
 	{
 		if (field == null) field = found;
 	}
@@ -235,7 +227,8 @@ public class ResolutionSetting : MonoBehaviour
 		if (sw > 0 && native.width > 0)
 			saved = Mathf.Clamp((float)sw / native.width, 0.35f, 1f);
 		mobileScaleSlider.SetValueWithoutNotify(saved);
-		UpdateMobileLabel(saved);
+		if (mobileScaleLabel != null)
+			mobileScaleLabel.text = Mathf.RoundToInt(saved * 100f) + "%";
 		mobileScaleSlider.onValueChanged.AddListener(v =>
 		{
 			int w = Mathf.Max(320, Mathf.RoundToInt(native.width * v));
@@ -243,7 +236,8 @@ public class ResolutionSetting : MonoBehaviour
 			PlayerPrefs.SetInt("ResWidth", w);
 			PlayerPrefs.SetInt("ResHeight", h);
 			PlayerPrefs.Save();
-			UpdateMobileLabel(v);
+			if (mobileScaleLabel != null)
+				mobileScaleLabel.text = Mathf.RoundToInt(v * 100f) + "%";
 			GraphicsBootstrap.ApplyResolution();
 		});
 	}
@@ -263,23 +257,14 @@ public class ResolutionSetting : MonoBehaviour
 		int saved = PlayerPrefs.GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", 60));
 		saved = Mathf.Clamp(saved, 30, maxFps);
 		fpsSlider.SetValueWithoutNotify(saved);
-		UpdateFpsLabel(saved);
+		if (fpsLabel != null) fpsLabel.text = saved + " FPS";
 
 		if (fpsLabel == null)
 		{
 			var texts = fpsSlider.GetComponentsInChildren<Text>(true);
 			if (texts != null && texts.Length > 0) fpsLabel = texts[0];
-			if (fpsSlider.transform.parent != null)
-			{
-				var ptexts = fpsSlider.transform.parent.GetComponentsInChildren<Text>(true);
-				for (int i = 0; i < ptexts.Length; i++)
-				{
-					if (ptexts[i] == null) continue;
-					string s = ptexts[i].text.ToLowerInvariant();
-					if (s.Contains("fps") || s.Contains("кадр")) { fpsLabel = ptexts[i]; break; }
-				}
-			}
 		}
+		if (fpsLabel != null) fpsLabel.text = saved + " FPS";
 
 		fpsSlider.onValueChanged.AddListener(v =>
 		{
@@ -289,14 +274,8 @@ public class ResolutionSetting : MonoBehaviour
 			PlayerPrefs.Save();
 			Application.targetFrameRate = fps;
 			QualitySettings.vSyncCount = 0;
-			UpdateFpsLabel(fps);
+			if (fpsLabel != null) fpsLabel.text = fps + " FPS";
 		});
-	}
-
-	private void UpdateFpsLabel(int fps)
-	{
-		if (fpsLabel == null) return;
-		fpsLabel.text = fps + " FPS";
 	}
 
 	private void SetupPcResolutions()
@@ -385,7 +364,6 @@ public class ResolutionSetting : MonoBehaviour
 	{
 		PlayerPrefs.SetInt(key, enabled ? 1 : 0);
 		PlayerPrefs.Save();
-		Debug.Log("[Settings] " + key + " = " + enabled);
 		GraphicsBootstrap.ApplyPostProcess();
 	}
 }
