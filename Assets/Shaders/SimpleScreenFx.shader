@@ -91,7 +91,7 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			sampler2D _PrevTex;
 			float _Bloom;
 			float _Vignette;
-			float _Chromatic;
+			float _Grain;
 			float _Motion;
 			float _AO;
 			float4 _MainTex_TexelSize;
@@ -123,11 +123,10 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 					col *= 1.0 - occ * _AO;
 				}
 
-				if (_Chromatic > 0.001)
+				if (_Grain > 0.001)
 				{
-					float2 off = n * _Chromatic * 0.004;
-					col.r = tex2D(_MainTex, uv + off).r;
-					col.b = tex2D(_MainTex, uv - off).b;
+					float n = frac(sin(dot(uv * float2(1280, 720) + _Time.y * 32.0, float2(12.9898, 78.233))) * 43758.5453);
+					col += (n - 0.5) * _Grain;
 				}
 
 				if (_Bloom > 0.001)
