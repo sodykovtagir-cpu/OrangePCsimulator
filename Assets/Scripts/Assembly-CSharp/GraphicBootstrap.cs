@@ -66,7 +66,7 @@ public static class GraphicsBootstrap
 	{
 		bool enabled = PlayerPrefs.GetInt("RTXMode", 0) == 1;
 		// MSAA kills Post Processing motion blur / AO. Use FXAA on the PP layer instead.
-		QualitySettings.antiAliasing = 0;
+		QualitySettings.antiAliasing = enabled ? 8 : 4;
 		if (enabled)
 		{
 			QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
@@ -120,7 +120,7 @@ public static class GraphicsBootstrap
 	{
 		if (cam == null) return;
 		cam.allowHDR = true;
-		cam.allowMSAA = false;
+		cam.allowMSAA = true;
 		if (PlayerPrefs.GetInt("PP_AO", 0) == 1)
 			cam.depthTextureMode |= DepthTextureMode.Depth;
 

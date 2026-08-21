@@ -14,7 +14,12 @@ public class DisplayManager : MonoBehaviour
 
 	public RenderTexture CreateDisplay(Canvas canvas, int width, int height)
 	{
-		var rt = new RenderTexture(width, height, 24, RenderTextureFormat.RGB565);
+		width = Mathf.Max(width, 1280);
+		height = Mathf.Max(height, 720);
+		var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+		rt.antiAliasing = 4;
+		rt.filterMode = FilterMode.Bilinear;
+		rt.anisoLevel = 4;
 		var go = new GameObject("Display Camera");
 		go.transform.position = new Vector3(500f, 0f, 0f);
 		var cam = go.AddComponent<Camera>();
