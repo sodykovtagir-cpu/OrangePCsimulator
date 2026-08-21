@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 {
-    [Header("Уникальный ID элемента")]
+    [Header("РЈРЅРёРєР°Р»СЊРЅС‹Р№ ID СЌР»РµРјРµРЅС‚Р°")]
     [SerializeField]
     private string controlId;
 
@@ -14,11 +14,11 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         get { return controlId; }
     }
 
-    [Header("Родительская область. В меню = PreviewMobileControlsPanel, в игре = MobileControlsPanel")]
+    [Header("Р РѕРґРёС‚РµР»СЊСЃРєР°СЏ РѕР±Р»Р°СЃС‚СЊ. Р’ РјРµРЅСЋ = PreviewMobileControlsPanel, РІ РёРіСЂРµ = MobileControlsPanel")]
     [SerializeField]
     private RectTransform parentRect;
 
-    [Header("Умные anchors")]
+    [Header("РЈРјРЅС‹Рµ anchors")]
     [SerializeField]
     private bool useSmartAnchors = true;
 
@@ -35,11 +35,11 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
     private Button button;
     private bool defaultInteractable;
 
-    // Старые ключи, чтобы можно было подхватить прежнюю раскладку.
+    // РЎС‚Р°СЂС‹Рµ РєР»СЋС‡Рё, С‡С‚РѕР±С‹ РјРѕР¶РЅРѕ Р±С‹Р»Рѕ РїРѕРґС…РІР°С‚РёС‚СЊ РїСЂРµР¶РЅСЋСЋ СЂР°СЃРєР»Р°РґРєСѓ.
     private string OldKeyX => "mobile_free_" + controlId + "_x";
     private string OldKeyY => "mobile_free_" + controlId + "_y";
 
-    // Новые ключи: сохраняем anchor + offset.
+    // РќРѕРІС‹Рµ РєР»СЋС‡Рё: СЃРѕС…СЂР°РЅСЏРµРј anchor + offset.
     private string KeyAnchorX => "mobile_free_anchor_" + controlId + "_ax";
     private string KeyAnchorY => "mobile_free_anchor_" + controlId + "_ay";
     private string KeyPosX => "mobile_free_anchor_" + controlId + "_px";
@@ -92,7 +92,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
         if (rect == null)
         {
-            Debug.LogWarning(name + ": MobileFreeDraggable должен висеть на UI-объекте с RectTransform.");
+            Debug.LogWarning(name + ": MobileFreeDraggable РґРѕР»Р¶РµРЅ РІРёСЃРµС‚СЊ РЅР° UI-РѕР±СЉРµРєС‚Рµ СЃ RectTransform.");
             return false;
         }
 
@@ -114,7 +114,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
         if (parentRect == null)
         {
-            Debug.LogWarning(name + ": Parent Rect не найден. Укажи Parent Rect вручную.");
+            Debug.LogWarning(name + ": Parent Rect РЅРµ РЅР°Р№РґРµРЅ. РЈРєР°Р¶Рё Parent Rect РІСЂСѓС‡РЅСѓСЋ.");
             return false;
         }
 
@@ -144,7 +144,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         Vector2 normalized = LocalToNormalized(localPoint);
         normalized = ClampNormalized(normalized);
 
-        // Во время перетаскивания двигаем просто по normalized-центру.
+        // Р’Рѕ РІСЂРµРјСЏ РїРµСЂРµС‚Р°СЃРєРёРІР°РЅРёСЏ РґРІРёРіР°РµРј РїСЂРѕСЃС‚Рѕ РїРѕ normalized-С†РµРЅС‚СЂСѓ.
         rect.anchorMin = normalized;
         rect.anchorMax = normalized;
         rect.anchoredPosition = Vector2.zero;
@@ -282,7 +282,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
         if (string.IsNullOrEmpty(controlId))
         {
-            Debug.LogWarning(name + ": controlId пустой.");
+            Debug.LogWarning(name + ": controlId РїСѓСЃС‚РѕР№.");
             return;
         }
 
@@ -310,7 +310,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         if (string.IsNullOrEmpty(controlId))
             return;
 
-        // Новый формат: anchor + anchoredPosition.
+        // РќРѕРІС‹Р№ С„РѕСЂРјР°С‚: anchor + anchoredPosition.
         if (
             PlayerPrefs.HasKey(KeyAnchorX) &&
             PlayerPrefs.HasKey(KeyAnchorY) &&
@@ -334,7 +334,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
             return;
         }
 
-        // Старый формат: normalized x/y.
+        // РЎС‚Р°СЂС‹Р№ С„РѕСЂРјР°С‚: normalized x/y.
         if (PlayerPrefs.HasKey(OldKeyX) && PlayerPrefs.HasKey(OldKeyY))
         {
             float x = PlayerPrefs.GetFloat(OldKeyX);
@@ -359,17 +359,17 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         if (string.IsNullOrEmpty(controlId))
             return;
 
-        // Новый формат
+        // РќРѕРІС‹Р№ С„РѕСЂРјР°С‚
         PlayerPrefs.DeleteKey(KeyAnchorX);
         PlayerPrefs.DeleteKey(KeyAnchorY);
         PlayerPrefs.DeleteKey(KeyPosX);
         PlayerPrefs.DeleteKey(KeyPosY);
 
-        // Старый формат
+        // РЎС‚Р°СЂС‹Р№ С„РѕСЂРјР°С‚
         PlayerPrefs.DeleteKey(OldKeyX);
         PlayerPrefs.DeleteKey(OldKeyY);
 
-        // Возможные старые варианты
+        // Р’РѕР·РјРѕР¶РЅС‹Рµ СЃС‚Р°СЂС‹Рµ РІР°СЂРёР°РЅС‚С‹
         PlayerPrefs.DeleteKey("mobile_free_v2_" + controlId + "_x");
         PlayerPrefs.DeleteKey("mobile_free_v2_" + controlId + "_y");
         PlayerPrefs.DeleteKey("mobile_free_v3_" + controlId + "_x");
