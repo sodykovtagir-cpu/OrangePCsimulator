@@ -128,6 +128,7 @@ public class WorkshopMenu : MonoBehaviour
 		WorkshopClient.Instance.Download(item, (path, err) =>
 		{
 			if (err != null) { SetStatus("Download: " + err); return; }
+			if (FileMenu.Instance != null) FileMenu.Instance.RebuildList();
 			SetStatus("Saved: " + Path.GetFileName(path));
 		});
 	}

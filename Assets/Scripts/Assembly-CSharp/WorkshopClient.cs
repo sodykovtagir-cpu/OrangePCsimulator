@@ -119,6 +119,18 @@ public class WorkshopClient : MonoBehaviour
 		string path = SaveUtility.GetNewPath(title);
 		try { File.WriteAllBytes(path, bytes); }
 		catch (Exception e) { done(null, e.Message); yield break; }
+		try
+		{
+			var loader = new DataLoader(path);
+			loader.LoadFromPath();
+			if (loader.GameData != null)
+			{
+				loader.GameData.roomName = string.IsNullOrEmpty(item.title) ? loader.GameData.roomName : item.title;
+				loader.GameData.workshopKey = "";
+				loader.WriteToFile();
+			}
+		}
+		catch { }
 		done(path, null);
 	}
 
