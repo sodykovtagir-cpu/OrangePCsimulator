@@ -82,16 +82,76 @@ public class FileInformation : MonoBehaviour
         coverJpg = null;
         RefreshWorkshopButtons();
         if (publishPanel != null) publishPanel.SetActive(false);
-        if (wsTitle != null) wsTitle.text = load.loader.GameData.roomName;
-        if (wsAuthor != null) wsAuthor.text = string.IsNullOrEmpty(load.loader.GameData.sign) ? "Player" : load.loader.GameData.sign;
-        if (wsDesc != null) wsDesc.text = "";
+        FillPublishForm(null);
         EnsureWorkshopClient();
     }
 
     public void OpenPublishPanel()
     {
         if (publishPanel != null) publishPanel.SetActive(true);
-        SetWsStatus(IsPublished() ? "Update listing" : "Upload to workshop");
+        ShowPublishFields();
+        FillPublishForm(null);
+        SetWsStatus(IsPublished() ? "Loading listing..." : "New upload");
+        if (!IsPublished()) return;
+        EnsureWorkshopClient();
+        int id = load.loader.GameData.workshopId;
+        WorkshopClient.Instance.ListSaves((list, err) =>
+        {
+            if (err != null)
+            {
+                SetWsStatus(err);
+                return;
+            }
+            WorkshopItem found = null;
+            if (list != null)
+            {
+                for (int i = 0; i < list.Count; i++)
+                    if (list[i] != null && list[i].id == id) { found = list[i]; break; }
+            }
+            FillPublishForm(found);
+            SetWsStatus("Edit and press Update");
+            if (found != null && found.has_cover && wsCover != null)
+                StartCoroutine(LoadWsCover(id));
+        });
+    }
+
+    private void ShowPublishFields()
+    {
+        if (wsTitle != null) wsTitle.gameObject.SetActive(true);
+        if (wsAuthor != null) wsAuthor.gameObject.SetActive(true);
+        if (wsDesc != null) wsDesc.gameObject.SetActive(true);
+        if (wsCover != null) wsCover.gameObject.SetActive(true);
+    }
+
+    private void FillPublishForm(WorkshopItem remote)
+    {
+        if (load == null || load.loader == null || load.loader.GameData == null) return;
+        var g = load.loader.GameData;
+        string title = g.roomName;
+        string author = PlayerPrefs.GetString("WorkshopAuthor", "Player");
+        string desc = "";
+        if (!string.IsNullOrEmpty(g.workshopTitle)) title = g.workshopTitle;
+        if (!string.IsNullOrEmpty(g.workshopAuthor)) author = g.workshopAuthor;
+        if (!string.IsNullOrEmpty(g.workshopDesc)) desc = g.workshopDesc;
+        if (remote != null)
+        {
+            if (!string.IsNullOrEmpty(remote.title)) title = remote.title;
+            if (!string.IsNullOrEmpty(remote.author)) author = remote.author;
+            if (remote.description != null) desc = remote.description;
+        }
+        if (wsTitle != null) wsTitle.text = title ?? "";
+        if (wsAuthor != null) wsAuthor.text = string.IsNullOrEmpty(author) ? "Player" : author;
+        if (wsDesc != null) wsDesc.text = desc ?? "";
+    }
+
+    private System.Collections.IEnumerator LoadWsCover(int id)
+    {
+        using (var req = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(WorkshopClient.CoverUrl(id)))
+        {
+            yield return req.SendWebRequest();
+            if (req.result == UnityEngine.Networking.UnityWebRequest.Result.Success && wsCover != null)
+                wsCover.texture = UnityEngine.Networking.DownloadHandlerTexture.GetContent(req);
+        }
     }
 
     public void ClosePublishPanel()
