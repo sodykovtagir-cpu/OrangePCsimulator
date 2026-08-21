@@ -171,9 +171,9 @@ public class WorkshopMenu : MonoBehaviour
 
 	private static Font UiFont()
 	{
-		var f = Resources.GetBuiltinResource<Font>("Arial.ttf");
-		if (f == null) f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 		if (f == null) f = Font.CreateDynamicFontFromOSFont("Arial", 16);
+		if (f == null) f = Font.CreateDynamicFontFromOSFont("Liberation Sans", 16);
 		return f;
 	}
 
