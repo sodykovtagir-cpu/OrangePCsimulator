@@ -9,7 +9,7 @@ namespace PC.Component
 		private LayerMask layer;
 
 		[SerializeField]
-		private Color burnedColor = new Color(50, 50, 50);
+		private Color burnedColor = new Color(50f / 255f, 50f / 255f, 50f / 255f, 1f);
 
 		public float defaultFrequency;
 
