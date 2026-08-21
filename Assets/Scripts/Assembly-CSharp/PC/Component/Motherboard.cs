@@ -186,7 +186,7 @@ namespace PC.Component
 
 		private void Fault()
         {
-			if (!running) return;
+			if (!running || System == null) return;
 			System.Fault();
         }
 
@@ -198,13 +198,13 @@ namespace PC.Component
 
 		private void AddHardware(Hardware hardware)
         {
-			if (!running) return;
+			if (!running || System == null) return;
 			System.AddHardware(hardware);
         }
 
 		private void RemoveHardware(Hardware hardware)
 		{
-			if (!running) return;
+			if (!running || System == null) return;
 			System.RemoveHardware(hardware);
 		}
 

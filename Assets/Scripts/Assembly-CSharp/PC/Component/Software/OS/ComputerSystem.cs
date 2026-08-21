@@ -72,8 +72,15 @@ namespace PC.Component.Software.OS
 			int index = AllStorage.IndexOf(s);
 			if (index < 0) return;
 
+			bool systemDisk = index == 0;
+			if (!systemDisk && s.TryGetFile("System/boot.bin", out var boot) && boot != null && boot.content == "pcos")
+				systemDisk = true;
+
 			if (index < occupied) occupied--;
 			AllStorage.RemoveAt(index);
+
+			if (systemDisk)
+				Fault();
 		}
 
 		public void TakeResource()
