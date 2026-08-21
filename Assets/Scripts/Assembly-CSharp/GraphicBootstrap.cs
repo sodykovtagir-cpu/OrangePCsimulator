@@ -1,18 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.Rendering.PostProcessing;
 
 public static class GraphicsBootstrap
 {
 	private static Resolution nativeResolution;
-	private static PostProcessVolume volume;
-	private static PostProcessProfile profile;
-	private static MotionBlur motionBlur;
-	private static Bloom bloom;
-	private static ColorGrading colorGrading;
-	private static Vignette vignette;
-	private static ChromaticAberration chromatic;
-	private static PostProcessResources ppResources;
 
 	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 	private static void OnGameStart()
@@ -31,8 +22,6 @@ public static class GraphicsBootstrap
 	private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 	{
 		ApplyReflectionsToScene();
-		EnsurePostProcess();
-		AttachLayersToCameras();
 		ApplyPostProcess();
 	}
 
@@ -42,8 +31,6 @@ public static class GraphicsBootstrap
 		ApplyReflectionsQuality();
 		ApplyResolution();
 		ApplyFPS();
-		EnsurePostProcess();
-		AttachLayersToCameras();
 		ApplyPostProcess();
 	}
 
@@ -122,60 +109,11 @@ public static class GraphicsBootstrap
 		QualitySettings.vSyncCount = 0;
 	}
 
-	private static void EnsurePostProcess()
-	{
-		if (volume != null && profile != null)
-			return;
-
-		var go = new GameObject("RuntimePostProcess");
-		Object.DontDestroyOnLoad(go);
-		go.layer = 0;
-
-		volume = go.AddComponent<PostProcessVolume>();
-		volume.isGlobal = true;
-		volume.priority = 100f;
-		volume.weight = 1f;
-		profile = ScriptableObject.CreateInstance<PostProcessProfile>();
-		volume.sharedProfile = profile;
-		volume.profile = profile;
-
-		motionBlur = profile.AddSettings<MotionBlur>();
-		motionBlur.enabled.Override(false);
-		motionBlur.shutterAngle.Override(270f);
-		motionBlur.sampleCount.Override(16);
-
-		bloom = profile.AddSettings<Bloom>();
-		bloom.enabled.Override(false);
-		bloom.intensity.Override(2.5f);
-		bloom.threshold.Override(0.9f);
-		bloom.softKnee.Override(0.5f);
-
-		vignette = profile.AddSettings<Vignette>();
-		vignette.enabled.Override(false);
-		vignette.intensity.Override(0.35f);
-
-		chromatic = profile.AddSettings<ChromaticAberration>();
-		chromatic.enabled.Override(false);
-		chromatic.intensity.Override(0.4f);
-
-		colorGrading = profile.AddSettings<ColorGrading>();
-		colorGrading.enabled.Override(true);
-	}
-
 	public static void AttachLayersToCameras()
 	{
-		var cams = Camera.allCameras;
+		var cams = Object.FindObjectsOfType<Camera>();
 		for (int i = 0; i < cams.Length; i++)
 			SetupCamera(cams[i]);
-	}
-
-	private static PostProcessResources GetResources()
-	{
-		if (ppResources != null) return ppResources;
-		var found = Resources.FindObjectsOfTypeAll<PostProcessResources>();
-		if (found != null && found.Length > 0)
-			ppResources = found[0];
-		return ppResources;
 	}
 
 	private static void SetupCamera(Camera cam)
@@ -183,67 +121,25 @@ public static class GraphicsBootstrap
 		if (cam == null) return;
 		cam.allowHDR = true;
 		cam.allowMSAA = false;
-		cam.depthTextureMode |= DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
-		var res = GetResources();
-		if (res == null)
-		{
-			Debug.LogWarning("[GraphicsBootstrap] PostProcessResources not found; skip PP layer.");
-			return;
-		}
+		var fx = cam.GetComponent<SimpleScreenFx>();
+		if (fx == null)
+			fx = cam.gameObject.AddComponent<SimpleScreenFx>();
 
-		var layerComp = cam.GetComponent<PostProcessLayer>();
-		if (layerComp == null)
-			layerComp = cam.gameObject.AddComponent<PostProcessLayer>();
-
-		layerComp.Init(res);
-		layerComp.volumeTrigger = cam.transform;
-		layerComp.volumeLayer = ~0;
-		layerComp.enabled = true;
-		layerComp.antialiasingMode = PostProcessLayer.Antialiasing.FastApproximateAntialiasing;
+		fx.bloom = PlayerPrefs.GetInt("PP_Bloom", 0) == 1;
+		fx.vignette = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
+		fx.chromatic = PlayerPrefs.GetInt("PP_Chromatic", 0) == 1;
+		fx.motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
+		fx.enabled = true;
 	}
 
 	public static void ApplyPostProcess()
 	{
-		EnsurePostProcess();
 		AttachLayersToCameras();
-
-		SetFx(motionBlur, "PP_MotionBlur", 0, on =>
-		{
-			motionBlur.shutterAngle.Override(on ? 270f : 0f);
-		});
-		SetFx(bloom, "PP_Bloom", 0, on =>
-		{
-			bloom.intensity.Override(on ? 2.5f : 0f);
-		});
-		SetFx(vignette, "PP_Vignette", 0, on =>
-		{
-			vignette.intensity.Override(on ? 0.35f : 0f);
-		});
-		SetFx(chromatic, "PP_Chromatic", 0, on =>
-		{
-			chromatic.intensity.Override(on ? 0.4f : 0f);
-		});
-
-		if (colorGrading != null)
-		{
-			colorGrading.enabled.Override(true);
-			colorGrading.postExposure.Override(PlayerPrefs.GetFloat("PP_Exposure", 0f));
-		}
-
-		if (volume != null)
-			volume.weight = 1f;
-
 		Debug.Log("[GraphicsBootstrap] Post-process applied"
 			+ " MB=" + PlayerPrefs.GetInt("PP_MotionBlur", 0)
-			+ " Bloom=" + PlayerPrefs.GetInt("PP_Bloom", 0));
-	}
-
-	private static void SetFx(PostProcessEffectSettings fx, string key, int def, System.Action<bool> extra)
-	{
-		if (fx == null) return;
-		bool on = PlayerPrefs.GetInt(key, def) == 1;
-		fx.enabled.Override(on);
-		extra?.Invoke(on);
+			+ " Bloom=" + PlayerPrefs.GetInt("PP_Bloom", 0)
+			+ " Vig=" + PlayerPrefs.GetInt("PP_Vignette", 0)
+			+ " CA=" + PlayerPrefs.GetInt("PP_Chromatic", 0));
 	}
 }
