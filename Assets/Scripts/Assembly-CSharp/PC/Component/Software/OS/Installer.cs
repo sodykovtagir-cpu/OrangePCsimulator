@@ -118,7 +118,7 @@ namespace PC.Component.Software.OS
 			var all = AllStorage;
 			if (lv == null || all == null) return;
 
-			int index = lv.SelectedIndex + 1;
+			int index = StorageIndexFromList(lv.SelectedIndex);
 			if (index < 0 || index >= all.Count) return;
 
 			var storage = all[index];
