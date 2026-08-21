@@ -34,6 +34,9 @@ namespace PC.Component.Software.OS
 		[SerializeField]
 		private App[] preinstalledApps;
 
+		private readonly List<int> installTargets = new List<int>();
+		private bool listHooked;
+
 		protected override void BootSystem()
         {
 			return;
@@ -45,15 +48,28 @@ namespace PC.Component.Software.OS
 			var lv = storageListView;
 			if (all == null || lv == null) return;
 
-			for (int index = 1; index < all.Count; index++)
+			lv.Clear();
+			installTargets.Clear();
+
+			for (int index = 0; index < all.Count; index++)
 			{
 				var s = all[index];
 				if (s == null) continue;
+				// Skip installer boot media only when there is another disk to install to.
+				if (index == 0 && all.Count > 1) continue;
 				var text = string.Format("{0:X8} {1}", s.Id, Conversion.Size(s.Capacity));
 				lv.Add(new ListViewItem(text, null));
+				installTargets.Add(index);
 			}
 
-			lv.SelectedIndexChanged += StorageListView_SelectedIndexChanged;
+			if (!listHooked)
+			{
+				lv.SelectedIndexChanged += StorageListView_SelectedIndexChanged;
+				listHooked = true;
+			}
+
+			if (informationNextButton != null)
+				informationNextButton.interactable = false;
 
 			if (welcome != null) welcome.SetActive(false);
 			if (information != null) information.SetActive(true);
@@ -61,13 +77,20 @@ namespace PC.Component.Software.OS
 			TakeResource();
 		}
 
+		private int StorageIndexFromList(int listIndex)
+		{
+			if (listIndex < 0 || listIndex >= installTargets.Count) return -1;
+			return installTargets[listIndex];
+		}
+
 		private void StorageListView_SelectedIndexChanged(int index)
 		{
 			var all = AllStorage;
 			if (all == null) return;
 			var btn = informationNextButton;
-			var storage = (index + 1 >= 0 && index + 1 < all.Count) ? all[index + 1] : null;
-			if (storage != null && btn != null) btn.interactable = minimumSpace < storage.Capacity;
+			int si = StorageIndexFromList(index);
+			var storage = (si >= 0 && si < all.Count) ? all[si] : null;
+			if (btn != null) btn.interactable = storage != null && minimumSpace < storage.Capacity;
 		}
 
 		public void Install()

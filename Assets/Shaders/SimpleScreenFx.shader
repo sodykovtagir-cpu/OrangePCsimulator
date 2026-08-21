@@ -108,15 +108,18 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				if (_AO > 0.001)
 				{
 					float d = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
-					float2 t = _MainTex_TexelSize.xy * 2.5;
+					float2 t = _MainTex_TexelSize.xy * 4.0;
 					float occ = 0;
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(t.x, 0)))) * 2.0);
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(-t.x, 0)))) * 2.0);
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, t.y)))) * 2.0);
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, -t.y)))) * 2.0);
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + t))) * 2.0);
-					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv - t))) * 2.0);
-					occ = saturate(occ / 6.0);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(t.x, 0)))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(-t.x, 0)))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, t.y)))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(0, -t.y)))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + t))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv - t))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(t.x, -t.y)))) * 0.6);
+					occ += saturate((d - LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + float2(-t.x, t.y)))) * 0.6);
+					occ = saturate(occ / 8.0);
+					occ = occ * occ;
 					col *= 1.0 - occ * _AO;
 				}
 

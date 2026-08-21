@@ -81,7 +81,7 @@ public class SimpleScreenFx : MonoBehaviour
 		m.SetFloat("_Vignette", vignette ? 0.38f : 0f);
 		m.SetFloat("_Chromatic", chromatic ? 0.55f : 0f);
 		m.SetFloat("_Motion", motionBlur ? 1f : 0f);
-		m.SetFloat("_AO", ao ? 0.55f : 0f);
+		m.SetFloat("_AO", ao ? 0.28f : 0f);
 
 		if (prev != null && prev.IsCreated())
 			m.SetTexture("_PrevTex", prev);

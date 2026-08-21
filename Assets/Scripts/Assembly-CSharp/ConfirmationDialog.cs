@@ -15,20 +15,33 @@ public class ConfirmationDialog : MonoBehaviour
 		animator = GetComponent<Animator>();
 	}
 
+	private Animator Anim()
+	{
+		if (animator == null) animator = GetComponent<Animator>();
+		return animator;
+	}
+
 	public void Show(Action callback)
 	{
 		this.callback = callback;
-		animator.SetBool(parameter, true);
+		if (!gameObject.activeSelf) gameObject.SetActive(true);
+		var a = Anim();
+		if (a != null && !string.IsNullOrEmpty(parameter))
+			a.SetBool(parameter, true);
 	}
 
 	public void Yes()
 	{
-		callback.Invoke();
-		animator.SetBool(parameter, false);
+		callback?.Invoke();
+		var a = Anim();
+		if (a != null && !string.IsNullOrEmpty(parameter))
+			a.SetBool(parameter, false);
 	}
 
 	public void No()
 	{
-		animator.SetBool(parameter, false);
+		var a = Anim();
+		if (a != null && !string.IsNullOrEmpty(parameter))
+			a.SetBool(parameter, false);
 	}
 }

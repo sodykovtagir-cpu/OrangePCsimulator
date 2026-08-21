@@ -73,10 +73,12 @@ public class PauseMenu : MonoBehaviour
 
     public void ExitWithoutSave()
 	{
-		warningDialog.Show(() =>
+		if (warningDialog == null)
 		{
-			MainMenu();	
-		});
+			MainMenu();
+			return;
+		}
+		warningDialog.Show(MainMenu);
 	}
 
 	public void Home()
