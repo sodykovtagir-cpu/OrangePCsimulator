@@ -262,19 +262,33 @@ public class FileInformation : MonoBehaviour
 		}
 	}
 
-	private bool IsPublished()
+	private bool IsOwner()
 	{
-		return load != null && load.loader != null && load.loader.GameData != null
-			&& load.loader.GameData.workshopId > 0
-			&& !string.IsNullOrEmpty(load.loader.GameData.workshopKey);
+		if (load == null || load.loader == null) return false;
+		WorkshopLocalRec rec;
+		return WorkshopLocal.TryGet(load.loader.Path, out rec);
+	}
+
+	private int OwnerId()
+	{
+		WorkshopLocalRec rec;
+		if (load != null && load.loader != null && WorkshopLocal.TryGet(load.loader.Path, out rec))
+			return rec.id;
+		return 0;
 	}
 
 	private void RefreshWorkshopButtons()
 	{
-		bool pub = IsPublished();
-		if (uploadButton != null) uploadButton.SetActive(!pub);
-		if (updateButton != null) updateButton.SetActive(pub);
-		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(pub);
+		bool owner = IsOwner();
+		if (uploadButton != null) uploadButton.SetActive(!owner);
+		if (updateButton != null) updateButton.SetActive(owner);
+		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(owner);
+		var all = GetComponentsInChildren<Transform>(true);
+		for (int i = 0; i < all.Length; i++)
+		{
+			if (all[i] != null && all[i].name == "Upload" && uploadButton == null)
+				all[i].gameObject.SetActive(!owner);
+		}
 	}
 
 	private void SetWsStatus(string s)
