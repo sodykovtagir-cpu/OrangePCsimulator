@@ -33,11 +33,29 @@ public class ResolutionSetting : MonoBehaviour
 	[SerializeField] private Text mobileScaleLabel;
 
 	private readonly List<Resolution> uniqueResolutions = new List<Resolution>();
+	private bool bound;
 
 	private void Awake()
 	{
-		AutoFindControls();
 		HideLegacyScaleButtons();
+	}
+
+	private void Start()
+	{
+		WireAll();
+		GraphicsBootstrap.AttachLayersToCameras();
+		GraphicsBootstrap.ApplyPostProcess();
+	}
+
+	private void OnEnable()
+	{
+		if (bound)
+			GraphicsBootstrap.ApplyPostProcess();
+	}
+
+	private void WireAll()
+	{
+		AutoFindControls();
 		BindToggle(rtxToggle, "RTXMode", 0, SetRTXMode);
 		BindToggle(reflectionsToggle, "Reflections", 1, SetReflections);
 		BindToggle(fullscreenToggle, "Fullscreen", 1, SetFullscreen);
@@ -47,6 +65,13 @@ public class ResolutionSetting : MonoBehaviour
 		BindToggle(vignetteToggle, "PP_Vignette", 0, SetVignette);
 		BindToggle(chromaticToggle, "PP_Chromatic", 0, SetChromatic);
 
+		Debug.Log("[Settings] Wired toggles"
+			+ " MB=" + (motionBlurToggle != null)
+			+ " Bloom=" + (bloomToggle != null)
+			+ " FS=" + (fullscreenToggle != null)
+			+ " RTX=" + (rtxToggle != null)
+			+ " Refl=" + (reflectionsToggle != null));
+
 #if UNITY_ANDROID || UNITY_IOS
 		SetupMobileSlider();
 		if (resolutionDropdown != null) resolutionDropdown.gameObject.SetActive(false);
@@ -55,17 +80,20 @@ public class ResolutionSetting : MonoBehaviour
 		SetupPcResolutions();
 		if (mobileScaleSlider != null) mobileScaleSlider.gameObject.SetActive(false);
 #endif
+		bound = true;
 	}
 
-	private void Start()
+	private Transform SearchRoot()
 	{
-		GraphicsBootstrap.AttachLayersToCameras();
-		GraphicsBootstrap.ApplyPostProcess();
+		var canvas = GetComponentInParent<Canvas>();
+		if (canvas != null) return canvas.transform;
+		return transform.root;
 	}
 
 	private void AutoFindControls()
 	{
-		var toggles = GetComponentsInChildren<Toggle>(true);
+		var root = SearchRoot();
+		var toggles = root.GetComponentsInChildren<Toggle>(true);
 		for (int i = 0; i < toggles.Length; i++)
 		{
 			var t = toggles[i];
@@ -75,16 +103,16 @@ public class ResolutionSetting : MonoBehaviour
 			else if (id.Contains("bloom")) Assign(ref bloomToggle, t);
 			else if (id.Contains("vignette")) Assign(ref vignetteToggle, t);
 			else if (id.Contains("chromatic") || id.Contains("aberr")) Assign(ref chromaticToggle, t);
-			else if (id.Contains("ao") || id.Contains("occlusion") || id.Contains("ssao")) Assign(ref aoToggle, t);
+			else if (id.Contains("occlusion") || id.Contains("ssao")) Assign(ref aoToggle, t);
 			else if (id.Contains("full")) Assign(ref fullscreenToggle, t);
-			else if (id.Contains("rtx") || id.Contains("высок") || id.Contains("high")) Assign(ref rtxToggle, t);
+			else if (id.Contains("rtx") || id.Contains("высок")) Assign(ref rtxToggle, t);
 			else if (id.Contains("reflect") || id.Contains("отраж")) Assign(ref reflectionsToggle, t);
 		}
 
 		if (resolutionDropdown == null)
-			resolutionDropdown = GetComponentInChildren<Dropdown>(true);
+			resolutionDropdown = root.GetComponentInChildren<Dropdown>(true);
 		if (mobileScaleSlider == null)
-			mobileScaleSlider = GetComponentInChildren<Slider>(true);
+			mobileScaleSlider = root.GetComponentInChildren<Slider>(true);
 	}
 
 	private static void Assign(ref Toggle field, Toggle found)
@@ -97,11 +125,14 @@ public class ResolutionSetting : MonoBehaviour
 		if (t == null) return "";
 		var parts = t.name;
 		var tr = t.transform;
-		for (int d = 0; d < 3 && tr != null; d++)
+		for (int d = 0; d < 4 && tr != null; d++)
 		{
 			parts += " " + tr.name;
-			var label = tr.GetComponentInChildren<Text>(true);
-			if (label != null) parts += " " + label.text;
+			var labels = tr.GetComponentsInChildren<Text>(true);
+			for (int i = 0; i < labels.Length && i < 4; i++)
+			{
+				if (labels[i] != null) parts += " " + labels[i].text;
+			}
 			tr = tr.parent;
 		}
 		return parts.ToLowerInvariant();
@@ -122,7 +153,6 @@ public class ResolutionSetting : MonoBehaviour
 		if (toggle == null) return;
 		bool saved = PlayerPrefs.GetInt(key, defaultValue) == 1;
 		toggle.SetIsOnWithoutNotify(saved);
-		toggle.onValueChanged.RemoveAllListeners();
 		toggle.onValueChanged.AddListener(v => onChanged(v));
 	}
 
@@ -131,18 +161,19 @@ public class ResolutionSetting : MonoBehaviour
 		if (mobileScaleSlider == null) return;
 		mobileScaleSlider.minValue = 0.35f;
 		mobileScaleSlider.maxValue = 1f;
-		float saved = PlayerPrefs.GetFloat("TargetResolution", 1f);
-		saved = Mathf.Clamp(saved, 0.35f, 1f);
+		float saved = 1f;
+		int sw = PlayerPrefs.GetInt("ResWidth", 0);
+		var native = Screen.currentResolution;
+		if (sw > 0 && native.width > 0)
+			saved = Mathf.Clamp((float)sw / native.width, 0.35f, 1f);
 		mobileScaleSlider.SetValueWithoutNotify(saved);
 		UpdateMobileLabel(saved);
 		mobileScaleSlider.onValueChanged.AddListener(v =>
 		{
-			var native = Screen.currentResolution;
 			int w = Mathf.Max(320, Mathf.RoundToInt(native.width * v));
 			int h = Mathf.Max(240, Mathf.RoundToInt(native.height * v));
 			PlayerPrefs.SetInt("ResWidth", w);
 			PlayerPrefs.SetInt("ResHeight", h);
-			PlayerPrefs.SetFloat("TargetResolution", 1f);
 			PlayerPrefs.Save();
 			UpdateMobileLabel(v);
 			GraphicsBootstrap.ApplyResolution();
@@ -188,7 +219,6 @@ public class ResolutionSetting : MonoBehaviour
 			resolutionDropdown.ClearOptions();
 			resolutionDropdown.AddOptions(options);
 			resolutionDropdown.SetValueWithoutNotify(Mathf.Clamp(selected, 0, uniqueResolutions.Count - 1));
-			resolutionDropdown.onValueChanged.RemoveAllListeners();
 			resolutionDropdown.onValueChanged.AddListener(OnPcResolutionChanged);
 		}
 	}
@@ -204,28 +234,11 @@ public class ResolutionSetting : MonoBehaviour
 		var r = uniqueResolutions[index];
 		PlayerPrefs.SetInt("ResWidth", r.width);
 		PlayerPrefs.SetInt("ResHeight", r.height);
-		PlayerPrefs.SetFloat("TargetResolution", 1f);
 		PlayerPrefs.Save();
 		GraphicsBootstrap.ApplyResolution();
 	}
 
-	public void SetResolution(float value)
-	{
-		SetScaleResolution(value);
-	}
-
-	private void SetScaleResolution(float value)
-	{
-		PlayerPrefs.SetFloat("TargetResolution", value);
-		if (value > 0f)
-		{
-			var native = Screen.currentResolution;
-			PlayerPrefs.SetInt("ResWidth", Mathf.RoundToInt(native.width * value));
-			PlayerPrefs.SetInt("ResHeight", Mathf.RoundToInt(native.height * value));
-		}
-		PlayerPrefs.Save();
-		GraphicsBootstrap.ApplyResolution();
-	}
+	public void SetResolution(float value) { }
 
 	public void SetFullscreen(bool enabled)
 	{
@@ -259,6 +272,7 @@ public class ResolutionSetting : MonoBehaviour
 	{
 		PlayerPrefs.SetInt(key, enabled ? 1 : 0);
 		PlayerPrefs.Save();
+		Debug.Log("[Settings] " + key + " = " + enabled);
 		GraphicsBootstrap.ApplyPostProcess();
 	}
 }
