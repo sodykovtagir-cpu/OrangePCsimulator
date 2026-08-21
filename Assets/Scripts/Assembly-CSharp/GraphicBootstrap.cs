@@ -20,7 +20,10 @@ public static class GraphicsBootstrap
 		if (nativeResolution.width == 0)
 			nativeResolution = Screen.currentResolution;
 
-		ApplyAll();
+		ApplyRTX();
+		ApplyReflectionsQuality();
+		ApplyResolution();
+		ApplyFPS();
 		SceneManager.sceneLoaded -= OnSceneLoaded;
 		SceneManager.sceneLoaded += OnSceneLoaded;
 	}
@@ -29,6 +32,7 @@ public static class GraphicsBootstrap
 	{
 		ApplyReflectionsToScene();
 		EnsurePostProcess();
+		AttachLayersToCameras();
 		ApplyPostProcess();
 	}
 
@@ -39,6 +43,7 @@ public static class GraphicsBootstrap
 		ApplyResolution();
 		ApplyFPS();
 		EnsurePostProcess();
+		AttachLayersToCameras();
 		ApplyPostProcess();
 	}
 
@@ -65,7 +70,7 @@ public static class GraphicsBootstrap
 			h = Mathf.RoundToInt(nativeResolution.height * Mathf.Clamp(scale, 0.25f, 2f));
 		}
 
-		var mode = fullscreen ? FullScreenMode.ExclusiveFullScreen : FullScreenMode.Windowed;
+		var mode = fullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
 		int refresh = nativeResolution.refreshRate;
 		Screen.SetResolution(w, h, mode, refresh);
 #endif
@@ -75,9 +80,10 @@ public static class GraphicsBootstrap
 	public static void ApplyRTX()
 	{
 		bool enabled = PlayerPrefs.GetInt("RTXMode", 0) == 1;
+		// MSAA kills Post Processing motion blur / AO. Use FXAA on the PP layer instead.
+		QualitySettings.antiAliasing = 0;
 		if (enabled)
 		{
-			QualitySettings.antiAliasing = 8;
 			QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
 			QualitySettings.shadows = ShadowQuality.All;
 			QualitySettings.shadowResolution = ShadowResolution.VeryHigh;
@@ -88,7 +94,6 @@ public static class GraphicsBootstrap
 		}
 		else
 		{
-			QualitySettings.antiAliasing = 0;
 			QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
 			QualitySettings.shadows = ShadowQuality.HardOnly;
 			QualitySettings.shadowResolution = ShadowResolution.Medium;
@@ -121,79 +126,115 @@ public static class GraphicsBootstrap
 
 	private static void EnsurePostProcess()
 	{
-		if (volume != null) return;
-
-		var layer = LayerMask.NameToLayer("PostProcessing");
-		if (layer < 0) layer = 0;
+		if (volume != null && profile != null)
+			return;
 
 		var go = new GameObject("RuntimePostProcess");
 		Object.DontDestroyOnLoad(go);
+		go.layer = 0;
+
 		volume = go.AddComponent<PostProcessVolume>();
 		volume.isGlobal = true;
 		volume.priority = 100f;
+		volume.weight = 1f;
 		profile = ScriptableObject.CreateInstance<PostProcessProfile>();
 		volume.sharedProfile = profile;
 		volume.profile = profile;
 
 		motionBlur = profile.AddSettings<MotionBlur>();
-		bloom = profile.AddSettings<Bloom>();
-		ao = profile.AddSettings<AmbientOcclusion>();
-		colorGrading = profile.AddSettings<ColorGrading>();
-		vignette = profile.AddSettings<Vignette>();
-		chromatic = profile.AddSettings<ChromaticAberration>();
+		motionBlur.enabled.Override(false);
+		motionBlur.shutterAngle.Override(270f);
+		motionBlur.sampleCount.Override(16);
 
-		var cams = Object.FindObjectsOfType<Camera>();
+		bloom = profile.AddSettings<Bloom>();
+		bloom.enabled.Override(false);
+		bloom.intensity.Override(2.5f);
+		bloom.threshold.Override(0.9f);
+		bloom.softKnee.Override(0.5f);
+
+		ao = profile.AddSettings<AmbientOcclusion>();
+		ao.enabled.Override(false);
+		ao.intensity.Override(0.7f);
+		ao.mode.Override(AmbientOcclusionMode.ScalableAmbientObscurance);
+
+		vignette = profile.AddSettings<Vignette>();
+		vignette.enabled.Override(false);
+		vignette.intensity.Override(0.35f);
+
+		chromatic = profile.AddSettings<ChromaticAberration>();
+		chromatic.enabled.Override(false);
+		chromatic.intensity.Override(0.4f);
+
+		colorGrading = profile.AddSettings<ColorGrading>();
+		colorGrading.enabled.Override(true);
+	}
+
+	public static void AttachLayersToCameras()
+	{
+		var cams = Camera.allCameras;
 		for (int i = 0; i < cams.Length; i++)
-		{
-			var cam = cams[i];
-			if (cam == null) continue;
-			var layerComp = cam.GetComponent<PostProcessLayer>();
-			if (layerComp == null)
-			{
-				layerComp = cam.gameObject.AddComponent<PostProcessLayer>();
-				layerComp.volumeTrigger = cam.transform;
-				layerComp.volumeLayer = ~0;
-				layerComp.antialiasingMode = PostProcessLayer.Antialiasing.FastApproximateAntialiasing;
-			}
-		}
+			SetupCamera(cams[i]);
+	}
+
+	private static void SetupCamera(Camera cam)
+	{
+		if (cam == null) return;
+		cam.allowHDR = true;
+		cam.allowMSAA = false;
+		cam.depthTextureMode |= DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+
+		var layerComp = cam.GetComponent<PostProcessLayer>();
+		if (layerComp == null)
+			layerComp = cam.gameObject.AddComponent<PostProcessLayer>();
+
+		layerComp.volumeTrigger = cam.transform;
+		layerComp.volumeLayer = ~0;
+		layerComp.enabled = true;
+		layerComp.antialiasingMode = PostProcessLayer.Antialiasing.FastApproximateAntialiasing;
 	}
 
 	public static void ApplyPostProcess()
 	{
 		EnsurePostProcess();
-		if (motionBlur != null)
+		AttachLayersToCameras();
+
+		SetFx(motionBlur, "PP_MotionBlur", 0, on =>
 		{
-			bool on = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
-			motionBlur.enabled.Override(on);
 			motionBlur.shutterAngle.Override(on ? 270f : 0f);
-		}
-		if (bloom != null)
+		});
+		SetFx(bloom, "PP_Bloom", 0, on =>
 		{
-			bool on = PlayerPrefs.GetInt("PP_Bloom", 1) == 1;
-			bloom.enabled.Override(on);
-			bloom.intensity.Override(on ? 0.35f : 0f);
-		}
-		if (ao != null)
+			bloom.intensity.Override(on ? 2.5f : 0f);
+		});
+		SetFx(ao, "PP_AO", 0, null);
+		SetFx(vignette, "PP_Vignette", 0, on =>
 		{
-			bool on = PlayerPrefs.GetInt("PP_AO", 0) == 1;
-			ao.enabled.Override(on);
-		}
-		if (vignette != null)
+			vignette.intensity.Override(on ? 0.35f : 0f);
+		});
+		SetFx(chromatic, "PP_Chromatic", 0, on =>
 		{
-			bool on = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
-			vignette.enabled.Override(on);
-			vignette.intensity.Override(on ? 0.28f : 0f);
-		}
-		if (chromatic != null)
-		{
-			bool on = PlayerPrefs.GetInt("PP_Chromatic", 0) == 1;
-			chromatic.enabled.Override(on);
-			chromatic.intensity.Override(on ? 0.25f : 0f);
-		}
+			chromatic.intensity.Override(on ? 0.4f : 0f);
+		});
+
 		if (colorGrading != null)
 		{
 			colorGrading.enabled.Override(true);
 			colorGrading.postExposure.Override(PlayerPrefs.GetFloat("PP_Exposure", 0f));
 		}
+
+		if (volume != null)
+			volume.weight = 1f;
+
+		Debug.Log("[GraphicsBootstrap] Post-process applied"
+			+ " MB=" + PlayerPrefs.GetInt("PP_MotionBlur", 0)
+			+ " Bloom=" + PlayerPrefs.GetInt("PP_Bloom", 0));
+	}
+
+	private static void SetFx(PostProcessEffectSettings fx, string key, int def, System.Action<bool> extra)
+	{
+		if (fx == null) return;
+		bool on = PlayerPrefs.GetInt(key, def) == 1;
+		fx.enabled.Override(on);
+		extra?.Invoke(on);
 	}
 }
