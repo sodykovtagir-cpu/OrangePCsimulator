@@ -47,8 +47,25 @@
 | `banned.json` | баны: `[{type: author|ip, value, reason, at}]` |
 | `quiz_pending.json` | отложенный квиз |
 | `admin_config.json` | хеш пароля админа |
+| `promos.json` | промокоды: `[{code, cash, btc}]` (НЕ в git) |
+| `promo_claimed.json` | выданные промокоды по client-id (НЕ в git) |
 
-Не кладите `config.php` и `admin_config.json` в git.
+Не кладите `config.php`, `admin_config.json`, `promos.json`, `promo_claimed.json` в git.
+
+## UPLOAD_KEY (закрытая загрузка)
+
+Чтобы посторонние не могли заливать сейвы, задай `UPLOAD_KEY` в `config.php`
+и впиши **то же самое** значение в клиент `WorkshopClient.UploadKey`
+(`Assets/Scripts/Assembly-CSharp/WorkshopClient.cs`). Если клиент не шлёт ключ,
+загрузка вернёт `403 bad key`. **Включать только вместе с релизом новой сборки**,
+иначе уже установленные клиенты перестанут заливать.
+
+## Промокоды (Giveaway) — серверная проверка
+
+Коды больше не зашиты в клиент. Игра шлёт `POST api.php?action=redeem`
+с `code` и `client` (client-id). Сервер сверяет код с `promos.json` и выдаёт
+его **один раз** на client-id (помечает в `promo_claimed.json`), т.е. удаление
+PlayerPrefs на клиенте не даёт повторно заклеймить. Ответ: `{ok, cash, btc}`.
 
 ## Деплой
 
@@ -56,4 +73,5 @@
 ftp → htdocs/workshop/
   api.php, index.php, admin.php, style.css
   uploads/ (с правами записи), banned.json (создастся сам)
+  promos.json + промокоды (создать руками, НЕ в git)
 ```

@@ -50,6 +50,15 @@ public class WorkshopQuizResponse
 	public string body;
 }
 
+[Serializable]
+public class WorkshopRedeemResponse
+{
+	public bool ok;
+	public string error;
+	public int cash;
+	public float btc;
+}
+
 public class WorkshopClient : MonoBehaviour
 {
 	public static readonly string[] ApiUrls =
@@ -57,7 +66,7 @@ public class WorkshopClient : MonoBehaviour
 		"https://orangepcsimu.byethost4.com/workshop/api.php"
 	};
 
-	public static string UploadKey = "";
+	public static string UploadKey = "f52aa253f7ee050a6069d858473880982acb4c5de7a929e3";
 	private static string byetCookie;
 	private static string workingUrl;
 
@@ -227,6 +236,27 @@ public class WorkshopClient : MonoBehaviour
 			try { p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body)); }
 			catch (Exception e) { done(e.Message); return; }
 			done(p != null && p.ok ? null : (p != null ? p.error : "delete fail"));
+		}));
+	}
+
+	/// <summary>
+	/// Проверка/активация промокода на сервере (Giveaway).
+	/// Сервер хранит коды в promos.json (не в клиенте) и одноразовость по client-id.
+	/// </summary>
+	public void Redeem(string code, Action<int, float, string> done)
+	{
+		StartCoroutine(SimplePost("?action=redeem&i=1", new List<IMultipartFormSection>
+		{
+			new MultipartFormDataSection("code", code ?? ""),
+			new MultipartFormDataSection("client", ClientId())
+		}, (body, err) =>
+		{
+			if (err != null) { done(0, 0, err); return; }
+			WorkshopRedeemResponse p = null;
+			try { p = JsonUtility.FromJson<WorkshopRedeemResponse>(StripJunk(body)); }
+			catch (Exception e) { done(0, 0, e.Message); return; }
+			if (p == null || !p.ok) { done(0, 0, p != null ? p.error : "redeem fail"); return; }
+			done(p.cash, p.btc, null);
 		}));
 	}
 

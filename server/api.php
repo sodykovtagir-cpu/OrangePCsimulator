@@ -239,4 +239,40 @@ if ($action === 'quiz') {
     json_out(['ok' => true, 'show' => false]);
 }
 
+if ($action === 'redeem' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Серверная проверка промокодов (Giveaway): коды лежат в promos.json
+    // (НЕ в git), одноразовость — по client-id в promo_claimed.json.
+    $code   = clean(isset($_POST['code']) ? $_POST['code'] : '', 64);
+    $client = clean(isset($_POST['client']) ? $_POST['client'] : '', 64);
+    if ($code === '' || $client === '') json_out(['ok' => false, 'error' => 'missing'], 400);
+
+    $promosPath  = __DIR__ . '/promos.json';
+    $claimedPath = __DIR__ . '/promo_claimed.json';
+    if (!is_file($promosPath)) json_out(['ok' => false, 'error' => 'promos not configured'], 500);
+    $promos = json_decode(@file_get_contents($promosPath), true);
+    if (!is_array($promos)) $promos = [];
+
+    $claimed = is_file($claimedPath) ? json_decode(@file_get_contents($claimedPath), true) : [];
+    if (!is_array($claimed)) $claimed = [];
+
+    $hash = hash('sha256', $client);
+    $claimedCodes = isset($claimed[$hash]) && is_array($claimed[$hash]) ? $claimed[$hash] : [];
+
+    $key = strtolower(trim($code));
+    $found = null;
+    foreach ($promos as $p) {
+        if (isset($p['code']) && strtolower(trim($p['code'])) === $key) { $found = $p; break; }
+    }
+    if ($found === null) json_out(['ok' => false, 'error' => 'invalid'], 404);
+
+    $lowerClaimed = array_map('strtolower', $claimedCodes);
+    if (in_array($key, $lowerClaimed, true)) json_out(['ok' => false, 'error' => 'already'], 409);
+
+    $claimedCodes[] = $key;
+    $claimed[$hash] = $claimedCodes;
+    @file_put_contents($claimedPath, json_encode($claimed, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+
+    json_out(['ok' => true, 'cash' => (int)($found['cash'] ?? 0), 'btc' => (float)($found['btc'] ?? 0)]);
+}
+
 json_out(['ok' => false, 'error' => 'unknown action'], 400);

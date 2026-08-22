@@ -292,3 +292,42 @@ server/api.php            (pub(): unset ip)
 Hosting/workshop/api.php  (pub(): unset ip, для консистентности)
 .gitignore                (блок секретов PHP)
 ```
+
+---
+
+## 11. Обновление 6 (22.08.2026) — закрытая загрузка + промокоды на сервере
+
+### 11.1 UPLOAD_KEY (загрузка только со своим ключом)
+- В `server/config.php` задан `UPLOAD_KEY` (в папке `server/`, в git не идёт).
+- В клиенте `WorkshopClient.UploadKey` теперь инициализирован **тем же значением** —
+  клиент шлёт его как поле `key`, сервер проверяет (`403 bad key`, если не совпадает).
+- ⚠️ **Координированный релиз:** включение ключа требует сборки с новым клиентом.
+  Старые установленные клиенты (без ключа) перестанут заливать до выката обновления.
+  На живом сервере ключ уже включён в `config.php`.
+- Замечание: ключ зашит в открытый клиент — это анти-спам от «ленивых» ботов и обход
+  rate-limit, а не серьёзная защита (исходники открыты). Полноценная авторизация —
+  серверные аккаунты/токены.
+
+### 11.2 Промокоды перенесены на сервер (Giveaway)
+- **Раньше:** список кодов и наград был зашит в `Giveaway.cs` (открытый репозиторий),
+  одноразовость держалась на PlayerPrefs и обходилась их удалением.
+- **Стало:** коды убраны из клиента. Игра шлёт `POST api.php?action=redeem`
+  (`code` + `client`-id). Сервер сверяет код с `promos.json` (лежит только на сервере,
+  НЕ в git) и выдаёт **один раз** на client-id (метка в `promo_claimed.json`).
+  Удаление PlayerPrefs больше не даёт повторно заклеймить.
+- `Giveaway.cs` переписан: без локального списка кодов, асинхронный вызов `Redeem`,
+  награда (`cash`/`btc`) берётся из ответа сервера.
+- `WorkshopClient.cs`: добавлен `WorkshopRedeemResponse` и метод `Redeem`.
+- `server/api.php`: добавлен обработчик `action=redeem` (validation + one-shot).
+
+### 11.3 Файлы обновления
+```
+Assets/Scripts/Assembly-CSharp/Giveaway.cs        (серверная активация промокодов)
+Assets/Scripts/Assembly-CSharp/WorkshopClient.cs  (UploadKey + Redeem + WorkshopRedeemResponse)
+server/api.php                                    (action=redeem)
+server/README.md                                  (UPLOAD_KEY + промокоды)
+.gitignore                                        (promos.json, promo_claimed.json)
+-- серверные, НЕ в git --
+server/config.php      (UPLOAD_KEY)
+server/promos.json     (коды + награды)
+```
