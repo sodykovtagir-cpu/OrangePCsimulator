@@ -302,6 +302,11 @@ public class WorkshopClient : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Проверка/активация промокода на сервере (Giveaway).
+	/// Сервер хранит коды в promos.json (не в клиенте) и одноразовость по client-id.
+	/// </summary>
+	public void Redeem(string code, Action<int, float, string> done)
 	{
 		StartCoroutine(SimplePost("?action=redeem&i=1", new List<IMultipartFormSection>
 		{
