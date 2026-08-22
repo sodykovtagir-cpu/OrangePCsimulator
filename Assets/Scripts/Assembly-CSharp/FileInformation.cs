@@ -394,8 +394,6 @@ public class FileInformation : MonoBehaviour
 		}
 	}
 
-	#endregion
-
 	private void SetWsStatus(string s)
 	{
 		if (wsStatus != null) wsStatus.text = s;
