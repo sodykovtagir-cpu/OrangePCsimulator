@@ -545,8 +545,9 @@ public class AccountPage : MonoBehaviour
 
 		var input = go.GetComponent<InputField>();
 		input.textComponent = MakeInnerText(go.transform, "Text", Color.black);
-		input.placeholder = MakeInnerText(go.transform, "Placeholder", new Color(0.35f, 0.35f, 0.35f));
-		input.placeholder.text = placeholder;
+		var phText = MakeInnerText(go.transform, "Placeholder", new Color(0.35f, 0.35f, 0.35f));
+		input.placeholder = phText;
+		phText.text = placeholder;
 		if (password) input.contentType = InputField.ContentType.Password;
 		return input;
 	}
