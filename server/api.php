@@ -59,7 +59,7 @@ function clean($s, $max) {
     return substr($s, 0, $max);
 }
 function pub($it) {
-    unset($it['owner_key'], $it['liked']);
+    unset($it['owner_key'], $it['liked'], $it['ip']);
     if (empty($it['likes'])) $it['likes'] = 0;
     if (empty($it['downloads'])) $it['downloads'] = 0;
     $it['has_cover'] = !empty($it['cover']);

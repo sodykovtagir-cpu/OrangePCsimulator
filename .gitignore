@@ -79,3 +79,16 @@ crashlytics-build.properties
 .idea/
 .vscode/
 UpgradeLog.htm
+
+# --- Orange PC Workshop (PHP backend) secrets ---
+# Не коммитим пароли/хеши/данные мастерской в git.
+server/config.php
+server/admin_config.json
+server/banned.json
+server/quiz_pending.json
+server/uploads/
+Hosting/workshop/config.php
+Hosting/workshop/admin_config.json
+Hosting/workshop/banned.json
+Hosting/workshop/quiz_pending.json
+Hosting/workshop/uploads/

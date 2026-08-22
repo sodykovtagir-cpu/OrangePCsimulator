@@ -265,3 +265,30 @@ server/style.css       (стили)
 server/README.md       (документация)
 server/admin_quiz.php  (удалён, заменён admin.php)
 ```
+
+---
+
+## 10. Обновление 5 (22.08.2026) — закрыта утечка IP + защита секретов PHP в git
+
+### 10.1 Утечка IP авторов через публичный API (критично)
+В `server/api.php` и `Hosting/workshop/api.php` функция `pub()` убирала из
+публичного листинга `owner_key` и `liked`, **но не `ip`**. Так как при загрузке
+в `index.json` пишется IP автора, а `pub()` применяется к каждому элементу
+в `api.php?action=list`, IP авторов публично отдавался любому посетителю API.
+Витрина `index.php` IP не показывала, но API — показывал.
+
+**Фикс:** в `pub()` добавлен `unset($it['ip'])`. IP остаётся в `index.json`
+(для модерации в `admin.php`), но больше не уходит в публичный листинг.
+
+### 10.2 Секреты PHP могли попасть в git
+`.gitignore` не игнорировал файлы с паролями/данными мастерской. Добавлен блок,
+исключающий из git: `config.php`, `admin_config.json` (хеш пароля админа),
+`banned.json`, `quiz_pending.json` и папку `uploads/` — для **обеих** копий бэкенда
+(`server/` и `Hosting/workshop/`).
+
+### Файлы обновления
+```
+server/api.php            (pub(): unset ip)
+Hosting/workshop/api.php  (pub(): unset ip, для консистентности)
+.gitignore                (блок секретов PHP)
+```
