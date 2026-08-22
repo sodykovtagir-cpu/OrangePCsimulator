@@ -199,3 +199,14 @@ server/README.md                                   (новое, инструкц
 2. Вставить блок из `api_quiz_snippet.php` в `api.php`.
 3. Поменять пароль в `admin_quiz.php`.
 4. Открыть `https://ВАШ_САЙТ/admin_quiz.php`, отправить квиз.
+
+## 8. Деплой Remote Quiz на хостинг (22.08.2026, по FTP)
+
+- Загружено на byethost (ftpupload.net, `b4_42712522`):
+  - `htdocs/workshop/api.php` — добавлен блок `action=quiz` (одноразовая выдача);
+  - `htdocs/workshop/admin_quiz.php` — админ-панель квиза.
+- Проверен полный цикл на живом сервере: вход в админку → отправка квиза →
+  игра получает его при опросе → повторный опрос пустой (one-shot).
+- Админка: `https://orangepcsimu.byethost4.com/workshop/admin_quiz.php`
+- ⚠️ Пароль админки по умолчанию `admin123` — СМЕНИТЕ (в `admin_quiz.php`).
+- Задеплоенная копия `api.php` добавлена в репозиторий (`server/api.php`).
