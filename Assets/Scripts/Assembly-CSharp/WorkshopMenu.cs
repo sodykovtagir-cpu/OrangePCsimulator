@@ -83,6 +83,11 @@ public class WorkshopMenu : MonoBehaviour
 
 	public void UploadSelected()
 	{
+		if (!AccountManager.IsLoggedIn())
+		{
+			SetStatus("Login to publish");
+			return;
+		}
 		if (localPaths.Count == 0)
 		{
 			SetStatus("No local .opc");
@@ -90,9 +95,24 @@ public class WorkshopMenu : MonoBehaviour
 		}
 		int i = localSavesDropdown != null ? localSavesDropdown.value : 0;
 		if (i < 0 || i >= localPaths.Count) i = 0;
+
+		// Защита от копирования: скачанный из мастерской сейв перевыложить нельзя.
+		try
+		{
+			var probe = new DataLoader(localPaths[i]);
+			probe.LoadFromPath();
+			if (probe.GameData != null && probe.GameData.workshopSourceId > 0)
+			{
+				SetStatus("Cannot republish a downloaded save");
+				return;
+			}
+		}
+		catch { }
+
 		string title = titleField != null && !string.IsNullOrEmpty(titleField.text)
 			? titleField.text : Path.GetFileNameWithoutExtension(localPaths[i]);
-		string author = authorField != null ? authorField.text : "Player";
+		string author = authorField != null && !string.IsNullOrEmpty(authorField.text)
+			? authorField.text : AccountManager.CurrentUser;
 		string desc = descField != null ? descField.text : "";
 		SetStatus("Uploading...");
 		WorkshopClient.Instance.Upload(localPaths[i], title, author, desc, null, (id, key, err) =>

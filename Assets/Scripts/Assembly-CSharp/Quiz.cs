@@ -11,28 +11,8 @@ public class Quiz : MonoBehaviour, IPointerClickHandler, IEventSystemHandler
 
 	private static int count;
 
-	private void Start()
-	{
-		var ads = AdManager.Instance;
-		if (ads == null) return;
-		if (ads.NoAds)
-		{
-			var go = gameObject;
-			if (go != null) go.SetActive(false);
-		}
-	}
-
-	public void OnPointerClick(PointerEventData eventData)
-	{
-		var dlg = dialog;
-		var cb = new System.Action(Play);
-		if (dlg != null) dlg.Show(cb);
-	}
-
 	public void Count()
 	{
-		var ads = AdManager.Instance;
-		if (ads == null || ads.NoAds) return;
 		count++;
 		if (count > 2)
 		{

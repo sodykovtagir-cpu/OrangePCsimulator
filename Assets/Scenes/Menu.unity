@@ -26898,7 +26898,7 @@ GameObject:
   - component: {fileID: 73924753}
   - component: {fileID: 73924752}
   m_Layer: 5
-  m_Name: No
+  m_Name: PublishAction
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -33697,7 +33697,7 @@ GameObject:
   - component: {fileID: 781334750}
   - component: {fileID: 781334749}
   m_Layer: 5
-  m_Name: No (3)
+  m_Name: PublishClose
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -40800,7 +40800,7 @@ GameObject:
   - component: {fileID: 1595154370}
   - component: {fileID: 1595154369}
   m_Layer: 5
-  m_Name: No (2)
+  m_Name: PublishDelete
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
