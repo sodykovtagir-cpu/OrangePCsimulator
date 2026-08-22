@@ -210,3 +210,58 @@ server/README.md                                   (новое, инструкц
 - Админка: `https://orangepcsimu.byethost4.com/workshop/admin_quiz.php`
 - ⚠️ Пароль админки по умолчанию `admin123` — СМЕНИТЕ (в `admin_quiz.php`).
 - Задеплоенная копия `api.php` добавлена в репозиторий (`server/api.php`).
+
+## 9. Обновление 4 (22.08.2026) — инспектор для аккаунта, модерация, красивый сайт
+
+### 9.1 Unity: панель аккаунта настраивается через ИНСПЕКТОР
+- Новый компонент **`AccountPanel`** (Assets/Scripts/Assembly-CSharp/AccountPanel.cs):
+  - сериализованные поля: `nickInput`, `passInput`, `loginButton`, `registerButton`,
+    `logoutButton`, `statusText`, `formRoot`, `autoCreateUI`;
+  - публичные методы для OnClick в инспекторе: `Login()`, `Register()`, `Logout()`, `ToggleForm()`;
+  - если ничего не привязано и `autoCreateUI=true` — UI создаётся автоматически
+    (кнопка «Login / Register» + форма), как было раньше;
+  - если на сцене нет ни одной панели — `FileInformation` сам создаёт её
+    (`AccountPanel.EnsureOnScene()`), так что сцена не ломается.
+- `AccountManager` теперь бросает событие `AccountChanged` — панели и кнопки
+  публикации (FileInformation) обновляются автоматически при входе/выходе.
+- Старый «захардкоженный» UI аккаунта из FileInformation удалён.
+
+**Как собрать свою страницу аккаунта:** создайте панель в сцене (Canvas → объект),
+добавьте компонент `AccountPanel`, привяжите в инспекторе свои InputField/Button/Text,
+а кнопкам в OnClick назначьте `Login()`/`Register()`/`Logout()`/`ToggleForm()`.
+
+### 9.2 Сервер: модерация сейвов и бан пользователей
+- **`api.php`**: при upload записывается IP автора; добавлена проверка бан-листа
+  (`banned.json`): забаненный ник или IP получает `403 {"ok":false,"error":"banned"}`
+  при upload/update. Скачивание не блокируется.
+- **`admin.php`** — единая админка (заменила admin_quiz.php):
+  - **Обзор** — статистика (сейвы, скачивания, лайки, баны);
+  - **Сейвы** — таблица всех сейвов с IP: удалить, забанить автора, забанить IP;
+  - **Баны** — список банов, снять бан, добавить вручную (автор/IP + причина);
+  - **Квиз** — отправка квиза в игру (одноразово);
+  - **Пароль** — смена пароля админа (хранится хешем в admin_config.json);
+  - CSRF-защита всех действий, пароль по умолчанию `admin123` — СМЕНИТЕ.
+- **`index.php`** — красивая публичная витрина мастерской: карточки сейвов
+  (обложка/название/автор/мета/скачать), поиск по названию и автору.
+- **`style.css`** — общий стиль (тёмная тема, оранжевый акцент Orange PC).
+
+### 9.3 Проверено на живом сервере (22.08.2026)
+- Логин в админку → модерация работает;
+- Удаление сейвов через админку — ок (тестовые сейвы вычищены, `items: []`);
+- Бан автора → upload отклоняется `403 banned` → разбан работает;
+- Квиз через админку — одноразовая выдача (poll1 show:true, poll2 show:false);
+- Витрина index.php открывается.
+
+### Файлы обновления
+```
+Assets/Scripts/Assembly-CSharp/AccountPanel.cs      (новый, инспектор-панель)
+Assets/Scripts/Assembly-CSharp/AccountPanel.cs.meta (новый)
+Assets/Scripts/Assembly-CSharp/AccountManager.cs    (событие AccountChanged)
+Assets/Scripts/Assembly-CSharp/FileInformation.cs   (аккаунт вынесен в AccountPanel)
+server/api.php         (бан-логика + IP при upload)
+server/admin.php       (новая админка с модерацией)
+server/index.php       (витрина мастерской)
+server/style.css       (стили)
+server/README.md       (документация)
+server/admin_quiz.php  (удалён, заменён admin.php)
+```

@@ -45,13 +45,29 @@ public class FileInformation : MonoBehaviour
 	private void Start()
 	{
 		menuManager = GetComponentInParent<MenuManager>();
-		CreateAccountButton();
+		AccountPanel.EnsureOnScene();
 #if UNITY_ANDROID || UNITY_IOS
 		if (!NativeFilePicker.CanExportFiles())
 			exportButton.SetActive(false);
 #else
 		exportButton.SetActive(true);
 #endif
+	}
+
+	private void OnEnable()
+	{
+		// При входе/выходе из аккаунта кнопки публикации обновляются сами.
+		AccountManager.AccountChanged += OnAccountChanged;
+	}
+
+	private void OnDisable()
+	{
+		AccountManager.AccountChanged -= OnAccountChanged;
+	}
+
+	private void OnAccountChanged()
+	{
+		RefreshWorkshopButtons();
 	}
 
 	public void Show(FileMenu.Load load)
@@ -81,7 +97,7 @@ public class FileInformation : MonoBehaviour
 		FillPublishForm(null);
 		EnsureWorkshopClient();
 		EnsurePublishLayout();
-		RefreshAccountButton();
+		AccountPanel.RefreshAll();
 	}
 
 	public void OpenPublishPanel()
@@ -376,166 +392,6 @@ public class FileInformation : MonoBehaviour
 			if (all[i] != null && all[i] != root && all[i].name == name)
 				all[i].gameObject.SetActive(on);
 		}
-	}
-
-	#region Account UI (programmatic, no scene edits needed)
-
-	private GameObject accountForm;
-	private Text accountBtnText;
-
-	private void CreateAccountButton()
-	{
-		if (transform.Find("AccountBtn") != null) return;
-
-		var btn = new GameObject("AccountBtn", typeof(RectTransform), typeof(Image), typeof(Button));
-		btn.transform.SetParent(transform, false);
-		var rt = btn.GetComponent<RectTransform>();
-		rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
-		rt.pivot = new Vector2(1f, 1f);
-		rt.anchoredPosition = new Vector2(-10f, -10f);
-		rt.sizeDelta = new Vector2(150f, 30f);
-		btn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
-
-		var label = new GameObject("Label", typeof(RectTransform), typeof(Text));
-		label.transform.SetParent(btn.transform, false);
-		var tx = label.GetComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.alignment = TextAnchor.MiddleCenter;
-		tx.color = Color.white;
-		tx.fontSize = 14;
-		accountBtnText = tx;
-
-		btn.GetComponent<Button>().onClick.AddListener(OnAccountButton);
-		RefreshAccountButton();
-	}
-
-	private void RefreshAccountButton()
-	{
-		if (accountBtnText == null) return;
-		accountBtnText.text = AccountManager.IsLoggedIn()
-			? AccountManager.CurrentUser + "  ·  Logout"
-			: "Login / Register";
-	}
-
-	private void OnAccountButton()
-	{
-		if (AccountManager.IsLoggedIn())
-		{
-			AccountManager.Logout();
-			if (accountForm != null) accountForm.SetActive(false);
-			RefreshAccountButton();
-			RefreshWorkshopButtons();
-			return;
-		}
-
-		if (accountForm == null) CreateAccountForm();
-		accountForm.SetActive(!accountForm.activeSelf);
-	}
-
-	private void CreateAccountForm()
-	{
-		var form = new GameObject("AccountForm", typeof(RectTransform), typeof(Image));
-		form.transform.SetParent(transform, false);
-		var rt = form.GetComponent<RectTransform>();
-		rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
-		rt.pivot = new Vector2(1f, 1f);
-		rt.anchoredPosition = new Vector2(-10f, -46f);
-		rt.sizeDelta = new Vector2(230f, 128f);
-		form.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.98f);
-		form.SetActive(false);
-		accountForm = form;
-
-		var nick = CreateField(form.transform, "NickField", "nick", false, new Vector2(-90f, 48f));
-		var pass = CreateField(form.transform, "PassField", "password", true, new Vector2(-90f, 16f));
-
-		var loginBtn = CreateTextButton(form.transform, "LoginBtn", "Login", new Vector2(-52f, -24f));
-		var regBtn = CreateTextButton(form.transform, "RegBtn", "Register", new Vector2(52f, -24f));
-
-		loginBtn.onClick.AddListener(() =>
-		{
-			if (AccountManager.Login(nick.text, pass.text))
-			{
-				pass.text = "";
-				form.SetActive(false);
-				RefreshAccountButton();
-				RefreshWorkshopButtons();
-			}
-			else
-			{
-				SetWsStatus("Bad login or account not found");
-			}
-		});
-
-		regBtn.onClick.AddListener(() =>
-		{
-			if (AccountManager.Register(nick.text, pass.text))
-			{
-				pass.text = "";
-				form.SetActive(false);
-				RefreshAccountButton();
-				RefreshWorkshopButtons();
-			}
-			else
-			{
-				SetWsStatus("Name taken or invalid (2-24 chars)");
-			}
-		});
-	}
-
-	private static InputField CreateField(Transform parent, string name, string placeholder, bool password, Vector2 pos)
-	{
-		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(InputField));
-		go.transform.SetParent(parent, false);
-		var rt = go.GetComponent<RectTransform>();
-		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-		rt.pivot = new Vector2(0.5f, 0.5f);
-		rt.anchoredPosition = pos;
-		rt.sizeDelta = new Vector2(200f, 26f);
-		go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.9f);
-
-		var input = go.GetComponent<InputField>();
-		var ph = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
-		ph.transform.SetParent(go.transform, false);
-		var phTx = ph.GetComponent<Text>();
-		phTx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		phTx.fontSize = 13;
-		phTx.color = new Color(0.3f, 0.3f, 0.3f);
-		phTx.text = placeholder;
-
-		var txt = new GameObject("Text", typeof(RectTransform), typeof(Text));
-		txt.transform.SetParent(go.transform, false);
-		var tx = txt.GetComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.fontSize = 13;
-		tx.color = Color.black;
-
-		input.textComponent = tx;
-		input.placeholder = phTx;
-		if (password) input.contentType = InputField.ContentType.Password;
-		return input;
-	}
-
-	private static Button CreateTextButton(Transform parent, string name, string label, Vector2 pos)
-	{
-		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-		go.transform.SetParent(parent, false);
-		var rt = go.GetComponent<RectTransform>();
-		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-		rt.pivot = new Vector2(0.5f, 0.5f);
-		rt.anchoredPosition = pos;
-		rt.sizeDelta = new Vector2(96f, 28f);
-		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
-
-		var txt = new GameObject("Label", typeof(RectTransform), typeof(Text));
-		txt.transform.SetParent(go.transform, false);
-		var tx = txt.GetComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.alignment = TextAnchor.MiddleCenter;
-		tx.fontSize = 13;
-		tx.color = Color.black;
-		tx.text = label;
-
-		return go.GetComponent<Button>();
 	}
 
 	#endregion

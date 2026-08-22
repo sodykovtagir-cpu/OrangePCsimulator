@@ -11,6 +11,9 @@ public static class AccountManager
 	private const string CurrentKey = "Acct_Current";
 	private const string PwPrefix = "Acct_Pw_";
 
+	/// <summary>Вызывается после входа/регистрации/выхода (Login, Register, Logout).</summary>
+	public static event System.Action AccountChanged;
+
 	public static string CurrentUser
 	{
 		get { return PlayerPrefs.GetString(CurrentKey, ""); }
@@ -31,6 +34,7 @@ public static class AccountManager
 		if (!string.Equals(stored, Hash(password), System.StringComparison.Ordinal)) return false;
 		PlayerPrefs.SetString(CurrentKey, name.Trim());
 		PlayerPrefs.Save();
+		AccountChanged?.Invoke();
 		return true;
 	}
 
@@ -46,6 +50,7 @@ public static class AccountManager
 		PlayerPrefs.SetString(key, Hash(password));
 		PlayerPrefs.SetString(CurrentKey, clean);
 		PlayerPrefs.Save();
+		AccountChanged?.Invoke();
 		return true;
 	}
 
@@ -53,6 +58,7 @@ public static class AccountManager
 	{
 		PlayerPrefs.DeleteKey(CurrentKey);
 		PlayerPrefs.Save();
+		AccountChanged?.Invoke();
 	}
 
 	/// <summary>FNV-1a хеш — просто чтобы не хранить пароль открытым текстом.</summary>

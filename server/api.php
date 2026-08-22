@@ -13,6 +13,29 @@ if (!defined('UPLOAD_KEY')) define('UPLOAD_KEY', '');
 if (!defined('UPLOADS_DIR')) define('UPLOADS_DIR', __DIR__ . '/uploads');
 if (!is_dir(UPLOADS_DIR)) @mkdir(UPLOADS_DIR, 0755, true);
 
+
+$BAN_FILE = __DIR__ . '/banned.json';
+
+function load_bans() {
+    global $BAN_FILE;
+    if (!is_file($BAN_FILE)) return [];
+    $j = json_decode(@file_get_contents($BAN_FILE), true);
+    return is_array($j) ? $j : [];
+}
+function save_bans($bans) {
+    global $BAN_FILE;
+    file_put_contents($BAN_FILE, json_encode($bans, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+}
+function is_banned($author, $ip) {
+    $author = strtolower(trim((string)$author));
+    foreach (load_bans() as $b) {
+        if (empty($b['value'])) continue;
+        if ($b['type'] === 'author' && strtolower(trim((string)$b['value'])) === $author) return true;
+        if ($b['type'] === 'ip' && trim((string)$b['value']) === trim((string)$ip)) return true;
+    }
+    return false;
+}
+
 $INDEX = UPLOADS_DIR . '/index.json';
 $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
@@ -128,6 +151,8 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $author = clean(isset($_POST['author']) ? $_POST['author'] : 'Player', 40);
     $desc = clean(isset($_POST['description']) ? $_POST['description'] : '', 280);
 
+    if (is_banned($author, $ip)) json_out(['ok' => false, 'error' => 'banned'], 403);
+
     $name = 's' . time() . '_' . bin2hex(random_bytes(3)) . '.opc';
     $dest = UPLOADS_DIR . '/' . $name;
     if (!move_uploaded_file($_FILES['file']['tmp_name'], $dest)) json_out(['ok' => false, 'error' => 'save fail'], 500);
@@ -150,6 +175,7 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'likes' => 0,
         'liked' => [],
         'owner_key' => $owner,
+        'ip' => $ip,
     ];
     save_index($INDEX, $items);
     file_put_contents($rateFile, (string)($hits + 1));
@@ -163,8 +189,11 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $i = find_item($items, $id);
     if ($i < 0) json_out(['ok' => false, 'error' => 'not found'], 404);
     if (empty($items[$i]['owner_key']) || $items[$i]['owner_key'] !== $owner) json_out(['ok' => false, 'error' => 'forbidden'], 403);
+    $newAuthor = isset($_POST['author']) ? clean($_POST['author'], 40) : $items[$i]['author'];
+    if (is_banned($newAuthor, isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0'))
+        json_out(['ok' => false, 'error' => 'banned'], 403);
     if (isset($_POST['title'])) $items[$i]['title'] = clean($_POST['title'], 80);
-    if (isset($_POST['author'])) $items[$i]['author'] = clean($_POST['author'], 40);
+    if (isset($_POST['author'])) $items[$i]['author'] = $newAuthor;
     if (isset($_POST['description'])) $items[$i]['description'] = clean($_POST['description'], 280);
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
