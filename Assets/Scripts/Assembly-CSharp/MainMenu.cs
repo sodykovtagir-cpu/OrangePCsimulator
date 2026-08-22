@@ -147,7 +147,7 @@ public class MainMenu : MonoBehaviour
         if (string.IsNullOrEmpty(fileContents))
         {
             Debug.LogError("[MainMenu] Failed to load example: " + name);
-            return;
+            yield break;
         }
         DataLoader lod = new DataLoader();
         lod.LoadFromString(fileContents);
