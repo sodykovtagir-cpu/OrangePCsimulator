@@ -60,6 +60,34 @@
 загрузка вернёт `403 bad key`. **Включать только вместе с релизом новой сборки**,
 иначе уже установленные клиенты перестанут заливать.
 
+## Аккаунты (account.php) — двухэтапка с email
+
+`server/account.php` — серверная регистрация: **ник + пароль + email → на почту код → вход**.
+Автовход через session-токен (клиент хранит в PlayerPrefs).
+
+| action | Метод | Поля | Ответ |
+|--------|-------|------|-------|
+| `register` | POST | name, email, password, client | `{ok, pending, sent}` (шлёт код на почту) |
+| `verify` | POST | email, code, client | `{ok, token, name, email}` |
+| `login` | POST | login (имя/email), password, client | `{ok, token, ...}` |
+| `resend` | POST | email | `{ok, sent}` |
+| `me` | GET/POST | token (заголовок `X-Auth-Token` или поле) | `{ok, name, email, tg, tg_bonus, saves:[...]}` |
+| `logout` | POST | token | `{ok}` |
+| `tg_link` | POST | token, telegram | бонус 5 BTC (или pending-ссылка при боте) |
+| `tg_bonus` | POST | token | `{ok, granted, btc:5}` |
+
+Хранилище: `users.json` (пароль и код — `password_hash`), `tg_pending.json`.
+**Почта:** по умолчанию встроенный PHP `mail()` (на бесплатном byethost часто не шлёт).
+Чтобы реально слать код — настрой SMTP в `config.php` (`MAIL_SMTP_*`) или укажи
+ящик, откуда разрешена отправка. `MAIL_FROM` должен совпадать с твоим доменом.
+
+**Telegram-бот:** в `config.php` задай `TELEGRAM_BOT_TOKEN` (от @BotFather).
+Тогда `tg_link` вернёт deep-link `https://t.me/<bot>?start=<code>`, а
+`telegram_bot.php` (запускай периодически или `php telegram_bot.php loop`) подтвердит
+привязку по `/start <code>` и выдаст +5 BTC. Без токена — мягкая привязка (бонус сразу).
+
+`users.json`, `tg_pending.json` в git **не клади** (уже в `.gitignore`).
+
 ## Промокоды (Giveaway) — серверная проверка
 
 Коды больше не зашиты в клиент. Игра шлёт `POST api.php?action=redeem`

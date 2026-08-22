@@ -89,6 +89,8 @@ server/quiz_pending.json
 server/promos.json
 server/promo_claimed.json
 server/uploads/
+server/users.json
+server/tg_pending.json
 Hosting/workshop/config.php
 Hosting/workshop/admin_config.json
 Hosting/workshop/banned.json
@@ -96,3 +98,5 @@ Hosting/workshop/quiz_pending.json
 Hosting/workshop/promos.json
 Hosting/workshop/promo_claimed.json
 Hosting/workshop/uploads/
+Hosting/workshop/users.json
+Hosting/workshop/tg_pending.json

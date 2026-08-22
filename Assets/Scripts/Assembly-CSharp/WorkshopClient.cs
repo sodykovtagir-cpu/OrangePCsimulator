@@ -59,11 +59,60 @@ public class WorkshopRedeemResponse
 	public float btc;
 }
 
+[Serializable]
+public class AccountAuthResponse
+{
+	public bool ok;
+	public string error;
+	public bool pending;
+	public bool sent;
+	public string token;
+	public string name;
+	public string email;
+	public bool verified;
+	public bool tg_bonus;
+	public bool granted;
+	public float btc;
+	public string tg;
+	public string link;
+}
+
+[Serializable]
+public class AccountSaveItem
+{
+	public int id;
+	public string title;
+	public string description;
+	public int downloads;
+	public int likes;
+	public string owner_key;
+	public bool has_cover;
+	public string created_at;
+}
+
+[Serializable]
+public class AccountMeResponse
+{
+	public bool ok;
+	public string error;
+	public string name;
+	public string email;
+	public string tg;
+	public bool tg_bonus;
+	public bool verified;
+	public AccountSaveItem[] saves;
+}
+
 public class WorkshopClient : MonoBehaviour
 {
 	public static readonly string[] ApiUrls =
 	{
 		"https://orangepcsimu.byethost4.com/workshop/api.php"
+	};
+
+	public static readonly string[] AccountUrls =
+	{
+		"https://orangepcsimu.byethost4.com/workshop/account.php"
 	};
 
 	public static string UploadKey = "f52aa253f7ee050a6069d858473880982acb4c5de7a929e3";
@@ -338,6 +387,103 @@ public class WorkshopClient : MonoBehaviour
 			if (p == null || !p.ok) { done(0, p != null ? p.error : "like fail"); return; }
 			done(p.likes, null);
 		}));
+	}
+
+	// ================= Серверные аккаунты (account.php) =================
+
+	public void AccountRegister(string name, string email, string password, Action<AccountAuthResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=register&i=1", Form(
+			("name", name), ("email", email), ("password", password), ("client", ClientId())),
+			(body, err) => ParseAuth(body, err, done)));
+	}
+
+	public void AccountVerify(string email, string code, Action<AccountAuthResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=verify&i=1", Form(
+			("email", email), ("code", code), ("client", ClientId())),
+			(body, err) => ParseAuth(body, err, done)));
+	}
+
+	public void AccountLogin(string login, string password, Action<AccountAuthResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=login&i=1", Form(
+			("login", login), ("password", password), ("client", ClientId())),
+			(body, err) => ParseAuth(body, err, done)));
+	}
+
+	public void AccountResend(string email, Action<AccountAuthResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=resend&i=1", Form(
+			("email", email)),
+			(body, err) => ParseAuth(body, err, done)));
+	}
+
+	public void AccountMe(string token, Action<AccountMeResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=me&i=1", Form(
+			("token", token)), (body, err) =>
+		{
+			if (err != null) { done(null, err); return; }
+			AccountMeResponse p = null;
+			try { p = JsonUtility.FromJson<AccountMeResponse>(StripJunk(body)); }
+			catch (Exception e) { done(null, e.Message); return; }
+			done(p, null);
+		}));
+	}
+
+	public void AccountLogout(string token, Action<string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=logout&i=1", Form(("token", token)),
+			(body, err) => { done(err); }));
+	}
+
+	public void TgLink(string token, string telegram, Action<AccountAuthResponse, string> done)
+	{
+		StartCoroutine(RequestPostBase(AccountUrls, "?action=tg_link&i=1", Form(
+			("token", token), ("telegram", telegram)),
+			(body, err) => ParseAuth(body, err, done)));
+	}
+
+	private static void ParseAuth(string body, string err, Action<AccountAuthResponse, string> done)
+	{
+		if (err != null) { done(null, err); return; }
+		AccountAuthResponse p = null;
+		try { p = JsonUtility.FromJson<AccountAuthResponse>(StripJunk(body)); }
+		catch (Exception e) { done(null, e.Message); return; }
+		done(p, null);
+	}
+
+	private static List<IMultipartFormSection> Form(params (string, string)[] fields)
+	{
+		var form = new List<IMultipartFormSection>();
+		foreach (var f in fields)
+			form.Add(new MultipartFormDataSection(f.Item1, f.Item2 ?? ""));
+		return form;
+	}
+
+	private IEnumerator RequestPostBase(IEnumerable<string> urls, string query, List<IMultipartFormSection> form, Action<string, string> done)
+	{
+		yield return BypassByethost();
+		foreach (var baseUrl in urls)
+		{
+			using (var req = UnityWebRequest.Post(baseUrl + query, form))
+			{
+				ApplyCookie(req);
+				req.timeout = 60;
+				req.certificateHandler = new AcceptAllCerts();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				yield return op;
+				if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
+				{
+					done(req.downloadHandler.text, null);
+					yield break;
+				}
+				Debug.LogWarning("[Account] POST " + baseUrl + " -> " + req.error);
+			}
+		}
+		done(null, "Empty reply from server");
 	}
 
 	private IEnumerator SimplePost(string query, List<IMultipartFormSection> form, Action<string, string> done)

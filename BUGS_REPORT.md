@@ -368,3 +368,50 @@ Assets/Scripts/Assembly-CSharp/SaveManagement/DataLoader.cs   (проверка 
 Assets/Scripts/Assembly-CSharp/FileOverview.cs                (ReadPayload)
 Assets/Scripts/Assembly-CSharp/WorkshopClient.cs              (cert-whitelist)
 ```
+
+---
+
+## 13. Обновление 8 (22.08.2026) — серверные аккаунты (двухэтапка) + поиск/сортировка в мастерской
+
+### 13.1 Серверные аккаунты с подтверждением по email
+Новый `server/account.php`: регистрация **ник + пароль + email** -> на почту код ->
+подтверждение -> выдача session-токена. Автовход (токен в PlayerPrefs).
+- `users.json` (пароль/код — `password_hash`), `tg_pending.json`, в `.gitignore`.
+- action: `register, verify, login, resend, me, logout, tg_link, tg_bonus`.
+- `me` возвращает профиль + **свои сейвы** (по автору), включая `owner_key` —
+  клиент может удалять/обновлять свои публикации.
+- Почта через встроенный `mail()` (на бесплатном byethost часто не шлёт) или
+  SMTP из `config.php`. **Нужно задать `MAIL_FROM` на твой домен / SMTP-креды.**
+
+### 13.2 CLI-аккаунт в Unity
+- `ServerAccounts` — состояние автовхода (токен/имя/email/бонус) + событие.
+- `AccountPage` — авто-UI: чип «Имя» / «Not logged in» на главном меню
+  (по клику открывает страницу). Не вошёл -> вход/регистрация (имя+пароль+почта)
+  -> экран кода. Вошёл -> профиль + управление своими сейвами (удалить)
+  + привязка Telegram (+5 BTC один раз).
+- `WorkshopClient`: добавлены `AccountRegister/Verify/Login/Resend/Me/Logout/TgLink`
+  (+ `AccountUrls` на `account.php`, `RequestPostBase`).
+- `MainMenu.Start` -> `AccountPage.EnsureOnScene()`.
+- `WorkshopMenu.UploadSelected` -> проверка **серверного** `ServerAccounts.LoggedIn`.
+- ⚠️ Осталась прежняя **локальная** система аккаунтов (`AccountManager`/`AccountPanel`),
+  используемая в панели файлов (FileInformation). Она и серверная — независимы.
+  Рекомендуется позже убрать локальную или свести её к серверной (offline-кэш).
+
+### 13.3 Поиск и сортировка в мастерской
+`WorkshopMenu`: добавлены поиск (по названию/автору/описанию), циклическая
+сортировка (Сначала новые → По скачиваниям → По лайкам) и переключатель
+порядка (по убыванию/по возрастанию). UI создаётся сам, если поля не привязаны.
+
+### 13.4 Файлы обновления
+```
+server/account.php           (новое, сервер аккаунтов)
+server/telegram_bot.php      (новое, подтверждение привязки TG)
+server/README.md             (документация аккаунтов)
+Hosting/workshop/config.example.php (mail/TG-константы)
+.gitignore                   (users.json, tg_pending.json)
+Assets/Scripts/Assembly-CSharp/ServerAccounts.cs   (новое)
+Assets/Scripts/Assembly-CSharp/AccountPage.cs       (новое, UI)
+Assets/Scripts/Assembly-CSharp/WorkshopClient.cs    (account-методы)
+Assets/Scripts/Assembly-CSharp/WorkshopMenu.cs      (поиск/сортировка)
+Assets/Scripts/Assembly-CSharp/MainMenu.cs          (EnsureOnScene)
+```

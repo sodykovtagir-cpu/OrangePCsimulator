@@ -60,6 +60,9 @@ public class MainMenu : MonoBehaviour
 
         AudioListener.volume = PlayerPrefs.GetFloat("Volume", 1f);
         InvokeRepeating(nameof(Blinking), 0.5f, 0.5f);
+
+        // Страница аккаунта (серверная, с двухэтапкой по email).
+        AccountPage.EnsureOnScene();
     }
 
     private static string GetSystemLanguage()

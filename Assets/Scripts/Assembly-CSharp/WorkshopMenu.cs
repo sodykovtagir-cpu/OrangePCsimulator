@@ -22,7 +22,27 @@ public class WorkshopMenu : MonoBehaviour
 	[SerializeField] private Button refreshButton;
 	[SerializeField] private Button uploadButton;
 
+	[Header("Search / Sort")]
+	[Tooltip("Поиск по названию/автору/описанию.")]
+	[SerializeField] private InputField searchField;
+	[Tooltip("Циклическая кнопка сортировки: Сначала новые → По скачиваниям → По лайкам.")]
+	[SerializeField] private Button sortButton;
+	[Tooltip("Переключатель порядка: По убыванию / По возрастанию.")]
+	[SerializeField] private Button orderButton;
+	[Tooltip("Кнопка возврата к сортировке «сначала новые».")]
+	[SerializeField] private Button resetButton;
+	[SerializeField] private Text sortLabel;
+	[SerializeField] private Text orderLabel;
+	[Tooltip("Если поля выше не привязаны в инспекторе — создать панельку саму.")]
+	[SerializeField] private bool autoCreateSearchSortUI = true;
+
+	private enum SortMode { New = 0, Downloads = 1, Likes = 2 }
+	private SortMode sortMode = SortMode.New;
+	private bool ascending = false;
+	private string searchText = "";
+
 	private readonly List<WorkshopItem> items = new List<WorkshopItem>();
+	private readonly List<WorkshopItem> visible = new List<WorkshopItem>();
 	private readonly List<string> localPaths = new List<string>();
 
 	private void Awake()
@@ -34,6 +54,23 @@ public class WorkshopMenu : MonoBehaviour
 		}
 		if (refreshButton != null) refreshButton.onClick.AddListener(RefreshList);
 		if (uploadButton != null) uploadButton.onClick.AddListener(UploadSelected);
+		WireSearchSort();
+	}
+
+	private void WireSearchSort()
+	{
+		if (searchField != null) searchField.onValueChanged.AddListener(OnSearchChanged);
+		if (sortButton != null) sortButton.onClick.AddListener(CycleSort);
+		if (orderButton != null) orderButton.onClick.AddListener(ToggleOrder);
+		if (resetButton != null) resetButton.onClick.AddListener(ResetSort);
+		if (autoCreateSearchSortUI && !HasSearchSortBindings()) CreateSearchSortUI();
+		RefreshSortLabels();
+	}
+
+	private bool HasSearchSortBindings()
+	{
+		return searchField != null || sortButton != null || orderButton != null
+			|| resetButton != null || sortLabel != null || orderLabel != null;
 	}
 
 	private void OnEnable()
@@ -59,9 +96,148 @@ public class WorkshopMenu : MonoBehaviour
 			}
 			items.Clear();
 			if (list != null) items.AddRange(list);
-			RebuildRows();
-			SetStatus(items.Count + " saves");
+			ApplyFilterSort();
+			SetStatus(visible.Count + " saves" + (visible.Count != items.Count ? " (of " + items.Count + ")" : ""));
 		});
+	}
+
+	// ================= Search / Sort =================
+
+	public void OnSearchChanged(string value)
+	{
+		searchText = value ?? "";
+		ApplyFilterSort();
+	}
+
+	public void CycleSort()
+	{
+		sortMode = (SortMode)(((int)sortMode + 1) % 3);
+		ApplyFilterSort();
+		RefreshSortLabels();
+	}
+
+	public void SetSort(int mode)
+	{
+		sortMode = (SortMode)Mathf.Clamp(mode, 0, 2);
+		ApplyFilterSort();
+		RefreshSortLabels();
+	}
+
+	public void ToggleOrder()
+	{
+		ascending = !ascending;
+		ApplyFilterSort();
+		RefreshSortLabels();
+	}
+
+	public void ResetSort()
+	{
+		sortMode = SortMode.New;
+		ascending = false;
+		ApplyFilterSort();
+		RefreshSortLabels();
+	}
+
+	private void ApplyFilterSort()
+	{
+		visible.Clear();
+		string q = (searchText ?? "").Trim().ToLowerInvariant();
+		for (int i = 0; i < items.Count; i++)
+		{
+			var it = items[i];
+			if (q.Length > 0)
+			{
+				bool match = Contains(it.title, q) || Contains(it.author, q) || Contains(it.description, q);
+				if (!match) continue;
+			}
+			visible.Add(it);
+		}
+		visible.Sort(Compare);
+		RebuildRows();
+	}
+
+	private bool Contains(string s, string q)
+	{
+		return !string.IsNullOrEmpty(s) && s.ToLowerInvariant().IndexOf(q, System.StringComparison.Ordinal) >= 0;
+	}
+
+	private int Compare(WorkshopItem a, WorkshopItem b)
+	{
+		int c = 0;
+		switch (sortMode)
+		{
+			case SortMode.Downloads: c = a.downloads.CompareTo(b.downloads); break;
+			case SortMode.Likes:     c = a.likes.CompareTo(b.likes); break;
+			default:                 c = string.CompareOrdinal(b.created_at ?? "", a.created_at ?? ""); break;
+		}
+		return ascending ? c : -c;
+	}
+
+	private void RefreshSortLabels()
+	{
+		if (sortLabel != null) sortLabel.text = SortName();
+		if (orderLabel != null) orderLabel.text = ascending ? "↑ asc" : "↓ desc";
+	}
+
+	private string SortName()
+	{
+		switch (sortMode)
+		{
+			case SortMode.Downloads: return "By downloads";
+			case SortMode.Likes:     return "By likes";
+			default:                 return "New first";
+		}
+	}
+
+	private void CreateSearchSortUI()
+	{
+		Transform holder = listParent != null ? listParent.parent : transform;
+		var bar = new GameObject("SearchSortBar", typeof(RectTransform), typeof(Image));
+		bar.transform.SetParent(holder, false);
+		bar.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+		var brt = bar.GetComponent<RectTransform>();
+		brt.anchorMin = new Vector2(0.5f, 1f); brt.anchorMax = new Vector2(0.5f, 1f);
+		brt.pivot = new Vector2(0.5f, 1f);
+		brt.anchoredPosition = new Vector2(0, -60f);
+		brt.sizeDelta = new Vector2(620f, 40f);
+
+		// Поиск
+		var sf = new GameObject("Search", typeof(RectTransform), typeof(Image), typeof(InputField));
+		sf.transform.SetParent(bar.transform, false);
+		var sfr = sf.GetComponent<RectTransform>();
+		sfr.anchorMin = sfr.anchorMax = new Vector2(0f, 0.5f);
+		sfr.anchoredPosition = new Vector2(70f, 0f);
+		sfr.sizeDelta = new Vector2(240f, 28f);
+		sf.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.9f);
+		var input = sf.GetComponent<InputField>();
+		input.onValueChanged.AddListener(OnSearchChanged);
+
+		MakeBarButton(bar.transform, "Sort", "Sort: " + SortName(), new Vector2(-170f, 0f), CycleSort, "SortLabel", ref sortLabel);
+		MakeBarButton(bar.transform, "Order", "↓ desc", new Vector2(-80f, 0f), ToggleOrder, "OrderLabel", ref orderLabel);
+		MakeBarButton(bar.transform, "Reset", "Reset", new Vector2(10f, 0f), ResetSort, null, ref orderLabel);
+
+		searchField = input;
+		RefreshSortLabels();
+	}
+
+	private static void MakeBarButton(Transform parent, string name, string label, Vector2 pos, UnityEngine.Events.UnityAction click, string labelChild, ref Text tex)
+	{
+		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+		go.transform.SetParent(parent, false);
+		var rt = go.GetComponent<RectTransform>();
+		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+		rt.anchoredPosition = pos;
+		rt.sizeDelta = new Vector2(90f, 28f);
+		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
+		go.GetComponent<Button>().onClick.AddListener(click);
+
+		var tx = go.AddComponent<Text>();
+		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		tx.alignment = TextAnchor.MiddleCenter;
+		tx.color = Color.black;
+		tx.fontSize = 13;
+		tx.text = label;
+		if (labelChild != null) tex = tx;
 	}
 
 	public void RefreshLocalSaves()
@@ -83,7 +259,7 @@ public class WorkshopMenu : MonoBehaviour
 
 	public void UploadSelected()
 	{
-		if (!AccountManager.IsLoggedIn())
+		if (!ServerAccounts.LoggedIn)
 		{
 			SetStatus("Login to publish");
 			return;
@@ -112,7 +288,7 @@ public class WorkshopMenu : MonoBehaviour
 		string title = titleField != null && !string.IsNullOrEmpty(titleField.text)
 			? titleField.text : Path.GetFileNameWithoutExtension(localPaths[i]);
 		string author = authorField != null && !string.IsNullOrEmpty(authorField.text)
-			? authorField.text : AccountManager.CurrentUser;
+			? authorField.text : ServerAccounts.Name;
 		string desc = descField != null ? descField.text : "";
 		SetStatus("Uploading...");
 		WorkshopClient.Instance.Upload(localPaths[i], title, author, desc, null, (id, key, err) =>
@@ -158,7 +334,7 @@ public class WorkshopMenu : MonoBehaviour
 		if (listParent == null) return;
 		for (int i = listParent.childCount - 1; i >= 0; i--)
 			Destroy(listParent.GetChild(i).gameObject);
-		foreach (var it in items)
+		foreach (var it in visible)
 		{
 			var row = CreateRow(it);
 			row.transform.SetParent(listParent, false);
