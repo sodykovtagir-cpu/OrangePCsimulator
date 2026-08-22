@@ -45,6 +45,7 @@ public class FileInformation : MonoBehaviour
 	private void Start()
 	{
 		menuManager = GetComponentInParent<MenuManager>();
+		CreateAccountButton();
 #if UNITY_ANDROID || UNITY_IOS
 		if (!NativeFilePicker.CanExportFiles())
 			exportButton.SetActive(false);
@@ -79,6 +80,8 @@ public class FileInformation : MonoBehaviour
 		if (publishPanel != null) publishPanel.SetActive(false);
 		FillPublishForm(null);
 		EnsureWorkshopClient();
+		EnsurePublishLayout();
+		RefreshAccountButton();
 	}
 
 	public void OpenPublishPanel()
@@ -279,14 +282,89 @@ public class FileInformation : MonoBehaviour
 
 	private void RefreshWorkshopButtons()
 	{
+		bool logged = AccountManager.IsLoggedIn();
 		bool owner = IsOwner();
-		if (uploadButton != null) uploadButton.SetActive(!owner);
-		if (updateButton != null) updateButton.SetActive(owner);
-		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(owner);
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", !owner);
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", owner);
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Delete", owner);
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "DeleteWorkshop", owner);
+		// Кнопка панели публикации видна, только если:
+		//  - вошли в аккаунт, И
+		//  - сейв свой (локальный не-скачанный ИЛИ мы его владелец).
+		bool canPublish = logged && CanPublish();
+
+		// Кнопки открытия панели публикации (панель файлов):
+		// Upload — для невыложенных, Update/Delete — для выложенных.
+		if (uploadButton != null) uploadButton.SetActive(canPublish && !owner);
+		if (updateButton != null) updateButton.SetActive(canPublish && owner);
+		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(canPublish && owner);
+
+		// Кнопки внутри панели публикации.
+		var action = FindPublishChild("PublishAction");
+		var del = FindPublishChild("PublishDelete");
+		var close = FindPublishChild("PublishClose");
+		if (action != null)
+		{
+			// Одна кнопка = и Upload и Update: меняем подпись по статусу владельца.
+			action.gameObject.SetActive(canPublish);
+			var tx = action.GetComponentInChildren<Text>();
+			if (tx != null) tx.text = owner ? "Update" : "Upload";
+		}
+		if (del != null) del.gameObject.SetActive(canPublish && owner);
+		if (close != null) close.gameObject.SetActive(canPublish);
+
+		// На всякий случай управляем и «каноническими» именами,
+		// если в других сценах/префабах кнопки названы Upload/Update/Delete.
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", canPublish && !owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", canPublish && owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Delete", canPublish && owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "DeleteWorkshop", canPublish && owner);
+	}
+
+	/// <summary>
+	/// Можно ли публиковать текущий сейв:
+	/// владелец всегда может; обычный локальный сейв — да;
+	/// скачанный чужой сейв (workshopSourceId > 0 без ключа владельца) — нет.
+	/// </summary>
+	private bool CanPublish()
+	{
+		if (load == null || load.loader == null || load.loader.GameData == null) return false;
+		if (IsOwner()) return true;
+		return load.loader.GameData.workshopSourceId <= 0;
+	}
+
+	private Transform FindPublishChild(string name)
+	{
+		if (publishPanel == null) return null;
+		var panel = publishPanel.transform.Find("Panel");
+		if (panel == null) return null;
+		var inner = panel.Find("Panel");
+		return inner != null ? inner.Find(name) : panel.Find(name);
+	}
+
+	/// <summary>
+	/// Включает горизонтальную раскладку кнопок панели публикации,
+	/// чтобы при скрытии одной кнопки остальные съезжались без пустот.
+	/// </summary>
+	private void EnsurePublishLayout()
+	{
+		if (publishPanel == null) return;
+		var panel = publishPanel.transform.Find("Panel");
+		var inner = panel != null ? panel.Find("Panel") : null;
+		if (inner == null) return;
+
+		if (inner.GetComponent<HorizontalLayoutGroup>() == null)
+		{
+			var h = inner.gameObject.AddComponent<HorizontalLayoutGroup>();
+			h.spacing = 8f;
+			h.childAlignment = TextAnchor.MiddleCenter;
+			h.childControlWidth = false;
+			h.childControlHeight = true;
+			h.childForceExpandWidth = false;
+			h.childForceExpandHeight = true;
+		}
+		if (inner.GetComponent<ContentSizeFitter>() == null)
+		{
+			var f = inner.gameObject.AddComponent<ContentSizeFitter>();
+			f.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+			f.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+		}
 	}
 
 	private static void ToggleNamed(Transform root, string name, bool on)
@@ -299,6 +377,168 @@ public class FileInformation : MonoBehaviour
 				all[i].gameObject.SetActive(on);
 		}
 	}
+
+	#region Account UI (programmatic, no scene edits needed)
+
+	private GameObject accountForm;
+	private Text accountBtnText;
+
+	private void CreateAccountButton()
+	{
+		if (transform.Find("AccountBtn") != null) return;
+
+		var btn = new GameObject("AccountBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+		btn.transform.SetParent(transform, false);
+		var rt = btn.GetComponent<RectTransform>();
+		rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
+		rt.pivot = new Vector2(1f, 1f);
+		rt.anchoredPosition = new Vector2(-10f, -10f);
+		rt.sizeDelta = new Vector2(150f, 30f);
+		btn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
+
+		var label = new GameObject("Label", typeof(RectTransform), typeof(Text));
+		label.transform.SetParent(btn.transform, false);
+		var tx = label.GetComponent<Text>();
+		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		tx.alignment = TextAnchor.MiddleCenter;
+		tx.color = Color.white;
+		tx.fontSize = 14;
+		accountBtnText = tx;
+
+		btn.GetComponent<Button>().onClick.AddListener(OnAccountButton);
+		RefreshAccountButton();
+	}
+
+	private void RefreshAccountButton()
+	{
+		if (accountBtnText == null) return;
+		accountBtnText.text = AccountManager.IsLoggedIn()
+			? AccountManager.CurrentUser + "  ·  Logout"
+			: "Login / Register";
+	}
+
+	private void OnAccountButton()
+	{
+		if (AccountManager.IsLoggedIn())
+		{
+			AccountManager.Logout();
+			if (accountForm != null) accountForm.SetActive(false);
+			RefreshAccountButton();
+			RefreshWorkshopButtons();
+			return;
+		}
+
+		if (accountForm == null) CreateAccountForm();
+		accountForm.SetActive(!accountForm.activeSelf);
+	}
+
+	private void CreateAccountForm()
+	{
+		var form = new GameObject("AccountForm", typeof(RectTransform), typeof(Image));
+		form.transform.SetParent(transform, false);
+		var rt = form.GetComponent<RectTransform>();
+		rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f);
+		rt.pivot = new Vector2(1f, 1f);
+		rt.anchoredPosition = new Vector2(-10f, -46f);
+		rt.sizeDelta = new Vector2(230f, 128f);
+		form.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.98f);
+		form.SetActive(false);
+		accountForm = form;
+
+		var nick = CreateField(form.transform, "NickField", "nick", false, new Vector2(-90f, 48f));
+		var pass = CreateField(form.transform, "PassField", "password", true, new Vector2(-90f, 16f));
+
+		var loginBtn = CreateTextButton(form.transform, "LoginBtn", "Login", new Vector2(-52f, -24f));
+		var regBtn = CreateTextButton(form.transform, "RegBtn", "Register", new Vector2(52f, -24f));
+
+		loginBtn.onClick.AddListener(() =>
+		{
+			if (AccountManager.Login(nick.text, pass.text))
+			{
+				pass.text = "";
+				form.SetActive(false);
+				RefreshAccountButton();
+				RefreshWorkshopButtons();
+			}
+			else
+			{
+				SetWsStatus("Bad login or account not found");
+			}
+		});
+
+		regBtn.onClick.AddListener(() =>
+		{
+			if (AccountManager.Register(nick.text, pass.text))
+			{
+				pass.text = "";
+				form.SetActive(false);
+				RefreshAccountButton();
+				RefreshWorkshopButtons();
+			}
+			else
+			{
+				SetWsStatus("Name taken or invalid (2-24 chars)");
+			}
+		});
+	}
+
+	private static InputField CreateField(Transform parent, string name, string placeholder, bool password, Vector2 pos)
+	{
+		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(InputField));
+		go.transform.SetParent(parent, false);
+		var rt = go.GetComponent<RectTransform>();
+		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+		rt.pivot = new Vector2(0.5f, 0.5f);
+		rt.anchoredPosition = pos;
+		rt.sizeDelta = new Vector2(200f, 26f);
+		go.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.9f);
+
+		var input = go.GetComponent<InputField>();
+		var ph = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
+		ph.transform.SetParent(go.transform, false);
+		var phTx = ph.GetComponent<Text>();
+		phTx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		phTx.fontSize = 13;
+		phTx.color = new Color(0.3f, 0.3f, 0.3f);
+		phTx.text = placeholder;
+
+		var txt = new GameObject("Text", typeof(RectTransform), typeof(Text));
+		txt.transform.SetParent(go.transform, false);
+		var tx = txt.GetComponent<Text>();
+		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		tx.fontSize = 13;
+		tx.color = Color.black;
+
+		input.textComponent = tx;
+		input.placeholder = phTx;
+		if (password) input.contentType = InputField.ContentType.Password;
+		return input;
+	}
+
+	private static Button CreateTextButton(Transform parent, string name, string label, Vector2 pos)
+	{
+		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+		go.transform.SetParent(parent, false);
+		var rt = go.GetComponent<RectTransform>();
+		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+		rt.pivot = new Vector2(0.5f, 0.5f);
+		rt.anchoredPosition = pos;
+		rt.sizeDelta = new Vector2(96f, 28f);
+		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
+
+		var txt = new GameObject("Label", typeof(RectTransform), typeof(Text));
+		txt.transform.SetParent(go.transform, false);
+		var tx = txt.GetComponent<Text>();
+		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		tx.alignment = TextAnchor.MiddleCenter;
+		tx.fontSize = 13;
+		tx.color = Color.black;
+		tx.text = label;
+
+		return go.GetComponent<Button>();
+	}
+
+	#endregion
 
 	private void SetWsStatus(string s)
 	{

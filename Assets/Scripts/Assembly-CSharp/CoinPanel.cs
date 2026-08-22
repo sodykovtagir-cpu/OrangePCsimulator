@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using GoogleMobileAds.Api;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -47,8 +46,6 @@ public class CoinPanel : MonoBehaviour
 	private void Awake()
 	{
 		source = GetComponent<AudioSource>();
-		var ad = AdManager.Instance;
-    	if (ad != null) ad.EarnedReward += EarnedReward;
 	}
 
 	private void OnEnable()
@@ -64,8 +61,6 @@ public class CoinPanel : MonoBehaviour
 
 	private void OnDestroy()
 	{
-		var ad = AdManager.Instance;
-		if (ad != null) ad.EarnedReward -= EarnedReward;
 	}
 
 	private void Update()
@@ -159,36 +154,14 @@ public class CoinPanel : MonoBehaviour
 
 	public void FreeCoins()
 	{
-		var ad = AdManager.Instance;
-		if (ad == null) return;
-
-		if (freeCoinsText != null)
-			freeCoinsText.text = Localization.GetText("Loading...");
-
-		if (freeCoinsButton != null)
-			freeCoinsButton.interactable = false;
-
-		Action<bool> rewardedAdCallback = value =>
-		{
-			if (freeCoinsText != null)
-				freeCoinsText.text = Localization.GetText("Free Coins");
-
-			if (freeCoinsButton != null)
-				freeCoinsButton.interactable = true;
-		};
-
-		ad.CreateAndLoadRewardedAd("FreeCoins", rewardedAdCallback);
-	}
-
-	private void EarnedReward(GoogleMobileAds.Api.Reward reward)
-	{
-		if (reward == null) return;
-		if (!string.Equals(reward.Type, "Coin")) return;
-
+		// Реклама вырезана: кнопка просто выдаёт монеты без просмотра рекламы.
 		var main = Main.Instance;
 		if (main == null) return;
 
-		int amount = (int)reward.Amount;
-		main.SetMoney(main.Money + amount, false);
+		main.SetMoney(main.Money + 25, false);
+		if (freeCoinsText != null)
+			freeCoinsText.text = Localization.GetText("Free Coins");
+		if (source != null)
+			source.PlayOneShot(cashSound);
 	}
 }

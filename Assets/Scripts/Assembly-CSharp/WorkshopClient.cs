@@ -126,7 +126,11 @@ public class WorkshopClient : MonoBehaviour
 			if (loader.GameData != null)
 			{
 				loader.GameData.roomName = string.IsNullOrEmpty(item.title) ? loader.GameData.roomName : item.title;
+				// Ключ владельца не передаётся скачанному файлу, а workshopSourceId
+				// помечает сейв как «скачанный из мастерской» — перевыложить его
+				// (защита от копирования) нельзя.
 				loader.GameData.workshopKey = "";
+				loader.GameData.workshopSourceId = item.id;
 				loader.WriteToFile();
 			}
 		}

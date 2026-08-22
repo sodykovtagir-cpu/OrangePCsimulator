@@ -29,6 +29,8 @@ public class GameData
 
 	public string workshopKey;
 
+	public int workshopSourceId;
+
 	public string workshopTitle;
 
 	public string workshopAuthor;

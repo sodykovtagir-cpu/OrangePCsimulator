@@ -1,134 +1,43 @@
-using System;
-using System.Runtime.CompilerServices;
-using GoogleMobileAds.Api;
 using UnityEngine;
-//ad this yourself
+
+// Реклама полностью вырезана (см. BUGS_REPORT.md, раздел «Реклама»).
+// Класс оставлен как пустая заглушка, чтобы не ломать ссылки в сценах
+// (GameObject с AdManager) и вызовы из Display/ShopPanel/StoreMenu.
 public class AdManager : MonoBehaviour
 {
-	[Serializable]
-	private struct RewardedId
-	{
-		public string name;
-
-		public string idAndroid;
-
-		public string idIOS;
-	}
-
-	[Header("Banner")]
-	[SerializeField]
-	private string bannerIdAndroid;
-
-	[SerializeField]
-	private string bannerIdIOS;
-
-	[SerializeField]
-	private AdPosition bannerPosition;
-
-	[SerializeField]
-	private bool autoLoadBanner;
-
-	[Header("Interstitial")]
-	[SerializeField]
-	private string interstitialIdAndroid;
-
-	[SerializeField]
-	private string interstitialIdIOS;
-
-	[SerializeField]
-	private bool autoLoadInterstitial;
-
-	[Header("Rewarded")]
-	[SerializeField]
-	private RewardedId[] rewardedIds;
-
-	[Header("Test")]
-	[SerializeField]
-	private bool testAds;
-
-	private BannerView bannerView;
-
-	private InterstitialAd interstitialAd;
-
-	private RewardedAd rewardedAd;
-
-	private Action<bool> rewardedAdCallback;
-
 	public static AdManager Instance { get; private set; }
 
 	public bool NoAds { get; private set; }
 
-	public event Action<Reward> EarnedReward
-	{
-		[CompilerGenerated]
-		add
-		{
-		}
-		[CompilerGenerated]
-		remove
-		{
-		}
-	}
-
 	private void Awake()
 	{
+		if (Instance != null && Instance != this)
+		{
+			Destroy(gameObject);
+			return;
+		}
+		Instance = this;
 		NoAds = PlayerPrefs.GetInt("NoAds", 0) == 1;
 	}
 
-	private void Init()
-	{
-	}
+	// --- Заглушки (вызываются из существующих скриптов/кнопок) ---
 
-	private string BannerId()
-	{
-		return null;
-	}
+	public void RequestBanner() { }
+	public void HideBanner(bool hide) { }
+	public void SetBannerPosition() { }
+	public void DestroyBanner() { }
+	public void RequestInterstitial() { }
+	public void ShowInterstitial() { }
 
-	public void RequestBanner()
+	public void CreateAndLoadRewardedAd(string name, System.Action<bool> callback = null)
 	{
-	}
-
-	public void HideBanner(bool hide)
-	{
-	}
-
-	public void SetBannerPosition(AdPosition adPosition)
-	{
-	}
-
-	public void DestroyBanner()
-	{
-	}
-
-	private string InterstitialId()
-	{
-		return null;
-	}
-
-	public void RequestInterstitial()
-	{
-	}
-
-	public void ShowInterstitial()
-	{
-	}
-
-	public void CreateAndLoadRewardedAd(string name, Action<bool> rewardedAdCallback = null)
-	{
-	}
-
-	private void HandleRewardedAdLoaded()
-	{
-	}
-
-	private void HandleRewardedAdFailedToLoad()
-	{
+		if (callback != null) callback(false);
 	}
 
 	public void RemoveAds()
-    {
-        PlayerPrefs.SetInt("NoAds", 1);
-        PlayerPrefs.Save();
-        NoAds = true;
-    }
+	{
+		PlayerPrefs.SetInt("NoAds", 1);
+		PlayerPrefs.Save();
+		NoAds = true;
+	}
 }
