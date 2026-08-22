@@ -185,7 +185,8 @@ namespace PC.Component.Software
 			{
 				if (command.Count > 0)
 				{
-					var ms = int.Parse(command.Dequeue());
+					int ms;
+					if (!int.TryParse(command.Dequeue(), out ms) || ms < 0) ms = 0;
 					yield return new WaitForSeconds(ms / 1000f);
 				}
 			}
@@ -198,7 +199,12 @@ namespace PC.Component.Software
 				Write(line);
 				newline = true;
 
-				if (command.Count > 0) frequency = float.Parse(command.Dequeue());
+				if (command.Count > 0)
+				{
+					float freq;
+					if (float.TryParse(command.Dequeue(), out freq) && freq > 0f)
+						frequency = freq;
+				}
 				timeIndex = 0;
 
 				var src = audioSource;
@@ -211,7 +217,8 @@ namespace PC.Component.Software
 
 					if (command.Count > 0)
 					{
-						var ms = int.Parse(command.Dequeue());
+						int ms;
+						if (!int.TryParse(command.Dequeue(), out ms) || ms < 0) ms = 0;
 						yield return new WaitForSeconds(ms / 1000f);
 						src.Stop();
 					}
@@ -243,7 +250,10 @@ namespace PC.Component.Software
 			var hex = command.Dequeue();
 			if (string.IsNullOrEmpty(hex)) return;
 
-			int id = Convert.ToInt32(hex, 16);
+			int id;
+			try { id = Convert.ToInt32(hex, 16); }
+			catch (FormatException) { return; }
+
 			var os = system;
 			if (os == null) return;
 

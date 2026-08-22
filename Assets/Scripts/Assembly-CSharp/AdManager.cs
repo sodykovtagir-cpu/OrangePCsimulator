@@ -72,6 +72,7 @@ public class AdManager : MonoBehaviour
 
 	private void Awake()
 	{
+		NoAds = PlayerPrefs.GetInt("NoAds", 0) == 1;
 	}
 
 	private void Init()
@@ -127,5 +128,7 @@ public class AdManager : MonoBehaviour
 	public void RemoveAds()
     {
         PlayerPrefs.SetInt("NoAds", 1);
+        PlayerPrefs.Save();
+        NoAds = true;
     }
 }

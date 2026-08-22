@@ -93,8 +93,12 @@ public class Item : MonoBehaviour, ISave
 
 	public virtual void FromData(JObject jObject)
 	{
-		jObject.TryGetValue("glue", out var val);
-		glue = val.Value<bool>();
+		// TryGetValue с отсутствующим ключом возвращает null-токен,
+		// и val.Value<bool>() кидал NRE при загрузке старых сейвов.
+		JToken val;
+		glue = jObject.TryGetValue("glue", out val) && val != null && val.Type != JTokenType.Null
+			? val.Value<bool>()
+			: false;
 	}
 
 	public void OnSlotConnected()

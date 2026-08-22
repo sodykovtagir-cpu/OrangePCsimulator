@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using GoogleMobileAds.Api;
 using UnityEngine;
 using UnityEngine.UI;
@@ -75,11 +76,10 @@ public class CoinPanel : MonoBehaviour
 		{
 			if (clickCount > clicksPerSecond)
 			{
-				if (earnButton == null)
-				{
-					throw new InvalidOperationException();
-				}
-				earnButton.SetActive(false);
+				// Не кидаем исключение: earnButton может быть не назначен
+				// в инспекторе — это не должно ронять игру.
+				if (earnButton != null)
+					earnButton.SetActive(false);
 			}
 			clickCount = 0;
 			time = 0f;
@@ -89,11 +89,13 @@ public class CoinPanel : MonoBehaviour
 	private void CalculateBalance()
 	{
 		if (cashoutInput == null)
-		{
-			throw new InvalidOperationException();
-		}
+			return;
 
-		float inputAmount = float.Parse(cashoutInput.text);
+		// TryParse + InvariantCulture: float.Parse падал на нечисловом вводе,
+		// а в русской локали "1.5" разбиралась как 15 (запятая = разделитель).
+		float inputAmount;
+		if (!float.TryParse(cashoutInput.text, NumberStyles.Float, CultureInfo.InvariantCulture, out inputAmount))
+			inputAmount = 0f;
 		bitcoinExchange = inputAmount;
 
 		float current = currentBitcoin;
@@ -105,29 +107,20 @@ public class CoinPanel : MonoBehaviour
 			bitcoinExchange = inputAmount;
 		}
 
-		if (cashoutButton != null)
+		if (cashoutButton != null && cashoutInput != null && estimateText != null)
 		{
 			cashoutButton.interactable = inputAmount <= current;
 
-			if (cashoutInput != null)
-			{
-				cashoutInput.text = inputAmount.ToString("F3");
+			cashoutInput.text = inputAmount.ToString("F3", CultureInfo.InvariantCulture);
 
-				if (estimateText != null)
-				{
-					float exchangedValue = bitcoinExchange * BitcoinManager.exchangeRate;
+			float exchangedValue = bitcoinExchange * BitcoinManager.exchangeRate;
 
-					int displayValue = float.IsInfinity(exchangedValue) ? int.MinValue : (int)exchangedValue;
+			int displayValue = float.IsInfinity(exchangedValue) ? int.MinValue : (int)exchangedValue;
 
-					string displayString = "> " + displayValue + "$";
+			string displayString = "> " + displayValue + "$";
 
-					estimateText.text = displayString;
-					return;
-				}
-			}
+			estimateText.text = displayString;
 		}
-
-		throw new InvalidOperationException();
 	}
 
 	private void CashOut()
@@ -138,34 +131,24 @@ public class CoinPanel : MonoBehaviour
 		BitcoinManager.Bitcoin = BitcoinManager.Bitcoin - bitcoinExchange;
 
 		var main = Main.Instance;
-		if (main != null)
-		{
-			float exchangedMoney = BitcoinManager.exchangeRate * bitcoinExchange;
-			int moneyToAdd = float.IsInfinity(exchangedMoney) ? int.MinValue : (int)exchangedMoney;
+		if (main == null || source == null)
+			return;
 
-			main.SetMoney(main.Money + moneyToAdd, false);
+		float exchangedMoney = BitcoinManager.exchangeRate * bitcoinExchange;
+		int moneyToAdd = float.IsInfinity(exchangedMoney) ? int.MinValue : (int)exchangedMoney;
 
-			if (source != null)
-			{
-				source.PlayOneShot(cashSound);
-				Refresh();
-				return;
-			}
-		}
-
-		throw new InvalidOperationException();
+		main.SetMoney(main.Money + moneyToAdd, false);
+		source.PlayOneShot(cashSound);
+		Refresh();
 	}
 
 	private void Refresh()
 	{
 		currentBitcoin = BitcoinManager.Bitcoin;
-		if (bitcoinText != null)
-		{
-			bitcoinText.text = currentBitcoin.ToString("F3");
-			CalculateBalance();
+		if (bitcoinText == null)
 			return;
-		}
-		throw new InvalidOperationException();
+		bitcoinText.text = currentBitcoin.ToString("F3", CultureInfo.InvariantCulture);
+		CalculateBalance();
 	}
 
 	public void EarnCoins()

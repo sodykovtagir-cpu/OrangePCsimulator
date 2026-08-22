@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using PC.Shop;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -127,16 +126,22 @@ public class Main : MonoBehaviour
 
 	public void AddItem(int id, Item item)
 	{
-		int id2 = id;
-		if (id == 0) {id2 = GetNewId(item); return;}
-		items.Add(id, item);
+		if (id == 0) { GetNewId(item); return; }
+		if (item == null) return;
+		// Индексатор вместо Add: не кидаем исключение при дубликате ID
+		// (например, при повторной загрузке сейва со старыми ID).
+		items[id] = item;
 	}
 
 	public int GetNewId(Item item)
 	{
+		// Guid вместо Random.Range(int.MinValue, int.MaxValue):
+		// у последнего переполняется диапазон (max - min), из-за чего
+		// значения схлопываются в узкий/смещённый интервал и растёт
+		// число коллизий (вплоть до бесконечного цикла в do/while).
 		int id;
-		do { id = UnityEngine.Random.Range(int.MinValue, int.MaxValue); }
-		while (items.ContainsKey(id));
+		do { id = Guid.NewGuid().GetHashCode(); }
+		while (id == 0 || items.ContainsKey(id));
 		AddItem(id, item);
 		return id;
 	}
@@ -289,7 +294,9 @@ public class Main : MonoBehaviour
 			var playerObject = player?.gameObject;
 			if (playerObject == null)
 			{
-				throw new InvalidOperationException();
+				Debug.LogWarning("[Main] Player.Instance is null on ExitVirtualWorld");
+				outside = false;
+				return;
 			}
 			playerObject.SetActive(true);
 			HideUI(false);

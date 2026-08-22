@@ -188,7 +188,9 @@ public class WorkshopClient : MonoBehaviour
 		}, (body, err) =>
 		{
 			if (err != null) { done(err); return; }
-			var p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body));
+			WorkshopUploadResponse p = null;
+			try { p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body)); }
+			catch (Exception e) { done(e.Message); return; }
 			done(p != null && p.ok ? null : (p != null ? p.error : "delete fail"));
 		}));
 	}
@@ -202,7 +204,9 @@ public class WorkshopClient : MonoBehaviour
 		}, (body, err) =>
 		{
 			if (err != null) { done(0, err); return; }
-			var p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body));
+			WorkshopUploadResponse p = null;
+			try { p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body)); }
+			catch (Exception e) { done(0, e.Message); return; }
 			if (p == null || !p.ok) { done(0, p != null ? p.error : "like fail"); return; }
 			done(p.likes, null);
 		}));

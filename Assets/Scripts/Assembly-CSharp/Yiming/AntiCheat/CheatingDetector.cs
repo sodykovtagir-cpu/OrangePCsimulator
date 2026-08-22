@@ -9,7 +9,7 @@ namespace Yiming.AntiCheat
 
 		public static void OnCheatDetected()
 		{
-			CheatDetected.Invoke();
+			CheatDetected?.Invoke();
 		}
 	}
 }
