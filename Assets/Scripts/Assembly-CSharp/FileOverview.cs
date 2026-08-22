@@ -41,7 +41,7 @@ public class FileOverview : MonoBehaviour
 
 		var regex = new System.Text.RegularExpressions.Regex(tex);
 		var path = filePaths[index];
-		var data = SaveManagement.SaveUtility.EncryptDecrypt(SaveManagement.SaveUtility.Load(path));
+		var data = SaveManagement.SaveUtility.ReadPayload(SaveManagement.SaveUtility.Load(path));
 		var matches = regex.Matches(data);
 		foreach (System.Text.RegularExpressions.Match m in matches)
 		{

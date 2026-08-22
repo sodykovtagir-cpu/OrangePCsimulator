@@ -72,11 +72,6 @@ public class WorkshopClient : MonoBehaviour
 
 	public static WorkshopClient Instance { get; private set; }
 
-	private class AcceptAllCerts : CertificateHandler
-	{
-		protected override bool ValidateCertificate(byte[] certificateData) { return true; }
-	}
-
 	private static UnityWebRequestAsyncOperation SafeSend(UnityWebRequest req)
 	{
 		try { return req.SendWebRequest(); }
@@ -239,11 +234,74 @@ public class WorkshopClient : MonoBehaviour
 		}));
 	}
 
+	public static readonly string[] AllowedHosts =
+	{
+		"orangepcsimu.byethost4.com",
+		"byethost4.com",
+		"*.byethost4.com"
+	};
+
 	/// <summary>
-	/// Проверка/активация промокода на сервере (Giveaway).
-	/// Сервер хранит коды в promos.json (не в клиенте) и одноразовость по client-id.
+	/// Принимает сертификат ТОЛЬКО для хостов мастерской (byethost). Раньше принимал
+	/// любой сертификат (MITM-риск). Сертификат byethost легитимен (ZeroSSL, SAN
+	/// *.byethost4.com), поэтому обход нужен лишь на устройствах, где цепочка
+	/// ZeroSSL не полностью доверена. Сужаем до whitelist, а не «accept all».
 	/// </summary>
-	public void Redeem(string code, Action<int, float, string> done)
+	private class AcceptAllCerts : CertificateHandler
+	{
+		protected override bool ValidateCertificate(byte[] certificateData)
+		{
+			try
+			{
+				if (certificateData == null || certificateData.Length == 0) return false;
+				var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certificateData);
+				if (IsByethost(cert)) return true;
+				return false;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		private static bool IsByethost(System.Security.Cryptography.X509Certificates.X509Certificate2 cert)
+		{
+			// Primary: DNS (SAN) / CN. Falls back to Subject if GetNameInfo
+			// is restricted on the current platform (it throws on some Unity targets).
+			try
+			{
+				string dns = cert.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.DnsName, false);
+				if (!string.IsNullOrEmpty(dns))
+				{
+					foreach (var allowed in AllowedHosts)
+						if (HostMatches(allowed, dns)) return true;
+				}
+			}
+			catch { /* fall through to Subject */ }
+
+			try
+			{
+				string subject = cert.Subject ?? string.Empty;
+				if (subject.IndexOf("byethost4.com", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+			}
+			catch { /* ignore */ }
+
+			return false;
+		}
+
+		private static bool HostMatches(string pattern, string host)
+		{
+			if (pattern == host) return true;
+			if (pattern.StartsWith("*."))
+			{
+				string suffix = pattern.Substring(1); // ".byethost4.com"
+				return host.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) &&
+					   host.Length > suffix.Length;
+			}
+			return false;
+		}
+	}
+
 	{
 		StartCoroutine(SimplePost("?action=redeem&i=1", new List<IMultipartFormSection>
 		{

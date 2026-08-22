@@ -41,9 +41,13 @@ namespace SaveManagement
             if (string.IsNullOrEmpty(data))
                 throw new Exception("Save file is empty.");
 
-            string decrypted = SaveUtility.EncryptDecrypt(data);
+            // Новый формат: XOR + HMAC-подпись. Старый формат: только XOR (обратная совместимость).
+            string payload;
+            var integrity = SaveUtility.Decode(data, out payload);
+            if (integrity == SaveUtility.SaveIntegrity.Tampered)
+                throw new Exception("Save integrity check failed (file may be modified).");
 
-            string[] parts = decrypted.Split(new[] { '\n' }, 2);
+            string[] parts = payload.Split(new[] { '\n' }, 2);
 
             if (parts.Length < 1)
                 throw new Exception("Invalid save format.");
@@ -64,8 +68,8 @@ namespace SaveManagement
             string json = JsonUtility.ToJson(GameData);
             string content = Content ?? string.Empty;
 
-            string encrypted =
-                SaveUtility.EncryptDecrypt(json + "\n" + content);
+            // Пишем новый формат (XOR + HMAC).
+            string encrypted = SaveUtility.Encode(json + "\n" + content);
 
             string directory = System.IO.Path.GetDirectoryName(Path);
 

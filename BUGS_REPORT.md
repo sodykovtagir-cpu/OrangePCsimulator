@@ -331,3 +331,40 @@ server/README.md                                  (UPLOAD_KEY + промокод
 server/config.php      (UPLOAD_KEY)
 server/promos.json     (коды + награды)
 ```
+
+---
+
+## 12. Обновление 7 (22.08.2026) — целостность сейвов (HMAC) + cert-whitelist
+
+### 12.1 Целостность сейвов (было: XOR с константой 129)
+Сейв `.opc` раньше был просто `XOR(код 129)` — файл тривиально правился
+(подделка `coin`/`playtime`/`hardcore`). Теперь:
+- **Новый формат `OPC2:`**: `XOR( контент + HMAC-SHA256(контент) )`.
+- При загрузке `DataLoader` проверяет HMAC; если подпись не совпала →
+  **`Tampered`** → сейв не загружается (анти-чит на подделку монет/BТС).
+- **Обратная совместимость:** старые сейвы без маркера `OPC2:` читаются как
+  раньше (целостность `None`). Коллизии нет — JSON GameData всегда начинается с `{`.
+- **Переносимость сохранена:** HMAC считается общим (не по устройству) секретом,
+  поэтому сейвы из мастерской по-прежнему открываются на других устройствах.
+- `SaveUtility` переписан: `Encode`/`Decode` + `ReadPayload`;
+  `FileOverview` использует `ReadPayload` (шапка срезается, regex по текстуракам цел).
+- ⚠️ **Ограничение:** секрет зашит в бинарь (проект опенсорс), поэтому против
+  целенаправленного реверса это не защита — только против «ручной правки» файла.
+  Полная защита — только на сервере (подпись/валидация на бэкенде).
+
+### 12.2 ML/сертификат: whitelist вместо «принимать всё» (было 6.4)
+`WorkshopClient.AcceptAllCerts` принимал **любой** сертификат (MITM-риск).
+Проверил реальный серт `orangepcsimu.byethost4.com`: **легитимный** (ZeroSSL,
+SAN `byethost4.com`/`*.byethost4.com`, действует до 13.09.2026).
+- Теперь `ValidateCertificate` доверяет **только** сертификатам для `byethost4.com`
+  (по SAN/CN, с фолбэком на Subject) — whitelist, а не «accept all».
+- Рабочий обход сохранён (для устройств, где цепочка ZeroSSL не доверена).
+- Полное решение — реальный домен с валидным сертификатом и без обхода анти-бота.
+
+### 12.3 Файлы обновления
+```
+Assets/Scripts/Assembly-CSharp/SaveManagement/SaveUtility.cs  (Encode/Decode + HMAC)
+Assets/Scripts/Assembly-CSharp/SaveManagement/DataLoader.cs   (проверка целостности)
+Assets/Scripts/Assembly-CSharp/FileOverview.cs                (ReadPayload)
+Assets/Scripts/Assembly-CSharp/WorkshopClient.cs              (cert-whitelist)
+```
