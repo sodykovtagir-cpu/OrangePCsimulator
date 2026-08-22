@@ -123,19 +123,32 @@ public class MainMenu : MonoBehaviour
 
     public void LoadExample(string name)
     {
+        StartCoroutine(LoadExampleCo(name));
+    }
+
+    private IEnumerator LoadExampleCo(string name)
+    {
         string path = Path.Combine(Application.streamingAssetsPath, "Examples", name + ".pc");
+        string fileContents = null;
 #if UNITY_ANDROID || UNITY_WEBGL
-		string fileContents = null;
-		var req = UnityEngine.Networking.UnityWebRequest.Get(path);
-		var op = req.SendWebRequest();
-		while (!op.isDone) { }
-		if (req.result == UnityWebRequest.Result.Success)
+		// Нельзя блокировать главный поток ожиданием isDone:
+		// на WebGL запрос вообще не завершится (вечный фриз),
+		// на Android это ANR. Только yield.
+		using (var req = UnityEngine.Networking.UnityWebRequest.Get(path))
 		{
-			fileContents = req.downloadHandler.text;
+			yield return req.SendWebRequest();
+			if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
+				fileContents = req.downloadHandler.text;
 		}
 #else
-        string fileContents = File.ReadAllText(path);
+        if (File.Exists(path))
+            fileContents = File.ReadAllText(path);
 #endif
+        if (string.IsNullOrEmpty(fileContents))
+        {
+            Debug.LogError("[MainMenu] Failed to load example: " + name);
+            return;
+        }
         DataLoader lod = new DataLoader();
         lod.LoadFromString(fileContents);
         LoadFile(lod);

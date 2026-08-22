@@ -2,7 +2,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 
-#if UNITY_STANDALONE || UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEditor;
 #endif
 
@@ -324,7 +324,8 @@ public class FileInformation : MonoBehaviour
 	public void Export()
 	{
 		if (load == null || load.loader == null) return;
-#if UNITY_STANDALONE || UNITY_EDITOR
+#if UNITY_EDITOR
+		// EditorUtility существует только в редакторе (UNITY_STANDALONE его не имеет).
 		string savePath = EditorUtility.SaveFilePanel("Export Save File", "", Path.GetFileName(load.loader.Path), "sav");
 		if (!string.IsNullOrEmpty(savePath))
 			File.Copy(load.loader.Path, savePath, true);

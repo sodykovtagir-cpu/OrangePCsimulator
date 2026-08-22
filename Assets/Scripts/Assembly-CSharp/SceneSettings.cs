@@ -26,7 +26,10 @@ public class SceneSettings : MonoBehaviour
 
 	private bool hardcore = false;
 
-	private static Regex illegalName;
+	// Кэшируем один раз: раньше compiled-регэксп пересоздавался на каждый вызов.
+	private static readonly Regex illegalName = new Regex(
+		"[" + Regex.Escape(new string(Path.GetInvalidFileNameChars())) + "]",
+		RegexOptions.Compiled);
 
 	private void Start()
 	{
@@ -36,7 +39,8 @@ public class SceneSettings : MonoBehaviour
 
 	private void OnDestroy()
 	{
-		inputName.onValueChanged.RemoveListener(OnValueChangedName);
+		if (inputName != null)
+			inputName.onValueChanged.RemoveListener(OnValueChangedName);
 	}
 
 	public void NextRoom()
@@ -120,7 +124,7 @@ public class SceneSettings : MonoBehaviour
 
 	public static string CheckName(string name)
 	{
-		illegalName = new Regex("[" + Regex.Escape(new string(Path.GetInvalidFileNameChars())) + "]", RegexOptions.Compiled);
+		if (string.IsNullOrEmpty(name)) return "";
 		return illegalName.Replace(name, "");
 	}
 }
