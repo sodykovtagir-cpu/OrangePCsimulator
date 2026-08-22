@@ -156,3 +156,46 @@ Assets/Scripts/Assembly-CSharp/GameData.cs                 (workshopSourceId)
 Assets/Scenes/Menu.unity                                  (имена 3 кнопок панели публикации)
 Assets/Scripts/FakeGoogleMobileAds/                       (удалено)
 ```
+
+---
+
+## 7. Обновление 3 (22.08.2026) — фикс CS0535 + Remote Quiz с админки сайта
+
+### 7.1 Исправлена ошибка компиляции
+`Quiz.cs` (4,36): **CS0535 — не реализован `IPointerClickHandler.OnPointerClick`**.
+Причина: при вырезке рекламы в прошлом обновлении метод `OnPointerClick` был удалён,
+а интерфейс в объявлении класса остался. Метод возвращён (без рекламных зависимостей).
+
+### 7.2 Remote Quiz — вызов квиза с админки сайта
+- **Игра (клиент):**
+  - `Quiz.cs`: добавлен `TriggerRemote(link, title, body)` + корутина `PollRemote()`,
+    которая каждые `pollInterval` (по умолчанию **45 сек**, настраивается в инспекторе;
+    первый опрос через 3 сек) спрашивает сервер через `WorkshopClient.GetQuiz()`.
+  - `WorkshopClient.cs`: добавлены класс `WorkshopQuizResponse` и метод `GetQuiz`
+    (запрос `?action=quiz&i=1`, через тот же обход анти-бота byethost, что и мастерская).
+  - Когда сервер отвечает `show: true`, игра подставляет Title/Body в диалог
+    (ищет тексты `Title`/`Body` в панели диалога) и показывает ConfirmationDialog;
+    кнопка **Yes** открывает ссылку.
+- **Сервер (папка `server/` в репозитории):**
+  - `admin_quiz.php` — админ-панель: вход по паролю (по умолчанию `admin123`,
+    **поменять**), поля Link/Title/Body, кнопка «Send to game», просмотр/очистка pending.
+  - `api_quiz_snippet.php` — блок для вставки в `api.php`: обработка `action=quiz`,
+    **одноразовая выдача** (после отдачи файл `quiz_pending.json` очищается).
+  - `README.md` — инструкция по установке на byethost.
+- Квиз одноразовый: отправленный с админки квиз ждёт в `quiz_pending.json`,
+  пока его не заберёт первый опросивший клиент.
+
+### Файлы обновления
+```
+Assets/Scripts/Assembly-CSharp/Quiz.cs            (OnPointerClick, TriggerRemote, PollRemote)
+Assets/Scripts/Assembly-CSharp/WorkshopClient.cs   (GetQuiz + WorkshopQuizResponse)
+server/admin_quiz.php                              (новое, админка)
+server/api_quiz_snippet.php                        (новое, сниппет для api.php)
+server/README.md                                   (новое, инструкция)
+```
+
+### Что нужно сделать на сайте
+1. Загрузить `admin_quiz.php` в папку с `api.php` (byethost).
+2. Вставить блок из `api_quiz_snippet.php` в `api.php`.
+3. Поменять пароль в `admin_quiz.php`.
+4. Открыть `https://ВАШ_САЙТ/admin_quiz.php`, отправить квиз.

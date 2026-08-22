@@ -40,6 +40,16 @@ public class WorkshopUploadResponse
 	public int likes;
 }
 
+[Serializable]
+public class WorkshopQuizResponse
+{
+	public bool ok;
+	public bool show;
+	public string link;
+	public string title;
+	public string body;
+}
+
 public class WorkshopClient : MonoBehaviour
 {
 	public static readonly string[] ApiUrls =
@@ -105,6 +115,27 @@ public class WorkshopClient : MonoBehaviour
 	public void Download(WorkshopItem item, Action<string, string> done)
 	{
 		StartCoroutine(DownloadCo(item, done));
+	}
+
+	/// <summary>
+	/// Запрашивает отложенный квиз от админ-панели сайта (action=quiz).
+	/// Сервер отдаёт квиз один раз и очищает его.
+	/// </summary>
+	public void GetQuiz(Action<WorkshopQuizResponse, string> done)
+	{
+		StartCoroutine(GetQuizCo(done));
+	}
+
+	private IEnumerator GetQuizCo(Action<WorkshopQuizResponse, string> done)
+	{
+		string body = null;
+		string err = null;
+		yield return RequestGet("?action=quiz&i=1", (t, e) => { body = t; err = e; });
+		if (err != null) { done(null, err); yield break; }
+		WorkshopQuizResponse parsed = null;
+		try { parsed = JsonUtility.FromJson<WorkshopQuizResponse>(StripJunk(body)); }
+		catch (Exception e) { done(null, e.Message); yield break; }
+		done(parsed, null);
 	}
 
 	private IEnumerator DownloadCo(WorkshopItem item, Action<string, string> done)
