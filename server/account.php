@@ -34,6 +34,7 @@ if (!defined('MAIL_SMTP_USER'))     define('MAIL_SMTP_USER', '');
 if (!defined('MAIL_SMTP_PASS'))     define('MAIL_SMTP_PASS', '');
 if (!defined('MAIL_SMTP_SECURE'))   define('MAIL_SMTP_SECURE', 'tls'); // tls|ssl|''
 if (!defined('TELEGRAM_BOT_TOKEN')) define('TELEGRAM_BOT_TOKEN', '');
+if (!defined('TELEGRAM_BOT_USERNAME')) define('TELEGRAM_BOT_USERNAME', ''); // без @
 
 function load_json($f, $def = []) {
     if (!is_file($f)) return $def;
@@ -308,12 +309,21 @@ if ($action === 'tg_link' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strpos($tg, '@') !== 0) $tg = '@' . $tg;
     $users[$i]['tg_username'] = $tg;
 
-    // С ботом — создаём pending-код и отдаём deep-link. Игра отдаёт юзеру ссылку,
-    // юзер жмёт /start <code> в боте, telegram_bot.php подтверждает привязку.
+    // С ботом — создаём pending-код и отдаём deep-link на БОТА (ссылка для запуска
+    // бота с кодом). Подтверждение приходит через webhook (telegram_webhook.php),
+    // т.к. byethost не имеет исходящего доступа к api.telegram.org.
     if (TELEGRAM_BOT_TOKEN !== '') {
         $code = bin2hex(random_bytes(4));
-        $username = str_replace('@', '', $tg);
-        $link = 'https://t.me/' . $username . '?start=' . $code;
+        $bot = TELEGRAM_BOT_USERNAME !== '' ? str_replace('@', '', TELEGRAM_BOT_USERNAME) : '';
+        if ($bot === '') {
+            // Если юзернейм бота не задан — попробуем вытащить из токена не можем,
+            // отдаём мягкую привязку, чтобы не ломать фичу.
+            $granted = empty($users[$i]['tg_bonus']);
+            if ($granted) $users[$i]['tg_bonus'] = true;
+            save_users($users);
+            json_out(['ok' => true, 'pending' => false, 'tg' => $tg, 'tg_bonus' => true, 'granted' => $granted, 'btc' => $granted ? 5 : 0]);
+        }
+        $link = 'https://t.me/' . $bot . '?start=' . $code;
         $pending = load_json(TG_PENDING_FILE);
         $pending[$code] = ['user' => (int)$users[$i]['id'], 'email' => $users[$i]['email'], 'at' => time()];
         save_json(TG_PENDING_FILE, $pending);

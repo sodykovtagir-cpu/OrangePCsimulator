@@ -405,7 +405,7 @@ Assets/Scripts/Assembly-CSharp/WorkshopClient.cs              (cert-whitelist)
 ### 13.4 Файлы обновления
 ```
 server/account.php           (новое, сервер аккаунтов)
-server/telegram_bot.php      (новое, подтверждение привязки TG)
+server/telegram_webhook.php  (новое, подтверждение привязки TG через webhook)
 server/README.md             (документация аккаунтов)
 Hosting/workshop/config.example.php (mail/TG-константы)
 .gitignore                   (users.json, tg_pending.json)

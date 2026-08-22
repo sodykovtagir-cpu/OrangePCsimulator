@@ -81,10 +81,20 @@
 Чтобы реально слать код — настрой SMTP в `config.php` (`MAIL_SMTP_*`) или укажи
 ящик, откуда разрешена отправка. `MAIL_FROM` должен совпадать с твоим доменом.
 
-**Telegram-бот:** в `config.php` задай `TELEGRAM_BOT_TOKEN` (от @BotFather).
-Тогда `tg_link` вернёт deep-link `https://t.me/<bot>?start=<code>`, а
-`telegram_bot.php` (запускай периодически или `php telegram_bot.php loop`) подтвердит
-привязку по `/start <code>` и выдаст +5 BTC. Без токена — мягкая привязка (бонус сразу).
+**Telegram-бот (через WEBHOOK):** на бесплатном byethost **заблокирован исходящий
+доступ к `api.telegram.org`** (DNS не резолвится), поэтому поллер не работает.
+Подтверждение идёт через **webhook**:
+1. В `config.php` задай `TELEGRAM_BOT_TOKEN` (от @BotFather),
+   `TELEGRAM_BOT_USERNAME` (юзернейм бота без `@`) и `TELEGRAM_WEBHOOK_SECRET`.
+2. Один раз зарегистрируй webhook (с машины с доступом к Telegram):
+   ```
+   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://orangepcsimu.byethost4.com/workshop/telegram_webhook.php&secret_token=<SECRET>
+   ```
+3. `tg_link` вернёт deep-link `https://t.me/<BOT>?start=<code>`. Игрок жмёт
+   `/start <code>` у бота → Telegram шлёт update на webhook → `telegram_webhook.php`
+   подтверждает привязку и выдаёт +5 BTC (по секрету из заголовка).
+Без токена — мягкая привязка (бонус сразу). `users.json`, `tg_pending.json`
+в git **не клади** (уже в `.gitignore`).
 
 `users.json`, `tg_pending.json` в git **не клади** (уже в `.gitignore`).
 

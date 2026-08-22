@@ -26,4 +26,9 @@ define('MAIL_SMTP_SECURE', 'tls'); // tls | ssl | пусто
 
 // ---- Telegram-бот (привязка аккаунта + бонус 5 BTC) ----
 // Токен от @BotFather. Пусто = мягкая привязка без проверки ботом.
+// TELEGRAM_BOT_USERNAME — юзернейм бота БЕЗ @ (напр. 'orangepcsimubot').
+// TELEGRAM_WEBHOOK_SECRET — секрет для проверки webhook-запросов.
+// Подтверждение через WEBHOOK (byethost не имеет исходящего доступа к api.telegram.org).
 define('TELEGRAM_BOT_TOKEN', '');
+define('TELEGRAM_BOT_USERNAME', '');
+define('TELEGRAM_WEBHOOK_SECRET', '');
