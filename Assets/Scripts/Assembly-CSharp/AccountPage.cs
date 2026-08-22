@@ -3,44 +3,92 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Страница аккаунта (серверная, с двухэтапкой по email).
-/// Создаёт себя сама: чип в углу главного меню («Имя» / «Not logged in»),
-/// по клику открывает экран:
-///   - не вошёл  -> вход/регистрация (имя + пароль + почта) -> код из почты -> вход;
-///   - вошёл     -> профиль (имя, почта), управление своими сейвами (удалить/обновить),
-///                  настройка: привязать Telegram и получить +5 BTC.
 ///
-/// Зависит от WorkshopClient (сеть) и ServerAccounts (состояние).
-/// Чтобы подключить на сцене:  AccountPage.EnsureOnScene()  (или добавь компонент).
+/// Два режима:
+///  A) АВТО (по умолчанию): autoCreateUI = true и в инспекторе ничего не привязано —
+///     весь UI (чип + страница: вход/регистрация/код/профиль) создаётся сам в рантайме.
+///  B) ВРУЧНУЮ: привязать элементы ниже в инспекторе. Как только привязан хотя бы
+///     один из контейнеров (chipButton / pageRoot / loginPanel / registerPanel /
+///     verifyPanel / homePanel), авто-создание ОТКЛЮЧАЕТСЯ — код управляет твоими
+///     объектами. Тогда нужно привязать все контейнеры и элементы этой страницы.
+///
+/// Для ручной сборки:
+///   1. Создай в сцене панельки (по одной на каждый экран) и назови их как хочешь.
+///   2. Перетащи их в поля ниже.
+///   3. Кнопкам можно не вешать onClick в инспекторе — код подпишет их сам
+///      (Login/Register/Verify/Resend/LinkTelegram/Logout/Show/LoginTab/RegisterTab),
+///      либо вешай эти же публичные методы на onClick вручную.
 /// </summary>
 public class AccountPage : MonoBehaviour
 {
+	[Header("Auto create")]
+	[Tooltip("Если true и в инспекторе ниже ничего не привязано — UI создастся сам.")]
 	[SerializeField] private bool autoCreateUI = true;
+	[Tooltip("Размер страницы (только для авто-режима).")]
 	[SerializeField] private Vector2 panelSize = new Vector2(520f, 500f);
 
+	// ============ Bindings (свой UI) ============
+	[Header("Bindings — чип/кнопка аккаунта (лев-верх)")]
+	[Tooltip("Кнопка-чип в углу: показывает имя или 'Not logged in', клик открывает страницу.")]
+	[SerializeField] private Button chipButton;
+	[Tooltip("Текст внутри чипа (имя / 'Not logged in'). Если пусто — возьмётся из детей chipButton.")]
+	[SerializeField] private Text chipText;
+
+	[Header("Bindings — страница (корневая панель)")]
+	[SerializeField] private GameObject pageRoot;
+	[Tooltip("Кнопка закрытия страницы (X).")]
+	[SerializeField] private Button closeButton;
+	[Tooltip("Строка статуса вверху страницы.")]
+	[SerializeField] private Text statusText;
+
+	[Header("Bindings — экран 'Вход'")]
+	[SerializeField] private GameObject loginPanel;
+	[SerializeField] private InputField loginField;      // имя или email
+	[SerializeField] private InputField passwordField;
+	[SerializeField] private Button loginButton;         // -> Login()
+	[SerializeField] private Button toRegisterButton;    // -> RegisterTab()
+
+	[Header("Bindings — экран 'Регистрация'")]
+	[SerializeField] private GameObject registerPanel;
+	[SerializeField] private InputField regNameField;
+	[SerializeField] private InputField regEmailField;
+	[SerializeField] private InputField regPassField;
+	[SerializeField] private Button registerButton;      // -> Register()
+	[SerializeField] private Button toLoginButton;       // -> LoginTab()
+
+	[Header("Bindings — экран 'Подтверждение по email'")]
+	[SerializeField] private GameObject verifyPanel;
+	[SerializeField] private InputField codeField;
+	[SerializeField] private Button verifyButton;        // -> Verify()
+	[SerializeField] private Button resendButton;        // -> Resend()
+	[SerializeField] private Button backButton;          // -> LoginTab()
+
+	[Header("Bindings — экран 'Профиль' (после входа)")]
+	[SerializeField] private GameObject homePanel;
+	[SerializeField] private Text nameText;
+	[SerializeField] private Text emailText;
+	[Tooltip("Заголовок над списком сейвов (опционально).")]
+	[SerializeField] private Text savesTitle;
+	[Tooltip("Контейнер, куда спавнятся строки ваших сейвов (с кнопкой Удалить).")]
+	[SerializeField] private Transform savesList;
+	[SerializeField] private InputField tgField;         // @telegram_username
+	[SerializeField] private Button tgButton;            // -> LinkTelegram()
+	[SerializeField] private Text bonusText;
+	[SerializeField] private Button logoutButton;        // -> Logout()
+
+	// ============ Внутренние ссылки (авто или из bindings) ============
 	private enum Mode { Login, Register, Verify, Home }
 	private Mode mode = Mode.Login;
 
 	private GameObject chip;
-	private Text chipText;
 	private GameObject page;
 	private GameObject loginGroup;
 	private GameObject registerGroup;
 	private GameObject verifyGroup;
 	private GameObject homeGroup;
-	private Text statusText;
 
-	// inputs
-	private InputField loginField;
-	private InputField passwordField;
-	private InputField regNameField;
-	private InputField regEmailField;
-	private InputField regPassField;
-	private InputField codeField;
-	private InputField tgField;
-	private Text nameText;
-	private Text emailText;
-	private Text bonusText;
-	private Transform savesList;
+	private bool wired;
+	private bool usingBindings;
 
 	private static AccountPage instance;
 	public static AccountPage Instance { get { return instance; } }
@@ -53,7 +101,11 @@ public class AccountPage : MonoBehaviour
 
 	private void Start()
 	{
-		if (autoCreateUI) CreateUI();
+		usingBindings = HasBindings();
+		if (autoCreateUI && !usingBindings) CreateUI();
+		CommitBindings();
+		WireButtons();
+
 		ServerAccounts.StateChanged += OnStateChanged;
 		RefreshHomeIfLogged();
 	}
@@ -63,11 +115,21 @@ public class AccountPage : MonoBehaviour
 		ServerAccounts.StateChanged -= OnStateChanged;
 	}
 
-	// ================= Public =================
+	// ================= Public (и для инспектора OnClick) =================
 
 	public void Show()   { if (page != null) page.SetActive(true); Refresh(); }
 	public void Hide()   { if (page != null) page.SetActive(false); }
 	public void Toggle() { if (page == null) return; if (page.activeSelf) Hide(); else Show(); }
+
+	public void Login()        { DoLogin(); }
+	public void Register()     { DoRegister(); }
+	public void Verify()       { DoVerify(); }
+	public void Resend()       { DoResend(); }
+	public void LinkTelegram() { DoTgLink(); }
+	public void Logout()       { DoLogout(); }
+	public void LoginTab()     { SetMode(Mode.Login); }
+	public void RegisterTab()  { SetMode(Mode.Register); }
+	public void VerifyTab()    { SetMode(Mode.Verify); }
 
 	/// <summary>Гарантирует наличие панели аккаунта на текущей сцене.</summary>
 	public static void EnsureOnScene()
@@ -88,7 +150,49 @@ public class AccountPage : MonoBehaviour
 		if (page != null && ServerAccounts.LoggedIn) Refresh();
 	}
 
-	// ================= UI creation =================
+	private bool HasBindings()
+	{
+		return chipButton != null || pageRoot != null || loginPanel != null
+			|| registerPanel != null || verifyPanel != null || homePanel != null;
+	}
+
+	// ================= Связывание то, что привязано в инспекторе =================
+
+	private void CommitBindings()
+	{
+		if (!usingBindings) return;
+
+		if (chipButton != null)
+		{
+			chip = chipButton.gameObject;
+			if (chipText == null) chipText = chipButton.GetComponentInChildren<Text>();
+		}
+		if (pageRoot != null) page = pageRoot;
+		loginGroup    = loginPanel;
+		registerGroup = registerPanel;
+		verifyGroup   = verifyPanel;
+		homeGroup     = homePanel;
+	}
+
+	private void WireButtons()
+	{
+		if (wired) return;
+		wired = true;
+
+		if (chipButton != null)       { chipButton.onClick.RemoveAllListeners(); chipButton.onClick.AddListener(Toggle); }
+		if (closeButton != null)      { closeButton.onClick.RemoveAllListeners(); closeButton.onClick.AddListener(Hide); }
+		if (loginButton != null)      { loginButton.onClick.RemoveAllListeners(); loginButton.onClick.AddListener(Login); }
+		if (toRegisterButton != null) { toRegisterButton.onClick.RemoveAllListeners(); toRegisterButton.onClick.AddListener(RegisterTab); }
+		if (registerButton != null)   { registerButton.onClick.RemoveAllListeners(); registerButton.onClick.AddListener(Register); }
+		if (toLoginButton != null)    { toLoginButton.onClick.RemoveAllListeners(); toLoginButton.onClick.AddListener(LoginTab); }
+		if (verifyButton != null)     { verifyButton.onClick.RemoveAllListeners(); verifyButton.onClick.AddListener(Verify); }
+		if (resendButton != null)     { resendButton.onClick.RemoveAllListeners(); resendButton.onClick.AddListener(Resend); }
+		if (backButton != null)       { backButton.onClick.RemoveAllListeners(); backButton.onClick.AddListener(LoginTab); }
+		if (tgButton != null)         { tgButton.onClick.RemoveAllListeners(); tgButton.onClick.AddListener(LinkTelegram); }
+		if (logoutButton != null)     { logoutButton.onClick.RemoveAllListeners(); logoutButton.onClick.AddListener(Logout); }
+	}
+
+	// ================= UI creation (авто-режим) =================
 
 	private Canvas FindCanvas()
 	{
@@ -118,7 +222,7 @@ public class AccountPage : MonoBehaviour
 		var canvas = FindCanvas();
 		Transform parent = canvas != null ? canvas.transform : transform;
 
-		// --- Чип в левом верхнем углу ---
+		// --- Чип ---
 		if (chip == null)
 		{
 			chip = new GameObject("AccountChip", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -129,7 +233,7 @@ public class AccountPage : MonoBehaviour
 			rt.anchoredPosition = new Vector2(10f, -10f);
 			rt.sizeDelta = new Vector2(190f, 32f);
 			chip.GetComponent<Image>().color = new Color(0.13f, 0.13f, 0.13f, 0.95f);
-			chip.GetComponent<Button>().onClick.AddListener(Toggle);
+			chipButton = chip.GetComponent<Button>();
 			chipText = MakeText(chip.transform, "Label", "", TextAnchor.MiddleLeft, 14, Color.white);
 			chipText.rectTransform.anchorMin = Vector2.zero;
 			chipText.rectTransform.anchorMax = Vector2.one;
@@ -137,7 +241,7 @@ public class AccountPage : MonoBehaviour
 			chipText.rectTransform.offsetMax = new Vector2(-8f, 0f);
 		}
 
-		// --- Страница (по центру) ---
+		// --- Страница ---
 		if (page == null)
 		{
 			page = new GameObject("AccountPage", typeof(RectTransform), typeof(Image));
@@ -147,14 +251,13 @@ public class AccountPage : MonoBehaviour
 			rt.sizeDelta = panelSize;
 			page.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.98f);
 
-			// Заголовок
 			var title = MakeText(page.transform, "Title", "Account", TextAnchor.MiddleCenter, 26, new Color(1f, 0.53f, 0f));
 			title.rectTransform.anchorMin = new Vector2(0f, 1f);
 			title.rectTransform.anchorMax = new Vector2(1f, 1f);
 			title.rectTransform.anchoredPosition = new Vector2(0f, -30f);
 			title.rectTransform.sizeDelta = new Vector2(0f, 50f);
 
-			// Кнопка закрыть (маленькая, в правом верхнем углу)
+			// Кнопка закрыть
 			{
 				var close = new GameObject("Close", typeof(RectTransform), typeof(Image), typeof(Button));
 				close.transform.SetParent(page.transform, false);
@@ -167,20 +270,19 @@ public class AccountPage : MonoBehaviour
 				var ctx = close.AddComponent<Text>();
 				ctx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 				ctx.alignment = TextAnchor.MiddleCenter; ctx.color = Color.white; ctx.fontSize = 16; ctx.text = "X";
-				close.GetComponent<Button>().onClick.AddListener(Hide);
+				closeButton = close.GetComponent<Button>();
 			}
 
-			// Статус
 			statusText = MakeText(page.transform, "Status", "", TextAnchor.MiddleCenter, 14, Color.white);
 			statusText.rectTransform.anchorMin = new Vector2(0f, 1f);
 			statusText.rectTransform.anchorMax = new Vector2(1f, 1f);
 			statusText.rectTransform.anchoredPosition = new Vector2(0f, -74f);
 			statusText.rectTransform.sizeDelta = new Vector2(-40f, 40f);
 
-			loginGroup    = MakeGroup(page.transform, "LoginGroup", new Vector2(0f, 20f));
-			registerGroup = MakeGroup(page.transform, "RegisterGroup", new Vector2(0f, 20f));
-			verifyGroup   = MakeGroup(page.transform, "VerifyGroup", new Vector2(0f, 20f));
-			homeGroup     = MakeGroup(page.transform, "HomeGroup", new Vector2(0f, 60f));
+			loginGroup    = MakeGroup(page.transform, "LoginGroup");
+			registerGroup = MakeGroup(page.transform, "RegisterGroup");
+			verifyGroup   = MakeGroup(page.transform, "VerifyGroup");
+			homeGroup     = MakeGroup(page.transform, "HomeGroup");
 
 			BuildLogin();
 			BuildRegister();
@@ -196,10 +298,10 @@ public class AccountPage : MonoBehaviour
 		var g = loginGroup.transform;
 		MakeText(g, "L1", "Sign in", TextAnchor.MiddleCenter, 18, Color.white);
 
-		loginField   = MakeInput(g, "LoginField", "Username or email", false, new Vector2(0f, -46f));
-		passwordField = MakeInput(g, "PassField", "Password", true, new Vector2(0f, -84f));
-		MakeButton(g, "LoginBtn", "Log in", new Vector2(0f, -128f), () => DoLogin());
-		MakeButton(g, "ToRegBtn", "No account? Register", new Vector2(0f, -166f), () => SetMode(Mode.Register));
+		loginField     = MakeInput(g, "LoginField", "Username or email", false, new Vector2(0f, -46f));
+		passwordField  = MakeInput(g, "PassField", "Password", true, new Vector2(0f, -84f));
+		loginButton    = MakeButton(g, "LoginBtn", "Log in", new Vector2(0f, -128f));
+		toRegisterButton = MakeButton(g, "ToRegBtn", "No account? Register", new Vector2(0f, -166f));
 	}
 
 	private void BuildRegister()
@@ -210,8 +312,8 @@ public class AccountPage : MonoBehaviour
 		regNameField  = MakeInput(g, "NameField", "Nickname", false, new Vector2(0f, -46f));
 		regEmailField = MakeInput(g, "EmailField", "Email", false, new Vector2(0f, -84f));
 		regPassField  = MakeInput(g, "PassField", "Password (min 6)", true, new Vector2(0f, -122f));
-		MakeButton(g, "RegBtn", "Register & send code", new Vector2(0f, -166f), () => DoRegister());
-		MakeButton(g, "ToLoginBtn", "Back to login", new Vector2(0f, -204f), () => SetMode(Mode.Login));
+		registerButton = MakeButton(g, "RegBtn", "Register & send code", new Vector2(0f, -166f));
+		toLoginButton  = MakeButton(g, "ToLoginBtn", "Back to login", new Vector2(0f, -204f));
 	}
 
 	private void BuildVerify()
@@ -220,10 +322,10 @@ public class AccountPage : MonoBehaviour
 		MakeText(g, "V1", "Check your email", TextAnchor.MiddleCenter, 18, Color.white);
 		MakeText(g, "V2", "Enter the 6-digit code sent to your email.", TextAnchor.MiddleCenter, 13, new Color(0.7f, 0.7f, 0.7f), new Vector2(0f, -34f));
 
-		codeField = MakeInput(g, "CodeField", "Code", false, new Vector2(0f, -74f));
-		MakeButton(g, "VerifyBtn", "Confirm", new Vector2(0f, -118f), () => DoVerify());
-		MakeButton(g, "ResendBtn", "Resend code", new Vector2(0f, -156f), () => DoResend());
-		MakeButton(g, "BackBtn", "Back", new Vector2(0f, -194f), () => SetMode(Mode.Login));
+		codeField     = MakeInput(g, "CodeField", "Code", false, new Vector2(0f, -74f));
+		verifyButton  = MakeButton(g, "VerifyBtn", "Confirm", new Vector2(0f, -118f));
+		resendButton  = MakeButton(g, "ResendBtn", "Resend code", new Vector2(0f, -156f));
+		backButton    = MakeButton(g, "BackBtn", "Back", new Vector2(0f, -194f));
 	}
 
 	private void BuildHome()
@@ -241,9 +343,8 @@ public class AccountPage : MonoBehaviour
 		emailText.rectTransform.anchoredPosition = new Vector2(0f, -44f);
 		emailText.rectTransform.sizeDelta = new Vector2(0f, 24f);
 
-		MakeText(g, "SavesTitle", "Your saves", TextAnchor.MiddleLeft, 16, Color.white, new Vector2(0f, -84f));
+		savesTitle = MakeText(g, "SavesTitle", "Your saves", TextAnchor.MiddleLeft, 16, Color.white, new Vector2(0f, -84f));
 
-		// Список сейвов
 		var listGo = new GameObject("SavesList", typeof(RectTransform));
 		listGo.transform.SetParent(g, false);
 		var lrt = listGo.GetComponent<RectTransform>();
@@ -253,16 +354,15 @@ public class AccountPage : MonoBehaviour
 		lrt.sizeDelta = new Vector2(0f, 170f);
 		savesList = listGo.transform;
 
-		// Telegram
 		tgField = MakeInput(g, "TgField", "@telegram_username", false, new Vector2(-90f, -330f));
-		MakeButton(g, "TgBtn", "Link TG + 5 BTC", new Vector2(90f, -330f), () => DoTgLink());
+		tgButton = MakeButton(g, "TgBtn", "Link TG + 5 BTC", new Vector2(90f, -330f));
 
 		bonusText = MakeText(g, "Bonus", "", TextAnchor.MiddleCenter, 13, new Color(0.7f, 0.7f, 0.7f), new Vector2(0f, -368f));
 
-		MakeButton(g, "LogoutBtn", "Log out", new Vector2(0f, -412f), DoLogout);
+		logoutButton = MakeButton(g, "LogoutBtn", "Log out", new Vector2(0f, -412f));
 	}
 
-	// ================= Modes =================
+	// ================= Modes & Refresh =================
 
 	private void SetMode(Mode m)
 	{
@@ -272,12 +372,15 @@ public class AccountPage : MonoBehaviour
 
 	private void Refresh()
 	{
-		if (loginGroup == null) return;
+		if (loginGroup == null && registerGroup == null && verifyGroup == null && homeGroup == null)
+			return;
+
 		bool logged = ServerAccounts.LoggedIn;
-		loginGroup.SetActive(!logged && mode == Mode.Login);
-		registerGroup.SetActive(!logged && mode == Mode.Register);
-		verifyGroup.SetActive(!logged && mode == Mode.Verify);
-		homeGroup.SetActive(logged);
+
+		if (loginGroup != null)    loginGroup.SetActive(!logged && mode == Mode.Login);
+		if (registerGroup != null) registerGroup.SetActive(!logged && mode == Mode.Register);
+		if (verifyGroup != null)   verifyGroup.SetActive(!logged && mode == Mode.Verify);
+		if (homeGroup != null)     homeGroup.SetActive(logged);
 
 		if (chipText != null)
 			chipText.text = logged ? ServerAccounts.Name : "Not logged in";
@@ -289,17 +392,19 @@ public class AccountPage : MonoBehaviour
 		}
 		else
 		{
-			nameText.text = ServerAccounts.Name;
-			emailText.text = ServerAccounts.Email;
-			bonusText.text = ServerAccounts.BonusClaimed
-				? "Telegram bonus already claimed."
-				: "Link your Telegram to get a bonus: +5 BTC";
+			if (nameText != null)  nameText.text = ServerAccounts.Name;
+			if (emailText != null) emailText.text = ServerAccounts.Email;
+			if (bonusText != null)
+				bonusText.text = ServerAccounts.BonusClaimed
+					? "Telegram bonus already claimed."
+					: "Link your Telegram to get a bonus: +5 BTC";
 			RebuildSaves();
 		}
 	}
 
 	private void RebuildSaves()
 	{
+		if (savesList == null) return;
 		for (int i = savesList.childCount - 1; i >= 0; i--)
 			Destroy(savesList.GetChild(i).gameObject);
 		var my = ServerAccounts.MySaves;
@@ -498,7 +603,7 @@ public class AccountPage : MonoBehaviour
 
 	// ================= UI widgets =================
 
-	private static GameObject MakeGroup(Transform parent, string name, Vector2 center)
+	private static GameObject MakeGroup(Transform parent, string name)
 	{
 		var go = new GameObject(name, typeof(RectTransform));
 		go.transform.SetParent(parent, false);
@@ -565,12 +670,7 @@ public class AccountPage : MonoBehaviour
 		return tx;
 	}
 
-	private static Button MakeButton(Transform parent, string name, string label, UnityEngine.Events.UnityAction click)
-	{
-		return MakeButton(parent, name, label, new Vector2(0f, -40f), click);
-	}
-
-	private static Button MakeButton(Transform parent, string name, string label, Vector2 pos, UnityEngine.Events.UnityAction click)
+	private static Button MakeButton(Transform parent, string name, string label, Vector2 pos)
 	{
 		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
 		go.transform.SetParent(parent, false);
@@ -582,9 +682,6 @@ public class AccountPage : MonoBehaviour
 		var tx = go.AddComponent<Text>();
 		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 		tx.alignment = TextAnchor.MiddleCenter; tx.color = Color.black; tx.fontSize = 14; tx.text = label;
-		go.GetComponent<Button>().onClick.AddListener(click);
 		return go.GetComponent<Button>();
 	}
-
 }
-
