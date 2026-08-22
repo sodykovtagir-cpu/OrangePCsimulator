@@ -283,11 +283,20 @@ public class FileInformation : MonoBehaviour
 		if (uploadButton != null) uploadButton.SetActive(!owner);
 		if (updateButton != null) updateButton.SetActive(owner);
 		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(owner);
-		var all = GetComponentsInChildren<Transform>(true);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", !owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Delete", owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "DeleteWorkshop", owner);
+	}
+
+	private static void ToggleNamed(Transform root, string name, bool on)
+	{
+		if (root == null) return;
+		var all = root.GetComponentsInChildren<Transform>(true);
 		for (int i = 0; i < all.Length; i++)
 		{
-			if (all[i] != null && all[i].name == "Upload" && uploadButton == null)
-				all[i].gameObject.SetActive(!owner);
+			if (all[i] != null && all[i] != root && all[i].name == name)
+				all[i].gameObject.SetActive(on);
 		}
 	}
 
