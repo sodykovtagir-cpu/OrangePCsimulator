@@ -267,9 +267,14 @@ public class AccountPage : MonoBehaviour
 				crt.anchoredPosition = new Vector2(-10f, -10f);
 				crt.sizeDelta = new Vector2(34f, 34f);
 				close.GetComponent<Image>().color = new Color(0.3f, 0.3f, 0.3f, 1f);
-				var ctx = close.AddComponent<Text>();
-				ctx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-				ctx.alignment = TextAnchor.MiddleCenter; ctx.color = Color.white; ctx.fontSize = 16; ctx.text = "X";
+				// Text нельзя вешать на тот же GameObject, что и Image (оба — Graphic).
+				// Поэтому подпись создаём дочерним объектом.
+				var ctx = MakeText(close.transform, "Label", "X", TextAnchor.MiddleCenter, 16, Color.white);
+				var clt = ctx.rectTransform;
+				clt.anchorMin = Vector2.zero;
+				clt.anchorMax = Vector2.one;
+				clt.offsetMin = Vector2.zero;
+				clt.offsetMax = Vector2.zero;
 				closeButton = close.GetComponent<Button>();
 			}
 
@@ -440,9 +445,13 @@ public class AccountPage : MonoBehaviour
 		go.GetComponent<Image>().color = new Color(0.8f, 0.2f, 0.2f, 1f);
 		var le = go.AddComponent<LayoutElement>();
 		le.preferredWidth = width; le.preferredHeight = 30f;
-		var tx = go.AddComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.alignment = TextAnchor.MiddleCenter; tx.color = Color.white; tx.fontSize = 13; tx.text = label;
+		// Text — дочерний объект, чтобы не конфликтовать с Image на самой кнопке.
+		var tx = MakeText(go.transform, "Label", label, TextAnchor.MiddleCenter, 13, Color.white);
+		var trt = tx.rectTransform;
+		trt.anchorMin = Vector2.zero;
+		trt.anchorMax = Vector2.one;
+		trt.offsetMin = Vector2.zero;
+		trt.offsetMax = Vector2.zero;
 		go.GetComponent<Button>().onClick.AddListener(click);
 	}
 
@@ -679,9 +688,13 @@ public class AccountPage : MonoBehaviour
 		rt.anchoredPosition = pos;
 		rt.sizeDelta = new Vector2(200f, 32f);
 		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
-		var tx = go.AddComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.alignment = TextAnchor.MiddleCenter; tx.color = Color.black; tx.fontSize = 14; tx.text = label;
+		// Text — дочерний объект, чтобы не конфликтовать с Image на самой кнопке.
+		var tx = MakeText(go.transform, "Label", label, TextAnchor.MiddleCenter, 14, Color.black);
+		var trt = tx.rectTransform;
+		trt.anchorMin = Vector2.zero;
+		trt.anchorMax = Vector2.one;
+		trt.offsetMin = Vector2.zero;
+		trt.offsetMax = Vector2.zero;
 		return go.GetComponent<Button>();
 	}
 }
