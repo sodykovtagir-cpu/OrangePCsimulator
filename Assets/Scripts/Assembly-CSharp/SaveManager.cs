@@ -107,8 +107,8 @@ public class SaveManager : MonoBehaviour
         if (string.IsNullOrEmpty(Loader.Path)) readOnly = true;
         if (!string.IsNullOrEmpty(Loader.GameData.sign)) readOnly = true;
 
-        Main.Instance.example = readOnly;
-        if (Main.Instance.example) saveButton.SetActive(false);
+		Main.Instance.example = readOnly;
+		if (Main.Instance.example && saveButton != null) saveButton.SetActive(false);
 
         Main.Instance.playTime = Loader.GameData.playtime;
         Main.Instance.SetMoney(Loader.GameData.coin, true);
