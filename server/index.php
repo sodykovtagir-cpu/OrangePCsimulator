@@ -42,9 +42,7 @@ function cover_style($it) {
         <small>Мастерская сохранений</small>
       </div>
     </div>
-    <div class="nav">
-      <a href="admin.php" class="btn small">Админка</a>
-    </div>
+    <div class="nav"></div>
   </div>
 
   <input type="text" class="search" id="q" placeholder="Поиск по названию или автору..." autofocus>
@@ -84,7 +82,7 @@ function cover_style($it) {
   </div>
   <?php endif; ?>
 
-  <div class="footer">Orange PC Simulator · мастерская · <a href="admin.php">вход для модерации</a></div>
+  <div class="footer">Orange PC Simulator · мастерская</div>
 </div>
 <script>
 var q = document.getElementById('q');
