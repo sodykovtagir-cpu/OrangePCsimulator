@@ -39,6 +39,9 @@ public class FileInformation : MonoBehaviour
 	[SerializeField] private RawImage wsCover;
 	[SerializeField] private Text wsStatus;
 
+	private static string Tr(string key) { return Localization.GetText(key); }
+	private static string Tr(string key, object a) { return string.Format(Localization.GetText(key), a); }
+
 	private byte[] coverJpg;
 	private FileMenu.Load load;
 	private MenuManager menuManager;
@@ -131,11 +134,11 @@ public class FileInformation : MonoBehaviour
 		EnsureWorkshopClient();
 		if (!ServerAccounts.LoggedIn)
 		{
-			SetWsStatus("Login to publish");
+			SetWsStatus(Tr("Login to publish"));
 			return;
 		}
 
-		SetWsStatus("Checking listing...");
+		SetWsStatus(Tr("Checking listing..."));
 		EnsureMeThen(LookupListing);
 	}
 
@@ -150,12 +153,12 @@ public class FileInformation : MonoBehaviour
 			{
 				ForgetListing();
 				FillPublishForm(null);
-				SetWsStatus("Listing gone. Publish again as new.");
+				SetWsStatus(Tr("Listing gone. Publish again as new."));
 				RefreshWorkshopButtons();
 				return;
 			}
 			FillPublishForm(found);
-			SetWsStatus(IsOwner() ? "Edit and press [Update]" : "New upload");
+			SetWsStatus(IsOwner() ? Tr("Edit and press [Update]") : Tr("New upload"));
 			RefreshWorkshopButtons();
 			if (found != null && found.has_cover && wsCover != null)
 			{
@@ -341,7 +344,7 @@ public class FileInformation : MonoBehaviour
 			var tex = new Texture2D(2, 2);
 			if (!tex.LoadImage(File.ReadAllBytes(path)))
 			{
-				SetWsStatus("Bad image");
+				SetWsStatus(Tr("Bad image"));
 				return;
 			}
 			if (wsCover != null)
@@ -352,11 +355,11 @@ public class FileInformation : MonoBehaviour
 			coverJpg = tex.EncodeToJPG(70);
 			if (coverJpg != null && coverJpg.Length > 300000)
 				coverJpg = tex.EncodeToJPG(40);
-			SetWsStatus("Cover ready (" + (coverJpg != null ? coverJpg.Length / 1024 : 0) + " KB)");
+			SetWsStatus(Tr("Cover ready ({0} KB)", coverJpg != null ? coverJpg.Length / 1024 : 0));
 		}
 		catch
 		{
-			SetWsStatus("Bad image");
+			SetWsStatus(Tr("Bad image"));
 		}
 	}
 
@@ -365,7 +368,7 @@ public class FileInformation : MonoBehaviour
 		if (load == null || load.loader == null) return;
 		if (!ServerAccounts.LoggedIn)
 		{
-			SetWsStatus("Login to publish");
+			SetWsStatus(Tr("Login to publish"));
 			return;
 		}
 		EnsureWorkshopClient();
@@ -374,7 +377,7 @@ public class FileInformation : MonoBehaviour
 		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : "Player";
 		string desc = wsDesc != null ? wsDesc.text : "";
 		ApplyPublishedMeta(title, desc, author, write: false);
-		SetWsStatus("Uploading...");
+		SetWsStatus(Tr("Uploading..."));
 		if (IsOwner())
 		{
 			int wid = OwnerId();
@@ -387,7 +390,7 @@ public class FileInformation : MonoBehaviour
 						if (IsGoneError(err))
 						{
 							ForgetListing();
-							SetWsStatus("Listing gone. Publishing as new...");
+							SetWsStatus(Tr("Listing gone. Publishing as new..."));
 							ConfirmPublish();
 							return;
 						}
@@ -399,7 +402,7 @@ public class FileInformation : MonoBehaviour
 					load.loader.GameData.workshopId = id > 0 ? id : wid;
 					load.loader.GameData.workshopKey = "";
 					ApplyPublishedMeta(title, desc, author, write: true);
-					SetWsStatus("Updated");
+					SetWsStatus(Tr("Updated"));
 					RefreshWorkshopButtons();
 				});
 		}
@@ -412,7 +415,7 @@ public class FileInformation : MonoBehaviour
 				load.loader.GameData.workshopId = id;
 				load.loader.GameData.workshopKey = "";
 				ApplyPublishedMeta(title, desc, author, write: true);
-				SetWsStatus("Published #" + id);
+				SetWsStatus(Tr("Published #{0}", id));
 				RefreshWorkshopButtons();
 			});
 		}
@@ -422,14 +425,14 @@ public class FileInformation : MonoBehaviour
 	{
 		if (!IsOwner()) return;
 		EnsureWorkshopClient();
-		SetWsStatus("Deleting...");
+		SetWsStatus(Tr("Deleting..."));
 		int wid = OwnerId();
 		string wkey = OwnerKey();
 		WorkshopClient.Instance.DeleteSave(wid, wkey, err =>
 		{
 			if (err != null && !IsGoneError(err)) { SetWsStatus(err); return; }
 			ForgetListing();
-			SetWsStatus("Removed from workshop");
+			SetWsStatus(Tr("Removed from workshop"));
 			RefreshWorkshopButtons();
 		});
 	}

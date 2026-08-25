@@ -91,6 +91,17 @@ public class AccountPage : MonoBehaviour
 	private static AccountPage instance;
 	public static AccountPage Instance { get { return instance; } }
 
+	private static string Tr(string key)
+	{
+		return Localization.GetText(key);
+	}
+
+	private static string Tr(string key, object a)
+	{
+		return string.Format(Localization.GetText(key), a);
+	}
+
+
 	private void Awake()
 	{
 		if (instance != null && instance != this) { Destroy(gameObject); return; }
@@ -107,6 +118,7 @@ public class AccountPage : MonoBehaviour
 		if (subscribed)
 		{
 			ServerAccounts.StateChanged -= OnStateChanged;
+			Localization.LanguageChanged -= OnLanguageChanged;
 			subscribed = false;
 		}
 		if (instance == this) instance = null;
@@ -211,6 +223,12 @@ public class AccountPage : MonoBehaviour
 		if (opened || (page != null && page.activeSelf)) Refresh();
 	}
 
+	private void OnLanguageChanged()
+	{
+		RefreshChip();
+		if (opened || (page != null && page.activeSelf)) Refresh();
+	}
+
 	// ================= Связывание то, что привязано в инспекторе =================
 
 	private void CommitBindings()
@@ -240,7 +258,7 @@ public class AccountPage : MonoBehaviour
 	{
 		if (subscribed) return;
 		ServerAccounts.StateChanged += OnStateChanged;
-		Localization.LanguageChanged += RefreshChip;
+		Localization.LanguageChanged += OnLanguageChanged;
 		subscribed = true;
 	}
 
@@ -353,8 +371,8 @@ public class AccountPage : MonoBehaviour
 		if (chipText == null && chipButton != null)
 			chipText = chipButton.GetComponentInChildren<Text>();
 		if (chipText == null) return;
-		string label = ServerAccounts.LoggedIn ? ServerAccounts.Name : NotLoggedChip;
-		if (string.IsNullOrEmpty(label)) label = NotLoggedChip;
+		string label = ServerAccounts.LoggedIn ? ServerAccounts.Name : Tr(NotLoggedChip);
+		if (string.IsNullOrEmpty(label)) label = Tr(NotLoggedChip);
 		chipText.text = label;
 		var loc = chipText.GetComponent<LocalizationText>();
 		if (loc != null) loc.enabled = false;
@@ -391,8 +409,8 @@ public class AccountPage : MonoBehaviour
 
 		if (!logged)
 		{
-			SetStatus(mode == Mode.Register ? "Create your account with email." :
-			          mode == Mode.Verify ? "Code sent to your email." : "Sign in to sync your profile.");
+			SetStatus(mode == Mode.Register ? Tr("Create your account with email.") :
+			          mode == Mode.Verify ? Tr("Code sent to your email.") : Tr("Sign in to sync your profile."));
 			return;
 		}
 
@@ -400,8 +418,8 @@ public class AccountPage : MonoBehaviour
 		if (emailText != null) emailText.text = ServerAccounts.Email;
 		if (bonusText != null)
 			bonusText.text = ServerAccounts.BonusClaimed
-				? "Telegram bonus already claimed."
-				: "Link your Telegram to get a bonus: +5 BTC";
+				? Tr("Telegram bonus already claimed.")
+				: Tr("Link your Telegram to get a bonus: +5 BTC");
 		RebuildSaves();
 	}
 
@@ -458,7 +476,7 @@ public class AccountPage : MonoBehaviour
 
 	private void ShowEmptySaves()
 	{
-		var empty = MakeText(savesList, "Empty", "You haven't published any saves yet.", TextAnchor.MiddleLeft, 18, new Color(0.75f, 0.75f, 0.75f));
+		var empty = MakeText(savesList, "Empty", Tr("You haven't published any saves yet."), TextAnchor.MiddleLeft, 18, new Color(0.75f, 0.75f, 0.75f));
 		empty.horizontalOverflow = HorizontalWrapMode.Wrap;
 		empty.verticalOverflow = VerticalWrapMode.Overflow;
 		empty.resizeTextForBestFit = false;
@@ -596,7 +614,7 @@ public class AccountPage : MonoBehaviour
 		var wc = WorkshopClient.Ensure();
 		if (wc == null)
 		{
-			SetStatus("Network client missing.");
+			SetStatus(Tr("Network client missing."));
 			return null;
 		}
 		return wc;
@@ -606,18 +624,18 @@ public class AccountPage : MonoBehaviour
 	{
 		string login = FieldText(loginField);
 		string pass = passwordField != null && passwordField.text != null ? passwordField.text : "";
-		if (login == "" || pass == "") { SetStatus("Enter login and password."); return; }
+		if (login == "" || pass == "") { SetStatus(Tr("Enter login and password.")); return; }
 		var wc = Net();
 		if (wc == null) return;
-		SetStatus("Signing in...");
+		SetStatus(Tr("Signing in..."));
 		wc.AccountLogin(login, pass, (r, err) =>
 		{
-			if (err != null) { SetStatus("Network error: " + err); return; }
-			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Login failed."); return; }
+			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
+			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Login failed.")); return; }
 			ServerAccounts.SetSession(r.token, r.name, r.email);
 			LoadMe();
 			SetMode(Mode.Home);
-			SetStatus("Welcome, " + r.name);
+			SetStatus(Tr("Welcome, {0}", r.name));
 		});
 	}
 
@@ -628,20 +646,20 @@ public class AccountPage : MonoBehaviour
 		string pass = regPassField != null && regPassField.text != null ? regPassField.text : "";
 		if (name.Length < 3 || email == "" || pass.Length < 6)
 		{
-			SetStatus("Name ≥3, valid email, password ≥6.");
+			SetStatus(Tr("Name ≥3, valid email, password ≥6."));
 			return;
 		}
 		var wc = Net();
 		if (wc == null) return;
-		SetStatus("Registering...");
+		SetStatus(Tr("Registering..."));
 		wc.AccountRegister(name, email, pass, (r, err) =>
 		{
-			if (err != null) { SetStatus("Network error: " + err); return; }
-			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Register failed."); return; }
+			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
+			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Register failed.")); return; }
 			ServerAccounts.SetSession("", r.name, email);
 			recallEmail = email;
 			EnterVerify(Mode.Register);
-			SetStatus(r.sent ? "Code sent! Check your email." : (r.sent == false ? "Code generated (email not sent by host). Enter it below if you have it." : "Verify your email."));
+			SetStatus(r.sent ? Tr("Code sent! Check your email.") : (r.sent == false ? Tr("Code generated (email not sent by host). Enter it below if you have it.") : Tr("Verify your email.")));
 		});
 	}
 
@@ -651,17 +669,17 @@ public class AccountPage : MonoBehaviour
 	{
 		string email = recallEmail != "" ? recallEmail : ServerAccounts.Email;
 		string code = FieldText(codeField);
-		if (code == "") { SetStatus("Enter the code from email."); return; }
+		if (code == "") { SetStatus(Tr("Enter the code from email.")); return; }
 		var wc = Net();
 		if (wc == null) return;
-		SetStatus("Verifying...");
+		SetStatus(Tr("Verifying..."));
 		wc.AccountVerify(email, code, (r, err) =>
 		{
-			if (err != null) { SetStatus("Network error: " + err); return; }
-			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Wrong code."); return; }
+			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
+			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Wrong code.")); return; }
 			ServerAccounts.SetSession(r.token, r.name, r.email);
 			recallEmail = "";
-			SetStatus("Verified! Welcome, " + r.name);
+			SetStatus(Tr("Verified! Welcome, {0}", r.name));
 			SetMode(Mode.Home);
 			LoadMe();
 		});
@@ -670,15 +688,15 @@ public class AccountPage : MonoBehaviour
 	private void DoResend()
 	{
 		string email = recallEmail != "" ? recallEmail : ServerAccounts.Email;
-		if (email == "") { SetStatus("Enter email first."); return; }
+		if (email == "") { SetStatus(Tr("Enter email first.")); return; }
 		var wc = Net();
 		if (wc == null) return;
-		SetStatus("Sending...");
+		SetStatus(Tr("Sending..."));
 		wc.AccountResend(email, (r, err) =>
 		{
-			if (err != null) { SetStatus("Network error: " + err); return; }
-			if (r != null && r.ok) SetStatus("Code re-sent. Check your email.");
-			else SetStatus("Could not resend.");
+			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
+			if (r != null && r.ok) SetStatus(Tr("Code re-sent. Check your email."));
+			else SetStatus(Tr("Could not resend."));
 		});
 	}
 
@@ -701,28 +719,28 @@ public class AccountPage : MonoBehaviour
 	private void DoTgLink()
 	{
 		string tg = FieldText(tgField);
-		if (tg == "") { SetStatus("Enter your Telegram username."); return; }
+		if (tg == "") { SetStatus(Tr("Enter your Telegram username.")); return; }
 		var wc = Net();
 		if (wc == null) return;
-		SetStatus("Linking Telegram...");
+		SetStatus(Tr("Linking Telegram..."));
 		wc.TgLink(ServerAccounts.Token, tg, (r, err) =>
 		{
-			if (err != null) { SetStatus("Network error: " + err); return; }
-			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Link failed."); return; }
+			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
+			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Link failed.")); return; }
 			if (!string.IsNullOrEmpty(r.link))
 			{
-				SetStatus("Open in Telegram and press Start: " + r.link);
+				SetStatus(Tr("Open in Telegram and press Start: {0}", r.link));
 				return;
 			}
 			if (r.btc > 0f)
 			{
 				BitcoinManager.Bitcoin = (float)BitcoinManager.Bitcoin + r.btc;
 				ServerAccounts.SetBonusClaimed();
-				SetStatus("Linked! Bonus +" + r.btc + " BTC added.");
+				SetStatus(Tr("Linked! Bonus +{0} BTC added.", r.btc));
 			}
 			else
 			{
-				SetStatus("Telegram linked.");
+				SetStatus(Tr("Telegram linked."));
 			}
 			LoadMe();
 		});
@@ -734,8 +752,8 @@ public class AccountPage : MonoBehaviour
 		if (wc == null) return;
 		wc.DeleteSave(id, owner, err =>
 		{
-			if (err != null) { SetStatus("Delete: " + err); return; }
-			SetStatus("Deleted #" + id);
+			if (err != null) { SetStatus(Tr("Delete: {0}", err)); return; }
+			SetStatus(Tr("Deleted #{0}", id));
 			LoadMe();
 		});
 	}
@@ -746,23 +764,23 @@ public class AccountPage : MonoBehaviour
 		ServerAccounts.Clear();
 		SetMode(Mode.Login);
 		RefreshChip();
-		SetStatus("Logged out");
+		SetStatus(Tr("Logged out"));
 	}
 
 	private string Err(string code)
 	{
 		switch (code)
 		{
-			case "name taken": return "Username already taken.";
-			case "email taken": return "Email already registered.";
-			case "bad name": return "Nickname must be 3-20 chars.";
-			case "bad email": return "Invalid email.";
-			case "bad password": return "Password must be ≥6 chars.";
-			case "bad code": return "Wrong code.";
-			case "expired": return "Code expired. Resend.";
-			case "unverified": return "Email not verified yet.";
-			case "no session": return "Session expired. Sign in again.";
-			case "already": return "Already claimed.";
+			case "name taken": return Tr("Username already taken.");
+			case "email taken": return Tr("Email already registered.");
+			case "bad name": return Tr("Nickname must be 3-20 chars.");
+			case "bad email": return Tr("Invalid email.");
+			case "bad password": return Tr("Password must be ≥6 chars.");
+			case "bad code": return Tr("Wrong code.");
+			case "expired": return Tr("Code expired. Resend.");
+			case "unverified": return Tr("Email not verified yet.");
+			case "no session": return Tr("Session expired. Sign in again.");
+			case "already": return Tr("Already claimed.");
 			default: return code;
 		}
 	}

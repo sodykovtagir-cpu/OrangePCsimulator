@@ -39,6 +39,10 @@ public class WorkshopMenu : MonoBehaviour
 	private bool ascending = false;
 	private string searchText = "";
 
+	private static string Tr(string key) { return Localization.GetText(key); }
+	private static string Tr(string key, object a) { return string.Format(Localization.GetText(key), a); }
+	private static string Tr(string key, object a, object b) { return string.Format(Localization.GetText(key), a, b); }
+
 	private readonly List<WorkshopItem> items = new List<WorkshopItem>();
 	private readonly List<WorkshopItem> visible = new List<WorkshopItem>();
 	private readonly List<string> localPaths = new List<string>();
@@ -85,21 +89,21 @@ public class WorkshopMenu : MonoBehaviour
 	{
 		if (WorkshopClient.Instance == null)
 		{
-			SetStatus("No client");
+			SetStatus(Tr("No client"));
 			return;
 		}
-		SetStatus("Loading...");
+		SetStatus(Tr("Loading..."));
 		WorkshopClient.Instance.ListSaves((list, err) =>
 		{
 			if (err != null)
 			{
-				SetStatus("Error: " + err);
+				SetStatus(Tr("Network error: {0}", err));
 				return;
 			}
 			items.Clear();
 			if (list != null) items.AddRange(list);
 			ApplyFilterSort();
-			SetStatus(visible.Count + " saves" + (visible.Count != items.Count ? " (of " + items.Count + ")" : ""));
+			SetStatus(visible.Count != items.Count ? Tr("{0} saves (of {1})", visible.Count, items.Count) : Tr("{0} saves", visible.Count));
 		});
 	}
 
@@ -185,9 +189,9 @@ public class WorkshopMenu : MonoBehaviour
 	{
 		switch (sortMode)
 		{
-			case SortMode.Downloads: return "By downloads";
-			case SortMode.Likes:     return "By likes";
-			default:                 return "New first";
+			case SortMode.Downloads: return Tr("By downloads");
+			case SortMode.Likes:     return Tr("By likes");
+			default:                 return Tr("New first");
 		}
 	}
 
@@ -252,20 +256,20 @@ public class WorkshopMenu : MonoBehaviour
 		int wid; string wkey; int src;
 		bool owner = SelectedIsOwner(out wid, out wkey, out src);
 		var tx = uploadButton.GetComponentInChildren<Text>();
-		if (tx != null) tx.text = owner ? "[Update]" : "[Upload]";
+		if (tx != null) tx.text = owner ? "[" + Tr("Update") + "]" : "[" + Tr("Upload") + "]";
 	}
 
 	public void UploadSelected()
 	{
 		if (!ServerAccounts.LoggedIn)
 		{
-			SetStatus("Login to publish");
+			SetStatus(Tr("Login to publish"));
 			return;
 		}
 		string path = SelectedPath();
 		if (string.IsNullOrEmpty(path))
 		{
-			SetStatus("No local .opc");
+			SetStatus(Tr("No local .opc"));
 			return;
 		}
 
@@ -273,7 +277,7 @@ public class WorkshopMenu : MonoBehaviour
 		bool owner = SelectedIsOwner(out wid, out wkey, out sourceId);
 		if (!owner && sourceId > 0)
 		{
-			SetStatus("Cannot republish a downloaded save");
+			SetStatus(Tr("Cannot republish a downloaded save"));
 			return;
 		}
 
@@ -283,22 +287,22 @@ public class WorkshopMenu : MonoBehaviour
 		string desc = descField != null ? descField.text : "";
 		if (owner)
 		{
-			SetStatus("Updating...");
+			SetStatus(Tr("Update") + "...");
 			WorkshopClient.Instance.UpdateSave(wid, wkey, path, title, author, desc, null, (id, key, err) =>
 			{
-				if (err != null) { SetStatus("Update: " + err); return; }
+				if (err != null) { SetStatus(Tr("Update: {0}", err)); return; }
 				if (!string.IsNullOrEmpty(key)) WorkshopLocal.Put(path, id > 0 ? id : wid, key);
-				SetStatus("Updated #" + (id > 0 ? id : wid));
+				SetStatus(Tr("Updated #{0}", id > 0 ? id : wid));
 				RefreshList();
 				RefreshUploadLabel();
 			});
 			return;
 		}
 
-		SetStatus("Uploading...");
+		SetStatus(Tr("Uploading..."));
 		WorkshopClient.Instance.Upload(path, title, author, desc, null, (id, key, err) =>
 		{
-			if (err != null) { SetStatus("Upload: " + err); return; }
+			if (err != null) { SetStatus(Tr("Upload: {0}", err)); return; }
 			WorkshopLocal.Put(path, id, key);
 			try
 			{
@@ -312,7 +316,7 @@ public class WorkshopMenu : MonoBehaviour
 				}
 			}
 			catch { }
-			SetStatus("Uploaded #" + id);
+			SetStatus(Tr("Uploaded #{0}", id));
 			RefreshList();
 			RefreshUploadLabel();
 		});
@@ -320,10 +324,10 @@ public class WorkshopMenu : MonoBehaviour
 
 	public void DownloadAndPlay(WorkshopItem item)
 	{
-		SetStatus("Downloading...");
+		SetStatus(Tr("Downloading..."));
 		WorkshopClient.Instance.Download(item, (path, err) =>
 		{
-			if (err != null) { SetStatus("Download: " + err); return; }
+			if (err != null) { SetStatus(Tr("Download: {0}", err)); return; }
 			try
 			{
 				var loader = new DataLoader(path);
@@ -332,19 +336,19 @@ public class WorkshopMenu : MonoBehaviour
 			}
 			catch (System.Exception e)
 			{
-				SetStatus("Bad save: " + e.Message);
+				SetStatus(Tr("Bad save: {0}", e.Message));
 			}
 		});
 	}
 
 	public void DownloadOnly(WorkshopItem item)
 	{
-		SetStatus("Downloading...");
+		SetStatus(Tr("Downloading..."));
 		WorkshopClient.Instance.Download(item, (path, err) =>
 		{
-			if (err != null) { SetStatus("Download: " + err); return; }
+			if (err != null) { SetStatus(Tr("Download: {0}", err)); return; }
 			if (FileMenu.Instance != null) FileMenu.Instance.RebuildList();
-			SetStatus("Saved: " + Path.GetFileName(path));
+			SetStatus(Tr("Saved: {0}", Path.GetFileName(path)));
 		});
 	}
 
