@@ -218,11 +218,15 @@ public class WorkshopClient : MonoBehaviour
 			if (loader.GameData != null)
 			{
 				loader.GameData.roomName = string.IsNullOrEmpty(item.title) ? loader.GameData.roomName : item.title;
-				// Ключ владельца не передаётся скачанному файлу, а workshopSourceId
-				// помечает сейв как «скачанный из мастерской» — перевыложить его
-				// (защита от копирования) нельзя.
+				loader.GameData.workshopTitle = item.title ?? "";
+				loader.GameData.workshopAuthor = item.author ?? "";
+				loader.GameData.workshopDesc = item.description ?? "";
+				// Ключ владельца не передаётся скачанному файлу.
+				// workshopSourceId помечает сейв как скачанный (чужой нельзя перевыложить).
+				// workshopId оставляем только если текущий аккаунт — автор листинга.
 				loader.GameData.workshopKey = "";
 				loader.GameData.workshopSourceId = item.id;
+				loader.GameData.workshopId = ServerAccounts.OwnsListing(item.id) ? item.id : 0;
 				loader.WriteToFile();
 			}
 		}
@@ -279,11 +283,11 @@ public class WorkshopClient : MonoBehaviour
 	{
 		var fields = new List<IMultipartFormSection>
 		{
-			new MultipartFormDataSection("id", id.ToString()),
-			new MultipartFormDataSection("owner_key", ownerKey ?? "")
+			Field("id", id.ToString()),
+			Field("owner_key", ownerKey ?? "")
 		};
-		if (ServerAccounts.LoggedIn)
-			fields.Add(new MultipartFormDataSection("token", ServerAccounts.Token ?? ""));
+		if (ServerAccounts.LoggedIn && !string.IsNullOrEmpty(ServerAccounts.Token))
+			fields.Add(Field("token", ServerAccounts.Token));
 		StartCoroutine(SimplePost("?action=delete&i=1", fields, (body, err) =>
 		{
 			if (err != null) { done(err); return; }
@@ -370,8 +374,8 @@ public class WorkshopClient : MonoBehaviour
 	{
 		StartCoroutine(SimplePost("?action=redeem&i=1", new List<IMultipartFormSection>
 		{
-			new MultipartFormDataSection("code", code ?? ""),
-			new MultipartFormDataSection("client", ClientId())
+			Field("code", code ?? ""),
+			Field("client", ClientId())
 		}, (body, err) =>
 		{
 			if (err != null) { done(0, 0, err); return; }
@@ -387,8 +391,8 @@ public class WorkshopClient : MonoBehaviour
 	{
 		StartCoroutine(SimplePost("?action=like&i=1", new List<IMultipartFormSection>
 		{
-			new MultipartFormDataSection("id", id.ToString()),
-			new MultipartFormDataSection("client", ClientId())
+			Field("id", id.ToString()),
+			Field("client", ClientId())
 		}, (body, err) =>
 		{
 			if (err != null) { done(0, err); return; }
@@ -469,8 +473,18 @@ public class WorkshopClient : MonoBehaviour
 	{
 		var form = new List<IMultipartFormSection>();
 		foreach (var f in fields)
-			form.Add(new MultipartFormDataSection(f.Item1, f.Item2 ?? ""));
+			form.Add(Field(f.Item1, f.Item2));
 		return form;
+	}
+
+	/// <summary>
+	/// Unity кидает ArgumentException на пустое тело MultipartFormDataSection.
+	/// Пустые поля отправляем пробелом — PHP clean() его обрежет.
+	/// </summary>
+	private static IMultipartFormSection Field(string name, string value)
+	{
+		if (string.IsNullOrEmpty(value)) value = " ";
+		return new MultipartFormDataSection(name, value);
 	}
 
 	private IEnumerator RequestPostBase(IEnumerable<string> urls, string query, List<IMultipartFormSection> form, Action<string, string> done)
@@ -514,15 +528,17 @@ public class WorkshopClient : MonoBehaviour
 
 		var form = new List<IMultipartFormSection>
 		{
-			new MultipartFormDataSection("title", title ?? ""),
-			new MultipartFormDataSection("author", author ?? "Player"),
-			new MultipartFormDataSection("description", description ?? "")
+			Field("title", title ?? ""),
+			Field("author", string.IsNullOrEmpty(author) ? "Player" : author),
+			Field("description", description ?? "")
 		};
 		if (id > 0)
 		{
-			form.Add(new MultipartFormDataSection("id", id.ToString()));
-			form.Add(new MultipartFormDataSection("owner_key", ownerKey ?? ""));
+			form.Add(Field("id", id.ToString()));
+			form.Add(Field("owner_key", ownerKey ?? ""));
 		}
+		if (ServerAccounts.LoggedIn && !string.IsNullOrEmpty(ServerAccounts.Token))
+			form.Add(Field("token", ServerAccounts.Token));
 		if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
 		{
 			var bytes = File.ReadAllBytes(localPath);

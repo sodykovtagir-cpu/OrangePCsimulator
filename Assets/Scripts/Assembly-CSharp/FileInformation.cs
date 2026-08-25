@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -94,16 +95,17 @@ public class FileInformation : MonoBehaviour
 		}
 		else if (load.loader.GameData.workshopId <= 0)
 		{
-			// Новый сейв на старом пути не наследует чужой листинг мастерской.
 			WorkshopLocal.Remove(load.loader.Path);
 		}
 		coverJpg = null;
-		RefreshWorkshopButtons();
 		if (publishPanel != null) publishPanel.SetActive(false);
 		FillPublishForm(null);
 		EnsureWorkshopClient();
 		EnsurePublishLayout();
 		AccountPanel.RefreshAll();
+		RefreshWorkshopButtons();
+		if (ServerAccounts.LoggedIn)
+			EnsureMeThen(() => { FillPublishForm(null); RefreshWorkshopButtons(); });
 	}
 
 	public void OpenPublishPanel()
@@ -119,18 +121,18 @@ public class FileInformation : MonoBehaviour
 			return;
 		}
 
-		int id = OwnerId();
-		SetWsStatus(id > 0 ? "Checking listing..." : "New upload");
+		SetWsStatus("Checking listing...");
+		EnsureMeThen(LookupListing);
+	}
+
+	private void LookupListing()
+	{
+		int id = ListingId();
 		WorkshopClient.Instance.ListSaves((list, err) =>
 		{
 			if (err != null) { SetWsStatus(err); return; }
-			WorkshopItem found = null;
-			if (id > 0 && list != null)
-			{
-				for (int i = 0; i < list.Count; i++)
-					if (list[i] != null && list[i].id == id) { found = list[i]; break; }
-			}
-			if (id > 0 && found == null)
+			WorkshopItem found = FindItem(list, id);
+			if (id > 0 && found == null && WasPublishedHere())
 			{
 				ForgetListing();
 				FillPublishForm(null);
@@ -139,7 +141,7 @@ public class FileInformation : MonoBehaviour
 				return;
 			}
 			FillPublishForm(found);
-			SetWsStatus(found != null ? "Edit and press Update" : "New upload");
+			SetWsStatus(IsOwner() ? "Edit and press [Update]" : "New upload");
 			RefreshWorkshopButtons();
 			if (found != null && found.has_cover && wsCover != null)
 			{
@@ -148,6 +150,36 @@ public class FileInformation : MonoBehaviour
 					if (tex != null && wsCover != null) wsCover.texture = tex;
 				});
 			}
+		});
+	}
+
+	private static WorkshopItem FindItem(List<WorkshopItem> list, int id)
+	{
+		if (id <= 0 || list == null) return null;
+		for (int i = 0; i < list.Count; i++)
+			if (list[i] != null && list[i].id == id) return list[i];
+		return null;
+	}
+
+	private void EnsureMeThen(System.Action next)
+	{
+		EnsureWorkshopClient();
+		if (!ServerAccounts.LoggedIn || WorkshopClient.Instance == null)
+		{
+			if (next != null) next();
+			return;
+		}
+		WorkshopClient.Instance.AccountMe(ServerAccounts.Token, (r, err) =>
+		{
+			if (r != null && r.ok)
+			{
+				ServerAccounts.SetSession(ServerAccounts.Token, r.name, r.email);
+				var list = r.saves != null
+					? new List<AccountSaveItem>(r.saves)
+					: new List<AccountSaveItem>();
+				ServerAccounts.SetSaves(list);
+			}
+			if (next != null) next();
 		});
 	}
 
@@ -174,14 +206,21 @@ public class FileInformation : MonoBehaviour
 		var g = load.loader.GameData;
 		string title = g.roomName;
 		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : PlayerPrefs.GetString("WorkshopAuthor", "Player");
-		string desc = "";
+		string desc = g.workshopDesc ?? "";
 		if (!string.IsNullOrEmpty(g.workshopTitle)) title = g.workshopTitle;
-		if (!string.IsNullOrEmpty(g.workshopDesc)) desc = g.workshopDesc;
+		var mine = ServerAccounts.FindSave(ListingId());
+		if (mine != null)
+		{
+			if (!string.IsNullOrEmpty(mine.title)) title = mine.title;
+			if (mine.description != null) desc = mine.description;
+		}
 		if (remote != null)
 		{
 			if (!string.IsNullOrEmpty(remote.title)) title = remote.title;
 			if (remote.description != null) desc = remote.description;
 		}
+		if (!string.IsNullOrEmpty(desc)) g.workshopDesc = desc;
+		if (!string.IsNullOrEmpty(title)) g.workshopTitle = title;
 		if (wsTitle != null) wsTitle.text = title ?? "";
 		if (wsAuthor != null)
 		{
@@ -256,10 +295,8 @@ public class FileInformation : MonoBehaviour
 		SetWsStatus("Uploading...");
 		if (IsOwner())
 		{
-			WorkshopLocalRec rec;
-			WorkshopLocal.TryGet(load.loader.Path, out rec);
-			int wid = rec != null ? rec.id : load.loader.GameData.workshopId;
-			string wkey = rec != null ? rec.key : load.loader.GameData.workshopKey;
+			int wid = OwnerId();
+			string wkey = OwnerKey();
 			WorkshopClient.Instance.UpdateSave(wid, wkey,
 				load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
 				{
@@ -304,10 +341,8 @@ public class FileInformation : MonoBehaviour
 		if (!IsOwner()) return;
 		EnsureWorkshopClient();
 		SetWsStatus("Deleting...");
-		WorkshopLocalRec rec;
-		WorkshopLocal.TryGet(load.loader.Path, out rec);
-		int wid = rec != null ? rec.id : load.loader.GameData.workshopId;
-		string wkey = rec != null ? rec.key : load.loader.GameData.workshopKey;
+		int wid = OwnerId();
+		string wkey = OwnerKey();
 		WorkshopClient.Instance.DeleteSave(wid, wkey, err =>
 		{
 			if (err != null && !IsGoneError(err)) { SetWsStatus(err); return; }
@@ -330,7 +365,18 @@ public class FileInformation : MonoBehaviour
 	{
 		if (load == null || load.loader == null || load.loader.GameData == null) return false;
 		WorkshopLocalRec rec;
-		return WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec);
+		if (WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec))
+			return true;
+		return ServerAccounts.OwnsListing(ListingId());
+	}
+
+	private int ListingId()
+	{
+		if (load == null || load.loader == null || load.loader.GameData == null) return 0;
+		var g = load.loader.GameData;
+		if (g.workshopId > 0) return g.workshopId;
+		if (g.workshopSourceId > 0) return g.workshopSourceId;
+		return 0;
 	}
 
 	private int OwnerId()
@@ -339,40 +385,43 @@ public class FileInformation : MonoBehaviour
 		if (load != null && load.loader != null && load.loader.GameData != null
 			&& WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec))
 			return rec.id;
+		return ListingId();
+	}
+
+	private string OwnerKey()
+	{
+		if (load == null || load.loader == null || load.loader.GameData == null) return "";
+		WorkshopLocalRec rec;
+		if (WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec)
+			&& rec != null && !string.IsNullOrEmpty(rec.key))
+			return rec.key;
+		if (!string.IsNullOrEmpty(load.loader.GameData.workshopKey))
+			return load.loader.GameData.workshopKey;
+		return ServerAccounts.OwnerKeyFor(OwnerId());
+	}
+
+	private bool WasPublishedHere()
+	{
 		return load != null && load.loader != null && load.loader.GameData != null
-			? load.loader.GameData.workshopId : 0;
+			&& load.loader.GameData.workshopId > 0;
 	}
 
 	private void RefreshWorkshopButtons()
 	{
 		bool logged = ServerAccounts.LoggedIn;
 		bool owner = IsOwner();
-		// Кнопка панели публикации видна, только если:
-		//  - вошли в аккаунт, И
-		//  - сейв свой (локальный не-скачанный ИЛИ мы его владелец).
 		bool canPublish = logged && CanPublish();
 
-		// Кнопки открытия панели публикации (панель файлов).
-		// Если Update не назначен — одна кнопка Upload меняет текст.
-		if (updateButton == null)
+		// Одна кнопка Upload: для своего листинга подпись [Update].
+		// Отдельная кнопка Update в сцене ни к чему не привязана — прячем всегда.
+		if (uploadButton != null)
 		{
-			if (uploadButton != null)
-			{
-				uploadButton.SetActive(canPublish);
-				SetButtonLabel(uploadButton, owner ? "[Update]" : "[Upload]");
-			}
+			uploadButton.SetActive(canPublish);
+			SetButtonLabel(uploadButton, owner ? "[Update]" : "[Upload]");
 		}
-		else
-		{
-			if (uploadButton != null)
-			{
-				uploadButton.SetActive(canPublish && !owner);
-				SetButtonLabel(uploadButton, "[Upload]");
-			}
-			updateButton.SetActive(canPublish && owner);
-			SetButtonLabel(updateButton, "[Update]");
-		}
-		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(canPublish && owner);
+		if (updateButton != null) updateButton.SetActive(false);
+		if (deleteWorkshopButton != null && deleteWorkshopButton.GetComponent<Button>() != null)
+			deleteWorkshopButton.SetActive(canPublish && owner);
 
 		var action = FindPublishChild("PublishAction");
 		var del = FindPublishChild("PublishDelete");
@@ -385,8 +434,8 @@ public class FileInformation : MonoBehaviour
 		if (del != null) del.gameObject.SetActive(canPublish && owner);
 		if (close != null) close.gameObject.SetActive(true);
 
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", canPublish && !owner);
-		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", canPublish && owner);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", canPublish);
+		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", false);
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Delete", canPublish && owner);
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "DeleteWorkshop", canPublish && owner);
 		ApplyPanelButtonTexts(canPublish, owner);
@@ -407,18 +456,35 @@ public class FileInformation : MonoBehaviour
 		{
 			var b = buttons[i];
 			if (b == null) continue;
+			if (uploadButton != null && b.gameObject == uploadButton) continue;
+			if (updateButton != null && b.gameObject == updateButton)
+			{
+				b.gameObject.SetActive(false);
+				continue;
+			}
 			string n = b.gameObject.name.ToLowerInvariant();
 			var tx = b.GetComponent<Text>();
 			if (tx == null) tx = b.GetComponentInChildren<Text>(true);
 			string t = tx != null && tx.text != null ? tx.text.ToLowerInvariant() : "";
+			bool isAction = n.Contains("publishaction");
 			bool isUpload = n.Contains("upload") || t.Contains("upload") || t.Contains("загруз");
 			bool isUpdate = n.Contains("update") || t.Contains("update") || t.Contains("обнов");
-			bool isDelete = (n.Contains("delete") && !n.Contains("file")) || t.Contains("удал") || t.Contains("[delete]");
-			bool isClose = n.Contains("close") || t.Contains("закры") || t.Contains("[close]");
+			bool isDelete = (n.Contains("delete") && !n.Contains("file")) || n.Contains("publishdelete") || t.Contains("удал") || t.Contains("[delete]");
+			bool isClose = n.Contains("close") || n.Contains("publishclose") || t.Contains("закры") || t.Contains("[close]");
 			if (isClose) { b.gameObject.SetActive(true); continue; }
 			if (isDelete) { b.gameObject.SetActive(canPublish && owner); continue; }
-			if (isUpdate && !isUpload) { b.gameObject.SetActive(canPublish && owner); continue; }
-			if (isUpload && !isUpdate) { b.gameObject.SetActive(canPublish && !owner); continue; }
+			if (isAction)
+			{
+				b.gameObject.SetActive(canPublish);
+				SetButtonLabel(b.gameObject, owner ? "[Update]" : "[Upload]");
+				continue;
+			}
+			if (isUpdate && !isUpload) { b.gameObject.SetActive(false); continue; }
+			if (isUpload)
+			{
+				b.gameObject.SetActive(canPublish);
+				SetButtonLabel(b.gameObject, owner ? "[Update]" : "[Upload]");
+			}
 		}
 	}
 
@@ -443,10 +509,6 @@ public class FileInformation : MonoBehaviour
 		return inner != null ? inner.Find(name) : panel.Find(name);
 	}
 
-	/// <summary>
-	/// Включает горизонтальную раскладку кнопок панели публикации,
-	/// чтобы при скрытии одной кнопки остальные съезжались без пустот.
-	/// </summary>
 	private void EnsurePublishLayout()
 	{
 		if (publishPanel == null) return;
@@ -478,6 +540,12 @@ public class FileInformation : MonoBehaviour
 		var tx = go.GetComponent<Text>();
 		if (tx == null) tx = go.GetComponentInChildren<Text>(true);
 		if (tx != null) tx.text = label;
+		var loc = go.GetComponent<LocalizationText>();
+		if (loc == null) loc = go.GetComponentInChildren<LocalizationText>(true);
+		if (loc != null) loc.Bind(label);
+		var anim = go.GetComponent<TextAnimation>();
+		if (anim == null) anim = go.GetComponentInChildren<TextAnimation>(true);
+		if (anim != null) anim.ResetText();
 	}
 
 	private static void ToggleNamed(Transform root, string name, bool on)
@@ -516,7 +584,6 @@ public class FileInformation : MonoBehaviour
 	{
 		if (load == null || load.loader == null) return;
 #if UNITY_EDITOR
-		// EditorUtility существует только в редакторе (UNITY_STANDALONE его не имеет).
 		string savePath = EditorUtility.SaveFilePanel("Export Save File", "", Path.GetFileName(load.loader.Path), "sav");
 		if (!string.IsNullOrEmpty(savePath))
 			File.Copy(load.loader.Path, savePath, true);
