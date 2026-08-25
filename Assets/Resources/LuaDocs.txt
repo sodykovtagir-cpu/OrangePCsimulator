@@ -1,0 +1,17 @@
+PCOS Lua
+========
+Write scripts in Lua Editor (left = code, right = hints).
+Click a hint like print("") — it is inserted and the caret moves inside the quotes.
+
+os.alert(title, msg)   message box
+os.open(name)          open app or file
+os.close(name)         close window
+os.apps() / os.windows()
+os.username() / os.id() / os.shutdown()
+fs.list / read / write / exists / delete
+win.alert / open / close
+
+if / while / for i=1,n / function / local / tables
+math, string, table
+
+Community: https://t.me/orangePCsimu
