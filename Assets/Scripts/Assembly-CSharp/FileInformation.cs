@@ -56,13 +56,14 @@ public class FileInformation : MonoBehaviour
 
 	private void OnEnable()
 	{
-		// При входе/выходе из аккаунта кнопки публикации обновляются сами.
 		AccountManager.AccountChanged += OnAccountChanged;
+		ServerAccounts.StateChanged += OnAccountChanged;
 	}
 
 	private void OnDisable()
 	{
 		AccountManager.AccountChanged -= OnAccountChanged;
+		ServerAccounts.StateChanged -= OnAccountChanged;
 	}
 
 	private void OnAccountChanged()
@@ -90,6 +91,11 @@ public class FileInformation : MonoBehaviour
 			WorkshopLocal.Put(load.loader.Path, load.loader.GameData.workshopId, load.loader.GameData.workshopKey);
 			load.loader.GameData.workshopKey = "";
 			load.loader.WriteToFile();
+		}
+		else if (load.loader.GameData.workshopId <= 0)
+		{
+			// Новый сейв на старом пути не наследует чужой листинг мастерской.
+			WorkshopLocal.Remove(load.loader.Path);
 		}
 		coverJpg = null;
 		RefreshWorkshopButtons();
@@ -143,19 +149,21 @@ public class FileInformation : MonoBehaviour
 		if (load == null || load.loader == null || load.loader.GameData == null) return;
 		var g = load.loader.GameData;
 		string title = g.roomName;
-		string author = PlayerPrefs.GetString("WorkshopAuthor", "Player");
+		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : PlayerPrefs.GetString("WorkshopAuthor", "Player");
 		string desc = "";
 		if (!string.IsNullOrEmpty(g.workshopTitle)) title = g.workshopTitle;
-		if (!string.IsNullOrEmpty(g.workshopAuthor)) author = g.workshopAuthor;
 		if (!string.IsNullOrEmpty(g.workshopDesc)) desc = g.workshopDesc;
 		if (remote != null)
 		{
 			if (!string.IsNullOrEmpty(remote.title)) title = remote.title;
-			if (!string.IsNullOrEmpty(remote.author)) author = remote.author;
 			if (remote.description != null) desc = remote.description;
 		}
 		if (wsTitle != null) wsTitle.text = title ?? "";
-		if (wsAuthor != null) wsAuthor.text = string.IsNullOrEmpty(author) ? "Player" : author;
+		if (wsAuthor != null)
+		{
+			wsAuthor.text = string.IsNullOrEmpty(author) ? "Player" : author;
+			wsAuthor.interactable = !ServerAccounts.LoggedIn;
+		}
 		if (wsDesc != null) wsDesc.text = desc ?? "";
 	}
 
@@ -204,11 +212,16 @@ public class FileInformation : MonoBehaviour
 	public void ConfirmPublish()
 	{
 		if (load == null || load.loader == null) return;
+		if (!ServerAccounts.LoggedIn)
+		{
+			SetWsStatus("Login to publish");
+			return;
+		}
 		EnsureWorkshopClient();
 		string title = wsTitle != null ? wsTitle.text : load.loader.GameData.roomName;
-		string author = wsAuthor != null ? wsAuthor.text : "Player";
+		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : (wsAuthor != null ? wsAuthor.text : "Player");
 		string desc = wsDesc != null ? wsDesc.text : "";
-		if (!string.IsNullOrEmpty(author))
+		if (!ServerAccounts.LoggedIn && !string.IsNullOrEmpty(author))
 		{
 			PlayerPrefs.SetString("WorkshopAuthor", author);
 			PlayerPrefs.Save();
@@ -283,44 +296,59 @@ public class FileInformation : MonoBehaviour
 
 	private bool IsOwner()
 	{
-		if (load == null || load.loader == null) return false;
+		if (load == null || load.loader == null || load.loader.GameData == null) return false;
 		WorkshopLocalRec rec;
-		return WorkshopLocal.TryGet(load.loader.Path, out rec);
+		return WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec);
 	}
 
 	private int OwnerId()
 	{
 		WorkshopLocalRec rec;
-		if (load != null && load.loader != null && WorkshopLocal.TryGet(load.loader.Path, out rec))
+		if (load != null && load.loader != null && load.loader.GameData != null
+			&& WorkshopLocal.TryGetForSave(load.loader.Path, load.loader.GameData.workshopId, out rec))
 			return rec.id;
-		return 0;
+		return load != null && load.loader != null && load.loader.GameData != null
+			? load.loader.GameData.workshopId : 0;
 	}
 
 	private void RefreshWorkshopButtons()
 	{
-		bool logged = AccountManager.IsLoggedIn();
+		bool logged = ServerAccounts.LoggedIn;
 		bool owner = IsOwner();
 		// Кнопка панели публикации видна, только если:
 		//  - вошли в аккаунт, И
 		//  - сейв свой (локальный не-скачанный ИЛИ мы его владелец).
 		bool canPublish = logged && CanPublish();
 
-		// Кнопки открытия панели публикации (панель файлов):
-		// Upload — для невыложенных, Update/Delete — для выложенных.
-		if (uploadButton != null) uploadButton.SetActive(canPublish && !owner);
-		if (updateButton != null) updateButton.SetActive(canPublish && owner);
+		// Кнопки открытия панели публикации (панель файлов).
+		// Если Update не назначен — одна кнопка Upload меняет текст.
+		if (updateButton == null)
+		{
+			if (uploadButton != null)
+			{
+				uploadButton.SetActive(canPublish);
+				SetButtonLabel(uploadButton, owner ? "[Update]" : "[Upload]");
+			}
+		}
+		else
+		{
+			if (uploadButton != null)
+			{
+				uploadButton.SetActive(canPublish && !owner);
+				SetButtonLabel(uploadButton, "[Upload]");
+			}
+			updateButton.SetActive(canPublish && owner);
+			SetButtonLabel(updateButton, "[Update]");
+		}
 		if (deleteWorkshopButton != null) deleteWorkshopButton.SetActive(canPublish && owner);
 
-		// Кнопки внутри панели публикации.
 		var action = FindPublishChild("PublishAction");
 		var del = FindPublishChild("PublishDelete");
 		var close = FindPublishChild("PublishClose");
 		if (action != null)
 		{
-			// Одна кнопка = и Upload и Update: меняем подпись по статусу владельца.
 			action.gameObject.SetActive(canPublish);
-			var tx = action.GetComponentInChildren<Text>();
-			if (tx != null) tx.text = owner ? "Update" : "Upload";
+			SetButtonLabel(action.gameObject, owner ? "[Update]" : "[Upload]");
 		}
 		if (del != null) del.gameObject.SetActive(canPublish && owner);
 		if (close != null) close.gameObject.SetActive(canPublish);
@@ -381,6 +409,14 @@ public class FileInformation : MonoBehaviour
 			f.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 			f.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 		}
+	}
+
+	private static void SetButtonLabel(GameObject go, string label)
+	{
+		if (go == null) return;
+		var tx = go.GetComponent<Text>();
+		if (tx == null) tx = go.GetComponentInChildren<Text>(true);
+		if (tx != null) tx.text = label;
 	}
 
 	private static void ToggleNamed(Transform root, string name, bool on)

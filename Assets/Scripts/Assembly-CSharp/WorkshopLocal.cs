@@ -71,6 +71,28 @@ public static class WorkshopLocal
 		return false;
 	}
 
+	/// <summary>
+	/// Владелец только если в самом сейве записан workshopId и он совпадает
+	/// с локальной записью. Имя файла / путь больше не делают новый сейв «тем же».
+	/// </summary>
+	public static bool TryGetForSave(string path, int workshopId, out WorkshopLocalRec rec)
+	{
+		rec = null;
+		if (workshopId <= 0) return false;
+		if (TryGet(path, out rec) && rec.id == workshopId) return true;
+		var list = LoadList();
+		for (int i = 0; i < list.Count; i++)
+		{
+			if (list[i] != null && list[i].id == workshopId && !string.IsNullOrEmpty(list[i].key))
+			{
+				rec = list[i];
+				return true;
+			}
+		}
+		rec = null;
+		return false;
+	}
+
 	public static void Put(string path, int id, string key)
 	{
 		var n = Norm(path);

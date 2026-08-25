@@ -68,6 +68,17 @@ public class WorkshopMenu : MonoBehaviour
 	{
 		RefreshLocalSaves();
 		RefreshList();
+		RefreshUploadLabel();
+		if (localSavesDropdown != null)
+		{
+			localSavesDropdown.onValueChanged.RemoveListener(OnLocalSavePicked);
+			localSavesDropdown.onValueChanged.AddListener(OnLocalSavePicked);
+		}
+	}
+
+	private void OnLocalSavePicked(int _)
+	{
+		RefreshUploadLabel();
 	}
 
 	public void RefreshList()

@@ -321,22 +321,29 @@ if ($action === 'me' && ($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUE
     if ($i < 0) json_out(['ok' => false, 'error' => 'no session'], 401);
     $u = $users[$i];
 
-    // Собственные сейвы из мастерской — по имени автора (без учёта регистра).
+    // Свои сейвы: по owner_user_id (надёжно). Имя автора больше не критерий владения.
     $items = load_json(__DIR__ . '/uploads/index.json');
     $mine = [];
+    $uid = (int)$u['id'];
+    $myName = norm_name($u['name']);
     foreach ($items as $it) {
-        if (norm_name(isset($it['author']) ? $it['author'] : '') === norm_name($u['name'])) {
-            $mine[] = [
-                'id' => (int)$it['id'],
-                'title' => isset($it['title']) ? $it['title'] : '',
-                'description' => isset($it['description']) ? $it['description'] : '',
-                'downloads' => (int)($it['downloads'] ?? 0),
-                'likes' => (int)($it['likes'] ?? 0),
-                'owner_key' => isset($it['owner_key']) ? $it['owner_key'] : '',
-                'has_cover' => !empty($it['cover']),
-                'created_at' => isset($it['created_at']) ? $it['created_at'] : '',
-            ];
+        $owned = !empty($it['owner_user_id']) && (int)$it['owner_user_id'] === $uid;
+        if (!$owned && empty($it['owner_user_id'])) {
+            $on = norm_name(isset($it['owner_name']) ? $it['owner_name'] : '');
+            $an = norm_name(isset($it['author']) ? $it['author'] : '');
+            $owned = ($on !== '' && $on === $myName) || ($an !== '' && $an === $myName);
         }
+        if (!$owned) continue;
+        $mine[] = [
+            'id' => (int)$it['id'],
+            'title' => isset($it['title']) ? $it['title'] : '',
+            'description' => isset($it['description']) ? $it['description'] : '',
+            'downloads' => (int)($it['downloads'] ?? 0),
+            'likes' => (int)($it['likes'] ?? 0),
+            'owner_key' => isset($it['owner_key']) ? $it['owner_key'] : '',
+            'has_cover' => !empty($it['cover']),
+            'created_at' => isset($it['created_at']) ? $it['created_at'] : '',
+        ];
     }
     json_out([
         'ok' => true,
