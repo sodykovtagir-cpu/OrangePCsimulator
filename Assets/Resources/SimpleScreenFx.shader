@@ -108,22 +108,22 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 
 				// Сначала размытие по сырому кадру, потом виньетка/зерно —
 				// иначе края смешиваются с невиньетированными сэмплами и мигают.
-				if (_Motion > 0.001)
+			if (_Motion > 0.001)
+			{
+				// Широкий гаусс: шлейф виден, но без отдельных «копий» кадра.
+				float2 d = _MotionDir;
+				float3 acc = 0;
+				float wsum = 0;
+				[unroll]
+				for (int s = -7; s <= 7; s++)
 				{
-					// Мягкий гаусс вдоль вектора камеры — без отдельных «копий» кадра.
-					float2 d = _MotionDir;
-					float3 acc = 0;
-					float wsum = 0;
-					[unroll]
-					for (int s = -5; s <= 5; s++)
-					{
-						float t = s / 5.0;
-						float w = exp(-t * t * 2.8);
-						acc += tex2D(_MainTex, saturate(uv + d * t)).rgb * w;
-						wsum += w;
-					}
-					col = lerp(col, acc / max(wsum, 1e-4), saturate(_Motion));
+					float t = s / 7.0;
+					float w = exp(-t * t * 1.55);
+					acc += tex2D(_MainTex, saturate(uv + d * t)).rgb * w;
+					wsum += w;
 				}
+				col = lerp(col, acc / max(wsum, 1e-4), saturate(_Motion));
+			}
 
 				if (_AO > 0.001)
 				{
