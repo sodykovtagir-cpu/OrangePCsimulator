@@ -45746,16 +45746,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1704076431}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f90c82d1e0f32f347aa8cd1bedf5a432, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoCreateUI: 0
-  panelSize: {x: 0, y: 0}
   chipButton: {fileID: 1030427668}
   chipText: {fileID: 79074060}
   pageRoot: {fileID: 1704076431}
+  mainPanel: {fileID: 253}
   closeButton: {fileID: 0}
   statusText: {fileID: 0}
   loginPanel: {fileID: 1571389829}
@@ -45763,17 +45762,20 @@ MonoBehaviour:
   passwordField: {fileID: 1156070901}
   loginButton: {fileID: 208257749}
   toRegisterButton: {fileID: 1006238783}
+  loginCloseButton: {fileID: 870159300}
   registerPanel: {fileID: 1715087282}
   regNameField: {fileID: 1854864321}
   regEmailField: {fileID: 311603204}
   regPassField: {fileID: 896105355}
   registerButton: {fileID: 107944294}
   toLoginButton: {fileID: 1618924932}
+  registerCloseButton: {fileID: 1239751500}
   verifyPanel: {fileID: 219633179}
   codeField: {fileID: 537204028}
   verifyButton: {fileID: 1938660929}
   resendButton: {fileID: 1783092173}
   backButton: {fileID: 1498339055}
+  verifyCloseButton: {fileID: 0}
   homePanel: {fileID: 0}
   nameText: {fileID: 0}
   emailText: {fileID: 0}
@@ -45783,6 +45785,7 @@ MonoBehaviour:
   tgButton: {fileID: 0}
   bonusText: {fileID: 0}
   logoutButton: {fileID: 0}
+  homeCloseButton: {fileID: 0}
 --- !u!1 &1706460704
 GameObject:
   m_ObjectHideFlags: 0
