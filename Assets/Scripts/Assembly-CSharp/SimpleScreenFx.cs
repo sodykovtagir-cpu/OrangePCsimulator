@@ -14,6 +14,8 @@ public class SimpleScreenFx : MonoBehaviour
 	private bool havePrevCam;
 	private Vector3 prevCamPos;
 	private Quaternion prevCamRot;
+	private Vector2 smoothDir;
+	private float smoothAmt;
 
 	private void OnDestroy()
 	{
@@ -96,6 +98,8 @@ public class SimpleScreenFx : MonoBehaviour
 		{
 			motionAmt = 0f;
 			havePrevCam = false;
+			smoothDir = Vector2.zero;
+			smoothAmt = 0f;
 			ReleasePrev();
 		}
 		m.SetFloat("_Motion", motionAmt);

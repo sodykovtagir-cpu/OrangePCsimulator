@@ -102,9 +102,25 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			fixed4 frag(v2f i) : SV_Target
 			{
 				float2 uv = i.uv;
-				float2 n = uv * 2.0 - 1.0;
+				float2 ndc = uv * 2.0 - 1.0;
 
 				float3 col = tex2D(_MainTex, uv).rgb;
+
+				// Сначала размытие по сырому кадру, потом виньетка/зерно —
+				// иначе края смешиваются с невиньетированными сэмплами и мигают.
+				if (_Motion > 0.001)
+				{
+					float2 d = _MotionDir;
+					float3 acc = 0;
+					acc += tex2D(_MainTex, saturate(uv)).rgb * 0.20;
+					acc += tex2D(_MainTex, saturate(uv + d * 0.28)).rgb * 0.17;
+					acc += tex2D(_MainTex, saturate(uv - d * 0.28)).rgb * 0.17;
+					acc += tex2D(_MainTex, saturate(uv + d * 0.58)).rgb * 0.13;
+					acc += tex2D(_MainTex, saturate(uv - d * 0.58)).rgb * 0.13;
+					acc += tex2D(_MainTex, saturate(uv + d * 0.90)).rgb * 0.10;
+					acc += tex2D(_MainTex, saturate(uv - d * 0.90)).rgb * 0.10;
+					col = lerp(col, acc, saturate(_Motion));
+				}
 
 				if (_AO > 0.001)
 				{
@@ -124,33 +140,19 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 					col *= 1.0 - occ * _AO;
 				}
 
-				if (_Grain > 0.001)
-				{
-					float n = frac(sin(dot(uv * float2(1280, 720) + _Time.y * 32.0, float2(12.9898, 78.233))) * 43758.5453);
-					col += (n - 0.5) * _Grain;
-				}
-
 				if (_Bloom > 0.001)
 					col += tex2D(_BloomTex, uv).rgb * _Bloom;
 
 				if (_Vignette > 0.001)
 				{
-					float vig = saturate(1.0 - dot(n, n) * _Vignette);
+					float vig = saturate(1.0 - dot(ndc, ndc) * _Vignette);
 					col *= vig;
 				}
 
-				if (_Motion > 0.001)
+				if (_Grain > 0.001)
 				{
-					// Camera-velocity directional blur (not a ghost of the last frame).
-					float2 d = _MotionDir;
-					float3 acc = col * 0.20;
-					acc += tex2D(_MainTex, uv + d * 0.28).rgb * 0.17;
-					acc += tex2D(_MainTex, uv - d * 0.28).rgb * 0.17;
-					acc += tex2D(_MainTex, uv + d * 0.58).rgb * 0.13;
-					acc += tex2D(_MainTex, uv - d * 0.58).rgb * 0.13;
-					acc += tex2D(_MainTex, uv + d * 0.90).rgb * 0.10;
-					acc += tex2D(_MainTex, uv - d * 0.90).rgb * 0.10;
-					col = lerp(col, acc, saturate(_Motion));
+					float gn = frac(sin(dot(uv * float2(1280, 720) + _Time.y * 32.0, float2(12.9898, 78.233))) * 43758.5453);
+					col += (gn - 0.5) * _Grain;
 				}
 
 				return float4(col, 1);
