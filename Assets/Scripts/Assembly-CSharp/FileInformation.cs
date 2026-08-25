@@ -42,6 +42,7 @@ public class FileInformation : MonoBehaviour
 	private byte[] coverJpg;
 	private FileMenu.Load load;
 	private MenuManager menuManager;
+	private static Texture2D coverPlaceholder;
 
 	private void Start()
 	{
@@ -98,7 +99,9 @@ public class FileInformation : MonoBehaviour
 			WorkshopLocal.Remove(load.loader.Path);
 		}
 		coverJpg = null;
+		ResetCover();
 		if (publishPanel != null) publishPanel.SetActive(false);
+		HideAuthorField();
 		FillPublishForm(null);
 		EnsureWorkshopClient();
 		EnsurePublishLayout();
@@ -112,6 +115,7 @@ public class FileInformation : MonoBehaviour
 	{
 		if (publishPanel != null) publishPanel.SetActive(true);
 		ShowPublishFields();
+		ResetCover();
 		FillPublishForm(null);
 		RefreshWorkshopButtons();
 		EnsureWorkshopClient();
@@ -187,47 +191,66 @@ public class FileInformation : MonoBehaviour
 	{
 		if (load == null || load.loader == null || load.loader.GameData == null) return;
 		WorkshopLocal.Remove(load.loader.Path);
-		load.loader.GameData.workshopId = 0;
-		load.loader.GameData.workshopKey = "";
+		var g = load.loader.GameData;
+		g.workshopId = 0;
+		g.workshopKey = "";
+		g.workshopSourceId = 0;
+		g.workshopTitle = "";
+		g.workshopDesc = "";
+		g.workshopAuthor = "";
 		load.loader.WriteToFile();
 	}
 
 	private void ShowPublishFields()
 	{
 		if (wsTitle != null) wsTitle.gameObject.SetActive(true);
-		if (wsAuthor != null) wsAuthor.gameObject.SetActive(true);
 		if (wsDesc != null) wsDesc.gameObject.SetActive(true);
 		if (wsCover != null) wsCover.gameObject.SetActive(true);
+		HideAuthorField();
+	}
+
+	private void HideAuthorField()
+	{
+		if (wsAuthor == null) return;
+		wsAuthor.gameObject.SetActive(false);
+		var p = wsAuthor.transform.parent;
+		if (p == null) return;
+		// Строка автора — отдельный контейнер Name (2), не общий корень панели.
+		if (p == transform || (publishPanel != null && p == publishPanel.transform)) return;
+		if (p.GetComponent<InputField>() != null) return;
+		bool hasOther = false;
+		if (wsTitle != null && wsTitle.transform.IsChildOf(p) && wsTitle.transform != wsAuthor.transform)
+			hasOther = true;
+		if (wsDesc != null && wsDesc.transform.IsChildOf(p) && wsDesc.transform != wsAuthor.transform)
+			hasOther = true;
+		if (!hasOther) p.gameObject.SetActive(false);
 	}
 
 	private void FillPublishForm(WorkshopItem remote)
 	{
+		if (wsTitle != null) wsTitle.text = "";
+		if (wsDesc != null) wsDesc.text = "";
+		HideAuthorField();
 		if (load == null || load.loader == null || load.loader.GameData == null) return;
 		var g = load.loader.GameData;
-		string title = g.roomName;
-		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : PlayerPrefs.GetString("WorkshopAuthor", "Player");
-		string desc = g.workshopDesc ?? "";
-		if (!string.IsNullOrEmpty(g.workshopTitle)) title = g.workshopTitle;
-		var mine = ServerAccounts.FindSave(ListingId());
-		if (mine != null)
-		{
-			if (!string.IsNullOrEmpty(mine.title)) title = mine.title;
-			if (mine.description != null) desc = mine.description;
-		}
+		string title = "";
+		string desc = "";
 		if (remote != null)
 		{
-			if (!string.IsNullOrEmpty(remote.title)) title = remote.title;
-			if (remote.description != null) desc = remote.description;
+			title = remote.title ?? "";
+			desc = remote.description ?? "";
 		}
-		if (!string.IsNullOrEmpty(desc)) g.workshopDesc = desc;
-		if (!string.IsNullOrEmpty(title)) g.workshopTitle = title;
-		if (wsTitle != null) wsTitle.text = title ?? "";
-		if (wsAuthor != null)
+		else
 		{
-			wsAuthor.text = string.IsNullOrEmpty(author) ? "Player" : author;
-			wsAuthor.interactable = !ServerAccounts.LoggedIn;
+			var mine = ServerAccounts.FindSave(ListingId());
+			if (mine != null)
+			{
+				title = mine.title ?? "";
+				desc = mine.description ?? "";
+			}
 		}
-		if (wsDesc != null) wsDesc.text = desc ?? "";
+		if (wsTitle != null) wsTitle.text = title;
+		if (wsDesc != null) wsDesc.text = desc;
 	}
 
 	public void ClosePublishPanel()
@@ -281,14 +304,10 @@ public class FileInformation : MonoBehaviour
 			return;
 		}
 		EnsureWorkshopClient();
-		string title = wsTitle != null ? wsTitle.text : load.loader.GameData.roomName;
-		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : (wsAuthor != null ? wsAuthor.text : "Player");
+		string title = wsTitle != null ? wsTitle.text : "";
+		if (string.IsNullOrWhiteSpace(title)) title = load.loader.GameData.roomName;
+		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : "Player";
 		string desc = wsDesc != null ? wsDesc.text : "";
-		if (!ServerAccounts.LoggedIn && !string.IsNullOrEmpty(author))
-		{
-			PlayerPrefs.SetString("WorkshopAuthor", author);
-			PlayerPrefs.Save();
-		}
 		load.loader.GameData.workshopTitle = title;
 		load.loader.GameData.workshopAuthor = author;
 		load.loader.GameData.workshopDesc = desc;
@@ -557,6 +576,99 @@ public class FileInformation : MonoBehaviour
 			if (all[i] != null && all[i] != root && all[i].name == name)
 				all[i].gameObject.SetActive(on);
 		}
+	}
+
+	private void ResetCover()
+	{
+		coverJpg = null;
+		if (wsCover == null) return;
+		wsCover.texture = CoverPlaceholder();
+		wsCover.color = Color.white;
+		wsCover.uvRect = new Rect(0f, 0f, 1f, 1f);
+		wsCover.gameObject.SetActive(true);
+	}
+
+	private static Texture2D CoverPlaceholder()
+	{
+		if (coverPlaceholder != null) return coverPlaceholder;
+		const int s = 128;
+		var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+		tex.wrapMode = TextureWrapMode.Clamp;
+		tex.filterMode = FilterMode.Point;
+		var px = new Color32[s * s];
+		var bg = new Color32(22, 22, 22, 255);
+		var frame = new Color32(255, 136, 0, 255);
+		var icon = new Color32(90, 90, 90, 255);
+		var sun = new Color32(255, 136, 0, 255);
+		for (int i = 0; i < px.Length; i++) px[i] = bg;
+		for (int i = 0; i < s; i++)
+		{
+			px[i] = frame;
+			px[(s - 1) * s + i] = frame;
+			px[i * s] = frame;
+			px[i * s + (s - 1)] = frame;
+			if (i < s - 2)
+			{
+				px[s + 1 + i] = frame;
+				px[(s - 2) * s + 1 + i] = frame;
+				px[(i + 1) * s + 1] = frame;
+				px[(i + 1) * s + (s - 2)] = frame;
+			}
+		}
+		FillCircle(px, s, 40, 88, 9, sun);
+		FillTri(px, s, 18, 28, 64, 78, 110, 28, icon);
+		FillTri(px, s, 50, 28, 92, 70, 118, 28, new Color32(60, 60, 60, 255));
+		tex.SetPixels32(px);
+		tex.Apply(false, false);
+		coverPlaceholder = tex;
+		return tex;
+	}
+
+	private static void FillCircle(Color32[] px, int s, int cx, int cy, int r, Color32 c)
+	{
+		int r2 = r * r;
+		for (int y = cy - r; y <= cy + r; y++)
+		{
+			if (y < 0 || y >= s) continue;
+			for (int x = cx - r; x <= cx + r; x++)
+			{
+				if (x < 0 || x >= s) continue;
+				int dx = x - cx, dy = y - cy;
+				if (dx * dx + dy * dy <= r2) px[y * s + x] = c;
+			}
+		}
+	}
+
+	private static void FillTri(Color32[] px, int s, int x1, int y1, int x2, int y2, int x3, int y3, Color32 c)
+	{
+		int minx = Mathf.Min(x1, Mathf.Min(x2, x3));
+		int maxx = Mathf.Max(x1, Mathf.Max(x2, x3));
+		int miny = Mathf.Min(y1, Mathf.Min(y2, y3));
+		int maxy = Mathf.Max(y1, Mathf.Max(y2, y3));
+		for (int y = miny; y <= maxy; y++)
+		{
+			if (y < 0 || y >= s) continue;
+			for (int x = minx; x <= maxx; x++)
+			{
+				if (x < 0 || x >= s) continue;
+				if (InsideTri(x, y, x1, y1, x2, y2, x3, y3)) px[y * s + x] = c;
+			}
+		}
+	}
+
+	private static bool InsideTri(int px, int py, int x1, int y1, int x2, int y2, int x3, int y3)
+	{
+		float d1 = Sign(px, py, x1, y1, x2, y2);
+		float d2 = Sign(px, py, x2, y2, x3, y3);
+		float d3 = Sign(px, py, x3, y3, x1, y1);
+		bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+		bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+		return !(hasNeg && hasPos);
+	}
+
+	private static float Sign(int x1, int y1, int x2, int y2, int x3, int y3)
+	{
+		return (x1 - x3) * (y2 - y3) - (x2 - x3) * (y1 - y3);
 	}
 
 	private void SetWsStatus(string s)
