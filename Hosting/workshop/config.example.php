@@ -14,15 +14,16 @@ define('RATE_PER_HOUR', 8);
 define('UPLOADS_DIR', __DIR__ . '/uploads');
 
 // ---- Почта (код подтверждения регистрации) ----
-// Если MAIL_SMTP_HOST пуст — используется встроенный PHP mail() на byethost.
-// Если хочешь SMTP (Gmail/Яндекс и т.п.) — заполни и получи пароль приложения.
-define('MAIL_FROM', 'noreply@orangepcsimu.byethost4.com');
+// Mail.ru / internet.ru: smtp.mail.ru, порт 465 (ssl) или 587 (tls).
+// MAIL_FROM и MAIL_SMTP_USER должны быть одним и тем же ящиком.
+// Пароль — только в config.php, не в example и не в git.
+define('MAIL_FROM', 'orangepcsimu@internet.ru');
 define('MAIL_FROM_NAME', 'Orange PC Simulator');
-define('MAIL_SMTP_HOST', '');
-define('MAIL_SMTP_PORT', 587);
-define('MAIL_SMTP_USER', '');
-define('MAIL_SMTP_PASS', '');
-define('MAIL_SMTP_SECURE', 'tls'); // tls | ssl | пусто
+define('MAIL_SMTP_HOST', 'smtp.mail.ru');
+define('MAIL_SMTP_PORT', 465);
+define('MAIL_SMTP_USER', 'orangepcsimu@internet.ru');
+define('MAIL_SMTP_PASS', ''); // пароль ящика / пароль приложения
+define('MAIL_SMTP_SECURE', 'ssl'); // ssl (465) | tls (587)
 
 // ---- Telegram-бот (привязка аккаунта + бонус 5 BTC) ----
 // Токен от @BotFather. Пусто = мягкая привязка без проверки ботом.

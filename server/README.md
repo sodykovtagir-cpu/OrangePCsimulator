@@ -77,9 +77,10 @@
 | `tg_bonus` | POST | token | `{ok, granted, btc:5}` |
 
 Хранилище: `users.json` (пароль и код — `password_hash`), `tg_pending.json`.
-**Почта:** по умолчанию встроенный PHP `mail()` (на бесплатном byethost часто не шлёт).
-Чтобы реально слать код — настрой SMTP в `config.php` (`MAIL_SMTP_*`) или укажи
-ящик, откуда разрешена отправка. `MAIL_FROM` должен совпадать с твоим доменом.
+**Почта:** SMTP Mail.ru (`smtp.mail.ru:465`, ящик `orangepcsimu@internet.ru`).
+Пароль и хост задаются в `config.php` (`MAIL_SMTP_*`) — файл **не в git**.
+`MAIL_FROM` должен совпадать с ящиком (`orangepcsimu@internet.ru`), иначе Mail.ru
+отклонит письмо. Если `MAIL_SMTP_HOST` пуст — fallback на PHP `mail()`.
 
 **Telegram-бот (через WEBHOOK):** на бесплатном byethost **заблокирован исходящий
 доступ к `api.telegram.org`** (DNS не резолвится), поэтому поллер не работает.
