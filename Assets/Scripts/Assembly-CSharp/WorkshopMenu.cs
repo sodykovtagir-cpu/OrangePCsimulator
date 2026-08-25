@@ -33,8 +33,6 @@ public class WorkshopMenu : MonoBehaviour
 	[SerializeField] private Button resetButton;
 	[SerializeField] private Text sortLabel;
 	[SerializeField] private Text orderLabel;
-	[Tooltip("Если поля выше не привязаны в инспекторе — создать панельку саму.")]
-	[SerializeField] private bool autoCreateSearchSortUI = true;
 
 	private enum SortMode { New = 0, Downloads = 1, Likes = 2 }
 	private SortMode sortMode = SortMode.New;
@@ -63,14 +61,7 @@ public class WorkshopMenu : MonoBehaviour
 		if (sortButton != null) sortButton.onClick.AddListener(CycleSort);
 		if (orderButton != null) orderButton.onClick.AddListener(ToggleOrder);
 		if (resetButton != null) resetButton.onClick.AddListener(ResetSort);
-		if (autoCreateSearchSortUI && !HasSearchSortBindings()) CreateSearchSortUI();
 		RefreshSortLabels();
-	}
-
-	private bool HasSearchSortBindings()
-	{
-		return searchField != null || sortButton != null || orderButton != null
-			|| resetButton != null || sortLabel != null || orderLabel != null;
 	}
 
 	private void OnEnable()
@@ -187,57 +178,6 @@ public class WorkshopMenu : MonoBehaviour
 			case SortMode.Likes:     return "By likes";
 			default:                 return "New first";
 		}
-	}
-
-	private void CreateSearchSortUI()
-	{
-		Transform holder = listParent != null ? listParent.parent : transform;
-		var bar = new GameObject("SearchSortBar", typeof(RectTransform), typeof(Image));
-		bar.transform.SetParent(holder, false);
-		bar.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-		var brt = bar.GetComponent<RectTransform>();
-		brt.anchorMin = new Vector2(0.5f, 1f); brt.anchorMax = new Vector2(0.5f, 1f);
-		brt.pivot = new Vector2(0.5f, 1f);
-		brt.anchoredPosition = new Vector2(0, -60f);
-		brt.sizeDelta = new Vector2(620f, 40f);
-
-		// Поиск
-		var sf = new GameObject("Search", typeof(RectTransform), typeof(Image), typeof(InputField));
-		sf.transform.SetParent(bar.transform, false);
-		var sfr = sf.GetComponent<RectTransform>();
-		sfr.anchorMin = sfr.anchorMax = new Vector2(0f, 0.5f);
-		sfr.anchoredPosition = new Vector2(70f, 0f);
-		sfr.sizeDelta = new Vector2(240f, 28f);
-		sf.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.9f);
-		var input = sf.GetComponent<InputField>();
-		input.onValueChanged.AddListener(OnSearchChanged);
-
-		MakeBarButton(bar.transform, "Sort", "Sort: " + SortName(), new Vector2(-170f, 0f), CycleSort, "SortLabel", ref sortLabel);
-		MakeBarButton(bar.transform, "Order", "↓ desc", new Vector2(-80f, 0f), ToggleOrder, "OrderLabel", ref orderLabel);
-		MakeBarButton(bar.transform, "Reset", "Reset", new Vector2(10f, 0f), ResetSort, null, ref orderLabel);
-
-		searchField = input;
-		RefreshSortLabels();
-	}
-
-	private static void MakeBarButton(Transform parent, string name, string label, Vector2 pos, UnityEngine.Events.UnityAction click, string labelChild, ref Text tex)
-	{
-		var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-		go.transform.SetParent(parent, false);
-		var rt = go.GetComponent<RectTransform>();
-		rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-		rt.anchoredPosition = pos;
-		rt.sizeDelta = new Vector2(90f, 28f);
-		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
-		go.GetComponent<Button>().onClick.AddListener(click);
-
-		var tx = go.AddComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.alignment = TextAnchor.MiddleCenter;
-		tx.color = Color.black;
-		tx.fontSize = 13;
-		tx.text = label;
-		if (labelChild != null) tex = tx;
 	}
 
 	public void RefreshLocalSaves()
