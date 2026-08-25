@@ -136,7 +136,11 @@ public class AccountPage : MonoBehaviour
 		if (mainPanel != null) mainPanel.SetActive(false);
 		if (page != null) page.SetActive(true);
 
-		if (ServerAccounts.LoggedIn) SetMode(Mode.Home);
+		if (ServerAccounts.LoggedIn)
+		{
+			SetMode(Mode.Home);
+			LoadMe();
+		}
 		else SetMode(Mode.Login);
 	}
 
@@ -379,7 +383,6 @@ public class AccountPage : MonoBehaviour
 	private void RebuildSaves()
 	{
 		if (savesList == null) return;
-		EnsureSavesLayout();
 		for (int i = savesList.childCount - 1; i >= 0; i--)
 		{
 			var ch = savesList.GetChild(i);

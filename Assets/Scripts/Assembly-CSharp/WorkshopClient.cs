@@ -277,11 +277,14 @@ public class WorkshopClient : MonoBehaviour
 
 	public void DeleteSave(int id, string ownerKey, Action<string> done)
 	{
-		StartCoroutine(SimplePost("?action=delete&i=1", new List<IMultipartFormSection>
+		var fields = new List<IMultipartFormSection>
 		{
 			new MultipartFormDataSection("id", id.ToString()),
 			new MultipartFormDataSection("owner_key", ownerKey ?? "")
-		}, (body, err) =>
+		};
+		if (ServerAccounts.LoggedIn)
+			fields.Add(new MultipartFormDataSection("token", ServerAccounts.Token ?? ""));
+		StartCoroutine(SimplePost("?action=delete&i=1", fields, (body, err) =>
 		{
 			if (err != null) { done(err); return; }
 			WorkshopUploadResponse p = null;
@@ -647,6 +650,8 @@ public class WorkshopClient : MonoBehaviour
 		if (!string.IsNullOrEmpty(byetCookie))
 			req.SetRequestHeader("Cookie", byetCookie);
 		req.SetRequestHeader("User-Agent", "Mozilla/5.0 OrangePCSimulator");
+		if (ServerAccounts.LoggedIn && !string.IsNullOrEmpty(ServerAccounts.Token))
+			req.SetRequestHeader("X-Auth-Token", ServerAccounts.Token);
 	}
 
 	private IEnumerator BypassByethost()

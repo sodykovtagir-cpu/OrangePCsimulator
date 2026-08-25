@@ -68,6 +68,17 @@ public class WorkshopMenu : MonoBehaviour
 	{
 		RefreshLocalSaves();
 		RefreshList();
+		RefreshUploadLabel();
+		if (localSavesDropdown != null)
+		{
+			localSavesDropdown.onValueChanged.RemoveListener(OnLocalSavePicked);
+			localSavesDropdown.onValueChanged.AddListener(OnLocalSavePicked);
+		}
+	}
+
+	private void OnLocalSavePicked(int _)
+	{
+		RefreshUploadLabel();
 	}
 
 	public void RefreshList()
@@ -197,6 +208,46 @@ public class WorkshopMenu : MonoBehaviour
 		localSavesDropdown.AddOptions(opts);
 	}
 
+	private string SelectedPath()
+	{
+		if (localPaths.Count == 0) return null;
+		int i = localSavesDropdown != null ? localSavesDropdown.value : 0;
+		if (i < 0 || i >= localPaths.Count) i = 0;
+		return localPaths[i];
+	}
+
+	private bool SelectedIsOwner(out int wid, out string wkey, out int sourceId)
+	{
+		wid = 0; wkey = ""; sourceId = 0;
+		string path = SelectedPath();
+		if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+		try
+		{
+			var probe = new DataLoader(path);
+			probe.LoadFromPath();
+			if (probe.GameData == null) return false;
+			sourceId = probe.GameData.workshopSourceId;
+			WorkshopLocalRec rec;
+			if (WorkshopLocal.TryGetForSave(path, probe.GameData.workshopId, out rec))
+			{
+				wid = rec.id;
+				wkey = rec.key;
+				return true;
+			}
+		}
+		catch { }
+		return false;
+	}
+
+	private void RefreshUploadLabel()
+	{
+		if (uploadButton == null) return;
+		int wid; string wkey; int src;
+		bool owner = SelectedIsOwner(out wid, out wkey, out src);
+		var tx = uploadButton.GetComponentInChildren<Text>();
+		if (tx != null) tx.text = owner ? "[Update]" : "[Upload]";
+	}
+
 	public void UploadSelected()
 	{
 		if (!ServerAccounts.LoggedIn)
@@ -204,38 +255,59 @@ public class WorkshopMenu : MonoBehaviour
 			SetStatus("Login to publish");
 			return;
 		}
-		if (localPaths.Count == 0)
+		string path = SelectedPath();
+		if (string.IsNullOrEmpty(path))
 		{
 			SetStatus("No local .opc");
 			return;
 		}
-		int i = localSavesDropdown != null ? localSavesDropdown.value : 0;
-		if (i < 0 || i >= localPaths.Count) i = 0;
 
-		// Защита от копирования: скачанный из мастерской сейв перевыложить нельзя.
-		try
+		int wid; string wkey; int sourceId;
+		bool owner = SelectedIsOwner(out wid, out wkey, out sourceId);
+		if (!owner && sourceId > 0)
 		{
-			var probe = new DataLoader(localPaths[i]);
-			probe.LoadFromPath();
-			if (probe.GameData != null && probe.GameData.workshopSourceId > 0)
-			{
-				SetStatus("Cannot republish a downloaded save");
-				return;
-			}
+			SetStatus("Cannot republish a downloaded save");
+			return;
 		}
-		catch { }
 
 		string title = titleField != null && !string.IsNullOrEmpty(titleField.text)
-			? titleField.text : Path.GetFileNameWithoutExtension(localPaths[i]);
-		string author = authorField != null && !string.IsNullOrEmpty(authorField.text)
-			? authorField.text : ServerAccounts.Name;
+			? titleField.text : Path.GetFileNameWithoutExtension(path);
+		string author = ServerAccounts.Name;
 		string desc = descField != null ? descField.text : "";
+		if (owner)
+		{
+			SetStatus("Updating...");
+			WorkshopClient.Instance.UpdateSave(wid, wkey, path, title, author, desc, null, (id, key, err) =>
+			{
+				if (err != null) { SetStatus("Update: " + err); return; }
+				if (!string.IsNullOrEmpty(key)) WorkshopLocal.Put(path, id > 0 ? id : wid, key);
+				SetStatus("Updated #" + (id > 0 ? id : wid));
+				RefreshList();
+				RefreshUploadLabel();
+			});
+			return;
+		}
+
 		SetStatus("Uploading...");
-		WorkshopClient.Instance.Upload(localPaths[i], title, author, desc, null, (id, key, err) =>
+		WorkshopClient.Instance.Upload(path, title, author, desc, null, (id, key, err) =>
 		{
 			if (err != null) { SetStatus("Upload: " + err); return; }
+			WorkshopLocal.Put(path, id, key);
+			try
+			{
+				var loader = new DataLoader(path);
+				loader.LoadFromPath();
+				if (loader.GameData != null)
+				{
+					loader.GameData.workshopId = id;
+					loader.GameData.workshopKey = "";
+					loader.WriteToFile();
+				}
+			}
+			catch { }
 			SetStatus("Uploaded #" + id);
 			RefreshList();
+			RefreshUploadLabel();
 		});
 	}
 

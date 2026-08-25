@@ -1,7 +1,7 @@
 <?php
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Upload-Key');
+header('Access-Control-Allow-Headers: Content-Type, X-Upload-Key, X-Auth-Token');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 $cfgPath = __DIR__ . '/config.php';
@@ -59,11 +59,46 @@ function clean($s, $max) {
     return substr($s, 0, $max);
 }
 function pub($it) {
-    unset($it['owner_key'], $it['liked'], $it['ip']);
+    unset($it['owner_key'], $it['liked'], $it['ip'], $it['owner_user_id']);
     if (empty($it['likes'])) $it['likes'] = 0;
     if (empty($it['downloads'])) $it['downloads'] = 0;
     $it['has_cover'] = !empty($it['cover']);
     return $it;
+}
+
+function request_token() {
+    if (!empty($_SERVER['HTTP_X_AUTH_TOKEN'])) return trim((string)$_SERVER['HTTP_X_AUTH_TOKEN']);
+    if (isset($_POST['token'])) return trim((string)$_POST['token']);
+    return '';
+}
+
+function resolve_user() {
+    $token = request_token();
+    if ($token === '') return null;
+    $users = [];
+    $f = __DIR__ . '/users.json';
+    if (is_file($f)) {
+        $j = json_decode(@file_get_contents($f), true);
+        if (is_array($j)) $users = $j;
+    }
+    foreach ($users as $u) {
+        if (!empty($u['token']) && hash_equals((string)$u['token'], $token)) return $u;
+    }
+    return null;
+}
+
+function require_user() {
+    $u = resolve_user();
+    if ($u === null) json_out(['ok' => false, 'error' => 'login required'], 401);
+    return $u;
+}
+
+function owns_item($it, $user, $ownerKey) {
+    if ($user !== null && !empty($it['owner_user_id']) && (int)$it['owner_user_id'] === (int)$user['id'])
+        return true;
+    if (!empty($it['owner_key']) && $ownerKey !== '' && hash_equals((string)$it['owner_key'], (string)$ownerKey))
+        return true;
+    return false;
 }
 function find_item(&$items, $id) {
     foreach ($items as $i => $it) {
@@ -135,11 +170,12 @@ if ($action === 'like' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_user();
     $gate = isset($_SERVER['HTTP_X_UPLOAD_KEY']) ? $_SERVER['HTTP_X_UPLOAD_KEY'] : (isset($_POST['key']) ? $_POST['key'] : '');
     if (UPLOAD_KEY !== '' && $gate !== UPLOAD_KEY) json_out(['ok' => false, 'error' => 'bad key'], 403);
 
     $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0';
-    $rateFile = UPLOADS_DIR . '/rate_' . md5($ip);
+    $rateFile = UPLOADS_DIR . '/rate_' . md5($ip . ':' . (int)$user['id']);
     $hits = 0;
     if (is_file($rateFile) && filemtime($rateFile) > time() - 3600) $hits = (int)file_get_contents($rateFile);
     if ($hits >= RATE_PER_HOUR) json_out(['ok' => false, 'error' => 'rate limit'], 429);
@@ -148,7 +184,7 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
 
     $title = clean(isset($_POST['title']) ? $_POST['title'] : 'Save', 80);
-    $author = clean(isset($_POST['author']) ? $_POST['author'] : 'Player', 40);
+    $author = clean(isset($user['name']) ? $user['name'] : 'Player', 40);
     $desc = clean(isset($_POST['description']) ? $_POST['description'] : '', 280);
 
     if (is_banned($author, $ip)) json_out(['ok' => false, 'error' => 'banned'], 403);
@@ -175,6 +211,8 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'likes' => 0,
         'liked' => [],
         'owner_key' => $owner,
+        'owner_user_id' => (int)$user['id'],
+        'owner_name' => $author,
         'ip' => $ip,
     ];
     save_index($INDEX, $items);
@@ -183,17 +221,22 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = resolve_user();
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $owner = isset($_POST['owner_key']) ? $_POST['owner_key'] : '';
     $items = load_index($INDEX);
     $i = find_item($items, $id);
     if ($i < 0) json_out(['ok' => false, 'error' => 'not found'], 404);
-    if (empty($items[$i]['owner_key']) || $items[$i]['owner_key'] !== $owner) json_out(['ok' => false, 'error' => 'forbidden'], 403);
-    $newAuthor = isset($_POST['author']) ? clean($_POST['author'], 40) : $items[$i]['author'];
+    if (!owns_item($items[$i], $user, $owner)) json_out(['ok' => false, 'error' => 'forbidden'], 403);
+    if ($user !== null) {
+        $items[$i]['owner_user_id'] = (int)$user['id'];
+        $items[$i]['owner_name'] = clean(isset($user['name']) ? $user['name'] : '', 40);
+        $items[$i]['author'] = $items[$i]['owner_name'] !== '' ? $items[$i]['owner_name'] : $items[$i]['author'];
+    }
+    $newAuthor = $items[$i]['author'];
     if (is_banned($newAuthor, isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0'))
         json_out(['ok' => false, 'error' => 'banned'], 403);
     if (isset($_POST['title'])) $items[$i]['title'] = clean($_POST['title'], 80);
-    if (isset($_POST['author'])) $items[$i]['author'] = $newAuthor;
     if (isset($_POST['description'])) $items[$i]['description'] = clean($_POST['description'], 280);
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
@@ -208,12 +251,13 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = resolve_user();
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $owner = isset($_POST['owner_key']) ? $_POST['owner_key'] : '';
     $items = load_index($INDEX);
     $i = find_item($items, $id);
     if ($i < 0) json_out(['ok' => false, 'error' => 'not found'], 404);
-    if (empty($items[$i]['owner_key']) || $items[$i]['owner_key'] !== $owner) json_out(['ok' => false, 'error' => 'forbidden'], 403);
+    if (!owns_item($items[$i], $user, $owner)) json_out(['ok' => false, 'error' => 'forbidden'], 403);
     @unlink(UPLOADS_DIR . '/' . basename($items[$i]['filename']));
     if (!empty($items[$i]['cover'])) @unlink(UPLOADS_DIR . '/' . basename($items[$i]['cover']));
     array_splice($items, $i, 1);
