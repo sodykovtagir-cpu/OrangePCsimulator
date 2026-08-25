@@ -6,7 +6,7 @@ namespace PC.Component.Software.Lua
 {
 	public static class PcosLuaHost
 	{
-		public static void Bind(PcosLua vm, OperatingSystem os)
+		public static void Bind(PcosLua vm, PC.Component.Software.OS.OperatingSystem os)
 		{
 			if (vm == null) return;
 
