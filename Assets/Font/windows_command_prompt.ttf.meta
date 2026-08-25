@@ -11,7 +11,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Windows Command Prompt
+  - Fixedsys Excelsior
   fallbackFontReferences:
   - {fileID: 12800000, guid: f81d08ae9d632bb44950f71a970b8d47, type: 3}
   customCharacters:
