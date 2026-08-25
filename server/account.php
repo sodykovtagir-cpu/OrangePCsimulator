@@ -25,14 +25,14 @@ if (is_file($cfgPath)) require $cfgPath;
 if (!defined('USERS_FILE'))         define('USERS_FILE', __DIR__ . '/users.json');
 if (!defined('TG_PENDING_FILE'))    define('TG_PENDING_FILE', __DIR__ . '/tg_pending.json');
 if (!defined('CODE_TTL'))           define('CODE_TTL', 900);          // 15 минут
-if (!defined('MAIL_FROM'))          define('MAIL_FROM', 'noreply@orangepcsimu.byethost4.com');
+if (!defined('MAIL_FROM'))          define('MAIL_FROM', 'orangepcsimu@internet.ru');
 if (!defined('MAIL_FROM_NAME'))     define('MAIL_FROM_NAME', 'Orange PC Simulator');
-// Optional SMTP (если задан MAIL_SMTP_HOST — используется он, иначе mail()).
+// SMTP: задаётся в config.php. Mail.ru: smtp.mail.ru:465 ssl.
 if (!defined('MAIL_SMTP_HOST'))     define('MAIL_SMTP_HOST', '');
-if (!defined('MAIL_SMTP_PORT'))     define('MAIL_SMTP_PORT', 587);
+if (!defined('MAIL_SMTP_PORT'))     define('MAIL_SMTP_PORT', 465);
 if (!defined('MAIL_SMTP_USER'))     define('MAIL_SMTP_USER', '');
 if (!defined('MAIL_SMTP_PASS'))     define('MAIL_SMTP_PASS', '');
-if (!defined('MAIL_SMTP_SECURE'))   define('MAIL_SMTP_SECURE', 'tls'); // tls|ssl|''
+if (!defined('MAIL_SMTP_SECURE'))   define('MAIL_SMTP_SECURE', 'ssl'); // ssl|tls|''
 if (!defined('TELEGRAM_BOT_TOKEN')) define('TELEGRAM_BOT_TOKEN', '');
 if (!defined('TELEGRAM_BOT_USERNAME')) define('TELEGRAM_BOT_USERNAME', ''); // без @
 
@@ -86,47 +86,107 @@ function valid_email($e) {
     return (bool)filter_var($e, FILTER_VALIDATE_EMAIL);
 }
 
-/** Минимальный SMTP-клиент (AUTH LOGIN). Возвращает true при успехе. */
+/** Читает многострочный ответ SMTP. */
+function smtp_read($sock) {
+    $data = '';
+    stream_set_timeout($sock, 20);
+    while (($line = @fgets($sock, 515)) !== false) {
+        $data .= $line;
+        if (strlen($line) >= 4 && $line[3] === ' ') break;
+        if (strlen($line) < 4) break;
+    }
+    return [(int)substr($data, 0, 3), $data];
+}
+
+/** Команда SMTP. $expect — код или массив допустимых кодов. */
+function smtp_cmd($sock, $cmd, $expect) {
+    if ($cmd !== null && $cmd !== '') fwrite($sock, $cmd . "\r\n");
+    list($code, $raw) = smtp_read($sock);
+    $ok = is_array($expect) ? in_array($code, $expect, true) : ($code === (int)$expect);
+    return [$ok, $code, $raw];
+}
+
+/** SMTP-клиент (AUTH LOGIN). ssl = implicit TLS :465, tls = STARTTLS :587. */
 function smtp_send($to, $subject, $htmlBody, $textBody) {
     $host = MAIL_SMTP_HOST;
     if ($host === '') return false;
-    $port  = MAIL_SMTP_PORT;
-    $user  = MAIL_SMTP_USER;
-    $pass  = MAIL_SMTP_PASS;
-    $secure = MAIL_SMTP_SECURE;
+    $port   = (int)MAIL_SMTP_PORT;
+    $user   = MAIL_SMTP_USER;
+    $pass   = MAIL_SMTP_PASS;
+    $secure = strtolower((string)MAIL_SMTP_SECURE);
 
-    $errno = 0; $errstr = '';
+    $ctx = stream_context_create([
+        'ssl' => [
+            'verify_peer'       => false,
+            'verify_peer_name'  => false,
+            'allow_self_signed' => true,
+            'crypto_method'     => STREAM_CRYPTO_METHOD_TLS_CLIENT,
+        ],
+    ]);
     $scheme = ($secure === 'ssl') ? 'ssl' : 'tcp';
-    $sock = @stream_socket_client($scheme . '://' . $host . ':' . $port, $errno, $errstr, 15);
+    $errno = 0; $errstr = '';
+    $sock = @stream_socket_client(
+        $scheme . '://' . $host . ':' . $port,
+        $errno,
+        $errstr,
+        20,
+        STREAM_CLIENT_CONNECT,
+        $ctx
+    );
     if (!$sock) return false;
+
+    list($ok) = smtp_cmd($sock, null, [220]);
+    if (!$ok) { fclose($sock); return false; }
+    list($ok) = smtp_cmd($sock, 'EHLO orangepcsimu.local', [250]);
+    if (!$ok) { fclose($sock); return false; }
+
     if ($secure === 'tls') {
-        if (!@stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) { fclose($sock); return false; }
+        list($ok) = smtp_cmd($sock, 'STARTTLS', [220]);
+        if (!$ok) { fclose($sock); return false; }
+        if (!@stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            fclose($sock);
+            return false;
+        }
+        list($ok) = smtp_cmd($sock, 'EHLO orangepcsimu.local', [250]);
+        if (!$ok) { fclose($sock); return false; }
     }
-    $r = function ($w) use ($sock) {
-        fwrite($sock, $w);
-        stream_set_timeout($sock, 10);
-        @fgets($sock);
-        if (function_exists('stream_get_meta_data')) { $m = stream_get_meta_data($sock); if (!empty($m['timed_out'])) { /* rate */ } }
-        return true;
-    };
-    $r("EHLO localhost\r\n");
+
     if ($user !== '') {
-        $r("AUTH LOGIN\r\n");
-        $r(base64_encode($user) . "\r\n");
-        $r(base64_encode($pass) . "\r\n");
+        list($ok) = smtp_cmd($sock, 'AUTH LOGIN', [334]);
+        if (!$ok) { fclose($sock); return false; }
+        list($ok) = smtp_cmd($sock, base64_encode($user), [334]);
+        if (!$ok) { fclose($sock); return false; }
+        list($ok) = smtp_cmd($sock, base64_encode($pass), [235, 250]);
+        if (!$ok) { fclose($sock); return false; }
     }
-    $r("MAIL FROM:<" . MAIL_FROM . ">\r\n");
-    $r("RCPT TO:<" . $to . ">\r\n");
-    $r("DATA\r\n");
-    $headers = "From: " . MAIL_FROM_NAME . " <" . MAIL_FROM . ">\r\n"
+
+    list($ok) = smtp_cmd($sock, 'MAIL FROM:<' . MAIL_FROM . '>', [250]);
+    if (!$ok) { fclose($sock); return false; }
+    list($ok) = smtp_cmd($sock, 'RCPT TO:<' . $to . '>', [250, 251]);
+    if (!$ok) { fclose($sock); return false; }
+    list($ok) = smtp_cmd($sock, 'DATA', [354]);
+    if (!$ok) { fclose($sock); return false; }
+
+    $subj = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($subject, 'UTF-8')
+        : $subject;
+    $fromName = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader(MAIL_FROM_NAME, 'UTF-8')
+        : MAIL_FROM_NAME;
+    $msgid = '<' . bin2hex(random_bytes(8)) . '@internet.ru>';
+    $headers = "From: " . $fromName . " <" . MAIL_FROM . ">\r\n"
              . "To: <" . $to . ">\r\n"
+             . "Date: " . gmdate('D, d M Y H:i:s') . " +0000\r\n"
+             . "Message-ID: " . $msgid . "\r\n"
              . "MIME-Version: 1.0\r\n"
              . "Content-Type: text/html; charset=utf-8\r\n"
-             . "Subject: " . mb_encode_mimeheader($subject, 'UTF-8') . "\r\n";
-    fwrite($sock, $headers . "\r\n" . $htmlBody . "\r\n.\r\n");
-    $r("QUIT\r\n");
+             . "Subject: " . $subj . "\r\n";
+    $body = str_replace(["\r\n.", "\n."], ["\r\n..", "\n.."], $htmlBody);
+    fwrite($sock, $headers . "\r\n" . $body . "\r\n.\r\n");
+    list($ok) = smtp_cmd($sock, null, [250]);
+    @smtp_cmd($sock, 'QUIT', [221, 250]);
     fclose($sock);
-    return true;
+    return $ok;
 }
 
 /** Отправка письма: SMTP если настроен, иначе mail(). */
