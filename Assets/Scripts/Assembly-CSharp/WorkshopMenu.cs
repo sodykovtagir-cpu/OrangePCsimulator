@@ -338,6 +338,7 @@ public class WorkshopMenu : MonoBehaviour
 				{
 					WorkshopClient.Instance.Like(captured, (n, err) =>
 					{
+						if (t == null) return;
 						if (err != null) { SetStatus(err); return; }
 						SetChildText(t, "Likes", n.ToString());
 					});
@@ -352,6 +353,7 @@ public class WorkshopMenu : MonoBehaviour
 			{
 				WorkshopClient.Instance.DownloadCover(it.id, (tex, err) =>
 				{
+					if (raw == null) return;
 					if (tex != null) raw.texture = tex;
 				});
 			}

@@ -62,8 +62,10 @@ public class AccountPage : MonoBehaviour
 	[SerializeField] private Text emailText;
 	[Tooltip("Заголовок над списком сейвов (опционально).")]
 	[SerializeField] private Text savesTitle;
-	[Tooltip("Контейнер, куда спавнятся строки ваших сейвов (с кнопкой Удалить).")]
+	[Tooltip("Контейнер, куда спавнятся карточки ваших сейвов.")]
 	[SerializeField] private Transform savesList;
+	[Tooltip("Своя карточка сейва. Дети: Name/Title, Downloads, Likes, Description, Cover (RawImage), Delete (Button). Шаблон-ребёнок Template не удаляется.")]
+	[SerializeField] private GameObject saveCardPrefab;
 	[SerializeField] private InputField tgField;         // @telegram_username
 	[SerializeField] private Button tgButton;            // -> LinkTelegram()
 	[SerializeField] private Text bonusText;
@@ -377,32 +379,164 @@ public class AccountPage : MonoBehaviour
 	private void RebuildSaves()
 	{
 		if (savesList == null) return;
+		EnsureSavesLayout();
 		for (int i = savesList.childCount - 1; i >= 0; i--)
-			Destroy(savesList.GetChild(i).gameObject);
-		var my = ServerAccounts.MySaves;
-		if (my.Count == 0)
 		{
-			var empty = MakeText(savesList, "Empty", "You haven't published any saves yet.", TextAnchor.MiddleLeft, 13, new Color(0.6f, 0.6f, 0.6f));
-			empty.rectTransform.anchorMin = empty.rectTransform.anchorMax = new Vector2(0f, 1f);
-			empty.rectTransform.anchoredPosition = new Vector2(0f, -10f);
+			var ch = savesList.GetChild(i);
+			if (IsSaveTemplate(ch.gameObject)) continue;
+			Destroy(ch.gameObject);
+		}
+
+		var my = ServerAccounts.MySaves;
+		if (my == null || my.Count == 0)
+		{
+			ShowEmptySaves();
 			return;
 		}
+
 		foreach (var s in my)
+			SpawnSaveCard(s);
+	}
+
+	private static bool IsSaveTemplate(GameObject go)
+	{
+		if (go == null) return false;
+		string n = go.name;
+		return n == "Template" || n == "SaveCard" || n == "Card" || n.EndsWith("(Template)");
+	}
+
+	private void EnsureSavesLayout()
+	{
+		var v = savesList.GetComponent<VerticalLayoutGroup>();
+		if (v == null)
 		{
-			var row = new GameObject("row_" + s.id, typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(Image));
+			v = savesList.gameObject.AddComponent<VerticalLayoutGroup>();
+			v.spacing = 8f;
+			v.padding = new RectOffset(8, 8, 8, 8);
+			v.childAlignment = TextAnchor.UpperLeft;
+			v.childControlWidth = true;
+			v.childControlHeight = false;
+			v.childForceExpandWidth = true;
+			v.childForceExpandHeight = false;
+		}
+		var fitter = savesList.GetComponent<ContentSizeFitter>();
+		if (fitter == null)
+		{
+			fitter = savesList.gameObject.AddComponent<ContentSizeFitter>();
+			fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+			fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+		}
+	}
+
+	private void ShowEmptySaves()
+	{
+		var empty = MakeText(savesList, "Empty", "You haven't published any saves yet.", TextAnchor.MiddleLeft, 18, new Color(0.75f, 0.75f, 0.75f));
+		empty.horizontalOverflow = HorizontalWrapMode.Wrap;
+		empty.verticalOverflow = VerticalWrapMode.Overflow;
+		empty.resizeTextForBestFit = false;
+		var rt = empty.rectTransform;
+		rt.anchorMin = new Vector2(0f, 1f);
+		rt.anchorMax = new Vector2(1f, 1f);
+		rt.pivot = new Vector2(0.5f, 1f);
+		rt.offsetMin = new Vector2(8f, -80f);
+		rt.offsetMax = new Vector2(-8f, -8f);
+		var le = empty.gameObject.AddComponent<LayoutElement>();
+		le.minHeight = 48f;
+		le.preferredHeight = 48f;
+		le.flexibleWidth = 1f;
+	}
+
+	private void SpawnSaveCard(AccountSaveItem s)
+	{
+		GameObject row = null;
+		if (saveCardPrefab != null)
+			row = Instantiate(saveCardPrefab, savesList, false);
+		else
+		{
+			var tmpl = FindSaveTemplate();
+			if (tmpl != null)
+			{
+				row = Instantiate(tmpl, savesList, false);
+				row.SetActive(true);
+			}
+		}
+
+		if (row == null)
+		{
+			row = new GameObject("row_" + s.id, typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(Image), typeof(LayoutElement));
 			row.transform.SetParent(savesList, false);
 			row.GetComponent<Image>().color = new Color(0.14f, 0.14f, 0.14f, 1f);
 			var h = row.GetComponent<HorizontalLayoutGroup>();
 			h.spacing = 6; h.padding = new RectOffset(8, 8, 4, 4); h.childForceExpandWidth = true;
-
-			var title = MakeText(row.transform, "Title", s.title + "  ·  " + s.likes + "♥  " + s.downloads + "⬇", TextAnchor.MiddleLeft, 14, Color.white);
-			var le = title.gameObject.AddComponent<LayoutElement>();
-			le.flexibleWidth = 1f;
-
-			int id = s.id;
-			string owner = s.owner_key;
-			MakeRowButton(row.transform, "Del", () => DoDelete(id, owner), 60f);
+			row.GetComponent<LayoutElement>().minHeight = 40f;
+			var title = MakeText(row.transform, "Name", "", TextAnchor.MiddleLeft, 16, Color.white);
+			title.horizontalOverflow = HorizontalWrapMode.Wrap;
+			title.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+			MakeRowButton(row.transform, "Delete", () => { }, 80f);
 		}
+
+		row.name = "row_" + s.id;
+		WireSaveCard(row.transform, s);
+	}
+
+	private GameObject FindSaveTemplate()
+	{
+		for (int i = 0; i < savesList.childCount; i++)
+		{
+			var ch = savesList.GetChild(i).gameObject;
+			if (IsSaveTemplate(ch))
+			{
+				ch.SetActive(false);
+				return ch;
+			}
+		}
+		return null;
+	}
+
+	private void WireSaveCard(Transform t, AccountSaveItem s)
+	{
+		string title = string.IsNullOrEmpty(s.title) ? ("Save #" + s.id) : s.title;
+		SetChildText(t, "Name", title);
+		SetChildText(t, "Title", title);
+		SetChildText(t, "Downloads", s.downloads.ToString());
+		SetChildText(t, "Likes", s.likes.ToString());
+		SetChildText(t, "Description", s.description ?? "");
+
+		int id = s.id;
+		string owner = s.owner_key;
+		var del = t.Find("Delete");
+		if (del == null) del = t.Find("Del");
+		if (del != null)
+		{
+			var b = del.GetComponent<Button>();
+			if (b != null)
+			{
+				b.onClick.RemoveAllListeners();
+				b.onClick.AddListener(() => DoDelete(id, owner));
+			}
+		}
+
+		var cover = t.Find("Cover");
+		if (cover != null && s.has_cover)
+		{
+			var raw = cover.GetComponent<RawImage>();
+			if (raw != null && WorkshopClient.Ensure() != null)
+			{
+				WorkshopClient.Instance.DownloadCover(s.id, (tex, err) =>
+				{
+					if (raw == null) return;
+					if (tex != null) raw.texture = tex;
+				});
+			}
+		}
+	}
+
+	private static void SetChildText(Transform t, string child, string value)
+	{
+		var c = t.Find(child);
+		if (c == null) return;
+		var tx = c.GetComponent<Text>();
+		if (tx != null) tx.text = value;
 	}
 
 	private void MakeRowButton(Transform parent, string label, UnityEngine.Events.UnityAction click, float width)
