@@ -140,22 +140,40 @@ public class SimpleScreenFx : MonoBehaviour
 
 		float fov = Mathf.Max(1f, cam.fieldOfView);
 		float aspect = Mathf.Max(0.1f, cam.aspect);
-		float shutter = 1f / 48f;
+		// Короче «выдержка» — мягкое смазывание, не длинный резкий шлейф.
+		float shutter = 1f / 72f;
 		float yawUv = (yaw / (fov * aspect)) * (shutter / dt);
 		float pitchUv = (pitch / fov) * (shutter / dt);
 
 		Vector3 local = cam.transform.InverseTransformDirection(pos - prevCamPos);
 		float z = Mathf.Max(1.5f, Mathf.Abs(local.z) + 1.5f);
-		float transX = (local.x / z) * (shutter / dt) * 0.35f;
-		float transY = (local.y / z) * (shutter / dt) * 0.35f;
+		float transX = (local.x / z) * (shutter / dt) * 0.22f;
+		float transY = (local.y / z) * (shutter / dt) * 0.22f;
 
 		Vector2 vel = new Vector2(-(yawUv + transX), pitchUv + transY);
 		float mag = vel.magnitude;
 		prevCamPos = pos;
 		prevCamRot = rot;
-		if (mag < 0.0006f) return;
 
-		dirUv = vel.normalized * Mathf.Clamp(mag, 0f, 0.045f);
-		amount = Mathf.Clamp01((mag - 0.0006f) * 14f);
+		Vector2 targetDir = Vector2.zero;
+		float targetAmt = 0f;
+		if (mag >= 0.00045f)
+		{
+			targetDir = vel.normalized * Mathf.Clamp(mag, 0f, 0.018f);
+			targetAmt = Mathf.Clamp01((mag - 0.00045f) * 8f) * 0.62f;
+		}
+
+		float k = mag >= 0.00045f ? 0.28f : 0.5f;
+		smoothDir = Vector2.Lerp(smoothDir, targetDir, k);
+		smoothAmt = Mathf.Lerp(smoothAmt, targetAmt, k);
+		if (smoothAmt < 0.02f)
+		{
+			smoothAmt = 0f;
+			smoothDir = Vector2.zero;
+			return;
+		}
+
+		dirUv = smoothDir;
+		amount = smoothAmt;
 	}
 }

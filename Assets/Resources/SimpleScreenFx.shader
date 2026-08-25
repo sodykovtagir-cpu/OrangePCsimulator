@@ -110,16 +110,19 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				// иначе края смешиваются с невиньетированными сэмплами и мигают.
 				if (_Motion > 0.001)
 				{
+					// Мягкий гаусс вдоль вектора камеры — без отдельных «копий» кадра.
 					float2 d = _MotionDir;
 					float3 acc = 0;
-					acc += tex2D(_MainTex, saturate(uv)).rgb * 0.20;
-					acc += tex2D(_MainTex, saturate(uv + d * 0.28)).rgb * 0.17;
-					acc += tex2D(_MainTex, saturate(uv - d * 0.28)).rgb * 0.17;
-					acc += tex2D(_MainTex, saturate(uv + d * 0.58)).rgb * 0.13;
-					acc += tex2D(_MainTex, saturate(uv - d * 0.58)).rgb * 0.13;
-					acc += tex2D(_MainTex, saturate(uv + d * 0.90)).rgb * 0.10;
-					acc += tex2D(_MainTex, saturate(uv - d * 0.90)).rgb * 0.10;
-					col = lerp(col, acc, saturate(_Motion));
+					float wsum = 0;
+					[unroll]
+					for (int s = -5; s <= 5; s++)
+					{
+						float t = s / 5.0;
+						float w = exp(-t * t * 2.8);
+						acc += tex2D(_MainTex, saturate(uv + d * t)).rgb * w;
+						wsum += w;
+					}
+					col = lerp(col, acc / max(wsum, 1e-4), saturate(_Motion));
 				}
 
 				if (_AO > 0.001)
