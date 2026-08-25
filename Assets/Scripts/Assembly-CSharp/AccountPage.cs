@@ -123,6 +123,7 @@ public class AccountPage : MonoBehaviour
 		WireButtons();
 		Subscribe();
 		RefreshChip();
+		WorkshopClient.Ensure();
 	}
 
 	// ================= Public (и для инспектора OnClick) =================
@@ -422,13 +423,32 @@ public class AccountPage : MonoBehaviour
 
 	// ================= Actions =================
 
+	private static string FieldText(InputField field)
+	{
+		if (field == null || field.text == null) return "";
+		return field.text.Trim();
+	}
+
+	private WorkshopClient Net()
+	{
+		var wc = WorkshopClient.Ensure();
+		if (wc == null)
+		{
+			SetStatus("Network client missing.");
+			return null;
+		}
+		return wc;
+	}
+
 	private void DoLogin()
 	{
-		string login = loginField != null ? loginField.text.Trim() : "";
-		string pass = passwordField != null ? passwordField.text : "";
+		string login = FieldText(loginField);
+		string pass = passwordField != null && passwordField.text != null ? passwordField.text : "";
 		if (login == "" || pass == "") { SetStatus("Enter login and password."); return; }
+		var wc = Net();
+		if (wc == null) return;
 		SetStatus("Signing in...");
-		WorkshopClient.Instance.AccountLogin(login, pass, (r, err) =>
+		wc.AccountLogin(login, pass, (r, err) =>
 		{
 			if (err != null) { SetStatus("Network error: " + err); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Login failed."); return; }
@@ -441,16 +461,18 @@ public class AccountPage : MonoBehaviour
 
 	private void DoRegister()
 	{
-		string name = regNameField != null ? regNameField.text.Trim() : "";
-		string email = regEmailField != null ? regEmailField.text.Trim() : "";
-		string pass = regPassField != null ? regPassField.text : "";
+		string name = FieldText(regNameField);
+		string email = FieldText(regEmailField);
+		string pass = regPassField != null && regPassField.text != null ? regPassField.text : "";
 		if (name.Length < 3 || email == "" || pass.Length < 6)
 		{
 			SetStatus("Name ≥3, valid email, password ≥6.");
 			return;
 		}
+		var wc = Net();
+		if (wc == null) return;
 		SetStatus("Registering...");
-		WorkshopClient.Instance.AccountRegister(name, email, pass, (r, err) =>
+		wc.AccountRegister(name, email, pass, (r, err) =>
 		{
 			if (err != null) { SetStatus("Network error: " + err); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Register failed."); return; }
@@ -466,10 +488,12 @@ public class AccountPage : MonoBehaviour
 	private void DoVerify()
 	{
 		string email = recallEmail != "" ? recallEmail : ServerAccounts.Email;
-		string code = codeField != null ? codeField.text.Trim() : "";
+		string code = FieldText(codeField);
 		if (code == "") { SetStatus("Enter the code from email."); return; }
+		var wc = Net();
+		if (wc == null) return;
 		SetStatus("Verifying...");
-		WorkshopClient.Instance.AccountVerify(email, code, (r, err) =>
+		wc.AccountVerify(email, code, (r, err) =>
 		{
 			if (err != null) { SetStatus("Network error: " + err); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Wrong code."); return; }
@@ -485,8 +509,10 @@ public class AccountPage : MonoBehaviour
 	{
 		string email = recallEmail != "" ? recallEmail : ServerAccounts.Email;
 		if (email == "") { SetStatus("Enter email first."); return; }
+		var wc = Net();
+		if (wc == null) return;
 		SetStatus("Sending...");
-		WorkshopClient.Instance.AccountResend(email, (r, err) =>
+		wc.AccountResend(email, (r, err) =>
 		{
 			if (err != null) { SetStatus("Network error: " + err); return; }
 			if (r != null && r.ok) SetStatus("Code re-sent. Check your email.");
@@ -496,7 +522,9 @@ public class AccountPage : MonoBehaviour
 
 	private void LoadMe()
 	{
-		WorkshopClient.Instance.AccountMe(ServerAccounts.Token, (r, err) =>
+		var wc = Net();
+		if (wc == null) return;
+		wc.AccountMe(ServerAccounts.Token, (r, err) =>
 		{
 			if (r == null || !r.ok) return;
 			ServerAccounts.SetSession(ServerAccounts.Token, r.name, r.email);
@@ -510,10 +538,12 @@ public class AccountPage : MonoBehaviour
 
 	private void DoTgLink()
 	{
-		string tg = tgField != null ? tgField.text.Trim() : "";
+		string tg = FieldText(tgField);
 		if (tg == "") { SetStatus("Enter your Telegram username."); return; }
+		var wc = Net();
+		if (wc == null) return;
 		SetStatus("Linking Telegram...");
-		WorkshopClient.Instance.TgLink(ServerAccounts.Token, tg, (r, err) =>
+		wc.TgLink(ServerAccounts.Token, tg, (r, err) =>
 		{
 			if (err != null) { SetStatus("Network error: " + err); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : "Link failed."); return; }
@@ -538,7 +568,9 @@ public class AccountPage : MonoBehaviour
 
 	private void DoDelete(int id, string owner)
 	{
-		WorkshopClient.Instance.DeleteSave(id, owner, err =>
+		var wc = Net();
+		if (wc == null) return;
+		wc.DeleteSave(id, owner, err =>
 		{
 			if (err != null) { SetStatus("Delete: " + err); return; }
 			SetStatus("Deleted #" + id);

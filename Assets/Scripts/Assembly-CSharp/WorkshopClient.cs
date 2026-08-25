@@ -121,6 +121,14 @@ public class WorkshopClient : MonoBehaviour
 
 	public static WorkshopClient Instance { get; private set; }
 
+	/// <summary>Создаёт клиента, если его ещё нет на сцене (меню аккаунта, промокоды и т.п.).</summary>
+	public static WorkshopClient Ensure()
+	{
+		if (Instance != null) return Instance;
+		var go = new GameObject("WorkshopClient");
+		return go.AddComponent<WorkshopClient>();
+	}
+
 	private static UnityWebRequestAsyncOperation SafeSend(UnityWebRequest req)
 	{
 		try { return req.SendWebRequest(); }
