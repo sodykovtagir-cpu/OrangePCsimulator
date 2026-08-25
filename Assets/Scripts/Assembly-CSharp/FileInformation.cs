@@ -111,29 +111,53 @@ public class FileInformation : MonoBehaviour
 		if (publishPanel != null) publishPanel.SetActive(true);
 		ShowPublishFields();
 		FillPublishForm(null);
-		SetWsStatus(IsOwner() ? "Loading listing..." : "New upload");
-		if (!IsOwner()) return;
+		RefreshWorkshopButtons();
 		EnsureWorkshopClient();
+		if (!ServerAccounts.LoggedIn)
+		{
+			SetWsStatus("Login to publish");
+			return;
+		}
+
 		int id = OwnerId();
+		SetWsStatus(id > 0 ? "Checking listing..." : "New upload");
 		WorkshopClient.Instance.ListSaves((list, err) =>
 		{
 			if (err != null) { SetWsStatus(err); return; }
 			WorkshopItem found = null;
-			if (list != null)
+			if (id > 0 && list != null)
 			{
 				for (int i = 0; i < list.Count; i++)
 					if (list[i] != null && list[i].id == id) { found = list[i]; break; }
 			}
+			if (id > 0 && found == null)
+			{
+				ForgetListing();
+				FillPublishForm(null);
+				SetWsStatus("Listing gone. Publish again as new.");
+				RefreshWorkshopButtons();
+				return;
+			}
 			FillPublishForm(found);
-			SetWsStatus("Edit and press Update");
+			SetWsStatus(found != null ? "Edit and press Update" : "New upload");
+			RefreshWorkshopButtons();
 			if (found != null && found.has_cover && wsCover != null)
 			{
-				WorkshopClient.Instance.DownloadCover(id, (tex, e) =>
+				WorkshopClient.Instance.DownloadCover(found.id, (tex, e) =>
 				{
 					if (tex != null && wsCover != null) wsCover.texture = tex;
 				});
 			}
 		});
+	}
+
+	private void ForgetListing()
+	{
+		if (load == null || load.loader == null || load.loader.GameData == null) return;
+		WorkshopLocal.Remove(load.loader.Path);
+		load.loader.GameData.workshopId = 0;
+		load.loader.GameData.workshopKey = "";
+		load.loader.WriteToFile();
 	}
 
 	private void ShowPublishFields()
@@ -239,7 +263,18 @@ public class FileInformation : MonoBehaviour
 			WorkshopClient.Instance.UpdateSave(wid, wkey,
 				load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
 				{
-					if (err != null) { SetWsStatus(err); return; }
+					if (err != null)
+					{
+						if (IsGoneError(err))
+						{
+							ForgetListing();
+							SetWsStatus("Listing gone. Publishing as new...");
+							ConfirmPublish();
+							return;
+						}
+						SetWsStatus(err);
+						return;
+					}
 					if (!string.IsNullOrEmpty(key))
 						WorkshopLocal.Put(load.loader.Path, id > 0 ? id : wid, key);
 					load.loader.GameData.workshopId = id > 0 ? id : wid;
@@ -275,11 +310,8 @@ public class FileInformation : MonoBehaviour
 		string wkey = rec != null ? rec.key : load.loader.GameData.workshopKey;
 		WorkshopClient.Instance.DeleteSave(wid, wkey, err =>
 		{
-			if (err != null) { SetWsStatus(err); return; }
-			WorkshopLocal.Remove(load.loader.Path);
-			load.loader.GameData.workshopId = 0;
-			load.loader.GameData.workshopKey = "";
-			load.loader.WriteToFile();
+			if (err != null && !IsGoneError(err)) { SetWsStatus(err); return; }
+			ForgetListing();
 			SetWsStatus("Removed from workshop");
 			RefreshWorkshopButtons();
 		});
@@ -351,14 +383,43 @@ public class FileInformation : MonoBehaviour
 			SetButtonLabel(action.gameObject, owner ? "[Update]" : "[Upload]");
 		}
 		if (del != null) del.gameObject.SetActive(canPublish && owner);
-		if (close != null) close.gameObject.SetActive(canPublish);
+		if (close != null) close.gameObject.SetActive(true);
 
-		// На всякий случай управляем и «каноническими» именами,
-		// если в других сценах/префабах кнопки названы Upload/Update/Delete.
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Upload", canPublish && !owner);
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Update", canPublish && owner);
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "Delete", canPublish && owner);
 		ToggleNamed(publishPanel != null ? publishPanel.transform : transform, "DeleteWorkshop", canPublish && owner);
+		ApplyPanelButtonTexts(canPublish, owner);
+	}
+
+	private static bool IsGoneError(string err)
+	{
+		if (string.IsNullOrEmpty(err)) return false;
+		err = err.ToLowerInvariant();
+		return err.Contains("not found") || err.Contains("forbidden") || err.Contains("no listing");
+	}
+
+	private void ApplyPanelButtonTexts(bool canPublish, bool owner)
+	{
+		if (publishPanel == null) return;
+		var buttons = publishPanel.GetComponentsInChildren<Button>(true);
+		for (int i = 0; i < buttons.Length; i++)
+		{
+			var b = buttons[i];
+			if (b == null) continue;
+			string n = b.gameObject.name.ToLowerInvariant();
+			var tx = b.GetComponent<Text>();
+			if (tx == null) tx = b.GetComponentInChildren<Text>(true);
+			string t = tx != null && tx.text != null ? tx.text.ToLowerInvariant() : "";
+			bool isUpload = n.Contains("upload") || t.Contains("upload") || t.Contains("загруз");
+			bool isUpdate = n.Contains("update") || t.Contains("update") || t.Contains("обнов");
+			bool isDelete = (n.Contains("delete") && !n.Contains("file")) || t.Contains("удал") || t.Contains("[delete]");
+			bool isClose = n.Contains("close") || t.Contains("закры") || t.Contains("[close]");
+			if (isClose) { b.gameObject.SetActive(true); continue; }
+			if (isDelete) { b.gameObject.SetActive(canPublish && owner); continue; }
+			if (isUpdate && !isUpload) { b.gameObject.SetActive(canPublish && owner); continue; }
+			if (isUpload && !isUpdate) { b.gameObject.SetActive(canPublish && !owner); continue; }
+		}
 	}
 
 	/// <summary>
