@@ -44,10 +44,16 @@ public class FileInformation : MonoBehaviour
 	private MenuManager menuManager;
 	private static Texture2D coverPlaceholder;
 
+	private void Awake()
+	{
+		HideStandaloneUpdate();
+	}
+
 	private void Start()
 	{
 		menuManager = GetComponentInParent<MenuManager>();
 		AccountPanel.EnsureOnScene();
+		HideStandaloneUpdate();
 #if UNITY_ANDROID || UNITY_IOS
 		if (!NativeFilePicker.CanExportFiles())
 			exportButton.SetActive(false);
@@ -60,6 +66,8 @@ public class FileInformation : MonoBehaviour
 	{
 		AccountManager.AccountChanged += OnAccountChanged;
 		ServerAccounts.StateChanged += OnAccountChanged;
+		HideStandaloneUpdate();
+		if (load != null) RefreshWorkshopButtons();
 	}
 
 	private void OnDisable()
@@ -199,6 +207,52 @@ public class FileInformation : MonoBehaviour
 		g.workshopDesc = "";
 		g.workshopAuthor = "";
 		load.loader.WriteToFile();
+		if (fileMenu != null) fileMenu.RefreshLoadButton(load);
+	}
+
+	/// <summary>
+	/// Публикация меняет имя сейва и workshop-описание. Sign не трогаем.
+	/// </summary>
+	private void ApplyPublishedMeta(string title, string desc, string author, bool write)
+	{
+		if (load == null || load.loader == null || load.loader.GameData == null) return;
+		var g = load.loader.GameData;
+		if (!string.IsNullOrWhiteSpace(title))
+		{
+			g.roomName = title.Trim();
+			g.workshopTitle = g.roomName;
+			if (nameInput != null) nameInput.text = g.roomName;
+		}
+		g.workshopDesc = desc ?? "";
+		if (!string.IsNullOrEmpty(author)) g.workshopAuthor = author;
+		// Sign остаётся как был.
+		if (write)
+		{
+			load.loader.WriteToFile();
+			if (fileMenu != null) fileMenu.RefreshLoadButton(load);
+		}
+	}
+
+	private void HideStandaloneUpdate()
+	{
+		if (updateButton != null) updateButton.SetActive(false);
+		var buttons = GetComponentsInChildren<Button>(true);
+		for (int i = 0; i < buttons.Length; i++)
+		{
+			var b = buttons[i];
+			if (b == null) continue;
+			if (uploadButton != null && b.gameObject == uploadButton) continue;
+			if (publishPanel != null && b.transform.IsChildOf(publishPanel.transform)
+				&& b.gameObject.name.IndexOf("PublishAction", System.StringComparison.OrdinalIgnoreCase) >= 0)
+				continue;
+			string n = b.gameObject.name.ToLowerInvariant();
+			var tx = b.GetComponent<Text>();
+			if (tx == null) tx = b.GetComponentInChildren<Text>(true);
+			string t = tx != null && tx.text != null ? tx.text.ToLowerInvariant() : "";
+			bool isUpdate = n.Contains("update") || t.Contains("update") || t.Contains("обнов");
+			bool isUpload = n.Contains("upload") || t.Contains("upload") || t.Contains("загруз") || n.Contains("publishaction");
+			if (isUpdate && !isUpload) b.gameObject.SetActive(false);
+		}
 	}
 
 	private void ShowPublishFields()
@@ -308,9 +362,7 @@ public class FileInformation : MonoBehaviour
 		if (string.IsNullOrWhiteSpace(title)) title = load.loader.GameData.roomName;
 		string author = ServerAccounts.LoggedIn ? ServerAccounts.Name : "Player";
 		string desc = wsDesc != null ? wsDesc.text : "";
-		load.loader.GameData.workshopTitle = title;
-		load.loader.GameData.workshopAuthor = author;
-		load.loader.GameData.workshopDesc = desc;
+		ApplyPublishedMeta(title, desc, author, write: false);
 		SetWsStatus("Uploading...");
 		if (IsOwner())
 		{
@@ -335,7 +387,7 @@ public class FileInformation : MonoBehaviour
 						WorkshopLocal.Put(load.loader.Path, id > 0 ? id : wid, key);
 					load.loader.GameData.workshopId = id > 0 ? id : wid;
 					load.loader.GameData.workshopKey = "";
-					load.loader.WriteToFile();
+					ApplyPublishedMeta(title, desc, author, write: true);
 					SetWsStatus("Updated");
 					RefreshWorkshopButtons();
 				});
@@ -348,7 +400,7 @@ public class FileInformation : MonoBehaviour
 				WorkshopLocal.Put(load.loader.Path, id, key);
 				load.loader.GameData.workshopId = id;
 				load.loader.GameData.workshopKey = "";
-				load.loader.WriteToFile();
+				ApplyPublishedMeta(title, desc, author, write: true);
 				SetWsStatus("Published #" + id);
 				RefreshWorkshopButtons();
 			});

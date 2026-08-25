@@ -78,6 +78,7 @@ public class FileMenu : MonoBehaviour
 			var x = Instantiate(pref, parent, false);
 			x.Find("Name").GetComponent<Text>().text = l.GameData.roomName;
 			x.Find("Hardcore").gameObject.SetActive(l.GameData.hardcore == true);
+			ApplyPublishedMark(x, IsPublished(l.GameData));
 			// add to load list
 			Load v = new Load();
 			v.graphic = x.gameObject;
@@ -128,6 +129,79 @@ public class FileMenu : MonoBehaviour
 		var x = load.graphic.transform;
 		x.Find("Name").GetComponent<Text>().text = load.loader.GameData.roomName;
 		x.Find("Hardcore").gameObject.SetActive(load.loader.GameData.hardcore == true);
+		ApplyPublishedMark(x, IsPublished(load.loader.GameData));
+	}
+
+	private static bool IsPublished(GameData g)
+	{
+		return g != null && g.workshopId > 0;
+	}
+
+	private static Sprite publishedSprite;
+
+	private static void ApplyPublishedMark(Transform row, bool on)
+	{
+		if (row == null) return;
+		var mark = row.Find("Published");
+		if (mark == null)
+		{
+			var go = new GameObject("Published", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+			go.transform.SetParent(row, false);
+			var rt = go.GetComponent<RectTransform>();
+			rt.anchorMin = new Vector2(1f, 0.5f);
+			rt.anchorMax = new Vector2(1f, 0.5f);
+			rt.pivot = new Vector2(0.5f, 0.5f);
+			rt.sizeDelta = new Vector2(28f, 28f);
+			rt.anchoredPosition = new Vector2(-168f, 0f);
+			var img = go.GetComponent<Image>();
+			img.raycastTarget = false;
+			img.preserveAspect = true;
+			mark = go.transform;
+		}
+		var image = mark.GetComponent<Image>();
+		if (image != null)
+		{
+			image.sprite = PublishedSprite();
+			image.color = Color.white;
+		}
+		mark.gameObject.SetActive(on);
+	}
+
+	private static Sprite PublishedSprite()
+	{
+		if (publishedSprite != null) return publishedSprite;
+		const int s = 32;
+		var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+		tex.wrapMode = TextureWrapMode.Clamp;
+		tex.filterMode = FilterMode.Bilinear;
+		var px = new Color32[s * s];
+		var clear = new Color32(0, 0, 0, 0);
+		var orange = new Color32(255, 136, 0, 255);
+		var dark = new Color32(40, 24, 0, 255);
+		for (int i = 0; i < px.Length; i++) px[i] = clear;
+		int cx = 16, cy = 16, r = 14;
+		int r2 = r * r;
+		for (int y = 0; y < s; y++)
+			for (int x = 0; x < s; x++)
+			{
+				int dx = x - cx, dy = y - cy;
+				if (dx * dx + dy * dy <= r2) px[y * s + x] = orange;
+			}
+		// стрелка вверх
+		for (int y = 8; y <= 20; y++)
+			for (int x = 14; x <= 17; x++)
+				px[y * s + x] = dark;
+		for (int i = 0; i <= 7; i++)
+			for (int x = 16 - i; x <= 16 + i; x++)
+			{
+				int y = 20 - i;
+				if (x >= 0 && x < s && y >= 0 && y < s) px[y * s + x] = dark;
+			}
+		tex.SetPixels32(px);
+		tex.Apply(false, false);
+		publishedSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 32f);
+		publishedSprite.name = "PublishedMark";
+		return publishedSprite;
 	}
 
 	public void DeleteLoadButton(Load load)
