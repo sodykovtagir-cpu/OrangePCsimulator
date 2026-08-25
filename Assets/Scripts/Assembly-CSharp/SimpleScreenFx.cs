@@ -11,6 +11,9 @@ public class SimpleScreenFx : MonoBehaviour
 
 	private Material mat;
 	private RenderTexture prev;
+	private bool havePrevCam;
+	private Vector3 prevCamPos;
+	private Quaternion prevCamRot;
 
 	private void OnDestroy()
 	{
@@ -86,40 +89,69 @@ public class SimpleScreenFx : MonoBehaviour
 		m.SetFloat("_Grain", grain ? 0.08f : 0f);
 		m.SetFloat("_AO", ao ? 0.28f : 0f);
 
-		float motionKeep = 0f;
-		if (motionBlur)
+		Vector2 motionDir;
+		float motionAmt;
+		ComputeCameraMotion(out motionDir, out motionAmt);
+		if (!motionBlur)
 		{
-			// Постоянная времени затухания шлейфа (~32мс) не зависит от FPS:
-			// keep = exp(-dt / tau) даёт одинаковую длину следа и на 30fps, и на 120fps.
-			float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.0001f, 0.25f);
-			motionKeep = Mathf.Clamp(Mathf.Exp(-dt / 0.032f), 0f, 0.85f);
+			motionAmt = 0f;
+			havePrevCam = false;
+			ReleasePrev();
 		}
-		m.SetFloat("_Motion", motionKeep);
-
-		if (prev != null && prev.IsCreated())
-			m.SetTexture("_PrevTex", prev);
-		else
-			m.SetTexture("_PrevTex", src);
+		m.SetFloat("_Motion", motionAmt);
+		m.SetVector("_MotionDir", new Vector4(motionDir.x, motionDir.y, 0f, 0f));
+		m.SetTexture("_PrevTex", src);
 
 		var composed = RenderTexture.GetTemporary(w, h, 0, fmt);
 		Graphics.Blit(src, composed, m, 3);
 		Graphics.Blit(composed, dest);
 
-		if (motionBlur)
-		{
-			if (prev == null || !prev.IsCreated() || prev.width != w || prev.height != h)
-			{
-				ReleasePrev();
-				prev = new RenderTexture(w, h, 0, fmt);
-				prev.filterMode = FilterMode.Bilinear;
-				prev.wrapMode = TextureWrapMode.Clamp;
-				prev.Create();
-			}
-			Graphics.Blit(composed, prev);
-		}
-
 		RenderTexture.ReleaseTemporary(composed);
 		if (bloomTex != null)
 			RenderTexture.ReleaseTemporary(bloomTex);
+	}
+
+	private void ComputeCameraMotion(out Vector2 dirUv, out float amount)
+	{
+		dirUv = Vector2.zero;
+		amount = 0f;
+		var cam = GetComponent<Camera>();
+		if (cam == null) return;
+
+		Vector3 pos = cam.transform.position;
+		Quaternion rot = cam.transform.rotation;
+		if (!havePrevCam)
+		{
+			havePrevCam = true;
+			prevCamPos = pos;
+			prevCamRot = rot;
+			return;
+		}
+
+		float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0.0001f, 0.08f);
+		Quaternion dRot = rot * Quaternion.Inverse(prevCamRot);
+		Vector3 euler = dRot.eulerAngles;
+		float yaw = Mathf.DeltaAngle(0f, euler.y);
+		float pitch = Mathf.DeltaAngle(0f, euler.x);
+
+		float fov = Mathf.Max(1f, cam.fieldOfView);
+		float aspect = Mathf.Max(0.1f, cam.aspect);
+		float shutter = 1f / 48f;
+		float yawUv = (yaw / (fov * aspect)) * (shutter / dt);
+		float pitchUv = (pitch / fov) * (shutter / dt);
+
+		Vector3 local = cam.transform.InverseTransformDirection(pos - prevCamPos);
+		float z = Mathf.Max(1.5f, Mathf.Abs(local.z) + 1.5f);
+		float transX = (local.x / z) * (shutter / dt) * 0.35f;
+		float transY = (local.y / z) * (shutter / dt) * 0.35f;
+
+		Vector2 vel = new Vector2(-(yawUv + transX), pitchUv + transY);
+		float mag = vel.magnitude;
+		prevCamPos = pos;
+		prevCamRot = rot;
+		if (mag < 0.0006f) return;
+
+		dirUv = vel.normalized * Mathf.Clamp(mag, 0f, 0.045f);
+		amount = Mathf.Clamp01((mag - 0.0006f) * 14f);
 	}
 }
