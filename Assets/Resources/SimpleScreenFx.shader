@@ -92,9 +92,10 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			float _Bloom;
 			float _Vignette;
 			float _Grain;
-			float _Motion;
-			float _AO;
-			float4 _MainTex_TexelSize;
+		float _Motion;
+		float2 _MotionDir;
+		float _AO;
+		float4 _MainTex_TexelSize;
 			UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
 			struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 			v2f vert(appdata_img v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.texcoord; return o; }
@@ -140,8 +141,16 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 
 				if (_Motion > 0.001)
 				{
-					float3 prev = tex2D(_PrevTex, uv).rgb;
-					col = lerp(col, prev, _Motion);
+					// Camera-velocity directional blur (not a ghost of the last frame).
+					float2 d = _MotionDir;
+					float3 acc = col * 0.20;
+					acc += tex2D(_MainTex, uv + d * 0.28).rgb * 0.17;
+					acc += tex2D(_MainTex, uv - d * 0.28).rgb * 0.17;
+					acc += tex2D(_MainTex, uv + d * 0.58).rgb * 0.13;
+					acc += tex2D(_MainTex, uv - d * 0.58).rgb * 0.13;
+					acc += tex2D(_MainTex, uv + d * 0.90).rgb * 0.10;
+					acc += tex2D(_MainTex, uv - d * 0.90).rgb * 0.10;
+					col = lerp(col, acc, saturate(_Motion));
 				}
 
 				return float4(col, 1);
