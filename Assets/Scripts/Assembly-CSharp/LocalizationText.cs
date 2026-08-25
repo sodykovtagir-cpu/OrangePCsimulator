@@ -25,6 +25,15 @@ public class LocalizationText : MonoBehaviour
 
 	public virtual void UpdateText()
 	{
+		if (text == null) text = GetComponent<Text>();
+		if (text == null) return;
 		text.text = Localization.GetText(id);
+	}
+
+	/// <summary>Меняет исходную строку (ключ / [ключ]) после программной смены текста.</summary>
+	public void Bind(string source)
+	{
+		id = source;
+		UpdateText();
 	}
 }

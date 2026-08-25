@@ -234,6 +234,13 @@ public class WorkshopMenu : MonoBehaviour
 				wkey = rec.key;
 				return true;
 			}
+			int id = probe.GameData.workshopId > 0 ? probe.GameData.workshopId : sourceId;
+			if (ServerAccounts.OwnsListing(id))
+			{
+				wid = id;
+				wkey = ServerAccounts.OwnerKeyFor(id);
+				return true;
+			}
 		}
 		catch { }
 		return false;

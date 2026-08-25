@@ -26,6 +26,25 @@ public static class ServerAccounts
 
 	public static IReadOnlyList<AccountSaveItem> MySaves { get { return saves; } }
 
+	public static AccountSaveItem FindSave(int id)
+	{
+		if (id <= 0) return null;
+		for (int i = 0; i < saves.Count; i++)
+			if (saves[i] != null && saves[i].id == id) return saves[i];
+		return null;
+	}
+
+	public static bool OwnsListing(int id)
+	{
+		return FindSave(id) != null;
+	}
+
+	public static string OwnerKeyFor(int id)
+	{
+		var s = FindSave(id);
+		return s != null ? (s.owner_key ?? "") : "";
+	}
+
 	public static void SetSession(string token, string name, string email)
 	{
 		if (!string.IsNullOrEmpty(token)) PlayerPrefs.SetString(TokenKey, token);

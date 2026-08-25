@@ -124,8 +124,10 @@ public class AccountPage : MonoBehaviour
 		ResolveMain();
 		WireButtons();
 		Subscribe();
+		LockChipText();
 		RefreshChip();
 		WorkshopClient.Ensure();
+		if (ServerAccounts.LoggedIn) LoadMe();
 	}
 
 	// ================= Public (и для инспектора OnClick) =================
@@ -238,6 +240,7 @@ public class AccountPage : MonoBehaviour
 	{
 		if (subscribed) return;
 		ServerAccounts.StateChanged += OnStateChanged;
+		Localization.LanguageChanged += RefreshChip;
 		subscribed = true;
 	}
 
@@ -345,12 +348,34 @@ public class AccountPage : MonoBehaviour
 		Refresh();
 	}
 
-	private void RefreshChip()
+	public void RefreshChip()
 	{
 		if (chipText == null && chipButton != null)
 			chipText = chipButton.GetComponentInChildren<Text>();
 		if (chipText == null) return;
-		chipText.text = ServerAccounts.LoggedIn ? ServerAccounts.Name : NotLoggedChip;
+		string label = ServerAccounts.LoggedIn ? ServerAccounts.Name : NotLoggedChip;
+		if (string.IsNullOrEmpty(label)) label = NotLoggedChip;
+		chipText.text = label;
+		var loc = chipText.GetComponent<LocalizationText>();
+		if (loc != null) loc.enabled = false;
+		var anim = chipText.GetComponent<TextAnimation>();
+		if (anim != null)
+		{
+			anim.ResetText();
+			anim.enabled = false;
+		}
+	}
+
+	private void LockChipText()
+	{
+		GameObject target = chipText != null ? chipText.gameObject : (chipButton != null ? chipButton.gameObject : null);
+		if (target == null) return;
+		var loc = target.GetComponent<LocalizationText>();
+		if (loc != null) loc.enabled = false;
+		var anim = target.GetComponent<TextAnimation>();
+		if (anim != null) anim.enabled = false;
+		if (target.GetComponent<AccountChipKeep>() == null)
+			target.AddComponent<AccountChipKeep>();
 	}
 
 	private void Refresh()
@@ -764,5 +789,18 @@ public class AccountPage : MonoBehaviour
 		var rt = go.GetComponent<RectTransform>();
 		rt.sizeDelta = new Vector2(380f, 26f);
 		return tx;
+	}
+}
+
+/// <summary>
+/// Чип лежит в Main: при уходе в настройки TextAnimation/локализация возвращают
+/// сценовую заглушку "User". OnEnable снова пишет имя аккаунта.
+/// </summary>
+public class AccountChipKeep : MonoBehaviour
+{
+	private void OnEnable()
+	{
+		var page = AccountPage.Instance;
+		if (page != null) page.RefreshChip();
 	}
 }
