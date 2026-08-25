@@ -29496,7 +29496,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &219633180
 RectTransform:
   m_ObjectHideFlags: 0
@@ -35920,6 +35920,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 781788932}
+  - component: {fileID: 781788933}
   m_Layer: 5
   m_Name: Content
   m_TagString: Untagged
@@ -35944,8 +35945,22 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 300}
+  m_SizeDelta: {x: -402, y: 300}
   m_Pivot: {x: 0, y: 1}
+--- !u!114 &781788933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 781788931}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_HorizontalFit: 1
+  m_VerticalFit: 0
 --- !u!1 &819450869
 GameObject:
   m_ObjectHideFlags: 0
@@ -46335,7 +46350,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1704076432
 RectTransform:
   m_ObjectHideFlags: 0
@@ -46403,11 +46418,12 @@ MonoBehaviour:
   emailText: {fileID: 1571509672}
   savesTitle: {fileID: 988662985}
   savesList: {fileID: 781788932}
+  saveCardPrefab: {fileID: 5137345041804844460, guid: 4bbf6b681bbdfe94c987248f71f0be82, type: 3}
   tgField: {fileID: 0}
   tgButton: {fileID: 0}
   bonusText: {fileID: 0}
-  logoutButton: {fileID: 0}
-  homeCloseButton: {fileID: 0}
+  logoutButton: {fileID: 635417562}
+  homeCloseButton: {fileID: 1058996552}
 --- !u!114 &1704076434
 MonoBehaviour:
   m_ObjectHideFlags: 0
