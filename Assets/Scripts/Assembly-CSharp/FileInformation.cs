@@ -92,8 +92,10 @@ public class FileInformation : MonoBehaviour
 			load.loader.GameData.sign = "";
 
 		nameInput.text = load.loader.GameData.roomName;
-		signInput.text = load.loader.GameData.sign;
-		signNameText.text = string.IsNullOrEmpty(load.loader.GameData.sign) ? "No Sign" : load.loader.GameData.sign;
+		string localDesc = FirstNonEmpty(load.loader.GameData.sign, load.loader.GameData.workshopDesc);
+		if (load.loader.GameData.sign == null) load.loader.GameData.sign = "";
+		signInput.text = localDesc;
+		signNameText.text = string.IsNullOrEmpty(localDesc) ? "No Sign" : localDesc;
 		playtimeText.text = Localization.GetText("Playing Time") + ":\n" + (load.loader.GameData.playtime / 60f).ToString("0.00") + " min";
 		fileLocationText.text = Path.GetFileName(load.loader.Path);
 		if (load.loader.GameData.workshopId > 0 && !string.IsNullOrEmpty(load.loader.GameData.workshopKey))
@@ -211,7 +213,7 @@ public class FileInformation : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Публикация меняет имя сейва и workshop-описание. Sign не трогаем.
+	/// Публикация пишет имя в сейв и описание в Sign (это поле описания на странице файла).
 	/// </summary>
 	private void ApplyPublishedMeta(string title, string desc, string author, bool write)
 	{
@@ -224,13 +226,22 @@ public class FileInformation : MonoBehaviour
 			if (nameInput != null) nameInput.text = g.roomName;
 		}
 		g.workshopDesc = desc ?? "";
+		g.sign = g.workshopDesc;
+		if (signInput != null) signInput.text = g.sign;
+		if (signNameText != null)
+			signNameText.text = string.IsNullOrEmpty(g.sign) ? "No Sign" : g.sign;
 		if (!string.IsNullOrEmpty(author)) g.workshopAuthor = author;
-		// Sign остаётся как был.
 		if (write)
 		{
 			load.loader.WriteToFile();
 			if (fileMenu != null) fileMenu.RefreshLoadButton(load);
 		}
+	}
+
+	private static string FirstNonEmpty(string a, string b)
+	{
+		if (!string.IsNullOrEmpty(a)) return a;
+		return b ?? "";
 	}
 
 	private void HideStandaloneUpdate()
