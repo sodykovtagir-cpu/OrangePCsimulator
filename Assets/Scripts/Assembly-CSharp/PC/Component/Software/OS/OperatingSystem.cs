@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -441,6 +441,132 @@ namespace PC.Component.Software.OS
             }
 
             RefreshDesktopIcon();
+            EnsureLuaEditor();
+        }
+
+        private void EnsureLuaEditor()
+        {
+            if (appPrefabs == null || !appPrefabs.TryGetValue("Lua Editor", out var prefab) || prefab == null)
+                return;
+            if (FileManager != null && FileManager.Exists(0, "System/lua_v1"))
+            {
+                if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
+                return;
+            }
+            if (!IsAppInstalled("Lua Editor"))
+                InstallApp(prefab);
+            if (FileManager != null)
+            {
+                var mark = FileManager.Write(0, "System/lua_v1", "1");
+                if (mark != null) mark.hidden = true;
+            }
+            EnsureLuaDocs();
+        }
+
+        private void EnsureLuaDocs()
+        {
+            if (FileManager == null) return;
+            if (FileManager.Exists(0, "Lua.txt")) return;
+            var text = LuaDocs.Text();
+            FileManager.Create(0, new File("Lua.txt", text, false, text.Length));
+            if (!FileManager.Exists(0, "hello.lua"))
+            {
+                const string hello = "-- PCOS Lua\nprint(\"Hello, PCOS!\")\nos.alert(\"Lua\", \"It works!\")\n";
+                FileManager.Create(0, new File("hello.lua", hello, false, hello.Length));
+            }
+            RefreshDesktopIcon();
+        }
+
+        public IList<string> InstalledAppNames()
+        {
+            return installedApps ?? new List<string>();
+        }
+
+        public List<string> RunningAppNames()
+        {
+            var r = new List<string>();
+            if (runningApps == null) return r;
+            for (int i = 0; i < runningApps.Count; i++)
+            {
+                var a = runningApps[i];
+                if (a != null) r.Add(a.AppName);
+            }
+            return r;
+        }
+
+        public bool TryLaunchApp(string name, string content = "")
+        {
+            if (string.IsNullOrEmpty(name) || appPrefabs == null) return false;
+            App prefab;
+            if (!appPrefabs.TryGetValue(name, out prefab) || prefab == null) return false;
+            if (!IsAppInstalled(name)) return false;
+            LaunchApp(prefab, content ?? "");
+            return true;
+        }
+
+        public bool TryCloseApp(string name)
+        {
+            var app = GetRunningApp(name);
+            if (app == null) return false;
+            app.Close();
+            return true;
+        }
+
+        public bool LuaOpen(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            if (TryLaunchApp(name)) return true;
+            File file;
+            if (FileManager != null && FileManager.TryGetFile(0, name, out file) && file != null)
+                return OpenFile(file);
+            return false;
+        }
+
+        public List<string> ListUserFiles()
+        {
+            var r = new List<string>();
+            var all = AllStorage;
+            if (all == null || all.Count == 0 || all[0] == null || all[0].files == null) return r;
+            var files = all[0].files;
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                if (f == null || f.hidden) continue;
+                r.Add(f.path);
+            }
+            return r;
+        }
+
+        public bool TryReadFile(string path, out string content)
+        {
+            content = null;
+            if (FileManager == null || string.IsNullOrEmpty(path)) return false;
+            File file;
+            if (!FileManager.TryGetFile(0, path, out file) || file == null) return false;
+            content = file.content ?? "";
+            return true;
+        }
+
+        public bool TryWriteFile(string path, string content)
+        {
+            if (FileManager == null || string.IsNullOrEmpty(path)) return false;
+            var file = FileManager.Write(0, path, content ?? "");
+            RefreshDesktopIcon();
+            return file != null;
+        }
+
+        public bool FileExists(string path)
+        {
+            return FileManager != null && !string.IsNullOrEmpty(path) && FileManager.Exists(0, path);
+        }
+
+        public bool TryDeleteFile(string path)
+        {
+            if (FileManager == null || string.IsNullOrEmpty(path)) return false;
+            if (!FileManager.Exists(0, path)) return false;
+            FileManager.Delete(0, path);
+            RefreshDesktopIcon();
+            return true;
         }
 
         private void AddApp(string name)
@@ -944,6 +1070,8 @@ namespace PC.Component.Software.OS
             if (existing != null)
             {
                 existing.transform.SetAsLastSibling();
+                if (!string.IsNullOrEmpty(content))
+                    existing.Open(content);
                 FocusApp(true);
                 return;
             }
