@@ -54,9 +54,10 @@ namespace PC.Component.Software
 			vm = new PcosLua();
 			vm.Printer = line => Debug.Log("[LuaApp] " + line);
 			PcosLuaHost.Bind(vm, system);
-			BindWindowApi();
 			var font = titleText != null ? titleText.font : null;
 			ui = new LuaUi(contentRoot, font, vm);
+			ui.OnTitle = SetTitle;
+			ui.OnSize = SetWindowSize;
 			ui.Bind();
 			try { vm.DoString(pack.script ?? ""); }
 			catch (Exception ex)
