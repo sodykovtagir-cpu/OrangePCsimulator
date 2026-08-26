@@ -44,11 +44,11 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Image windowState;
 
-		private bool maximized;
+		protected bool maximized;
 
 		protected RectTransform rect;
 
-		private Vector2 defaultSize;
+		protected Vector2 defaultSize;
 
 		protected bool canDrag = true;
 
