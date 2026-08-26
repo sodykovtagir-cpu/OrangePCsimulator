@@ -35,9 +35,16 @@ namespace PC.Component.Software
 		[SerializeField] private LuaSnippet[] snippets;
 
 		[Header("Highlight (optional)")]
+		[Tooltip("Code = InputField, Overlay = Text поверх (Rich Text). У Code цвет текста почти прозрачный.")]
 		[SerializeField] private LuaSyntaxHighlight highlighter;
 
+		[Header("Compile to .exe")]
+		[SerializeField] private InputField compileName;
+		[SerializeField] private RawImage compileIconPreview;
+		[SerializeField] private Text docsLanguageHint;
+
 		private string filePath;
+		private string compileIconB64 = "";
 		private bool snippetsBuilt;
 		private int lastCaret;
 		private int lastSelA;
@@ -108,10 +115,39 @@ namespace PC.Component.Software
 			system.SaveDialog.ShowDialog(name, code.text ?? "", new[] { ".lua", ".txt" });
 		}
 
+		public void ToggleDocs()
+		{
+			if (docsPanel == null) return;
+			bool on = !docsPanel.activeSelf;
+			docsPanel.SetActive(on);
+			if (on) ShowDocs();
+		}
+
+		public void ShowDocs()
+		{
+			var text = LuaDocs.Text();
+			if (docsText != null) docsText.text = text;
+			if (docsPanel != null) docsPanel.SetActive(true);
+			if (docsLanguageHint != null)
+				docsLanguageHint.text = Localization.GetLanguage() ?? "EN";
+		}
+
 		public void Run()
 		{
 			if (code == null) return;
 			if (output != null) output.text = "";
+			var name = compileName != null && !string.IsNullOrEmpty(compileName.text) ? compileName.text : "Preview";
+			var pack = new Lua.LuaAppPackage
+			{
+				name = name,
+				script = code.text ?? "",
+				icon = compileIconB64
+			};
+			if (system != null && system.LaunchLuaApp(pack.ToJson()))
+			{
+				AppendOut(Localization.GetText("Lua finished."));
+				return;
+			}
 			var vm = new PcosLua();
 			vm.Printer = AppendOut;
 			PcosLuaHost.Bind(vm, system);
@@ -127,13 +163,52 @@ namespace PC.Component.Software
 			}
 		}
 
-		public void ToggleDocs()
+		string compileIconB64 = "";
+
+		public void PickIcon()
 		{
-			if (docsPanel == null) return;
-			bool on = !docsPanel.activeSelf;
-			docsPanel.SetActive(on);
-			if (on && docsText != null && string.IsNullOrEmpty(docsText.text))
-				docsText.text = LuaDocs.Text();
+			if (system == null) return;
+			system.SelectFile("*", file =>
+			{
+				if (file == null || string.IsNullOrEmpty(file.content)) return;
+				compileIconB64 = file.content;
+				if (compileIconPreview == null) return;
+				try
+				{
+					var data = Convert.FromBase64String(file.content);
+					var tex = new Texture2D(2, 2);
+					tex.filterMode = FilterMode.Point;
+					if (tex.LoadImage(data))
+						compileIconPreview.texture = tex;
+				}
+				catch { }
+			});
+		}
+
+		public void Compile()
+		{
+			if (code == null || system == null || system.FileManager == null) return;
+			var name = compileName != null ? compileName.text : "";
+			if (string.IsNullOrEmpty(name))
+				name = File.NameWithoutExtension(string.IsNullOrEmpty(filePath) ? defaultFileName : filePath);
+			if (string.IsNullOrEmpty(name) || name == "Untitled") name = "LuaApp";
+			foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+				name = name.Replace(c, '_');
+			if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+				name = name.Substring(0, name.Length - 4);
+			var pack = new Lua.LuaAppPackage
+			{
+				name = name,
+				script = code.text ?? "",
+				icon = compileIconB64 ?? ""
+			};
+			var json = pack.ToJson();
+			var path = name + ".exe";
+			system.FileManager.Write(0, path, json);
+			system.RefreshDesktopIcon();
+			filePath = path;
+			AppendOut("compiled " + path);
+			if (system != null) system.ShowMessageBox("Lua", path);
 		}
 
 		public void InsertSnippet(string snippet)
@@ -213,7 +288,7 @@ namespace PC.Component.Software
 
 		static string DefaultSource()
 		{
-			return "-- PCOS Lua\nprint(\"Hello, PCOS!\")\n-- os.alert(\"Lua\", \"It works!\")\n-- os.open(\"Text Editor\")\n";
+			return "-- PCOS Lua\nui.title(\"Counter\")\nui.size(320, 180)\nlocal n = 0\nlocal lab = ui.label(\"0\", 20, 20, 200, 24)\nui.button(\"Click\", 20, 60, 100, 28, function()\n  n = n + 1\n  ui.set(lab, tostring(n))\nend)\n";
 		}
 
 		public static LuaSnippet[] DefaultSnippets()
@@ -248,7 +323,18 @@ namespace PC.Component.Software
 				new LuaSnippet { label = "type", insert = "type(|)" },
 				new LuaSnippet { label = "math.random", insert = "math.random(|)" },
 				new LuaSnippet { label = "string.upper", insert = "string.upper(\"|\")" },
-				new LuaSnippet { label = "table.insert", insert = "table.insert(|, )" }
+				new LuaSnippet { label = "table.insert", insert = "table.insert(|, )" },
+				new LuaSnippet { label = "ui.title", insert = "ui.title(\"|\")" },
+				new LuaSnippet { label = "ui.size", insert = "ui.size(400, 240)" },
+				new LuaSnippet { label = "ui.label", insert = "ui.label(\"|\", 10, 10, 200, 24)" },
+				new LuaSnippet { label = "ui.button", insert = "ui.button(\"OK\", 10, 40, 80, 24, function()\n  \nend)" },
+				new LuaSnippet { label = "ui.input", insert = "ui.input(\"|\", 10, 70, 180, 24)" },
+				new LuaSnippet { label = "ui.panel", insert = "ui.panel(8, 8, 200, 100)" },
+				new LuaSnippet { label = "ui.slider", insert = "ui.slider(10, 100, 180, 20, 0, 1)" },
+				new LuaSnippet { label = "ui.toggle", insert = "ui.toggle(\"On\", 10, 130, 120, 22, true)" },
+				new LuaSnippet { label = "ui.get / set", insert = "ui.set(id, ui.get(id))" },
+				new LuaSnippet { label = "ui.style", insert = "ui.style({ button = {0.9, 0.9, 0.9}, text = {0,0,0} })" },
+				new LuaSnippet { label = "ui.systemstyle", insert = "ui.systemstyle()" }
 			};
 		}
 	}
@@ -257,27 +343,13 @@ namespace PC.Component.Software
 	{
 		public static string Text()
 		{
-			var lang = Localization.GetLanguage() ?? "";
-			var ru = lang == "RU" || lang == "UA" || lang == "BRL";
-			if (ru)
-			{
-				return
-					"PCOS Lua — язык внутри системы.\n\n" +
-					"Слева код, справа подсказки. | в шаблоне = куда встанет курсор.\n\n" +
-					"print(x)\nos.alert(t, m)\nos.open(name)\nos.close(name)\n" +
-					"os.apps() / os.windows()\nos.username() / os.id()\nos.installed(name)\nos.shutdown()\n" +
-					"fs.list / read / write / exists / delete\nwin.alert / open / close\n\n" +
-					"if / while / for i=1,n / function / local / tables {}\nmath / string / table\n\n" +
-					"tg: t.me/orangePCsimu";
-			}
-			return
-				"PCOS Lua — scripting language inside the OS.\n\n" +
-				"Code left, hints right. | in a snippet is the caret target.\n\n" +
-				"print(x)\nos.alert(t, m)\nos.open(name)\nos.close(name)\n" +
-				"os.apps() / os.windows()\nos.username() / os.id()\nos.installed(name)\nos.shutdown()\n" +
-				"fs.list / read / write / exists / delete\nwin.alert / open / close\n\n" +
-				"if / while / for i=1,n / function / local / tables {}\nmath / string / table\n\n" +
-				"tg: t.me/orangePCsimu";
+			var lang = Localization.GetLanguage() ?? "EN";
+			if (lang == "UA" || lang == "BRL") lang = "RU";
+			var asset = Resources.Load<TextAsset>("LuaDocs_" + lang);
+			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs_EN");
+			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs");
+			if (asset != null && !string.IsNullOrEmpty(asset.text)) return asset.text;
+			return "PCOS Lua. Open Lua.txt on the desktop or press Docs.";
 		}
 	}
 }

@@ -1,0 +1,88 @@
+PCOS Lua
+========
+Scripting language inside the OS. Community: t.me/orangePCsimu
+
+EDITOR
+------
+Left: code. Right: snippets. | in a snippet is where the caret jumps.
+Run — preview the program in a system window (needed for ui.*).
+Save — .lua / .txt source.
+Compile — writes Name.exe to the desktop (shortcut). Double-click to launch.
+Pick icon — choose a .pic (or any base64 image file) for that .exe.
+Compile name — InputField on the editor (inspector: Compile Name).
+
+Open Docs: button ToggleDocs / ShowDocs, or desktop file Lua.txt
+(rewritten to the current game language on boot).
+
+SYNTAX HIGHLIGHT
+----------------
+On the Lua Editor object add LuaSyntaxHighlight:
+  Code = the code InputField
+  Overlay = a Text copy of that field (same RectTransform, Rich Text ON, Raycast OFF)
+Set the InputField text color almost transparent so only the overlay shows.
+Colors (keyword / string / comment / number) are in the inspector.
+
+COMPILE / .EXE
+--------------
+Compile packs JSON { pcos: lua-app, name, icon, script } into Name.exe.
+Desktop icon uses your picture if Pick Icon was used.
+Several compiled apps can run at once.
+
+UI (system look: angular PCOS chrome)
+-------------------------------------
+Coordinates: top-left origin, Y down, pixels.
+
+ui.title("Name")
+ui.size(w, h)
+ui.label(text, x, y, w, h)           -> id
+ui.button(text, x, y, w, h, fn)      -> id
+ui.input(text, x, y, w, h)           -> id
+ui.panel(x, y, w, h)                 -> id
+ui.slider(x, y, w, h, min, max)      -> id
+ui.toggle(text, x, y, w, h, on)      -> id
+ui.get(id)  ui.set(id, text)
+ui.value(id)     -- slider
+ui.checked(id)   -- toggle
+ui.remove(id)  ui.clear()
+ui.systemstyle()
+ui.style({
+  window={r,g,b}, panel={r,g,b},
+  button={r,g,b}, buttonText={r,g,b},
+  text={r,g,b}, input={r,g,b}, inputText={r,g,b},
+  fontSize=14
+})
+Colors are 0..1 tables {r,g,b} or {r,g,b,a}.
+
+Example:
+  ui.title("Counter")
+  ui.size(320, 180)
+  local n = 0
+  local lab = ui.label("0", 20, 20, 200, 24)
+  ui.button("Click", 20, 60, 100, 28, function()
+    n = n + 1
+    ui.set(lab, tostring(n))
+  end)
+
+OS / FILES / WINDOWS
+--------------------
+print(...)
+os.alert(title, msg)  os.open(nameOrFile)  os.close(name)
+os.apps()  os.windows()  os.username()  os.id()
+os.installed(name)  os.shutdown()  os.time()  os.ready()
+fs.list()  fs.read(p)  fs.write(p,s)  fs.exists(p)  fs.delete(p)
+win.alert(msg)  win.open(name)  win.close(name)
+
+LANGUAGE
+--------
+if / then / elseif / else / end
+while / do / end   repeat / until
+for i = 1, n do ... end
+function name(...) ... end
+local x = ...
+tables {1,2, a=3}, t.a, t[1], #t
+and or not  ..  == ~= < >
+
+math.abs/floor/ceil/sqrt/sin/cos/min/max/random/pi
+string.len/upper/lower/sub/rep/find
+table.insert / table.concat
+tonumber tostring type assert error

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using PC.Component.Software.Lua;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.UI.Extensions;
@@ -434,6 +435,7 @@ namespace PC.Component.Software.OS
                     if (f == null) continue;
                     if (string.Equals(f.Extension(), ".exe"))
                     {
+                        if (LuaAppPackage.IsPackage(f.content)) continue;
                         var name = f.NameWithoutExtension();
                         AddApp(name);
                     }
@@ -466,9 +468,8 @@ namespace PC.Component.Software.OS
         private void EnsureLuaDocs()
         {
             if (FileManager == null) return;
-            if (FileManager.Exists(0, "Lua.txt")) return;
             var text = LuaDocs.Text();
-            FileManager.Create(0, new File("Lua.txt", text, false, text.Length));
+            FileManager.Write(0, "Lua.txt", text);
             if (!FileManager.Exists(0, "hello.lua"))
             {
                 const string hello = "-- PCOS Lua\nprint(\"Hello, PCOS!\")\nos.alert(\"Lua\", \"It works!\")\n";
@@ -609,30 +610,7 @@ namespace PC.Component.Software.OS
                     return;
                 }
 
-                var ext = f.Extension();
-
-                foreach (var name in installedApps)
-                {
-                    if (!appPrefabs.TryGetValue(name, out var prefab) || prefab == null)
-                        continue;
-
-                    bool match = false;
-
-                    if (ext == ".exe")
-                    {
-                        var noExt = f.NameWithoutExtension();
-                        match = noExt == prefab.AppName;
-                    }
-                    else if (!string.IsNullOrEmpty(ext))
-                    {
-                        match = prefab.FileName == ext;
-                    }
-
-                    if (!match) continue;
-
-                    LaunchApp(prefab, f.content);
-                    break;
-                }
+                OpenFile(f);
             });
 
             if (file.isFolder)
@@ -645,6 +623,18 @@ namespace PC.Component.Software.OS
 
         public Sprite GetFileSprite(string fileName)
         {
+            File packed;
+            if (FileManager != null && FileManager.TryGetFile(0, fileName, out packed) && packed != null
+                && LuaAppPackage.IsPackage(packed.content))
+            {
+                var pack = LuaAppPackage.Parse(packed.content);
+                Sprite fallback = unknownFileSprite;
+                App luaApp;
+                if (appPrefabs != null && appPrefabs.TryGetValue("Lua App", out luaApp) && luaApp != null)
+                    fallback = luaApp.Icon != null ? luaApp.Icon : unknownFileSprite;
+                if (pack != null) return pack.MakeIcon(fallback);
+            }
+
             var ext = File.Extension(fileName);
             if (installedApps == null || appPrefabs == null) return unknownFileSprite;
 
@@ -665,10 +655,22 @@ namespace PC.Component.Software.OS
             return unknownFileSprite;
         }
 
+        public bool LaunchLuaApp(string content)
+        {
+            App prefab = null;
+            if (appPrefabs != null) appPrefabs.TryGetValue("Lua App", out prefab);
+            if (prefab == null) return false;
+            LaunchApp(prefab, content ?? "");
+            return true;
+        }
+
         public bool OpenFile(File file)
         {
-            if (file == null || installedApps == null || appPrefabs == null) return false;
+            if (file == null || appPrefabs == null) return false;
+            if (LuaAppPackage.IsPackage(file.content))
+                return LaunchLuaApp(file.content);
 
+            if (installedApps == null) return false;
             var ext = file.Extension();
 
             for (int i = 0; i < installedApps.Count; i++)
@@ -1065,15 +1067,17 @@ namespace PC.Component.Software.OS
         {
             if (prefab == null) return;
 
-            var existing = GetRunningApp(prefab.AppName);
-
-            if (existing != null)
+            if (prefab.SingleInstance)
             {
-                existing.transform.SetAsLastSibling();
-                if (!string.IsNullOrEmpty(content))
-                    existing.Open(content);
-                FocusApp(true);
-                return;
+                var existing = GetRunningApp(prefab.AppName);
+                if (existing != null)
+                {
+                    existing.transform.SetAsLastSibling();
+                    if (!string.IsNullOrEmpty(content))
+                        existing.Open(content);
+                    FocusApp(true);
+                    return;
+                }
             }
 
             var app = Instantiate(prefab, appParent);
