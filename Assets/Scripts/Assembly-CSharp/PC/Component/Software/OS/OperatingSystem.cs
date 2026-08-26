@@ -468,11 +468,11 @@ namespace PC.Component.Software.OS
         private void EnsureLuaDocs()
         {
             if (FileManager == null) return;
-            var text = LuaDocs.Text();
-            FileManager.Write(0, "Lua.txt", text);
+            if (FileManager.Exists(0, "Lua.txt"))
+                FileManager.Delete(0, "Lua.txt");
             if (!FileManager.Exists(0, "hello.lua"))
             {
-                const string hello = "-- PCOS Lua\nprint(\"Hello, PCOS!\")\nos.alert(\"Lua\", \"It works!\")\n";
+                const string hello = "print(\"Hello world!\")\n";
                 FileManager.Create(0, new File("hello.lua", hello, false, hello.Length));
             }
             RefreshDesktopIcon();

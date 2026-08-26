@@ -112,7 +112,7 @@ namespace PC.Component.Software
 			if (rect != null) defaultSize = rect.sizeDelta;
 		}
 
-		public void Maximize()
+		public virtual void Maximize()
 		{
 			if (!canMaximize && !maximized) return;
 			if (rect == null) rect = GetComponent<RectTransform>();
@@ -137,6 +137,28 @@ namespace PC.Component.Software
 				rect.sizeDelta = defaultSize;
 				if (windowState != null && maximizeSprite != null) windowState.sprite = maximizeSprite;
 			}
+		}
+
+		protected void FitToDesktop()
+		{
+			if (rect == null) return;
+			var parent = rect.parent as RectTransform;
+			var center = new Vector2(0.5f, 0.5f);
+			rect.anchorMin = center;
+			rect.anchorMax = center;
+			rect.pivot = center;
+			if (parent == null)
+			{
+				rect.sizeDelta = new Vector2(800, 500);
+				rect.anchoredPosition = Vector2.zero;
+				return;
+			}
+			float padX = 10f;
+			float padTop = 8f;
+			float padBottom = 52f;
+			var s = parent.rect.size;
+			rect.sizeDelta = new Vector2(Mathf.Max(200f, s.x - padX * 2f), Mathf.Max(140f, s.y - padTop - padBottom));
+			rect.anchoredPosition = new Vector2(0f, (padBottom - padTop) * 0.5f);
 		}
 
 		public virtual void SetDraggable(bool on)

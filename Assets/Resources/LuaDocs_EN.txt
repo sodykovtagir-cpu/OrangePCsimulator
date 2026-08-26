@@ -13,7 +13,6 @@ Compile name — InputField on the editor (inspector: Compile Name).
 
 Docs — separate button, OnClick = Docs (or OpenDocs / ShowDocs),
 target = this Lua Editor window in the scene (not the Project prefab).
-Or desktop file Lua.txt (rewritten to the current game language on boot).
 
 SYNTAX HIGHLIGHT
 ----------------
@@ -33,10 +32,17 @@ UI (system look: angular PCOS chrome)
 -------------------------------------
 Coordinates: top-left origin, Y down, pixels.
 
+WINDOW
+------
+isdraggable(true/false)    -- also ui.isdraggable
+ismaximable(true/false)    -- show maximize like Video; also ismaxible / ui.ismaximable
+enabledebugger()           -- read-only draggable console (works in compiled .exe too)
+
+print(...) goes to the editor Output. After enabledebugger() also to that console.
+Not the Unity log. Log is not cleared after run.
+
 ui.title("Name")
 ui.size(w, h)
-ui.isdraggable(true/false)           -- also ui.draggable
-ui.ismaximable(true/false)           -- also ui.ismaximizable / ui.maximizable
 ui.label(text, x, y, w, h)           -> id
 ui.button(text, x, y, w, h, fn)      -> id
 ui.input(text, x, y, w, h)           -> id
@@ -76,9 +82,6 @@ gfx.size(w, h)   gfx.color(r,g,b,a)   gfx.clear(r,g,b,a)
 gfx.pixel(x,y,r,g,b)  gfx.rect(x,y,w,h,r,g,b)  gfx.box(...)
 gfx.line(x1,y1,x2,y2,r,g,b)  gfx.circle(x,y,r,r,g,b)  gfx.ring(...)
 gfx.flip() / gfx.apply()
-
-print(...) writes to the program log (editor Output + bar in the Lua window),
-not the Unity console. The log is not cleared when the script ends.
 
 OS / FILES / WINDOWS
 --------------------

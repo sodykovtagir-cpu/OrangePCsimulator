@@ -150,7 +150,6 @@ namespace PC.Component.Software
 			if (dt != null) dt.text = text;
 			var panel = Live(docsPanel);
 			if (panel != null) panel.SetActive(true);
-			else if (system != null) system.LuaOpen("Lua.txt");
 			var hint = Live(docsLanguageHint);
 			if (hint != null)
 				hint.text = Localization.GetLanguage() ?? "EN";
@@ -558,7 +557,7 @@ namespace PC.Component.Software
 
 		static string DefaultSource()
 		{
-			return "-- PCOS Lua\nui.title(\"Counter\")\nui.size(320, 180)\nlocal n = 0\nlocal lab = ui.label(\"0\", 20, 20, 200, 24)\nui.button(\"Click\", 20, 60, 100, 28, function()\n  n = n + 1\n  ui.set(lab, tostring(n))\nend)\n";
+			return "print(\"Hello world!\")\n";
 		}
 
 		public static LuaSnippet[] DefaultSnippets()
@@ -604,7 +603,12 @@ namespace PC.Component.Software
 				new LuaSnippet { label = "ui.toggle", insert = "ui.toggle(\"On\", 10, 130, 120, 22, true)" },
 				new LuaSnippet { label = "ui.get / set", insert = "ui.set(id, ui.get(id))" },
 				new LuaSnippet { label = "ui.style", insert = "ui.style({ button = {0.9, 0.9, 0.9}, text = {0,0,0} })" },
-				new LuaSnippet { label = "ui.systemstyle", insert = "ui.systemstyle()" }
+				new LuaSnippet { label = "ui.systemstyle", insert = "ui.systemstyle()" },
+				new LuaSnippet { label = "isdraggable", insert = "isdraggable(true)" },
+				new LuaSnippet { label = "ismaximable", insert = "ismaximable(true)" },
+				new LuaSnippet { label = "enabledebugger", insert = "enabledebugger()" },
+				new LuaSnippet { label = "ui.rect", insert = "ui.rect(10, 10, 80, 40, 0.2, 0.4, 0.8)" },
+				new LuaSnippet { label = "gfx.rect", insert = "gfx.rect(10, 10, 40, 40, 1, 0, 0)" }
 			};
 		}
 	}
@@ -619,7 +623,7 @@ namespace PC.Component.Software
 			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs_EN");
 			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs");
 			if (asset != null && !string.IsNullOrEmpty(asset.text)) return asset.text;
-			return "PCOS Lua. Open Lua.txt on the desktop or press Docs.";
+			return "PCOS Lua. Press Docs.";
 		}
 	}
 }
