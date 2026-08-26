@@ -40,9 +40,18 @@ namespace PC.Component.Software
 		[SerializeField] private LuaSyntaxHighlight highlighter;
 
 		[Header("Compile to .exe")]
+		[SerializeField] private GameObject compilePanel;
 		[SerializeField] private InputField compileName;
 		[SerializeField] private RawImage compileIconPreview;
+		[SerializeField] private Image compileIconImage;
 		[SerializeField] private Text docsLanguageHint;
+
+		[Header("Icon picker")]
+		[SerializeField] private GameObject iconPickerPanel;
+		[SerializeField] private Transform iconGrid;
+		[Tooltip("Кнопка-ячейка с Image.")]
+		[SerializeField] private Button iconCellPrefab;
+		[SerializeField] private Sprite[] extraIcons;
 
 		private string filePath;
 		private string compileIconB64 = "";
@@ -166,6 +175,11 @@ namespace PC.Component.Software
 			}
 		}
 
+		public void Compile()
+		{
+			OpenCompilePanel();
+		}
+
 		public void OpenCompilePanel()
 		{
 			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
@@ -186,7 +200,7 @@ namespace PC.Component.Software
 
 		public void ConfirmCompile()
 		{
-			Compile();
+			WriteCompiledExe();
 			CancelCompile();
 		}
 
@@ -224,7 +238,7 @@ namespace PC.Component.Software
 			}, "Icon", "image/*");
 		}
 
-		public void Compile()
+		void WriteCompiledExe()
 		{
 			if (code == null || system == null || system.FileManager == null) return;
 			var name = compileName != null ? compileName.text : "";
