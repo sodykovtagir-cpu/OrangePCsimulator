@@ -103,8 +103,10 @@ namespace PC.Component.Software
 			if (string.IsNullOrEmpty(filePath)) filePath = defaultFileName;
 			AppendOut(Localization.GetText("Lua ready. Click a hint to insert."));
 			if (highlighter != null) highlighter.Refresh();
-			if (compilePanel != null) compilePanel.SetActive(false);
-			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
+			var cp = Live(compilePanel);
+			if (cp != null) cp.SetActive(false);
+			var ip = Live(iconPickerPanel);
+			if (ip != null) ip.SetActive(false);
 		}
 
 		public void OpenFile()
@@ -182,20 +184,25 @@ namespace PC.Component.Software
 
 		public void OpenCompilePanel()
 		{
-			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
-			if (compileName != null && string.IsNullOrEmpty(compileName.text))
+			var picker = Live(iconPickerPanel);
+			if (picker != null) picker.SetActive(false);
+			var nameField = Live(compileName);
+			if (nameField != null && string.IsNullOrEmpty(nameField.text))
 			{
 				var n = File.NameWithoutExtension(string.IsNullOrEmpty(filePath) ? defaultFileName : filePath);
 				if (string.IsNullOrEmpty(n) || n == "Untitled") n = "LuaApp";
-				compileName.text = n;
+				nameField.text = n;
 			}
-			if (compilePanel != null) compilePanel.SetActive(true);
+			var panel = Live(compilePanel);
+			if (panel != null) panel.SetActive(true);
 		}
 
 		public void CancelCompile()
 		{
-			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
-			if (compilePanel != null) compilePanel.SetActive(false);
+			var picker = Live(iconPickerPanel);
+			if (picker != null) picker.SetActive(false);
+			var panel = Live(compilePanel);
+			if (panel != null) panel.SetActive(false);
 		}
 
 		public void ConfirmCompile()
@@ -206,13 +213,20 @@ namespace PC.Component.Software
 
 		public void OpenIconPicker()
 		{
+			var picker = Live(iconPickerPanel);
+			if (picker == null)
+			{
+				AppendOut("Assign Icon Picker Panel: child of this window, not a Project prefab.");
+				return;
+			}
 			FillIconGrid();
-			if (iconPickerPanel != null) iconPickerPanel.SetActive(true);
+			picker.SetActive(true);
 		}
 
 		public void CancelIconPicker()
 		{
-			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
+			var picker = Live(iconPickerPanel);
+			if (picker != null) picker.SetActive(false);
 		}
 
 		public void PickIcon()
@@ -241,7 +255,8 @@ namespace PC.Component.Software
 		void WriteCompiledExe()
 		{
 			if (code == null || system == null || system.FileManager == null) return;
-			var name = compileName != null ? compileName.text : "";
+			var nameField = Live(compileName);
+			var name = nameField != null ? nameField.text : "";
 			if (string.IsNullOrEmpty(name))
 				name = File.NameWithoutExtension(string.IsNullOrEmpty(filePath) ? defaultFileName : filePath);
 			if (string.IsNullOrEmpty(name) || name == "Untitled") name = "LuaApp";
@@ -266,20 +281,34 @@ namespace PC.Component.Software
 
 		void FillIconGrid()
 		{
-			if (iconGrid == null || iconCellPrefab == null) return;
-			for (int i = iconGrid.childCount - 1; i >= 0; i--)
-				Destroy(iconGrid.GetChild(i).gameObject);
+			var grid = Live(iconGrid);
+			if (grid == null || iconCellPrefab == null)
+			{
+				AppendOut("Icon Grid / Icon Cell Prefab: assign children of this window.");
+				return;
+			}
+
+			for (int i = grid.childCount - 1; i >= 0; i--)
+			{
+				var ch = grid.GetChild(i);
+				if (ch != null) Destroy(ch.gameObject);
+			}
 
 			var seen = new HashSet<Sprite>();
 			void Add(Sprite sp)
 			{
 				if (sp == null || seen.Contains(sp)) return;
 				seen.Add(sp);
-				var btn = Instantiate(iconCellPrefab, iconGrid);
+				var btn = Instantiate(iconCellPrefab);
+				btn.transform.SetParent(grid, false);
 				btn.gameObject.SetActive(true);
 				var img = btn.GetComponent<Image>();
 				if (img == null) img = btn.GetComponentInChildren<Image>();
-				if (img != null) img.sprite = sp;
+				if (img != null)
+				{
+					img.sprite = sp;
+					img.preserveAspect = true;
+				}
 				var captured = sp;
 				btn.onClick.RemoveAllListeners();
 				btn.onClick.AddListener(() => SelectGridIcon(captured));
@@ -301,6 +330,40 @@ namespace PC.Component.Software
 			}
 		}
 
+		static bool InScene(GameObject go)
+		{
+			return go != null && go.scene.IsValid();
+		}
+
+		T Live<T>(T assigned) where T : Component
+		{
+			if (assigned == null) return null;
+			if (InScene(assigned.gameObject)) return assigned;
+			var found = FindDeep(transform, assigned.name);
+			if (found == null) return null;
+			return found.GetComponent<T>() ?? found.GetComponentInChildren<T>(true);
+		}
+
+		GameObject Live(GameObject assigned)
+		{
+			if (assigned == null) return null;
+			if (InScene(assigned)) return assigned;
+			var found = FindDeep(transform, assigned.name);
+			return found != null ? found.gameObject : null;
+		}
+
+		static Transform FindDeep(Transform root, string name)
+		{
+			if (root == null || string.IsNullOrEmpty(name)) return null;
+			if (root.name == name) return root;
+			for (int i = 0; i < root.childCount; i++)
+			{
+				var f = FindDeep(root.GetChild(i), name);
+				if (f != null) return f;
+			}
+			return null;
+		}
+
 		void SelectGridIcon(Sprite sprite)
 		{
 			if (sprite == null) return;
@@ -319,9 +382,11 @@ namespace PC.Component.Software
 			var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 			tex.filterMode = FilterMode.Point;
 			if (!tex.LoadImage(bytes)) return;
-			if (compileIconPreview != null) compileIconPreview.texture = tex;
-			if (compileIconImage != null)
-				compileIconImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+			var raw = Live(compileIconPreview);
+			if (raw != null) raw.texture = tex;
+			var img = Live(compileIconImage);
+			if (img != null)
+				img.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
 		}
 
 		void ShowSpritePreview(Sprite sprite)
