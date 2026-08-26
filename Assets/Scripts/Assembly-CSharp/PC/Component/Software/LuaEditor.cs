@@ -163,8 +163,6 @@ namespace PC.Component.Software
 			}
 		}
 
-		string compileIconB64 = "";
-
 		public void PickIcon()
 		{
 			if (system == null) return;
