@@ -179,11 +179,15 @@ namespace PC.Component.Software
 
 		public void Compile()
 		{
+			var live = SceneSelf();
+			if (live != null && live != this) { live.Compile(); return; }
 			OpenCompilePanel();
 		}
 
 		public void OpenCompilePanel()
 		{
+			var live = SceneSelf();
+			if (live != null && live != this) { live.OpenCompilePanel(); return; }
 			var picker = Live(iconPickerPanel);
 			if (picker != null) picker.SetActive(false);
 			var nameField = Live(compileName);
@@ -213,6 +217,8 @@ namespace PC.Component.Software
 
 		public void OpenIconPicker()
 		{
+			var live = SceneSelf();
+			if (live != null && live != this) { live.OpenIconPicker(); return; }
 			var picker = Live(iconPickerPanel);
 			if (picker == null)
 			{
@@ -281,17 +287,28 @@ namespace PC.Component.Software
 
 		void FillIconGrid()
 		{
-			var grid = Live(iconGrid);
-			if (grid == null || iconCellPrefab == null)
+			if (!InScene(gameObject)) return;
+			var picker = Live(iconPickerPanel);
+			Transform grid = null;
+			if (picker != null)
 			{
-				AppendOut("Icon Grid / Icon Cell Prefab: assign children of this window.");
+				if (iconGrid != null)
+					grid = FindDeep(picker.transform, iconGrid.name);
+				if (grid == null)
+					grid = FindDeep(picker.transform, "Content");
+			}
+			if (grid == null) grid = Live(iconGrid);
+			if (grid == null || !InScene(grid.gameObject) || iconCellPrefab == null)
+			{
+				AppendOut("Icon Grid must be Content inside the picker panel of this window.");
 				return;
 			}
 
 			for (int i = grid.childCount - 1; i >= 0; i--)
 			{
 				var ch = grid.GetChild(i);
-				if (ch != null) Destroy(ch.gameObject);
+				if (ch == null || !InScene(ch.gameObject)) continue;
+				Destroy(ch.gameObject);
 			}
 
 			var seen = new HashSet<Sprite>();
@@ -300,6 +317,7 @@ namespace PC.Component.Software
 				if (sp == null || seen.Contains(sp)) return;
 				seen.Add(sp);
 				var btn = Instantiate(iconCellPrefab);
+				if (!InScene(grid.gameObject)) return;
 				btn.transform.SetParent(grid, false);
 				btn.gameObject.SetActive(true);
 				var img = btn.GetComponent<Image>();
@@ -332,7 +350,20 @@ namespace PC.Component.Software
 
 		static bool InScene(GameObject go)
 		{
-			return go != null && go.scene.IsValid();
+			return go != null && go.scene.IsValid() && go.scene.isLoaded;
+		}
+
+		LuaEditor SceneSelf()
+		{
+			if (InScene(gameObject)) return this;
+			var all = FindObjectsOfType<LuaEditor>();
+			if (all == null) return null;
+			for (int i = 0; i < all.Length; i++)
+			{
+				var e = all[i];
+				if (e != null && e != this && InScene(e.gameObject)) return e;
+			}
+			return null;
 		}
 
 		T Live<T>(T assigned) where T : UnityEngine.Component
@@ -400,17 +431,19 @@ namespace PC.Component.Software
 		{
 			if (sprite == null || sprite.texture == null) return null;
 			var src = sprite.texture;
+			var tr = sprite.textureRect;
+			int x = Mathf.Clamp(Mathf.RoundToInt(tr.x), 0, Mathf.Max(0, src.width - 1));
+			int y = Mathf.Clamp(Mathf.RoundToInt(tr.y), 0, Mathf.Max(0, src.height - 1));
+			int w = Mathf.Clamp(Mathf.RoundToInt(tr.width), 1, src.width - x);
+			int h = Mathf.Clamp(Mathf.RoundToInt(tr.height), 1, src.height - y);
+
 			try
 			{
 				if (src.isReadable)
 				{
-					var r = sprite.textureRect;
-					var x = Mathf.FloorToInt(r.x);
-					var y = Mathf.FloorToInt(r.y);
-					var w = Mathf.Max(1, Mathf.FloorToInt(r.width));
-					var h = Mathf.Max(1, Mathf.FloorToInt(r.height));
 					var pix = src.GetPixels(x, y, w, h);
 					var copy = new Texture2D(w, h, TextureFormat.RGBA32, false);
+					copy.filterMode = FilterMode.Point;
 					copy.SetPixels(pix);
 					copy.Apply();
 					return copy.EncodeToPNG();
@@ -418,16 +451,21 @@ namespace PC.Component.Software
 			}
 			catch { }
 
-			var rt = RenderTexture.GetTemporary(Mathf.Max(16, src.width), Mathf.Max(16, src.height), 0, RenderTextureFormat.ARGB32);
+			var rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.ARGB32);
 			Graphics.Blit(src, rt);
 			var prev = RenderTexture.active;
 			RenderTexture.active = rt;
-			var tmp = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
-			tmp.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-			tmp.Apply();
+			var full = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false);
+			full.ReadPixels(new Rect(0, 0, src.width, src.height), 0, 0);
+			full.Apply();
 			RenderTexture.active = prev;
 			RenderTexture.ReleaseTemporary(rt);
-			return tmp.EncodeToPNG();
+			var crop = new Texture2D(w, h, TextureFormat.RGBA32, false);
+			crop.filterMode = FilterMode.Point;
+			crop.SetPixels(full.GetPixels(x, y, w, h));
+			crop.Apply();
+			UnityEngine.Object.Destroy(full);
+			return crop.EncodeToPNG();
 		}
 
 		public void InsertSnippet(string snippet)
