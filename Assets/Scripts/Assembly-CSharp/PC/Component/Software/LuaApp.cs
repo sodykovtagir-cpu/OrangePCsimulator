@@ -15,6 +15,7 @@ namespace PC.Component.Software
 		PcosLua vm;
 		LuaUi ui;
 		LuaGfx gfx;
+		LuaFunction tick;
 		GameObject maximizeGo;
 		WindowDrag dragBar;
 		GameObject debuggerGo;
@@ -91,6 +92,7 @@ namespace PC.Component.Software
 			SetWindowSize(defaultWindowSize.x, defaultWindowSize.y);
 			if (ui != null) ui.Clear();
 			if (gfx != null) gfx.Destroy();
+			tick = null;
 			vm = new PcosLua();
 			vm.Printer = HandlePrint;
 			PcosLuaHost.Bind(vm, system);
@@ -135,6 +137,27 @@ namespace PC.Component.Software
 			vm.SetNative("Ismaximable", Max);
 			vm.SetNative("enabledebugger", a => { EnableDebugger(); return LuaValue.Nil; });
 			vm.SetNative("EnableDebugger", a => { EnableDebugger(); return LuaValue.Nil; });
+			vm.SetNative("onupdate", a =>
+			{
+				tick = (a.Length > 0 && a[0].Type == LuaType.Function) ? a[0].Fn : null;
+				return LuaValue.Nil;
+			});
+		}
+
+		void Update()
+		{
+			if (tick == null || vm == null) return;
+			vm.Ops = 0;
+			try
+			{
+				vm.Call(LuaValue.FromFn(tick), new System.Collections.Generic.List<LuaValue>(), 0);
+			}
+			catch (Exception ex)
+			{
+				tick = null;
+				HandlePrint("error: " + ex.Message);
+			}
+			if (gfx != null) gfx.Apply();
 		}
 
 		void HandlePrint(string line)

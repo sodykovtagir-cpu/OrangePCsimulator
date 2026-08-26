@@ -169,8 +169,8 @@ namespace PC.Component.Software
 			};
 			if (system != null)
 			{
-				var app = system.SpawnLuaApp(pack.ToJson(), AppendOut);
-				if (app != null) return;
+				if (system.RunLua(pack.ToJson(), AppendOut))
+					return;
 			}
 			var vm = new PcosLua();
 			vm.Printer = AppendOut;

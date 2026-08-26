@@ -657,7 +657,37 @@ namespace PC.Component.Software.OS
 
         public bool LaunchLuaApp(string content)
         {
-            return SpawnLuaApp(content, null) != null;
+            return RunLua(content, null);
+        }
+
+        public bool RunLua(string content, Action<string> printer)
+        {
+            var pack = LuaAppPackage.Parse(content);
+            var script = pack != null ? pack.script : content;
+            if (LuaAppPackage.NeedsWindow(script))
+                return SpawnLuaApp(content ?? "", printer) != null;
+            RunLuaHeadless(script ?? "", printer);
+            return true;
+        }
+
+        void RunLuaHeadless(string script, Action<string> printer)
+        {
+            var vm = new PcosLua();
+            vm.Printer = printer;
+            PcosLuaHost.Bind(vm, this);
+            vm.SetNative("isdraggable", a => LuaValue.Bool(false));
+            vm.SetNative("Isdraggable", a => LuaValue.Bool(false));
+            vm.SetNative("ismaximable", a => LuaValue.Bool(false));
+            vm.SetNative("ismaxible", a => LuaValue.Bool(false));
+            vm.SetNative("ismaximizable", a => LuaValue.Bool(false));
+            vm.SetNative("enabledebugger", a => LuaValue.Nil);
+            vm.SetNative("onupdate", a => LuaValue.Nil);
+            try { vm.DoString(script ?? ""); }
+            catch (Exception ex)
+            {
+                if (printer != null) printer("error: " + ex.Message);
+                ShowMessageBox("Lua", ex.Message);
+            }
         }
 
         public LuaApp SpawnLuaApp(string content, Action<string> printer)

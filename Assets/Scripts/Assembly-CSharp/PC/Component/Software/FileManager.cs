@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
+using PC.Component.Software.Lua;
 
 namespace PC.Component.Software
 {
@@ -339,7 +340,12 @@ namespace PC.Component.Software
             if (file.isFolder && systemFolders.Contains(GetDisplayName(file.path))) return true;
 
             var ext = File.Extension(file.path);
-            return ext == ".exe" || file.path == "System/boot.bin" || file.hidden;
+            if (ext == ".exe")
+            {
+                if (LuaAppPackage.IsPackage(file.content)) return false;
+                return true;
+            }
+            return file.path == "System/boot.bin" || file.hidden;
         }
 
         private void OpenFolder(int index)
@@ -648,6 +654,7 @@ namespace PC.Component.Software
                 if (fb.block != null) Destroy(fb.block.gameObject);
             }
 
+            if (system != null) system.RefreshDesktopIcon();
             RefreshItem();
         }
 

@@ -18,6 +18,22 @@ namespace PC.Component.Software.Lua
 				|| content.IndexOf("\"pcos\": \"lua-app\"", StringComparison.Ordinal) >= 0;
 		}
 
+		public static bool NeedsWindow(string script)
+		{
+			if (string.IsNullOrEmpty(script)) return false;
+			if (Has(script, "ui.")) return true;
+			if (Has(script, "gfx.")) return true;
+			if (Has(script, "onupdate")) return true;
+			if (Has(script, "isdraggable")) return true;
+			if (Has(script, "ismaximable") || Has(script, "ismaxible") || Has(script, "ismaximizable")) return true;
+			return false;
+		}
+
+		static bool Has(string s, string token)
+		{
+			return s.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0;
+		}
+
 		public static LuaAppPackage Parse(string content)
 		{
 			if (string.IsNullOrEmpty(content)) return null;
