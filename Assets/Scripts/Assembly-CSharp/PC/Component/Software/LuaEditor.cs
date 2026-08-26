@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using PC.Component.Software.Lua;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace PC.Component.Software
@@ -41,15 +42,22 @@ namespace PC.Component.Software
 		private int lastCaret;
 		private int lastSelA;
 		private int lastSelB;
+		private LuaCaretTrack track;
 
-		InputField Code => code;
-
-		void LateUpdate()
+		void EnsureTrack()
 		{
-			if (code == null || !code.isFocused) return;
-			lastCaret = code.caretPosition;
-			lastSelA = code.selectionAnchorPosition;
-			lastSelB = code.selectionFocusPosition;
+			if (code == null) return;
+			track = code.GetComponent<LuaCaretTrack>();
+			if (track == null) track = code.gameObject.AddComponent<LuaCaretTrack>();
+		}
+
+		protected override void Start()
+		{
+			base.Start();
+			EnsureTrack();
+			BuildSnippetButtons();
+			if (highlighter != null && code != null)
+				highlighter.Bind(code);
 		}
 
 		[ContextMenu("Fill default snippets")]
@@ -65,17 +73,10 @@ namespace PC.Component.Software
 			snippets = DefaultSnippets();
 		}
 
-		protected override void Start()
-		{
-			base.Start();
-			BuildSnippetButtons();
-			if (highlighter != null && code != null)
-				highlighter.Bind(code);
-		}
-
 		public override void Open(string content)
 		{
 			base.Open(content);
+			EnsureTrack();
 			BuildSnippetButtons();
 			if (fillDocsOnOpen && docsText != null && string.IsNullOrEmpty(docsText.text))
 				docsText.text = LuaDocs.Text();
@@ -138,25 +139,36 @@ namespace PC.Component.Software
 		public void InsertSnippet(string snippet)
 		{
 			if (code == null || string.IsNullOrEmpty(snippet)) return;
+			if (!isActiveAndEnabled || !gameObject.activeInHierarchy) return;
+
+			EnsureTrack();
+			if (track != null)
+			{
+				lastCaret = track.Caret;
+				lastSelA = track.SelA;
+				lastSelB = track.SelB;
+			}
+
 			int mark = snippet.IndexOf('|');
 			string ins = snippet.Replace("|", "");
 			string t = code.text ?? "";
-			int caret = code.caretPosition;
+			int caret = lastCaret;
 			if (caret < 0 || caret > t.Length) caret = t.Length;
-			if (code.selectionAnchorPosition != code.selectionFocusPosition)
+
+			int a = Mathf.Min(lastSelA, lastSelB);
+			int b = Mathf.Max(lastSelA, lastSelB);
+			if (a != b && a >= 0 && b <= t.Length)
 			{
-				int a = Mathf.Min(code.selectionAnchorPosition, code.selectionFocusPosition);
-				int b = Mathf.Max(code.selectionAnchorPosition, code.selectionFocusPosition);
-				if (a >= 0 && b <= t.Length && b >= a)
-				{
-					t = t.Remove(a, b - a);
-					caret = a;
-				}
+				t = t.Remove(a, b - a);
+				caret = a;
 			}
+
 			code.text = t.Insert(caret, ins);
 			int pos = caret + (mark >= 0 ? mark : ins.Length);
-			StartCoroutine(PlaceCaret(pos));
+			lastCaret = lastSelA = lastSelB = pos;
+			if (track != null) track.Set(pos, pos, pos);
 			if (highlighter != null) highlighter.Refresh();
+			StartCoroutine(PlaceCaret(pos));
 		}
 
 		IEnumerator PlaceCaret(int pos)
