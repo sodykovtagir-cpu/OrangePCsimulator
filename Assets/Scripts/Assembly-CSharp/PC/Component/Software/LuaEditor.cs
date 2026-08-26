@@ -38,8 +38,19 @@ namespace PC.Component.Software
 
 		private string filePath;
 		private bool snippetsBuilt;
+		private int lastCaret;
+		private int lastSelA;
+		private int lastSelB;
 
 		InputField Code => code;
+
+		void LateUpdate()
+		{
+			if (code == null || !code.isFocused) return;
+			lastCaret = code.caretPosition;
+			lastSelA = code.selectionAnchorPosition;
+			lastSelB = code.selectionFocusPosition;
+		}
 
 		[ContextMenu("Fill default snippets")]
 		public void FillDefaultSnippets()
