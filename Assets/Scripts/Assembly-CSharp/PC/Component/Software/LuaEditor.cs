@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using PC.Component.Software.Lua;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -93,6 +94,8 @@ namespace PC.Component.Software
 			if (string.IsNullOrEmpty(filePath)) filePath = defaultFileName;
 			AppendOut(Localization.GetText("Lua ready. Click a hint to insert."));
 			if (highlighter != null) highlighter.Refresh();
+			if (compilePanel != null) compilePanel.SetActive(false);
+			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
 		}
 
 		public void OpenFile()
@@ -137,7 +140,7 @@ namespace PC.Component.Software
 			if (code == null) return;
 			if (output != null) output.text = "";
 			var name = compileName != null && !string.IsNullOrEmpty(compileName.text) ? compileName.text : "Preview";
-			var pack = new Lua.LuaAppPackage
+			var pack = new LuaAppPackage
 			{
 				name = name,
 				script = code.text ?? "",
@@ -163,24 +166,62 @@ namespace PC.Component.Software
 			}
 		}
 
+		public void OpenCompilePanel()
+		{
+			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
+			if (compileName != null && string.IsNullOrEmpty(compileName.text))
+			{
+				var n = File.NameWithoutExtension(string.IsNullOrEmpty(filePath) ? defaultFileName : filePath);
+				if (string.IsNullOrEmpty(n) || n == "Untitled") n = "LuaApp";
+				compileName.text = n;
+			}
+			if (compilePanel != null) compilePanel.SetActive(true);
+		}
+
+		public void CancelCompile()
+		{
+			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
+			if (compilePanel != null) compilePanel.SetActive(false);
+		}
+
+		public void ConfirmCompile()
+		{
+			Compile();
+			CancelCompile();
+		}
+
+		public void OpenIconPicker()
+		{
+			FillIconGrid();
+			if (iconPickerPanel != null) iconPickerPanel.SetActive(true);
+		}
+
+		public void CancelIconPicker()
+		{
+			if (iconPickerPanel != null) iconPickerPanel.SetActive(false);
+		}
+
 		public void PickIcon()
 		{
-			if (system == null) return;
-			system.SelectFile("*", file =>
+			OpenIconPicker();
+		}
+
+		public void PickIconFromDevice()
+		{
+			NativeGallery.GetImageFromGallery(path =>
 			{
-				if (file == null || string.IsNullOrEmpty(file.content)) return;
-				compileIconB64 = file.content;
-				if (compileIconPreview == null) return;
+				if (string.IsNullOrEmpty(path)) return;
 				try
 				{
-					var data = Convert.FromBase64String(file.content);
-					var tex = new Texture2D(2, 2);
-					tex.filterMode = FilterMode.Point;
-					if (tex.LoadImage(data))
-						compileIconPreview.texture = tex;
+					var bytes = System.IO.File.ReadAllBytes(path);
+					ApplyIconBytes(bytes);
+					CancelIconPicker();
 				}
-				catch { }
-			});
+				catch (Exception ex)
+				{
+					AppendOut("icon: " + ex.Message);
+				}
+			}, "Icon", "image/*");
 		}
 
 		public void Compile()
@@ -194,7 +235,7 @@ namespace PC.Component.Software
 				name = name.Replace(c, '_');
 			if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
 				name = name.Substring(0, name.Length - 4);
-			var pack = new Lua.LuaAppPackage
+			var pack = new LuaAppPackage
 			{
 				name = name,
 				script = code.text ?? "",
@@ -207,6 +248,107 @@ namespace PC.Component.Software
 			filePath = path;
 			AppendOut("compiled " + path);
 			if (system != null) system.ShowMessageBox("Lua", path);
+		}
+
+		void FillIconGrid()
+		{
+			if (iconGrid == null || iconCellPrefab == null) return;
+			for (int i = iconGrid.childCount - 1; i >= 0; i--)
+				Destroy(iconGrid.GetChild(i).gameObject);
+
+			var seen = new HashSet<Sprite>();
+			void Add(Sprite sp)
+			{
+				if (sp == null || seen.Contains(sp)) return;
+				seen.Add(sp);
+				var btn = Instantiate(iconCellPrefab, iconGrid);
+				btn.gameObject.SetActive(true);
+				var img = btn.GetComponent<Image>();
+				if (img == null) img = btn.GetComponentInChildren<Image>();
+				if (img != null) img.sprite = sp;
+				var captured = sp;
+				btn.onClick.RemoveAllListeners();
+				btn.onClick.AddListener(() => SelectGridIcon(captured));
+			}
+
+			if (extraIcons != null)
+			{
+				for (int i = 0; i < extraIcons.Length; i++) Add(extraIcons[i]);
+			}
+			var apps = Resources.LoadAll<App>("apps");
+			if (apps != null)
+			{
+				for (int i = 0; i < apps.Length; i++)
+				{
+					if (apps[i] == null) continue;
+					Add(apps[i].Icon);
+					Add(apps[i].FileIcon);
+				}
+			}
+		}
+
+		void SelectGridIcon(Sprite sprite)
+		{
+			if (sprite == null) return;
+			var bytes = SpriteToPng(sprite);
+			if (bytes != null && bytes.Length > 0)
+				ApplyIconBytes(bytes);
+			else
+				ShowSpritePreview(sprite);
+			CancelIconPicker();
+		}
+
+		void ApplyIconBytes(byte[] bytes)
+		{
+			if (bytes == null || bytes.Length == 0) return;
+			compileIconB64 = Convert.ToBase64String(bytes);
+			var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+			tex.filterMode = FilterMode.Point;
+			if (!tex.LoadImage(bytes)) return;
+			if (compileIconPreview != null) compileIconPreview.texture = tex;
+			if (compileIconImage != null)
+				compileIconImage.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+		}
+
+		void ShowSpritePreview(Sprite sprite)
+		{
+			if (compileIconImage != null) compileIconImage.sprite = sprite;
+			if (compileIconPreview != null && sprite != null && sprite.texture != null)
+				compileIconPreview.texture = sprite.texture;
+		}
+
+		static byte[] SpriteToPng(Sprite sprite)
+		{
+			if (sprite == null || sprite.texture == null) return null;
+			var src = sprite.texture;
+			try
+			{
+				if (src.isReadable)
+				{
+					var r = sprite.textureRect;
+					var x = Mathf.FloorToInt(r.x);
+					var y = Mathf.FloorToInt(r.y);
+					var w = Mathf.Max(1, Mathf.FloorToInt(r.width));
+					var h = Mathf.Max(1, Mathf.FloorToInt(r.height));
+					var pix = src.GetPixels(x, y, w, h);
+					var copy = new Texture2D(w, h, TextureFormat.RGBA32, false);
+					copy.SetPixels(pix);
+					copy.Apply();
+					return copy.EncodeToPNG();
+				}
+			}
+			catch { }
+
+			var rt = RenderTexture.GetTemporary(Mathf.Max(16, src.width), Mathf.Max(16, src.height), 0, RenderTextureFormat.ARGB32);
+			Graphics.Blit(src, rt);
+			var prev = RenderTexture.active;
+			RenderTexture.active = rt;
+			var tmp = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+			tmp.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+			tmp.Apply();
+			RenderTexture.active = prev;
+			RenderTexture.ReleaseTemporary(rt);
+			return tmp.EncodeToPNG();
 		}
 
 		public void InsertSnippet(string snippet)
