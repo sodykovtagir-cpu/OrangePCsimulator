@@ -316,7 +316,16 @@ MonoBehaviour:
   maximizeSprite: {fileID: 0}
   normalSprite: {fileID: 0}
   windowState: {fileID: 0}
-  input: {fileID: 114830581342418658}
+  code: {fileID: 114830581342418658}
+  output: {fileID: 0}
+  defaultFileName: Untitled.lua
+  docsPanel: {fileID: 0}
+  docsText: {fileID: 0}
+  fillDocsOnOpen: 1
+  snippetParent: {fileID: 0}
+  snippetButtonPrefab: {fileID: 0}
+  snippets: []
+  highlighter: {fileID: 0}
 --- !u!224 &224468881094630765
 RectTransform:
   m_ObjectHideFlags: 0
