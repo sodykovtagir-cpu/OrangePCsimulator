@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemName: KCAS
   price: 120
-  bitcoin: 0
+  bitcoin: 5
   sprite: {fileID: 21300000, guid: 94154035da25f2c44b981d5563c8e33b, type: 3}
   spawn: {fileID: 1237095893359166, guid: 990e6101507bad54c845136c4f7c2c63, type: 3}
   large: 0
