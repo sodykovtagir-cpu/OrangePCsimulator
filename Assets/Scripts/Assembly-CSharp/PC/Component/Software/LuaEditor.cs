@@ -335,7 +335,7 @@ namespace PC.Component.Software
 			return go != null && go.scene.IsValid();
 		}
 
-		T Live<T>(T assigned) where T : Component
+		T Live<T>(T assigned) where T : UnityEngine.Component
 		{
 			if (assigned == null) return null;
 			if (InScene(assigned.gameObject)) return assigned;
