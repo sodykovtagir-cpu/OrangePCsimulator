@@ -173,6 +173,38 @@ MonoBehaviour:
     insert: string.upper("|")
   - label: table.insert
     insert: table.insert(|, )
+  - label: ui.title
+    insert: ui.title("|")
+  - label: ui.size
+    insert: ui.size(400, 240)
+  - label: ui.label
+    insert: ui.label("|", 10, 10, 200, 24)
+  - label: ui.button
+    insert: "ui.button(\"OK\", 10, 40, 80, 24, function()\n  \nend)"
+  - label: ui.input
+    insert: ui.input("|", 10, 70, 180, 24)
+  - label: ui.panel
+    insert: ui.panel(8, 8, 200, 100)
+  - label: ui.slider
+    insert: ui.slider(10, 100, 180, 20, 0, 1)
+  - label: ui.toggle
+    insert: ui.toggle("On", 10, 130, 120, 22, true)
+  - label: ui.get / set
+    insert: ui.set(id, ui.get(id))
+  - label: ui.style
+    insert: ui.style({ button = {0.9, 0.9, 0.9}, text = {0,0,0} })
+  - label: ui.systemstyle
+    insert: ui.systemstyle()
+  - label: isdraggable
+    insert: isdraggable(true)
+  - label: ismaximable
+    insert: ismaximable(true)
+  - label: enabledebugger
+    insert: enabledebugger()
+  - label: ui.rect
+    insert: ui.rect(10, 10, 80, 40, 0.2, 0.4, 0.8)
+  - label: gfx.rect
+    insert: gfx.rect(10, 10, 40, 40, 1, 0, 0)
   highlighter: {fileID: 0}
   compilePanel: {fileID: 6923151918422282091}
   compileName: {fileID: 1910487099442789750}
