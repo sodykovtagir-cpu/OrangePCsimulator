@@ -131,36 +131,47 @@ namespace PC.Component.Software
 
 		public void ToggleDocs()
 		{
-			if (docsPanel == null) return;
-			bool on = !docsPanel.activeSelf;
-			docsPanel.SetActive(on);
+			var panel = Live(docsPanel);
+			if (panel == null) { ShowDocs(); return; }
+			bool on = !panel.activeSelf;
+			panel.SetActive(on);
 			if (on) ShowDocs();
 		}
 
+		public void Docs() { ShowDocs(); }
+		public void OpenDocs() { ShowDocs(); }
+
 		public void ShowDocs()
 		{
+			var live = SceneSelf();
+			if (live != null && live != this) { live.ShowDocs(); return; }
 			var text = LuaDocs.Text();
-			if (docsText != null) docsText.text = text;
-			if (docsPanel != null) docsPanel.SetActive(true);
-			if (docsLanguageHint != null)
-				docsLanguageHint.text = Localization.GetLanguage() ?? "EN";
+			var dt = Live(docsText);
+			if (dt != null) dt.text = text;
+			var panel = Live(docsPanel);
+			if (panel != null) panel.SetActive(true);
+			else if (system != null) system.LuaOpen("Lua.txt");
+			var hint = Live(docsLanguageHint);
+			if (hint != null)
+				hint.text = Localization.GetLanguage() ?? "EN";
 		}
 
 		public void Run()
 		{
 			if (code == null) return;
-			if (output != null) output.text = "";
-			var name = compileName != null && !string.IsNullOrEmpty(compileName.text) ? compileName.text : "Preview";
+			AppendOut("---");
+			var nameField = Live(compileName);
+			var name = nameField != null && !string.IsNullOrEmpty(nameField.text) ? nameField.text : "Preview";
 			var pack = new LuaAppPackage
 			{
 				name = name,
 				script = code.text ?? "",
 				icon = compileIconB64
 			};
-			if (system != null && system.LaunchLuaApp(pack.ToJson()))
+			if (system != null)
 			{
-				AppendOut(Localization.GetText("Lua finished."));
-				return;
+				var app = system.SpawnLuaApp(pack.ToJson(), AppendOut);
+				if (app != null) return;
 			}
 			var vm = new PcosLua();
 			vm.Printer = AppendOut;
@@ -539,8 +550,10 @@ namespace PC.Component.Software
 		void AppendOut(string line)
 		{
 			if (output == null) return;
-			if (string.IsNullOrEmpty(output.text)) output.text = line;
-			else output.text = output.text + "\n" + line;
+			if (string.IsNullOrEmpty(output.text)) output.text = line ?? "";
+			else output.text = output.text + "\n" + (line ?? "");
+			if (output.text.Length > 16000)
+				output.text = output.text.Substring(output.text.Length - 12000);
 		}
 
 		static string DefaultSource()

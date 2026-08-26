@@ -657,11 +657,20 @@ namespace PC.Component.Software.OS
 
         public bool LaunchLuaApp(string content)
         {
+            return SpawnLuaApp(content, null) != null;
+        }
+
+        public LuaApp SpawnLuaApp(string content, Action<string> printer)
+        {
             App prefab = null;
             if (appPrefabs != null) appPrefabs.TryGetValue("Lua App", out prefab);
-            if (prefab == null) return false;
-            LaunchApp(prefab, content ?? "");
-            return true;
+            if (prefab == null) return null;
+            var app = LaunchApp(prefab, content ?? "", lua =>
+            {
+                var inst = lua as LuaApp;
+                if (inst != null && printer != null) inst.Printer = printer;
+            });
+            return app as LuaApp;
         }
 
         public bool OpenFile(File file)

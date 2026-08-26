@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
@@ -37,7 +37,7 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (window == null || parentRect == null) return;
+        if (!enabled || window == null || parentRect == null) return;
 
         Vector2 localPointerPos;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(

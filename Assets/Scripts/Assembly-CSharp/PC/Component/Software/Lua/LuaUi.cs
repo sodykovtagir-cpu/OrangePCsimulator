@@ -88,7 +88,36 @@ namespace PC.Component.Software.Lua
 			ui.Set(LuaValue.String("systemstyle"), Native(a => { style = Style.System(); ApplyWindow(); return LuaValue.Nil; }));
 			ui.Set(LuaValue.String("title"), Native(a => { if (OnTitle != null) OnTitle(Str(a, 0)); return LuaValue.Nil; }));
 			ui.Set(LuaValue.String("size"), Native(a => { if (OnSize != null) OnSize(Num(a, 0, 420), Num(a, 1, 280)); return LuaValue.Nil; }));
+			ui.Set(LuaValue.String("color"), Native(a => { ColorWidget(Str(a, 0), ColorArg(a, 1)); return LuaValue.Nil; }));
+			ui.Set(LuaValue.String("rect"), Native(a => LuaValue.String(Rect(Num(a, 0), Num(a, 1), Num(a, 2, 40), Num(a, 3, 40), ColorArg(a, 4)))));
+			ui.Set(LuaValue.String("image"), Native(a => LuaValue.String(Image(Str(a, 0), Num(a, 1), Num(a, 2), Num(a, 3, 64), Num(a, 4, 64)))));
+			ui.Set(LuaValue.String("isdraggable"), Native(DragFn));
+			ui.Set(LuaValue.String("draggable"), Native(DragFn));
+			ui.Set(LuaValue.String("ismaximable"), Native(MaxFn));
+			ui.Set(LuaValue.String("ismaximizable"), Native(MaxFn));
+			ui.Set(LuaValue.String("maximizable"), Native(MaxFn));
 			vm.SetGlobal("ui", LuaValue.FromTable(ui));
+		}
+
+		LuaValue DragFn(LuaValue[] a)
+		{
+			var app = Host();
+			if (a.Length == 0) return LuaValue.Bool(app != null && app.IsDraggable);
+			if (app != null) app.SetDraggable(a[0].IsTruthy());
+			return LuaValue.Nil;
+		}
+
+		LuaValue MaxFn(LuaValue[] a)
+		{
+			var app = Host();
+			if (a.Length == 0) return LuaValue.Bool(app != null && app.IsMaximizable);
+			if (app != null) app.SetMaximizable(a[0].IsTruthy());
+			return LuaValue.Nil;
+		}
+
+		LuaApp Host()
+		{
+			return root != null ? root.GetComponentInParent<LuaApp>() : null;
 		}
 
 		string NewId() { return "w" + (nextId++); }
@@ -118,7 +147,12 @@ namespace PC.Component.Software.Lua
 			{
 				if (captured == null || vm == null) return;
 				try { vm.Call(LuaValue.FromFn(captured), new List<LuaValue>(), 0); }
-				catch (Exception ex) { Debug.LogWarning("[LuaUi] " + ex.Message); }
+				catch (Exception ex)
+				{
+					if (vm.Printer != null) vm.Printer("error: " + ex.Message);
+				}
+				var host = Host();
+				if (host != null) host.FlipGfx();
 			});
 			var tx = MakeText(text, style.buttonText);
 			tx.transform.SetParent(go.transform, false);
@@ -278,12 +312,74 @@ namespace PC.Component.Software.Lua
 		{
 			if (root == null) return;
 			for (int i = root.childCount - 1; i >= 0; i--)
-				UnityEngine.Object.Destroy(root.GetChild(i).gameObject);
+			{
+				var ch = root.GetChild(i);
+				if (ch == null) continue;
+				if (ch.name != null && ch.name.StartsWith("__")) continue;
+				UnityEngine.Object.Destroy(ch.gameObject);
+			}
 			widgets.Clear();
 			inputs.Clear();
 			labels.Clear();
 			sliders.Clear();
 			toggles.Clear();
+		}
+
+		string Rect(float x, float y, float w, float h, Color color)
+		{
+			var id = Panel(x, y, w, h);
+			Graphic g;
+			if (widgets.TryGetValue(id, out g) && g != null) g.color = color;
+			return id;
+		}
+
+		string Image(string path, float x, float y, float w, float h)
+		{
+			var id = NewId();
+			var go = new GameObject(id, typeof(RectTransform), typeof(RawImage));
+			go.transform.SetParent(root, false);
+			var raw = go.GetComponent<RawImage>();
+			raw.color = Color.white;
+			raw.raycastTarget = false;
+			var host = Host();
+			Texture2D tex = host != null ? host.LoadUserTexture(path) : null;
+			if (tex != null) raw.texture = tex;
+			Place(go.GetComponent<RectTransform>(), x, y, w, h);
+			widgets[id] = raw;
+			return id;
+		}
+
+		void ColorWidget(string id, Color color)
+		{
+			Graphic g;
+			if (widgets.TryGetValue(id, out g) && g != null) g.color = color;
+		}
+
+		Color ColorArg(LuaValue[] a, int i)
+		{
+			if (i >= a.Length) return style.panel;
+			if (a[i].Type == LuaType.Table) return ColorOf(a[i].Table, style.panel);
+			if (a[i].Type == LuaType.Number)
+			{
+				float r = (float)a[i].N;
+				float g = i + 1 < a.Length && a[i + 1].Type == LuaType.Number ? (float)a[i + 1].N : r;
+				float b = i + 2 < a.Length && a[i + 2].Type == LuaType.Number ? (float)a[i + 2].N : r;
+				float al = i + 3 < a.Length && a[i + 3].Type == LuaType.Number ? (float)a[i + 3].N : 1f;
+				return new Color(r, g, b, al);
+			}
+			return style.panel;
+		}
+
+		static Color ColorOf(LuaTable t, Color fallback)
+		{
+			if (t == null) return fallback;
+			float R(int i)
+			{
+				var x = t.Get(LuaValue.Number(i));
+				return x.Type == LuaType.Number ? (float)x.N : 0f;
+			}
+			var a = t.Get(LuaValue.Number(4));
+			return new Color(R(1), R(2), R(3), a.Type == LuaType.Number ? (float)a.N : 1f);
 		}
 
 		LuaValue ApplyStyle(LuaValue[] a)
@@ -317,8 +413,7 @@ namespace PC.Component.Software.Lua
 		{
 			var v = t.Get(LuaValue.String(key));
 			if (v.Type != LuaType.Table) return fallback;
-			float R(int i) { var x = v.Table.Get(LuaValue.Number(i)); return x.Type == LuaType.Number ? (float)x.N : 0f; }
-			return new Color(R(1), R(2), R(3), v.Table.Get(LuaValue.Number(4)).Type == LuaType.Number ? (float)v.Table.Get(LuaValue.Number(4)).N : 1f);
+			return ColorOf(v.Table, fallback);
 		}
 
 		Text MakeText(string text, Color color)
