@@ -567,36 +567,24 @@ namespace PC.Component.Software.Lua
 				try
 				{
 					var result = Call(fn, callArgs);
-					return LuaValue.FromTable(new LuaTable
-					{
-						Map = new Dictionary<LuaValue, LuaValue>
-						{
-							{ LuaValue.Number(1), LuaValue.Bool(true) },
-							{ LuaValue.Number(2), result }
-						}
-					});
+					var t = new LuaTable();
+					t.Set(LuaValue.Number(1), LuaValue.Bool(true));
+					t.Set(LuaValue.Number(2), result);
+					return LuaValue.FromTable(t);
 				}
 				catch (PcosLuaException ex)
 				{
-					return LuaValue.FromTable(new LuaTable
-					{
-						Map = new Dictionary<LuaValue, LuaValue>
-						{
-							{ LuaValue.Number(1), LuaValue.Bool(false) },
-							{ LuaValue.Number(2), LuaValue.String(ex.Message) }
-						}
-					});
+					var t = new LuaTable();
+					t.Set(LuaValue.Number(1), LuaValue.Bool(false));
+					t.Set(LuaValue.Number(2), LuaValue.String(ex.Message));
+					return LuaValue.FromTable(t);
 				}
 				catch (Exception ex)
 				{
-					return LuaValue.FromTable(new LuaTable
-					{
-						Map = new Dictionary<LuaValue, LuaValue>
-						{
-							{ LuaValue.Number(1), LuaValue.Bool(false) },
-							{ LuaValue.Number(2), LuaValue.String(ex.Message) }
-						}
-					});
+					var t = new LuaTable();
+					t.Set(LuaValue.Number(1), LuaValue.Bool(false));
+					t.Set(LuaValue.Number(2), LuaValue.String(ex.Message));
+					return LuaValue.FromTable(t);
 				}
 			});
 
@@ -615,24 +603,18 @@ namespace PC.Component.Software.Lua
 				{
 					Native = a =>
 					{
-						while (idx[0] < keys.Count)
-						{
-							var k = keys[idx[0]++];
-							var v = tbl.Get(k);
-							if (v.Type != LuaType.Nil)
+							while (idx[0] < keys.Count)
 							{
-								// Сохраняем ключ и значение в глобалах для возврата
-								// Используем подход: возвращаем k, v через table
-								return LuaValue.FromTable(new LuaTable
+								var k = keys[idx[0]++];
+								var v = tbl.Get(k);
+								if (v.Type != LuaType.Nil)
 								{
-									Map = new Dictionary<LuaValue, LuaValue>
-									{
-										{ LuaValue.Number(1), k },
-										{ LuaValue.Number(2), v }
-									}
-								});
+									var pair = new LuaTable();
+									pair.Set(LuaValue.Number(1), k);
+									pair.Set(LuaValue.Number(2), v);
+									return LuaValue.FromTable(pair);
+								}
 							}
-						}
 						return LuaValue.Nil;
 					}
 				};
