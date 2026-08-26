@@ -14,4 +14,3 @@ win.alert / open / close
 if / while / for i=1,n / function / local / tables
 math, string, table
 
-Community: https://t.me/orangePCsimu
