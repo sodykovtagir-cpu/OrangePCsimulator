@@ -52,6 +52,8 @@ namespace PC.Component.Software
 
 		protected virtual bool ShowMenuBar => true;
 
+		public virtual bool SingleInstance => true;
+
 		public Sprite FileIcon
 		{
 			get

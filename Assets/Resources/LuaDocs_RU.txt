@@ -1,0 +1,88 @@
+PCOS Lua
+========
+Язык внутри системы. Канал: t.me/orangePCsimu
+
+РЕДАКТОР
+--------
+Слева код, справа подсказки. | в шаблоне — куда встанет курсор.
+Run — превью в системном окне (нужно для ui.*).
+Save — исходник .lua / .txt.
+Compile — пишет Name.exe на рабочий стол (ярлык). Запуск двойным кликом.
+Pick icon — иконка из .pic (или любой файл-картинка в base64).
+Имя .exe — поле Compile Name в инспекторе редактора.
+
+Документация: кнопка Docs (ToggleDocs / ShowDocs) или файл Lua.txt
+на рабочем столе (при загрузке ОС перезаписывается на текущий язык игры).
+
+ПОДСВЕТКА СИНТАКСИСА
+--------------------
+На объект Lua Editor повесь LuaSyntaxHighlight:
+  Code = InputField с кодом
+  Overlay = Text-копия того же поля (тот же Rect, Rich Text ВКЛ, Raycast ВЫКЛ)
+Цвет текста у InputField почти прозрачный — виден только overlay.
+Цвета keyword / string / comment / number настраиваются в инспекторе.
+
+КОМПИЛЯЦИЯ / .EXE
+-----------------
+Compile пакует JSON { pcos: lua-app, name, icon, script } в Name.exe.
+Иконка на рабочем столе — из Pick Icon, если выбирал.
+Несколько скомпилированных окон могут быть открыты сразу.
+
+ИНТЕРФЕЙС (системный угловатый PCOS)
+------------------------------------
+Координаты: левый верх, Y вниз, пиксели.
+
+ui.title("Имя")
+ui.size(w, h)
+ui.label(text, x, y, w, h)           -> id
+ui.button(text, x, y, w, h, fn)      -> id
+ui.input(text, x, y, w, h)           -> id
+ui.panel(x, y, w, h)                 -> id
+ui.slider(x, y, w, h, min, max)      -> id
+ui.toggle(text, x, y, w, h, on)      -> id
+ui.get(id)  ui.set(id, text)
+ui.value(id)     -- слайдер
+ui.checked(id)   -- галка
+ui.remove(id)  ui.clear()
+ui.systemstyle()
+ui.style({
+  window={r,g,b}, panel={r,g,b},
+  button={r,g,b}, buttonText={r,g,b},
+  text={r,g,b}, input={r,g,b}, inputText={r,g,b},
+  fontSize=14
+})
+Цвет — таблица 0..1 {r,g,b} или {r,g,b,a}.
+
+Пример:
+  ui.title("Счётчик")
+  ui.size(320, 180)
+  local n = 0
+  local lab = ui.label("0", 20, 20, 200, 24)
+  ui.button("Клик", 20, 60, 100, 28, function()
+    n = n + 1
+    ui.set(lab, tostring(n))
+  end)
+
+ОС / ФАЙЛЫ / ОКНА
+-----------------
+print(...)
+os.alert(title, msg)  os.open(имяИлиФайл)  os.close(имя)
+os.apps()  os.windows()  os.username()  os.id()
+os.installed(имя)  os.shutdown()  os.time()  os.ready()
+fs.list()  fs.read(p)  fs.write(p,s)  fs.exists(p)  fs.delete(p)
+win.alert(msg)  win.open(имя)  win.close(имя)
+
+ЯЗЫК
+----
+if / then / elseif / else / end
+while / do / end   repeat / until
+for i = 1, n do ... end
+function name(...) ... end
+local x = ...
+таблицы {1,2, a=3}, t.a, t[1], #t
+and or not  ..  == ~= < >
+
+math.abs/floor/ceil/sqrt/sin/cos/min/max/random/pi
+string.len/upper/lower/sub/rep/find
+table.insert / table.concat
+tonumber tostring type assert error
