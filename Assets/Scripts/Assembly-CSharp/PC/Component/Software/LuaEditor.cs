@@ -608,7 +608,20 @@ namespace PC.Component.Software
 				new LuaSnippet { label = "ismaximable", insert = "ismaximable(true)" },
 				new LuaSnippet { label = "enabledebugger", insert = "enabledebugger()" },
 				new LuaSnippet { label = "ui.rect", insert = "ui.rect(10, 10, 80, 40, 0.2, 0.4, 0.8)" },
-				new LuaSnippet { label = "gfx.rect", insert = "gfx.rect(10, 10, 40, 40, 1, 0, 0)" }
+				new LuaSnippet { label = "gfx.rect", insert = "gfx.rect(10, 10, 40, 40, 1, 0, 0)" },
+				new LuaSnippet { label = "gfx.text", insert = "gfx.text(10, 10, \"Hello\", 1, 1, 1)" },
+				new LuaSnippet { label = "gfx.line", insert = "gfx.line(0, 0, 100, 100, 1, 1, 1)" },
+				new LuaSnippet { label = "gfx.circle", insert = "gfx.circle(50, 50, 20, 0, 1, 0)" },
+				new LuaSnippet { label = "gfx.getpixel", insert = "gfx.getpixel(10, 10)" },
+				new LuaSnippet { label = "pairs(t)", insert = "pairs(|)" },
+				new LuaSnippet { label = "ipairs(t)", insert = "ipairs(|)" },
+				new LuaSnippet { label = "pcall", insert = "pcall(|, )" },
+				new LuaSnippet { label = "string.format", insert = "string.format(\"|\", )" },
+				new LuaSnippet { label = "string.reverse", insert = "string.reverse(\"|\")" },
+				new LuaSnippet { label = "table.sort", insert = "table.sort(|)" },
+				new LuaSnippet { label = "table.remove", insert = "table.remove(|)" },
+				new LuaSnippet { label = "ui.image", insert = "ui.image(\"|\", 10, 10, 64, 64)" },
+				new LuaSnippet { label = "ui.clear", insert = "ui.clear()" }
 			};
 		}
 	}

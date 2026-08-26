@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using UnityEngine;
 
 namespace PC.Component.Software.Lua
 {
@@ -467,8 +468,18 @@ namespace PC.Component.Software.Lua
 				case "+": return LuaValue.Number(a.AsNumber() + c.AsNumber());
 				case "-": return LuaValue.Number(a.AsNumber() - c.AsNumber());
 				case "*": return LuaValue.Number(a.AsNumber() * c.AsNumber());
-				case "/": return LuaValue.Number(a.AsNumber() / c.AsNumber());
-				case "%": return LuaValue.Number(a.AsNumber() % c.AsNumber());
+				case "/":
+				{
+					double divisor = c.AsNumber();
+					if (divisor == 0.0) throw new PcosLuaException("attempt to divide by zero", b.Line);
+					return LuaValue.Number(a.AsNumber() / divisor);
+				}
+				case "%":
+				{
+					double divisor = c.AsNumber();
+					if (divisor == 0.0) throw new PcosLuaException("attempt to perform 'n % 0'", b.Line);
+					return LuaValue.Number(a.AsNumber() % divisor);
+				}
 				case "^": return LuaValue.Number(Math.Pow(a.AsNumber(), c.AsNumber()));
 				case "..": return LuaValue.String(a.AsString() + c.AsString());
 				case "==": return LuaValue.Bool(a.Equals(c));
@@ -545,6 +556,119 @@ namespace PC.Component.Software.Lua
 				return args[i];
 			});
 
+			// pcall(f, ...) — вызов с защитой от ошибок
+			SetNative("pcall", args =>
+			{
+				if (args.Length == 0 || args[0].Type != LuaType.Function)
+					throw new PcosLuaException("pcall: function expected");
+				var fn = args[0];
+				var callArgs = new List<LuaValue>();
+				for (int i = 1; i < args.Length; i++) callArgs.Add(args[i]);
+				try
+				{
+					var result = Call(fn, callArgs);
+					return LuaValue.FromTable(new LuaTable
+					{
+						Map = new Dictionary<LuaValue, LuaValue>
+						{
+							{ LuaValue.Number(1), LuaValue.Bool(true) },
+							{ LuaValue.Number(2), result }
+						}
+					});
+				}
+				catch (PcosLuaException ex)
+				{
+					return LuaValue.FromTable(new LuaTable
+					{
+						Map = new Dictionary<LuaValue, LuaValue>
+						{
+							{ LuaValue.Number(1), LuaValue.Bool(false) },
+							{ LuaValue.Number(2), LuaValue.String(ex.Message) }
+						}
+					});
+				}
+				catch (Exception ex)
+				{
+					return LuaValue.FromTable(new LuaTable
+					{
+						Map = new Dictionary<LuaValue, LuaValue>
+						{
+							{ LuaValue.Number(1), LuaValue.Bool(false) },
+							{ LuaValue.Number(2), LuaValue.String(ex.Message) }
+						}
+					});
+				}
+			});
+
+			// pairs(t) — возвращает итератор, таблицу, nil
+			SetNative("pairs", args =>
+			{
+				if (args.Length == 0 || args[0].Type != LuaType.Table)
+					throw new PcosLuaException("pairs: table expected, got " + (args.Length > 0 ? args[0].TypeName() : "no value"));
+				var tbl = args[0].Table;
+				// Создаём closure-итератор через нативную функцию
+				// Для простоты возвращаем таблицу ключей и счётчик
+				var keys = new List<LuaValue>();
+				foreach (var kv in tbl.Map) keys.Add(kv.Key);
+				int[] idx = { 0 };
+				var iterFn = new LuaFunction
+				{
+					Native = a =>
+					{
+						while (idx[0] < keys.Count)
+						{
+							var k = keys[idx[0]++];
+							var v = tbl.Get(k);
+							if (v.Type != LuaType.Nil)
+							{
+								// Сохраняем ключ и значение в глобалах для возврата
+								// Используем подход: возвращаем k, v через table
+								return LuaValue.FromTable(new LuaTable
+								{
+									Map = new Dictionary<LuaValue, LuaValue>
+									{
+										{ LuaValue.Number(1), k },
+										{ LuaValue.Number(2), v }
+									}
+								});
+							}
+						}
+						return LuaValue.Nil;
+					}
+				};
+				// Возвращаем: iterator function, table, nil
+				// Но поскольку у нас нет multi-return, меняем подход:
+				// pairs(t) возвращает таблицу {keys={k1,k2,...}, values={v1,v2,...}}
+				// и пользователь итерирует через for i=1, #result.keys do
+				var keysTable = new LuaTable();
+				var valsTable = new LuaTable();
+				int n = 1;
+				foreach (var kv in tbl.Map)
+				{
+					keysTable.Set(LuaValue.Number(n), kv.Key);
+					valsTable.Set(LuaValue.Number(n), kv.Value);
+					n++;
+				}
+				var result = new LuaTable();
+				result.Set(LuaValue.String("keys"), LuaValue.FromTable(keysTable));
+				result.Set(LuaValue.String("values"), LuaValue.FromTable(valsTable));
+				result.Set(LuaValue.String("n"), LuaValue.Number(n - 1));
+				return LuaValue.FromTable(result);
+			});
+
+			// ipairs(t) — итерация по числовым ключам 1..n
+			SetNative("ipairs", args =>
+			{
+				if (args.Length == 0 || args[0].Type != LuaType.Table)
+					throw new PcosLuaException("ipairs: table expected, got " + (args.Length > 0 ? args[0].TypeName() : "no value"));
+				var tbl = args[0].Table;
+				int len = tbl.Length();
+				var result = new LuaTable();
+				result.Set(LuaValue.String("n"), LuaValue.Number(len));
+				// Просто возвращаем таблицу (массив уже есть)
+				return LuaValue.FromTable(tbl);
+			});
+
 			var math = new LuaTable();
 			math.Set(LuaValue.String("pi"), LuaValue.Number(Math.PI));
 			math.Set(LuaValue.String("abs"), Native(a => LuaValue.Number(Math.Abs(Num(a, 0)))));
@@ -571,6 +695,9 @@ namespace PC.Component.Software.Lua
 				if (a.Length == 1) return LuaValue.Number(UnityEngine.Random.Range(1, (int)Num(a, 0) + 1));
 				return LuaValue.Number(UnityEngine.Random.Range((int)Num(a, 0), (int)Num(a, 1) + 1));
 			}));
+			math.Set(LuaValue.String("huge"), LuaValue.Number(double.PositiveInfinity));
+			math.Set(LuaValue.String("maxinteger"), LuaValue.Number(double.MaxValue));
+			math.Set(LuaValue.String("mininteger"), LuaValue.Number(double.MinValue));
 			SetGlobal("math", LuaValue.FromTable(math));
 
 			var str = new LuaTable();
@@ -609,6 +736,38 @@ namespace PC.Component.Software.Lua
 				int idx = s.IndexOf(p, start - 1, StringComparison.Ordinal);
 				return idx < 0 ? LuaValue.Nil : LuaValue.Number(idx + 1);
 			}));
+			str.Set(LuaValue.String("reverse"), Native(a =>
+			{
+				var s = Str(a, 0);
+				var chars = s.ToCharArray();
+				Array.Reverse(chars);
+				return LuaValue.String(new string(chars));
+			}));
+			str.Set(LuaValue.String("byte"), Native(a =>
+			{
+				var s = Str(a, 0);
+				int i = a.Length > 1 ? (int)Num(a, 1) : 1;
+				if (i < 1 || i > s.Length) return LuaValue.Nil;
+				return LuaValue.Number((int)s[i - 1]);
+			}));
+			str.Set(LuaValue.String("char"), Native(a =>
+			{
+				var sb = new StringBuilder();
+				for (int i = 0; i < a.Length; i++)
+				{
+					int code = (int)Num(a, i);
+					if (code < 0 || code > 0xFFFF) throw new PcosLuaException("invalid value for string.char");
+					sb.Append((char)code);
+				}
+				return LuaValue.String(sb.ToString());
+			}));
+			str.Set(LuaValue.String("format"), Native(a =>
+			{
+				if (a.Length == 0) return LuaValue.String("");
+				var fmt = Str(a, 0);
+				try { return LuaValue.String(LuaStringFormat(fmt, a)); }
+				catch { return LuaValue.String(fmt); }
+			}));
 			SetGlobal("string", LuaValue.FromTable(str));
 
 			var tbl = new LuaTable();
@@ -633,12 +792,121 @@ namespace PC.Component.Software.Lua
 				}
 				return LuaValue.String(sb.ToString());
 			}));
+			tbl.Set(LuaValue.String("remove"), Native(a =>
+			{
+				if (a.Length == 0 || a[0].Type != LuaType.Table) return LuaValue.Nil;
+				var t = a[0].Table;
+				int n = t.Length();
+				if (n == 0) return LuaValue.Nil;
+				int pos = a.Length > 1 ? (int)Num(a, 1) : n;
+				if (pos < 1) pos = 1;
+				if (pos > n) pos = n;
+				var removed = t.Get(LuaValue.Number(pos));
+				// Сдвигаем элементы
+				for (int i = pos; i < n; i++)
+					t.Set(LuaValue.Number(i), t.Get(LuaValue.Number(i + 1)));
+				t.Set(LuaValue.Number(n), LuaValue.Nil); // удаляем последний
+				return removed;
+			}));
+			tbl.Set(LuaValue.String("sort"), Native(a =>
+			{
+				if (a.Length == 0 || a[0].Type != LuaType.Table) return LuaValue.Nil;
+				var t = a[0].Table;
+				int n = t.Length();
+				if (n <= 1) return LuaValue.Nil;
+				var arr = new LuaValue[n];
+				for (int i = 0; i < n; i++) arr[i] = t.Get(LuaValue.Number(i + 1));
+				bool hasFn = a.Length > 1 && a[1].Type == LuaType.Function;
+				var cmpFn = hasFn ? a[1].Fn : null;
+				var self = this;
+				Array.Sort(arr, (x, y) =>
+				{
+					if (cmpFn != null)
+					{
+						try
+						{
+							var r = self.Call(LuaValue.FromFn(cmpFn), new List<LuaValue> { x, y });
+							return r.IsTruthy() ? -1 : 1;
+						}
+						catch { return 0; }
+					}
+					if (x.Type == LuaType.Number && y.Type == LuaType.Number)
+						return x.N.CompareTo(y.N);
+					if (x.Type == LuaType.String && y.Type == LuaType.String)
+						return string.CompareOrdinal(x.S, y.S);
+					return 0;
+				});
+				for (int i = 0; i < n; i++) t.Set(LuaValue.Number(i + 1), arr[i]);
+				return LuaValue.Nil;
+			}));
 			SetGlobal("table", LuaValue.FromTable(tbl));
 		}
 
 		static double Num(LuaValue[] a, int i) { return i < a.Length ? a[i].AsNumber() : 0; }
 		static string Str(LuaValue[] a, int i) { return i < a.Length ? a[i].AsString() : ""; }
 		static LuaValue Native(Func<LuaValue[], LuaValue> fn) { return LuaValue.FromFn(new LuaFunction { Native = fn }); }
+
+		static string LuaStringFormat(string fmt, LuaValue[] args)
+		{
+			var sb = new StringBuilder();
+			int ai = 1;
+			for (int i = 0; i < fmt.Length; i++)
+			{
+				if (fmt[i] == '%' && i + 1 < fmt.Length)
+				{
+					if (fmt[i + 1] == '%') { sb.Append('%'); i++; continue; }
+					i++;
+					var spec = new StringBuilder("%");
+					// flags
+					while (i < fmt.Length && "-+ #0".IndexOf(fmt[i]) >= 0) { spec.Append(fmt[i]); i++; }
+					// width
+					while (i < fmt.Length && char.IsDigit(fmt[i])) { spec.Append(fmt[i]); i++; }
+					// precision
+					if (i < fmt.Length && fmt[i] == '.')
+					{
+						spec.Append('.'); i++;
+						while (i < fmt.Length && char.IsDigit(fmt[i])) { spec.Append(fmt[i]); i++; }
+					}
+					if (i >= fmt.Length) break;
+					char conv = fmt[i];
+					spec.Append(conv);
+					if (ai >= args.Length) { sb.Append(spec); continue; }
+					var v = args[ai++];
+					switch (conv)
+					{
+						case 'd': case 'i':
+							sb.Append(string.Format(spec.ToString().Replace("d", "D").Replace("i", "D"), (long)v.AsNumber()));
+							break;
+						case 'f':
+							sb.Append(string.Format(CultureInfo.InvariantCulture, spec.ToString(), v.AsNumber()));
+							break;
+						case 'e': case 'E':
+							sb.Append(v.AsNumber().ToString(spec.ToString(), CultureInfo.InvariantCulture));
+							break;
+						case 'x': case 'X':
+							sb.Append(((long)v.AsNumber()).ToString(spec.ToString().Replace("x", "x").Replace("X", "X"), CultureInfo.InvariantCulture));
+							break;
+						case 'o':
+							sb.Append(Convert.ToString((long)v.AsNumber(), 8));
+							break;
+						case 's':
+							sb.Append(v.AsString());
+							break;
+						case 'c':
+							sb.Append((char)(int)v.AsNumber());
+							break;
+						case 'q':
+							sb.Append('"').Append(v.AsString().Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n")).Append('"');
+							break;
+						default:
+							sb.Append(spec);
+							break;
+					}
+				}
+				else sb.Append(fmt[i]);
+			}
+			return sb.ToString();
+		}
 	}
 
 	sealed class Tok
@@ -683,7 +951,7 @@ namespace PC.Component.Software.Lua
 			if (char.IsDigit(c) || (c == '.' && i + 1 < s.Length && char.IsDigit(s[i + 1])))
 				return Num();
 			if (c == '"' || c == '\'') return Str(c);
-			if (c == '.' && i + 1 < s.Length && s[i + 1] == '.')
+			if (c == '[' && i + 1 < s.Length && s[i + 1] == '[') return LongStr();
 			{
 				if (i + 2 < s.Length && s[i + 2] == '.') { i += 3; return T("...", "..."); }
 				i += 2; return T("..", "..");
@@ -768,6 +1036,29 @@ namespace PC.Component.Software.Lua
 			if (i >= s.Length) throw new PcosLuaException("unfinished string", line);
 			i++;
 			return new Tok { Kind = "string", Text = sb.ToString(), Line = line };
+		}
+
+		Tok LongStr()
+		{
+			int startLine = line;
+			i += 2; // skip [[
+			var sb = new StringBuilder();
+			// Skip immediate newline after [[
+			if (i < s.Length && s[i] == '\n') { i++; line++; }
+			else if (i < s.Length && s[i] == '\r')
+			{
+				i++;
+				if (i < s.Length && s[i] == '\n') { i++; }
+				line++;
+			}
+			while (i + 1 < s.Length && !(s[i] == ']' && s[i + 1] == ']'))
+			{
+				if (s[i] == '\n') line++;
+				sb.Append(s[i++]);
+			}
+			if (i + 1 >= s.Length) throw new PcosLuaException("unfinished long string", startLine);
+			i += 2; // skip ]]
+			return new Tok { Kind = "string", Text = sb.ToString(), Line = startLine };
 		}
 
 		Tok T(string k, string t) { return new Tok { Kind = k, Text = t, Line = line }; }

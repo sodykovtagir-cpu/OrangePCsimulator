@@ -14,8 +14,18 @@ namespace PC.Component.Software.Lua
 		public static bool IsPackage(string content)
 		{
 			if (string.IsNullOrEmpty(content)) return false;
-			return content.IndexOf("\"pcos\":\"lua-app\"", StringComparison.Ordinal) >= 0
-				|| content.IndexOf("\"pcos\": \"lua-app\"", StringComparison.Ordinal) >= 0;
+			// Быстрая проверка: должен начинаться с { и содержать "pcos"
+			var trimmed = content.TrimStart();
+			if (!trimmed.StartsWith("{")) return false;
+			try
+			{
+				var pkg = JsonUtility.FromJson<LuaAppPackage>(content);
+				return pkg != null && pkg.pcos == "lua-app";
+			}
+			catch
+			{
+				return false;
+			}
 		}
 
 		public static bool NeedsWindow(string script)

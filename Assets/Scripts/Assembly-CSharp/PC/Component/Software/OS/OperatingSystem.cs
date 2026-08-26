@@ -146,10 +146,11 @@ namespace PC.Component.Software.OS
             {
                 ud = JsonUtility.FromJson<User>(uf.content);
 
-                Debug.Log("Содержимое System/user:");
-                Debug.Log(uf.content);
-
-                Debug.Log("После загрузки customBackgroundPath = " + ud.customBackgroundPath);
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log("Содержимое System/user:");
+                UnityEngine.Debug.Log(uf.content);
+                UnityEngine.Debug.Log("После загрузки customBackgroundPath = " + ud.customBackgroundPath);
+#endif
             }
             else
             {
@@ -187,7 +188,9 @@ namespace PC.Component.Software.OS
 
         private void Desktop()
         {
-            Debug.Log("customBackgroundPath = " + userData.customBackgroundPath);
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log("customBackgroundPath = " + userData.customBackgroundPath);
+#endif
             if (userData == null || texDesktop == null) return;
 
             // Логика загрузки обоев (стандартные или кастомные)
@@ -785,6 +788,20 @@ namespace PC.Component.Software.OS
 
         private void FocusApp(bool focus)
         {
+            if (!focus)
+            {
+                // При unfocus — скрываем меню-бар если все окна закрыты
+                if (runningApps.Count == 0 && menuBar != null)
+                    menuBar.gameObject.SetActive(false);
+                return;
+            }
+            // При focus — поднимаем последнее приложение наверх
+            if (runningApps.Count > 0)
+            {
+                var last = runningApps[runningApps.Count - 1];
+                if (last != null && last.transform != null)
+                    last.transform.SetAsLastSibling();
+            }
         }
 
         public void OnFileIconDropped(ReorderableList.ReorderableListEventStruct reorderableListEventStruct)
@@ -907,7 +924,9 @@ namespace PC.Component.Software.OS
 
         private void SaveUserData()
         {
-            Debug.Log(JsonUtility.ToJson(userData));
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log(JsonUtility.ToJson(userData));
+#endif
             var fm = FileManager;
             var content = JsonUtility.ToJson(userData);
             if (fm == null) return;
@@ -951,7 +970,6 @@ namespace PC.Component.Software.OS
         [SerializeField] private Button shutdownButton;
 
         private List<App> runningApps = new List<App>();
-        private float gameTime;
 
         private bool taskbarInitialized;
 
@@ -973,25 +991,22 @@ namespace PC.Component.Software.OS
         {
             if (!Ready) return;
 
-            gameTime += Time.deltaTime;
-
             if (clockText != null)
             {
-                int h = Mathf.FloorToInt(gameTime / 3600);
-                int m = Mathf.FloorToInt((gameTime % 3600) / 60);
-                int s = Mathf.FloorToInt(gameTime % 60);
-
-                clockText.text = $"{h:00}:{m:00}:{s:00}";
+                var now = System.DateTime.Now;
+                clockText.text = $"{now.Hour:00}:{now.Minute:00}:{now.Second:00}";
             }
         }
 
         private void ToggleStartMenu()
         {
-            Debug.Log("StartMenu Animator = " + startMenuAnimator);
-            Debug.Log("Controller = " +
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log("StartMenu Animator = " + startMenuAnimator);
+            UnityEngine.Debug.Log("Controller = " +
                 (startMenuAnimator != null
                     ? startMenuAnimator.runtimeAnimatorController
                     : null));
+#endif
             if (startMenu == null)
                 return;
 
