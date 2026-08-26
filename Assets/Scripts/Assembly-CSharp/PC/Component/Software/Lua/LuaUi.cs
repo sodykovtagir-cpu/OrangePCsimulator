@@ -38,6 +38,7 @@ namespace PC.Component.Software.Lua
 		readonly Font font;
 		readonly PcosLua vm;
 		readonly Dictionary<string, Graphic> widgets = new Dictionary<string, Graphic>();
+		readonly Dictionary<string, GameObject> widgetRoots = new Dictionary<string, GameObject>();
 		readonly Dictionary<string, InputField> inputs = new Dictionary<string, InputField>();
 		readonly Dictionary<string, Text> labels = new Dictionary<string, Text>();
 		readonly Dictionary<string, Slider> sliders = new Dictionary<string, Slider>();
@@ -129,6 +130,7 @@ namespace PC.Component.Software.Lua
 			Place(t.rectTransform, x, y, w, h);
 			labels[id] = t;
 			widgets[id] = t;
+			widgetRoots[id] = t.gameObject;
 			return id;
 		}
 
@@ -159,6 +161,7 @@ namespace PC.Component.Software.Lua
 			Stretch(tx.rectTransform);
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			widgets[id] = img;
+			widgetRoots[id] = go;
 			return id;
 		}
 
@@ -179,6 +182,7 @@ namespace PC.Component.Software.Lua
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			inputs[id] = field;
 			widgets[id] = go.GetComponent<Image>();
+			widgetRoots[id] = go;
 			return id;
 		}
 
@@ -191,6 +195,7 @@ namespace PC.Component.Software.Lua
 			img.color = style.panel;
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			widgets[id] = img;
+			widgetRoots[id] = go;
 			return id;
 		}
 
@@ -228,6 +233,7 @@ namespace PC.Component.Software.Lua
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			sliders[id] = sl;
 			widgets[id] = bg.GetComponent<Image>();
+			widgetRoots[id] = go;
 			return id;
 		}
 
@@ -262,6 +268,7 @@ namespace PC.Component.Software.Lua
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			toggles[id] = tg;
 			widgets[id] = box.GetComponent<Image>();
+			widgetRoots[id] = go;
 			return id;
 		}
 
@@ -298,9 +305,16 @@ namespace PC.Component.Software.Lua
 
 		void Remove(string id)
 		{
-			Graphic g;
-			if (widgets.TryGetValue(id, out g) && g != null)
-				UnityEngine.Object.Destroy(g.transform.root == root ? g.gameObject : g.transform.parent != null && g.transform.parent != root ? g.transform.parent.gameObject : g.gameObject);
+			GameObject go;
+			if (widgetRoots.TryGetValue(id, out go) && go != null)
+				UnityEngine.Object.Destroy(go);
+			else
+			{
+				Graphic g;
+				if (widgets.TryGetValue(id, out g) && g != null)
+					UnityEngine.Object.Destroy(g.gameObject);
+			}
+			widgetRoots.Remove(id);
 			widgets.Remove(id);
 			inputs.Remove(id);
 			labels.Remove(id);
@@ -319,6 +333,7 @@ namespace PC.Component.Software.Lua
 				UnityEngine.Object.Destroy(ch.gameObject);
 			}
 			widgets.Clear();
+			widgetRoots.Clear();
 			inputs.Clear();
 			labels.Clear();
 			sliders.Clear();
@@ -346,6 +361,7 @@ namespace PC.Component.Software.Lua
 			if (tex != null) raw.texture = tex;
 			Place(go.GetComponent<RectTransform>(), x, y, w, h);
 			widgets[id] = raw;
+			widgetRoots[id] = go;
 			return id;
 		}
 

@@ -64,26 +64,35 @@ namespace PC.Component.Software.Lua
 			fs.Set(LuaValue.String("write"), Native(a =>
 			{
 				if (os == null || a.Length < 2) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.TryWriteFile(a[0].AsString(), a[1].AsString()));
+				var path = a[0].AsString();
+				// Защита системных файлов от перезаписи через Lua
+				if (IsProtectedPath(path)) return LuaValue.Bool(false);
+				return LuaValue.Bool(os.TryWriteFile(path, a[1].AsString()));
+			}));
+			fs.Set(LuaValue.String("delete"), Native(a =>
+			{
+				if (os == null || a.Length == 0) return LuaValue.Bool(false);
+				var path = a[0].AsString();
+				// Защита системных файлов от удаления через Lua
+				if (IsProtectedPath(path)) return LuaValue.Bool(false);
+				return LuaValue.Bool(os.TryDeleteFile(path));
 			}));
 			fs.Set(LuaValue.String("exists"), Native(a =>
 			{
 				if (os == null || a.Length == 0) return LuaValue.Bool(false);
 				return LuaValue.Bool(os.FileExists(a[0].AsString()));
 			}));
-			fs.Set(LuaValue.String("delete"), Native(a =>
-			{
-				if (os == null || a.Length == 0) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.TryDeleteFile(a[0].AsString()));
-			}));
+	
 			vm.SetGlobal("fs", LuaValue.FromTable(fs));
 
 			var win = new LuaTable();
 			win.Set(LuaValue.String("alert"), Native(a =>
 			{
 				if (os == null) return LuaValue.Nil;
-				var msg = a.Length > 0 ? a[0].AsString() : "";
-				var title = a.Length > 1 ? a[1].AsString() : "Lua";
+				// alert(title, msg) — как os.alert, для консистентности
+				var title = a.Length > 0 ? a[0].AsString() : "Lua";
+				var msg = a.Length > 1 ? a[1].AsString() : (a.Length > 0 ? a[0].AsString() : "");
+				if (a.Length == 1) { msg = title; title = "Lua"; }
 				os.ShowMessageBox(title, msg);
 				return LuaValue.Nil;
 			}));
@@ -113,6 +122,16 @@ namespace PC.Component.Software.Lua
 		static LuaValue Native(Func<LuaValue[], LuaValue> fn)
 		{
 			return LuaValue.FromFn(new LuaFunction { Native = fn });
+		}
+
+		// Защита системных файлов от перезаписи/удаления через Lua
+		static bool IsProtectedPath(string path)
+		{
+			if (string.IsNullOrEmpty(path)) return false;
+			var lower = path.ToLowerInvariant().Replace("\\", "/");
+			if (lower.StartsWith("system/")) return true;
+			if (lower == "system") return true;
+			return false;
 		}
 	}
 }
