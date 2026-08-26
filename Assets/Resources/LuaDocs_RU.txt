@@ -11,8 +11,9 @@ Compile — пишет Name.exe на рабочий стол (ярлык). За�
 Pick icon — иконка из .pic (или любой файл-картинка в base64).
 Имя .exe — поле Compile Name в инспекторе редактора.
 
-Документация: кнопка Docs (ToggleDocs / ShowDocs) или файл Lua.txt
-на рабочем столе (при загрузке ОС перезаписывается на текущий язык игры).
+Документация: отдельная кнопка, OnClick = Docs (или OpenDocs / ShowDocs),
+цель = это окно Lua Editor на сцене, не префаб из Project.
+Или файл Lua.txt на рабочем столе (при загрузке ОС перезаписывается на язык игры).
 
 ПОДСВЕТКА СИНТАКСИСА
 --------------------
@@ -34,13 +35,18 @@ Compile пакует JSON { pcos: lua-app, name, icon, script } в Name.exe.
 
 ui.title("Имя")
 ui.size(w, h)
+ui.isdraggable(true/false)           -- также ui.draggable
+ui.ismaximable(true/false)           -- также ui.ismaximizable / ui.maximizable
 ui.label(text, x, y, w, h)           -> id
 ui.button(text, x, y, w, h, fn)      -> id
 ui.input(text, x, y, w, h)           -> id
 ui.panel(x, y, w, h)                 -> id
+ui.rect(x, y, w, h, r, g, b, a)      -> id
+ui.image(path, x, y, w, h)           -> id  (.pic / файл в base64)
 ui.slider(x, y, w, h, min, max)      -> id
 ui.toggle(text, x, y, w, h, on)      -> id
 ui.get(id)  ui.set(id, text)
+ui.color(id, r, g, b, a)
 ui.value(id)     -- слайдер
 ui.checked(id)   -- галка
 ui.remove(id)  ui.clear()

@@ -11,8 +11,9 @@ Compile — writes Name.exe to the desktop (shortcut). Double-click to launch.
 Pick icon — choose a .pic (or any base64 image file) for that .exe.
 Compile name — InputField on the editor (inspector: Compile Name).
 
-Open Docs: button ToggleDocs / ShowDocs, or desktop file Lua.txt
-(rewritten to the current game language on boot).
+Docs — separate button, OnClick = Docs (or OpenDocs / ShowDocs),
+target = this Lua Editor window in the scene (not the Project prefab).
+Or desktop file Lua.txt (rewritten to the current game language on boot).
 
 SYNTAX HIGHLIGHT
 ----------------
@@ -34,13 +35,18 @@ Coordinates: top-left origin, Y down, pixels.
 
 ui.title("Name")
 ui.size(w, h)
+ui.isdraggable(true/false)           -- also ui.draggable
+ui.ismaximable(true/false)           -- also ui.ismaximizable / ui.maximizable
 ui.label(text, x, y, w, h)           -> id
 ui.button(text, x, y, w, h, fn)      -> id
 ui.input(text, x, y, w, h)           -> id
 ui.panel(x, y, w, h)                 -> id
+ui.rect(x, y, w, h, r, g, b, a)      -> id
+ui.image(path, x, y, w, h)           -> id  (.pic / base64 file)
 ui.slider(x, y, w, h, min, max)      -> id
 ui.toggle(text, x, y, w, h, on)      -> id
 ui.get(id)  ui.set(id, text)
+ui.color(id, r, g, b, a)
 ui.value(id)     -- slider
 ui.checked(id)   -- toggle
 ui.remove(id)  ui.clear()
@@ -62,6 +68,17 @@ Example:
     n = n + 1
     ui.set(lab, tostring(n))
   end)
+
+GRAPHICS
+--------
+Origin top-left, Y down. Call gfx.flip() if you draw after a click.
+gfx.size(w, h)   gfx.color(r,g,b,a)   gfx.clear(r,g,b,a)
+gfx.pixel(x,y,r,g,b)  gfx.rect(x,y,w,h,r,g,b)  gfx.box(...)
+gfx.line(x1,y1,x2,y2,r,g,b)  gfx.circle(x,y,r,r,g,b)  gfx.ring(...)
+gfx.flip() / gfx.apply()
+
+print(...) writes to the program log (editor Output + bar in the Lua window),
+not the Unity console. The log is not cleared when the script ends.
 
 OS / FILES / WINDOWS
 --------------------

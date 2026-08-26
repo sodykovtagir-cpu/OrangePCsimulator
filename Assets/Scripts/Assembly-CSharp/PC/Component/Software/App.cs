@@ -50,9 +50,19 @@ namespace PC.Component.Software
 
 		private Vector2 defaultSize;
 
+		protected bool canDrag = true;
+
+		protected bool canMaximize = true;
+
 		protected virtual bool ShowMenuBar => true;
 
 		public virtual bool SingleInstance => true;
+
+		public bool IsDraggable => canDrag;
+
+		public bool IsMaximizable => canMaximize;
+
+		public bool IsMaximized => maximized;
 
 		public Sprite FileIcon
 		{
@@ -104,6 +114,10 @@ namespace PC.Component.Software
 
 		public void Maximize()
 		{
+			if (!canMaximize && !maximized) return;
+			if (rect == null) rect = GetComponent<RectTransform>();
+			if (rect == null) return;
+
 			var wasMaximized = maximized;
 			maximized = !wasMaximized;
 
@@ -111,8 +125,9 @@ namespace PC.Component.Software
 			{
 				rect.anchorMin = Vector2.zero;
 				rect.anchorMax = Vector2.one;
+				rect.anchoredPosition = Vector2.zero;
 				rect.sizeDelta = Vector2.zero;
-				windowState.sprite = normalSprite;
+				if (windowState != null && normalSprite != null) windowState.sprite = normalSprite;
 			}
 			else
 			{
@@ -120,8 +135,36 @@ namespace PC.Component.Software
 				rect.anchorMin = center;
 				rect.anchorMax = center;
 				rect.sizeDelta = defaultSize;
-				windowState.sprite = maximizeSprite;
+				if (windowState != null && maximizeSprite != null) windowState.sprite = maximizeSprite;
 			}
+		}
+
+		public virtual void SetDraggable(bool on)
+		{
+			canDrag = on;
+			var drags = GetComponentsInChildren<WindowDrag>(true);
+			if (drags == null) return;
+			for (int i = 0; i < drags.Length; i++)
+			{
+				if (drags[i] != null) drags[i].enabled = on;
+			}
+		}
+
+		public virtual void SetMaximizable(bool on)
+		{
+			canMaximize = on;
+			if (!on && maximized) Maximize();
+			if (windowState != null)
+			{
+				var btn = windowState.GetComponent<Button>();
+				if (btn != null) btn.interactable = on;
+				windowState.gameObject.SetActive(on);
+			}
+		}
+
+		protected void SetWindowStateImage(Image img)
+		{
+			windowState = img;
 		}
 
 		public void SetDefaultSize(Vector2 size)
