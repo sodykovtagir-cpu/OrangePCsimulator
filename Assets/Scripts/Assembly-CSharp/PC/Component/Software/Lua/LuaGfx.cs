@@ -199,10 +199,10 @@ namespace PC.Component.Software.Lua
 			if (r > 256) r = 256;
 			if (fill)
 			{
-				for (int y = -r; y <= r; y++)
+				for (int yy = -r; yy <= r; yy++)
 				{
-					int span = (int)Mathf.Sqrt(r * r - y * y);
-					FillRect(cx - span, cy + y, span * 2 + 1, 1, c);
+					int span = (int)Mathf.Sqrt(r * r - yy * yy);
+					FillRect(cx - span, cy + yy, span * 2 + 1, 1, c);
 				}
 				return;
 			}

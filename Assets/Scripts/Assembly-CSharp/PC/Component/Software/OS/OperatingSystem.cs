@@ -665,12 +665,18 @@ namespace PC.Component.Software.OS
             App prefab = null;
             if (appPrefabs != null) appPrefabs.TryGetValue("Lua App", out prefab);
             if (prefab == null) return null;
-            var app = LaunchApp(prefab, content ?? "", lua =>
-            {
-                var inst = lua as LuaApp;
-                if (inst != null && printer != null) inst.Printer = printer;
-            });
-            return app as LuaApp;
+
+            var app = Instantiate(prefab, appParent);
+            if (app == null) return null;
+
+            app.Init(this);
+            var lua = app as LuaApp;
+            if (lua != null && printer != null) lua.Printer = printer;
+            RegisterRunningApp(app);
+            app.AppClosed += ResetAppState;
+            app.Open(content ?? "");
+            FocusApp(true);
+            return lua;
         }
 
         public bool OpenFile(File file)
