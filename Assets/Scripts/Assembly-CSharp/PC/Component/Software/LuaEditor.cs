@@ -621,7 +621,8 @@ namespace PC.Component.Software
 				new LuaSnippet { label = "table.sort", insert = "table.sort(|)" },
 				new LuaSnippet { label = "table.remove", insert = "table.remove(|)" },
 				new LuaSnippet { label = "ui.image", insert = "ui.image(\"|\", 10, 10, 64, 64)" },
-				new LuaSnippet { label = "ui.clear", insert = "ui.clear()" }
+				new LuaSnippet { label = "ui.clear", insert = "ui.clear()" },
+				new LuaSnippet { label = "onupdate", insert = "onupdate(function(dt)\n  \nend)" }
 			};
 		}
 	}
