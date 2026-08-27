@@ -934,6 +934,7 @@ namespace PC.Component.Software.Lua
 				return Num();
 			if (c == '"' || c == '\'') return Str(c);
 			if (c == '[' && i + 1 < s.Length && s[i + 1] == '[') return LongStr();
+			if (c == '.' && i + 1 < s.Length && s[i + 1] == '.')
 			{
 				if (i + 2 < s.Length && s[i + 2] == '.') { i += 3; return T("...", "..."); }
 				i += 2; return T("..", "..");
