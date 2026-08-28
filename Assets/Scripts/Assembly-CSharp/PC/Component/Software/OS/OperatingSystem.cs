@@ -611,9 +611,12 @@ namespace PC.Component.Software.OS
             var iconInstance = Instantiate(fileIconPrefab, iconParent);
             if (iconInstance == null) return;
 
-            // Ensure DesktopIconDragger exists
-            if (iconInstance.GetComponent<DesktopIconDragger>() == null)
-                iconInstance.gameObject.AddComponent<DesktopIconDragger>();
+            // Ensure fresh DesktopIconDragger
+            var oldDragger = iconInstance.GetComponent<DesktopIconDragger>();
+            if (oldDragger != null)
+                DestroyImmediate(oldDragger);
+            var dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
+            dragger.Init();
 
             iconInstance.Init(file, f =>
             {
