@@ -446,7 +446,7 @@ namespace PC.Component.Software.OS
             }
 
             RefreshDesktopIcon();
-            EnsureLuaEditor();
+            // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
         }
 
         private void EnsureLuaEditor()
@@ -473,11 +473,7 @@ namespace PC.Component.Software.OS
             if (FileManager == null) return;
             if (FileManager.Exists(0, "Lua.txt"))
                 FileManager.Delete(0, "Lua.txt");
-            if (!FileManager.Exists(0, "hello.lua"))
-            {
-                const string hello = "print(\"Hello world!\")\n";
-                FileManager.Create(0, new File("hello.lua", hello, false, hello.Length));
-            }
+            // hello.lua не создаётся — пользователь сам решит когда нужен
             RefreshDesktopIcon();
         }
 
