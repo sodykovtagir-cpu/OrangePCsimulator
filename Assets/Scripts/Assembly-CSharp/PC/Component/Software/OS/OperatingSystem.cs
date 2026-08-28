@@ -69,6 +69,7 @@ namespace PC.Component.Software.OS
         private Dictionary<string, App> appPrefabs = new Dictionary<string, App>();
         private List<string> installedApps = new List<string>();
         private Dictionary<string, FileIcon> fileIcons = new Dictionary<string, FileIcon>();
+        private Dictionary<string, Vector2> iconPositions = new Dictionary<string, Vector2>();
         private const string userFilePath = "System/user";
         private User userData;
 
@@ -617,6 +618,10 @@ namespace PC.Component.Software.OS
             else
                 iconInstance.Sprite = GetFileSprite(file.path);
 
+            // Restore saved position if available
+            if (iconPositions != null && iconPositions.ContainsKey(key))
+                iconInstance.SetPosition(iconPositions[key]);
+
             fileIcons.Add(key, iconInstance);
         }
 
@@ -831,7 +836,16 @@ namespace PC.Component.Software.OS
 
         public void RefreshDesktopIcon()
         {
-            if (fileIcons != null) fileIcons.Clear();
+            // Collect positions before destroying icons
+            if (fileIcons != null && iconPositions != null)
+            {
+                foreach (var kvp in fileIcons)
+                {
+                    if (kvp.Value != null)
+                        iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                }
+                fileIcons.Clear();
+            }
 
             if (iconParent != null)
             {
