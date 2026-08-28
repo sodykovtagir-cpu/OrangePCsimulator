@@ -4252,7 +4252,6 @@ GameObject:
   - component: {fileID: 114311323515574720}
   - component: {fileID: 222726612254766085}
   - component: {fileID: 114770443189700872}
-  - component: {fileID: 114825579820122947}
   m_Layer: 5
   m_Name: Icons
   m_TagString: Untagged
@@ -4291,7 +4290,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6fed88dafe43f8f95b6b3cdc5788ce0c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ContentLayout: {fileID: 114825579820122947}
+  ContentLayout: {fileID: 0}
   DraggableArea: {fileID: 224577745306843036}
   IsDraggable: 1
   CloneDraggedObject: 0
@@ -4376,30 +4375,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &114825579820122947
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1583803054014249}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9184f03a1a6dc1199a0e3272269b12c4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Padding:
-    m_Left: 20
-    m_Right: 20
-    m_Top: 20
-    m_Bottom: 20
-  m_ChildAlignment: 0
-  m_StartCorner: 0
-  m_StartAxis: 1
-  m_CellSize: {x: 70, y: 70}
-  m_Spacing: {x: 20, y: 20}
-  m_Constraint: 0
-  m_ConstraintCount: 2
 --- !u!1 &1586341637561352
 GameObject:
   m_ObjectHideFlags: 0
