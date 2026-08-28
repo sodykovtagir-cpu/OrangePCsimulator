@@ -11,6 +11,24 @@ namespace PC.Component.Software.OS
 {
     public class OperatingSystem : ComputerSystem
     {
+
+    void Start()
+    {
+        // Disable ReorderableList layout on iconParent for free icon positioning
+        if (iconParent != null)
+        {
+            var rl = iconParent.GetComponent<UnityEngine.UI.Extensions.ReorderableList>();
+            if (rl != null)
+            {
+                rl.IsDraggable = false;
+                rl.enabled = false;
+            }
+            
+            var lg = iconParent.GetComponent<UnityEngine.UI.LayoutGroup>();
+            if (lg != null)
+                lg.enabled = false;
+        }
+    }
         [Serializable]
         private class User
         {

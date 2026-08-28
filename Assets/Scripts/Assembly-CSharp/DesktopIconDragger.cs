@@ -6,39 +6,39 @@ namespace PC.Component.Software
     public class DesktopIconDragger : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler, IEventSystemHandler
     {
         private RectTransform rectTransform;
-        private Canvas parentCanvas;
-        private RectTransform canvasRect;
+        private RectTransform parentRect;
+        private Vector2 dragOffset;
 
         private void Awake()
         {
             rectTransform = GetComponent<RectTransform>();
-            parentCanvas = GetComponentInParent<Canvas>();
-            if (parentCanvas != null)
-                canvasRect = parentCanvas.GetComponent<RectTransform>();
+            var parent = transform.parent;
+            if (parent != null)
+                parentRect = parent.GetComponent<RectTransform>();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (rectTransform == null || eventData == null) return;
+            
+            // Calculate offset from icon center to click point
+            Vector2 localMousePos;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                rectTransform, eventData.position, eventData.pressEventCamera, out localMousePos))
+            {
+                dragOffset = localMousePos - rectTransform.anchoredPosition;
+            }
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (rectTransform == null || parentCanvas == null) return;
+            if (rectTransform == null || parentRect == null || eventData == null) return;
 
-            if (canvasRect == null)
-            {
-                parentCanvas = GetComponentInParent<Canvas>();
-                if (parentCanvas != null)
-                    canvasRect = parentCanvas.GetComponent<RectTransform>();
-            }
-
-            if (canvasRect == null) return;
-
-            Vector2 localPos;
+            Vector2 localMousePos;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                canvasRect, eventData.position, eventData.pressEventCamera, out localPos))
+                parentRect, eventData.position, eventData.pressEventCamera, out localMousePos))
             {
-                rectTransform.anchoredPosition = localPos;
+                rectTransform.anchoredPosition = localMousePos - dragOffset;
             }
         }
 
