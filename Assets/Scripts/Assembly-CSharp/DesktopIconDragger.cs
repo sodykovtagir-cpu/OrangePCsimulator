@@ -201,15 +201,31 @@ namespace PC.Component.Software
         public void SetLayoutHorizontal()
         {
             // Called when parent rect changes (resize)
-            if (rectTransform != null && parentRect != null)
-            {
-                var pos = SnapToGrid(rectTransform.anchoredPosition, true);
-                rectTransform.anchoredPosition = pos;
-                
-                var os = GetComponentInParent<OS.OperatingSystem>();
-                if (os != null)
-                    os.SaveIconPosition(GetIconKey(), pos);
-            }
+            if (rectTransform == null || parentRect == null) return;
+
+            float pw = parentRect.rect.width;
+            float ph = parentRect.rect.height;
+
+            float originX = -pw / 2f + padding + cellWidth / 2f;
+            float originY = ph / 2f - padding - cellHeight / 2f;
+            float maxX = pw / 2f - padding - cellWidth / 2f;
+            float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
+
+            // Snap current position to new grid
+            var pos = rectTransform.anchoredPosition;
+            float gridX = originX + Mathf.Round((pos.x - originX) / gridStepX) * gridStepX;
+            float gridY = originY + Mathf.Round((pos.y - originY) / gridStepY) * gridStepY;
+
+            // Clamp to new bounds
+            gridX = Mathf.Clamp(gridX, originX, maxX);
+            gridY = Mathf.Clamp(gridY, maxY, originY);
+
+            var newPos = new Vector2(gridX, gridY);
+            rectTransform.anchoredPosition = newPos;
+
+            var os = GetComponentInParent<OS.OperatingSystem>();
+            if (os != null)
+                os.SaveIconPosition(GetIconKey(), newPos);
         }
 
         public void SetLayoutVertical()

@@ -611,6 +611,10 @@ namespace PC.Component.Software.OS
             var iconInstance = Instantiate(fileIconPrefab, iconParent);
             if (iconInstance == null) return;
 
+            // Ensure DesktopIconDragger exists
+            if (iconInstance.GetComponent<DesktopIconDragger>() == null)
+                iconInstance.gameObject.AddComponent<DesktopIconDragger>();
+
             iconInstance.Init(file, f =>
             {
                 if (f.isFolder)
@@ -996,6 +1000,14 @@ namespace PC.Component.Software.OS
                 if (f.isFolder && f.path == "System") continue;
 
                 AddFileIcon(f);
+            }
+
+            // Trigger layout rebuild so resize handler works
+            if (iconParent != null)
+            {
+                var rt = iconParent.GetComponent<RectTransform>();
+                if (rt != null)
+                    UnityEngine.UI.LayoutRebuilder.MarkLayoutForRebuild(rt);
             }
         }
 
