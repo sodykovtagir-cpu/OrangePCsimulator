@@ -10,7 +10,15 @@ namespace PC.Component.Software
         private Vector2 dragOffset;
         private Camera eventCamera;
         
-        [SerializeField] private float gridSize = 80f;
+        [Header("Grid Settings")]
+        [SerializeField] private float cellWidth = 70f;
+        [SerializeField] private float cellHeight = 70f;
+        [SerializeField] private float spacingX = 20f;
+        [SerializeField] private float spacingY = 20f;
+        [SerializeField] private float padding = 20f;
+
+        private float gridStepX => cellWidth + spacingX;
+        private float gridStepY => cellHeight + spacingY;
 
         private void Awake()
         {
@@ -54,8 +62,8 @@ namespace PC.Component.Software
             
             // Snap to grid
             Vector2 pos = rectTransform.anchoredPosition;
-            pos.x = Mathf.Round(pos.x / gridSize) * gridSize;
-            pos.y = Mathf.Round(pos.y / gridSize) * gridSize;
+            pos.x = padding + Mathf.Round((pos.x - padding) / gridStepX) * gridStepX;
+            pos.y = padding + Mathf.Round((pos.y - padding) / gridStepY) * gridStepY;
             rectTransform.anchoredPosition = pos;
             
             // Notify OperatingSystem to save position
