@@ -637,9 +637,15 @@ namespace PC.Component.Software.OS
             else
                 iconInstance.Sprite = GetFileSprite(file.path);
 
-            // Restore saved position if available
+            // Restore saved position or find free spawn position
             if (iconPositions != null && iconPositions.ContainsKey(key))
+            {
                 iconInstance.SetPosition(iconPositions[key]);
+            }
+            else
+            {
+                iconInstance.SetPosition(FindFreeSpawnPosition());
+            }
 
             fileIcons.Add(key, iconInstance);
         }
@@ -888,6 +894,68 @@ namespace PC.Component.Software.OS
         {
             yield return new WaitForEndOfFrame();
             RefreshDesktopIcon();
+        }
+
+
+        private Vector2 FindFreeSpawnPosition()
+        {
+            if (iconParent == null) return Vector2.zero;
+            
+            float padding = 20f;
+            float cellWidth = 70f;
+            float cellHeight = 70f;
+            float spacingX = 20f;
+            float spacingY = 20f;
+            float bottomPadding = 60f;
+            
+            float gridStepX = cellWidth + spacingX;
+            float gridStepY = cellHeight + spacingY;
+            
+            var parentRT = iconParent.GetComponent<RectTransform>();
+            if (parentRT == null) return Vector2.zero;
+            
+            float pw = parentRT.rect.width;
+            float ph = parentRT.rect.height;
+            
+            float originX = -pw / 2f + padding + cellWidth / 2f;
+            float originY = ph / 2f - padding - cellHeight / 2f;
+            float maxX = pw / 2f - padding - cellWidth / 2f;
+            float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
+            
+            // Get occupied cells
+            var occupied = new HashSet<Vector2Int>();
+            foreach (var kvp in fileIcons)
+            {
+                if (kvp.Value != null)
+                {
+                    var rt = kvp.Value.GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
+                        int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
+                        occupied.Add(new Vector2Int(col, row));
+                    }
+                }
+            }
+            
+            // Find first free cell (row by row, left to right)
+            int maxCols = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
+            int maxRows = Mathf.FloorToInt((originY - maxY) / gridStepY) + 1;
+            
+            for (int row = 0; row < maxRows; row++)
+            {
+                for (int col = 0; col < maxCols; col++)
+                {
+                    if (!occupied.Contains(new Vector2Int(col, row)))
+                    {
+                        float x = originX + col * gridStepX;
+                        float y = originY - row * gridStepY;
+                        return new Vector2(x, y);
+                    }
+                }
+            }
+            
+            return new Vector2(originX, originY); // Fallback
         }
 
         public void RefreshDesktopIcon()
