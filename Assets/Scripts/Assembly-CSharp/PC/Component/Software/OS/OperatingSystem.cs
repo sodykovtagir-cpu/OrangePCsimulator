@@ -838,7 +838,7 @@ namespace PC.Component.Software.OS
                 for (int i = iconParent.childCount - 1; i >= 0; i--)
                 {
                     var c = iconParent.GetChild(i);
-                    if (c != null) Destroy(c.gameObject);
+                    if (c != null) DestroyImmediate(c.gameObject);
                 }
             }
 
