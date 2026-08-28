@@ -9,6 +9,8 @@ namespace PC.Component.Software
         private RectTransform parentRect;
         private Vector2 dragOffset;
         private Camera eventCamera;
+        
+        [SerializeField] private float gridSize = 80f;
 
         private void Awake()
         {
@@ -48,6 +50,26 @@ namespace PC.Component.Software
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (rectTransform == null) return;
+            
+            // Snap to grid
+            Vector2 pos = rectTransform.anchoredPosition;
+            pos.x = Mathf.Round(pos.x / gridSize) * gridSize;
+            pos.y = Mathf.Round(pos.y / gridSize) * gridSize;
+            rectTransform.anchoredPosition = pos;
+            
+            // Notify OperatingSystem to save position
+            var os = GetComponentInParent<OS.OperatingSystem>();
+            if (os != null)
+                os.SaveIconPosition(GetIconKey(), pos);
+        }
+        
+        private string GetIconKey()
+        {
+            var fileIcon = GetComponent<FileIcon>();
+            if (fileIcon != null && fileIcon.File != null)
+                return fileIcon.File.path;
+            return null;
         }
     }
 }

@@ -14,6 +14,7 @@ namespace PC.Component.Software.OS
 
     void Start()
     {
+        LoadIconPositions();
         // Disable ReorderableList layout on iconParent for free icon positioning
         if (iconParent != null)
         {
