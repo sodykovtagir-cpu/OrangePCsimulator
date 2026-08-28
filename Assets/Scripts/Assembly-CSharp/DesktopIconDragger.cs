@@ -46,6 +46,10 @@ namespace PC.Component.Software
 
         private void Update()
         {
+            // Reinit if references lost
+            if (rectTransform == null || parentRect == null)
+                Init();
+            
             if (!isDragging) return;
             
             if (Input.GetMouseButton(0))
