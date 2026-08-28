@@ -2,9 +2,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
 
-namespace PC.Component.Software.Editor
+namespace PC.Component.Software.Tools
 {
-    public class LuaEditorSetup : Editor
+    public class LuaEditorSetup : ScriptableObject
     {
         [MenuItem("Tools/Setup LuaEditor NotepadInput")]
         public static void SetupLuaEditor()
