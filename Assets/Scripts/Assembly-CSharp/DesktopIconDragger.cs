@@ -4,12 +4,13 @@ using UnityEngine.EventSystems;
 
 namespace PC.Component.Software
 {
-    public class DesktopIconDragger : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler, IEventSystemHandler
+    public class DesktopIconDragger : MonoBehaviour, IPointerDownHandler, IEventSystemHandler
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
         private Vector2 dragOffset;
         private Camera eventCamera;
+        private bool isDragging = false;
         
         [Header("Grid Settings")]
         [SerializeField] private float cellWidth = 70f;
@@ -39,9 +40,33 @@ namespace PC.Component.Software
                 eventCamera = canvas.worldCamera;
         }
 
-        public void OnBeginDrag(PointerEventData eventData)
+        private void Update()
+        {
+            if (!isDragging) return;
+            
+            if (Input.GetMouseButton(0))
+            {
+                Vector2 mousePos = Input.mousePosition;
+                Vector2 localMousePos;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, mousePos, eventCamera, out localMousePos))
+                {
+                    rectTransform.anchoredPosition = localMousePos - dragOffset;
+                }
+            }
+            else
+            {
+                // Mouse released
+                isDragging = false;
+                OnDragEnd();
+            }
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
+            
+            isDragging = true;
             
             Vector2 localMousePos;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -50,20 +75,8 @@ namespace PC.Component.Software
                 dragOffset = localMousePos - rectTransform.anchoredPosition;
             }
         }
-
-        public void OnDrag(PointerEventData eventData)
-        {
-            if (rectTransform == null || parentRect == null || eventData == null) return;
-
-            Vector2 localMousePos;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                parentRect, eventData.position, eventCamera, out localMousePos))
-            {
-                rectTransform.anchoredPosition = localMousePos - dragOffset;
-            }
-        }
-
-        public void OnEndDrag(PointerEventData eventData)
+        
+        private void OnDragEnd()
         {
             if (rectTransform == null || parentRect == null) return;
             
