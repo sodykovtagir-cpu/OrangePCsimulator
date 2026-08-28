@@ -1,15 +1,15 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace PC.Component.Software
 {
-    public class DesktopIconDragger : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IEventSystemHandler
+    public class DesktopIconDragger : MonoBehaviour
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
         private Vector2 dragOffset;
         private Camera eventCamera;
+        private bool isDragging = false;
         
         public static bool IsDragging { get; private set; }
         
@@ -41,36 +41,62 @@ namespace PC.Component.Software
                 eventCamera = canvas.worldCamera;
         }
 
-        public void OnBeginDrag(PointerEventData eventData)
+        private void Update()
         {
-            if (rectTransform == null || parentRect == null || eventData == null) return;
-            
-            IsDragging = true;
-            
-            Vector2 localMousePos;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                parentRect, eventData.position, eventCamera, out localMousePos))
+            if (rectTransform == null || parentRect == null)
             {
-                dragOffset = localMousePos - rectTransform.anchoredPosition;
+                Init();
+                return;
+            }
+
+            if (Input.GetMouseButtonDown(0) && IsPointerOverIcon())
+            {
+                isDragging = true;
+                IsDragging = true;
+                
+                Vector2 mousePos = Input.mousePosition;
+                Vector2 localMousePos;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, mousePos, eventCamera, out localMousePos))
+                {
+                    dragOffset = localMousePos - rectTransform.anchoredPosition;
+                }
+            }
+            else if (Input.GetMouseButton(0) && isDragging)
+            {
+                Vector2 mousePos = Input.mousePosition;
+                Vector2 localMousePos;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, mousePos, eventCamera, out localMousePos))
+                {
+                    rectTransform.anchoredPosition = localMousePos - dragOffset;
+                }
+            }
+            else if (Input.GetMouseButtonUp(0) && isDragging)
+            {
+                isDragging = false;
+                IsDragging = false;
+                OnDragEnd();
             }
         }
 
-        public void OnDrag(PointerEventData eventData)
+        private bool IsPointerOverIcon()
         {
-            if (rectTransform == null || parentRect == null || eventData == null) return;
-
+            // Check if mouse is over this icon
+            Vector2 mousePos = Input.mousePosition;
             Vector2 localMousePos;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                parentRect, eventData.position, eventCamera, out localMousePos))
+                rectTransform, mousePos, eventCamera, out localMousePos))
             {
-                rectTransform.anchoredPosition = localMousePos - dragOffset;
+                float w = rectTransform.rect.width;
+                float h = rectTransform.rect.height;
+                return Mathf.Abs(localMousePos.x) <= w / 2f && Mathf.Abs(localMousePos.y) <= h / 2f;
             }
+            return false;
         }
 
-        public void OnEndDrag(PointerEventData eventData)
+        private void OnDragEnd()
         {
-            IsDragging = false;
-            
             if (rectTransform == null || parentRect == null) return;
             
             Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, true);
