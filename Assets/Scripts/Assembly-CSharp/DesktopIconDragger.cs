@@ -4,16 +4,14 @@ using UnityEngine.EventSystems;
 
 namespace PC.Component.Software
 {
-    public class DesktopIconDragger : MonoBehaviour, IPointerDownHandler, IEventSystemHandler
+    public class DesktopIconDragger : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IEventSystemHandler
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
         private Vector2 dragOffset;
         private Camera eventCamera;
-        private bool isDragging = false;
-        private Vector2 pointerDownPos;
         
-        public static bool WasDragged { get; private set; }
+        public static bool IsDragging { get; private set; }
         
         [Header("Grid Settings")]
         [SerializeField] private float cellWidth = 70f;
@@ -22,7 +20,6 @@ namespace PC.Component.Software
         [SerializeField] private float spacingY = 20f;
         [SerializeField] private float padding = 20f;
         [SerializeField] private float bottomPadding = 60f;
-        [SerializeField] private float dragThreshold = 5f;
 
         private float gridStepX => cellWidth + spacingX;
         private float gridStepY => cellHeight + spacingY;
@@ -44,61 +41,11 @@ namespace PC.Component.Software
                 eventCamera = canvas.worldCamera;
         }
 
-        private void Update()
-        {
-            // Reinit if references lost
-            if (rectTransform == null || parentRect == null)
-                Init();
-            
-            if (!isDragging) return;
-            
-            if (Input.GetMouseButton(0))
-            {
-                Vector2 mousePos = Input.mousePosition;
-                
-                // Check if moved enough to be a drag
-                if (!isDragging && Vector2.Distance(mousePos, pointerDownPos) > dragThreshold)
-                {
-                    isDragging = true;
-                    WasDragged = true;
-                }
-                
-                if (isDragging)
-                {
-                    Vector2 localMousePos;
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                        parentRect, mousePos, eventCamera, out localMousePos))
-                    {
-                        rectTransform.anchoredPosition = localMousePos - dragOffset;
-                    }
-                }
-            }
-            else
-            {
-                // Mouse released
-                bool wasDrag = isDragging;
-                isDragging = false;
-                
-                if (wasDrag)
-                    OnDragEnd();
-                
-                // Reset static flag after frame
-                Invoke(nameof(ResetWasDragged), 0.1f);
-            }
-        }
-
-        private void ResetWasDragged()
-        {
-            WasDragged = false;
-        }
-
-        public void OnPointerDown(PointerEventData eventData)
+        public void OnBeginDrag(PointerEventData eventData)
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
             
-            pointerDownPos = eventData.position;
-            isDragging = false;
-            WasDragged = false;
+            IsDragging = true;
             
             Vector2 localMousePos;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -107,9 +54,23 @@ namespace PC.Component.Software
                 dragOffset = localMousePos - rectTransform.anchoredPosition;
             }
         }
-        
-        private void OnDragEnd()
+
+        public void OnDrag(PointerEventData eventData)
         {
+            if (rectTransform == null || parentRect == null || eventData == null) return;
+
+            Vector2 localMousePos;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect, eventData.position, eventCamera, out localMousePos))
+            {
+                rectTransform.anchoredPosition = localMousePos - dragOffset;
+            }
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            IsDragging = false;
+            
             if (rectTransform == null || parentRect == null) return;
             
             Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, true);
