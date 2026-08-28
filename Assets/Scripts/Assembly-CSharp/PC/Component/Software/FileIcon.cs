@@ -68,6 +68,7 @@ namespace PC.Component.Software
         {
             if (eventData == null) return;
             if (eventData.dragging) return;
+            if (DesktopIconDragger.WasDragged) return;
             var cb = callback;
             if (cb != null) cb(File);
         }

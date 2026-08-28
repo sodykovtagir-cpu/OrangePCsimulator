@@ -11,6 +11,9 @@ namespace PC.Component.Software
         private Vector2 dragOffset;
         private Camera eventCamera;
         private bool isDragging = false;
+        private Vector2 pointerDownPos;
+        
+        public static bool WasDragged { get; private set; }
         
         [Header("Grid Settings")]
         [SerializeField] private float cellWidth = 70f;
@@ -19,6 +22,7 @@ namespace PC.Component.Software
         [SerializeField] private float spacingY = 20f;
         [SerializeField] private float padding = 20f;
         [SerializeField] private float bottomPadding = 60f;
+        [SerializeField] private float dragThreshold = 5f;
 
         private float gridStepX => cellWidth + spacingX;
         private float gridStepY => cellHeight + spacingY;
@@ -47,26 +51,50 @@ namespace PC.Component.Software
             if (Input.GetMouseButton(0))
             {
                 Vector2 mousePos = Input.mousePosition;
-                Vector2 localMousePos;
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parentRect, mousePos, eventCamera, out localMousePos))
+                
+                // Check if moved enough to be a drag
+                if (!isDragging && Vector2.Distance(mousePos, pointerDownPos) > dragThreshold)
                 {
-                    rectTransform.anchoredPosition = localMousePos - dragOffset;
+                    isDragging = true;
+                    WasDragged = true;
+                }
+                
+                if (isDragging)
+                {
+                    Vector2 localMousePos;
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        parentRect, mousePos, eventCamera, out localMousePos))
+                    {
+                        rectTransform.anchoredPosition = localMousePos - dragOffset;
+                    }
                 }
             }
             else
             {
                 // Mouse released
+                bool wasDrag = isDragging;
                 isDragging = false;
-                OnDragEnd();
+                
+                if (wasDrag)
+                    OnDragEnd();
+                
+                // Reset static flag after frame
+                Invoke(nameof(ResetWasDragged), 0.1f);
             }
+        }
+
+        private void ResetWasDragged()
+        {
+            WasDragged = false;
         }
 
         public void OnPointerDown(PointerEventData eventData)
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
             
-            isDragging = true;
+            pointerDownPos = eventData.position;
+            isDragging = false;
+            WasDragged = false;
             
             Vector2 localMousePos;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
