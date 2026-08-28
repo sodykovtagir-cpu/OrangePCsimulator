@@ -847,6 +847,43 @@ namespace PC.Component.Software.OS
             StartCoroutine(WaitRefresh());
         }
 
+
+        public void SaveIconPosition(string key, Vector2 position)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+            iconPositions[key] = position;
+
+            var sb = new System.Text.StringBuilder();
+            foreach (var kvp in iconPositions)
+            {
+                if (sb.Length > 0) sb.Append(";");
+                sb.Append(kvp.Key).Append(",").Append(kvp.Value.x).Append(",").Append(kvp.Value.y);
+            }
+            PlayerPrefs.SetString("icon_positions", sb.ToString());
+        }
+
+        private void LoadIconPositions()
+        {
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+
+            var data = PlayerPrefs.GetString("icon_positions", "");
+            if (string.IsNullOrEmpty(data)) return;
+
+            var entries = data.Split(';');
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrEmpty(entry)) continue;
+                var parts = entry.Split(',');
+                if (parts.Length == 3)
+                {
+                    float x, y;
+                    if (float.TryParse(parts[1], out x) && float.TryParse(parts[2], out y))
+                        iconPositions[parts[0]] = new Vector2(x, y);
+                }
+            }
+        }
+
         private IEnumerator WaitRefresh()
         {
             yield return new WaitForEndOfFrame();
