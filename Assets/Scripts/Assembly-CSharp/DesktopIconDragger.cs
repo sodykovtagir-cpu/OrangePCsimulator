@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 namespace PC.Component.Software
 {
-    public class DesktopIconDragger : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler, ILayoutSelfController, IEventSystemHandler
+    public class DesktopIconDragger : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler, IEventSystemHandler
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
@@ -18,12 +17,17 @@ namespace PC.Component.Software
         [SerializeField] private float spacingX = 20f;
         [SerializeField] private float spacingY = 20f;
         [SerializeField] private float padding = 20f;
-        [SerializeField] private float bottomPadding = 60f; // Extra padding for taskbar
+        [SerializeField] private float bottomPadding = 60f;
 
         private float gridStepX => cellWidth + spacingX;
         private float gridStepY => cellHeight + spacingY;
 
         private void Awake()
+        {
+            Init();
+        }
+
+        public void Init()
         {
             rectTransform = GetComponent<RectTransform>();
             var parent = transform.parent;
@@ -78,24 +82,18 @@ namespace PC.Component.Software
             float pw = parentRect.rect.width;
             float ph = parentRect.rect.height;
             
-            // Grid origin (top-left cell center in anchored coordinates)
             float originX = -pw / 2f + padding + cellWidth / 2f;
             float originY = ph / 2f - padding - cellHeight / 2f;
-            
-            // Bottom bound with taskbar padding
             float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
             
-            // Snap to grid relative to origin
             float gridX = originX + Mathf.Round((pos.x - originX) / gridStepX) * gridStepX;
             float gridY = originY + Mathf.Round((pos.y - originY) / gridStepY) * gridStepY;
             
-            // Clamp to bounds
             float maxX = pw / 2f - padding - cellWidth / 2f;
             
             gridX = Mathf.Clamp(gridX, originX, maxX);
             gridY = Mathf.Clamp(gridY, maxY, originY);
             
-            // Avoid collisions if requested
             if (avoidCollisions)
             {
                 pos = new Vector2(gridX, gridY);
@@ -109,11 +107,9 @@ namespace PC.Component.Software
         {
             var occupied = GetOccupiedCells();
             
-            // Check if target cell is free
             if (!IsCellOccupied(targetPos, occupied))
                 return targetPos;
             
-            // Search for free cell (spiral out from target)
             int maxSearch = 100;
             for (int radius = 1; radius < maxSearch; radius++)
             {
@@ -137,7 +133,7 @@ namespace PC.Component.Software
                 }
             }
             
-            return targetPos; // Return original if no free cell found
+            return targetPos;
         }
         
         private bool IsCellOccupied(Vector2 pos, HashSet<Vector2Int> occupied)
@@ -165,7 +161,6 @@ namespace PC.Component.Software
             
             if (parentRect == null) return occupied;
             
-            // Get all sibling icons
             var parent = transform.parent;
             if (parent == null) return occupied;
             
@@ -196,41 +191,6 @@ namespace PC.Component.Software
             if (fileIcon != null && fileIcon.File != null)
                 return fileIcon.File.path;
             return null;
-        }
-        
-        public void SetLayoutHorizontal()
-        {
-            // Called when parent rect changes (resize)
-            if (rectTransform == null || parentRect == null) return;
-
-            float pw = parentRect.rect.width;
-            float ph = parentRect.rect.height;
-
-            float originX = -pw / 2f + padding + cellWidth / 2f;
-            float originY = ph / 2f - padding - cellHeight / 2f;
-            float maxX = pw / 2f - padding - cellWidth / 2f;
-            float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
-
-            // Snap current position to new grid
-            var pos = rectTransform.anchoredPosition;
-            float gridX = originX + Mathf.Round((pos.x - originX) / gridStepX) * gridStepX;
-            float gridY = originY + Mathf.Round((pos.y - originY) / gridStepY) * gridStepY;
-
-            // Clamp to new bounds
-            gridX = Mathf.Clamp(gridX, originX, maxX);
-            gridY = Mathf.Clamp(gridY, maxY, originY);
-
-            var newPos = new Vector2(gridX, gridY);
-            rectTransform.anchoredPosition = newPos;
-
-            var os = GetComponentInParent<OS.OperatingSystem>();
-            if (os != null)
-                os.SaveIconPosition(GetIconKey(), newPos);
-        }
-
-        public void SetLayoutVertical()
-        {
-            SetLayoutHorizontal();
         }
     }
 }
