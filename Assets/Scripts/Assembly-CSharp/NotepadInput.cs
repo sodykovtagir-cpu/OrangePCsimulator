@@ -15,16 +15,16 @@ namespace PC.Component.Software
     public class NotepadInput : MonoBehaviour
     {
         [Header("Размеры")]
-        [SerializeField] private float minHeight = 24f;
-        [SerializeField] private float maxHeight = 400f;
-        [SerializeField] private float lineHeight = 18f;
-        [SerializeField] private float padding = 4f;
+        public float minHeight = 24f;
+        public float maxHeight = 400f;
+        public float lineHeight = 18f;
+        public float padding = 4f;
 
         [Header("Ссылки")]
-        [SerializeField] private InputField inputField;
-        [SerializeField] private Text textComponent;
-        [SerializeField] private ScrollRect scrollRect;
-        [SerializeField] private RectTransform contentRect;
+        public InputField inputField;
+        public Text textComponent;
+        public ScrollRect scrollRect;
+        public RectTransform contentRect;
 
         private RectTransform selfRect;
         private string lastText = "";
