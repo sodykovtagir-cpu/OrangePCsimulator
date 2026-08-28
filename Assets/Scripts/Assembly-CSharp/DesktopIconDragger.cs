@@ -45,11 +45,20 @@ namespace PC.Component.Software
         public void OnDrag(PointerEventData eventData)
         {
             if (!isDragging) return;
+            if (rectTransform == null) return;
+
+            // Находим Canvas
+            if (canvas == null)
+                canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) return;
+
+            var canvasRect = canvas.GetComponent<RectTransform>();
+            if (canvasRect == null) return;
 
             // Двигаем иконку за курсором
             Vector2 newPosition;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                canvas.GetComponent<RectTransform>(),
+                canvasRect,
                 eventData.position,
                 canvas.worldCamera,
                 out newPosition))
