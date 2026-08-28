@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace PC.Component.Software
 {
-    public class FileIcon : MonoBehaviour, IPointerClickHandler, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IEventSystemHandler
+    public class FileIcon : MonoBehaviour, IPointerClickHandler, IEventSystemHandler
     {
         [SerializeField]
         private Image img;
@@ -15,9 +15,6 @@ namespace PC.Component.Software
 
         private Action<File> callback;
         private RectTransform rectTransform;
-        private Canvas parentCanvas;
-        private Vector2 dragOffset;
-        private bool isDragging = false;
 
         public File File { get; private set; }
 
@@ -32,7 +29,6 @@ namespace PC.Component.Software
         private void Awake()
         {
             rectTransform = GetComponent<RectTransform>();
-            parentCanvas = GetComponentInParent<Canvas>();
         }
 
         public void Init(File file, Action<File> callback)
@@ -68,45 +64,10 @@ namespace PC.Component.Software
             if (cb != null) cb(File);
         }
 
-        public void OnPointerDown(PointerEventData eventData)
-        {
-            if (eventData == null || rectTransform == null) return;
-            
-            // Запоминаем смещение от центра иконки до курсора
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                rectTransform, eventData.position, eventData.pressEventCamera, out dragOffset);
-        }
-
-        public void OnBeginDrag(PointerEventData eventData)
-        {
-            if (eventData == null || rectTransform == null) return;
-            isDragging = true;
-        }
-
-        public void OnDrag(PointerEventData eventData)
-        {
-            if (eventData == null || rectTransform == null || parentCanvas == null || !isDragging) return;
-
-            Vector2 localPoint;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                rectTransform, eventData.position, eventData.pressEventCamera, out localPoint))
-            {
-                rectTransform.anchoredPosition += localPoint - dragOffset;
-            }
-        }
-
-        public void OnEndDrag(PointerEventData eventData)
-        {
-            if (!isDragging) return;
-            isDragging = false;
-        }
-
         public void OnPointerClick(PointerEventData eventData)
         {
             if (eventData == null) return;
             if (eventData.dragging) return;
-            if (isDragging) return;
-            
             var cb = callback;
             if (cb != null) cb(File);
         }
