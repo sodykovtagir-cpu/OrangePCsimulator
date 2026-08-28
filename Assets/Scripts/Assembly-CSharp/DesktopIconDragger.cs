@@ -60,35 +60,37 @@ namespace PC.Component.Software
         {
             if (rectTransform == null || parentRect == null) return;
             
-            // iconParent has pivot (0.5, 0.5) and anchors stretch (0,0)-(1,1)
-            // anchoredPosition (0,0) = center, (-w/2, h/2) = top-left
+            Vector2 pos = SnapToGrid(rectTransform.anchoredPosition);
+            rectTransform.anchoredPosition = pos;
+            
+            var os = GetComponentInParent<OS.OperatingSystem>();
+            if (os != null)
+                os.SaveIconPosition(GetIconKey(), pos);
+        }
+        
+        public Vector2 SnapToGrid(Vector2 pos)
+        {
+            if (parentRect == null) return pos;
+            
             float pw = parentRect.rect.width;
             float ph = parentRect.rect.height;
             
-            // Grid origin (top-left corner in anchored coordinates)
-            float originX = -pw / 2f + padding;
-            float originY = ph / 2f - padding;
-            
-            // Grid bounds (bottom-right, accounting for cell size)
-            float maxX = pw / 2f - padding - cellWidth;
-            float maxY = -ph / 2f + padding + cellHeight;
-            
-            Vector2 pos = rectTransform.anchoredPosition;
+            // Grid origin (top-left cell center in anchored coordinates)
+            float originX = -pw / 2f + padding + cellWidth / 2f;
+            float originY = ph / 2f - padding - cellHeight / 2f;
             
             // Snap to grid relative to origin
-            float gridX = Mathf.Round((pos.x - originX) / gridStepX) * gridStepX + originX;
-            float gridY = Mathf.Round((pos.y - originY) / gridStepY) * gridStepY + originY;
+            float gridX = originX + Mathf.Round((pos.x - originX) / gridStepX) * gridStepX;
+            float gridY = originY + Mathf.Round((pos.y - originY) / gridStepY) * gridStepY;
             
             // Clamp to bounds
+            float maxX = pw / 2f - padding - cellWidth / 2f;
+            float maxY = -ph / 2f + padding + cellHeight / 2f;
+            
             gridX = Mathf.Clamp(gridX, originX, maxX);
             gridY = Mathf.Clamp(gridY, maxY, originY);
             
-            rectTransform.anchoredPosition = new Vector2(gridX, gridY);
-            
-            // Save position
-            var os = GetComponentInParent<OS.OperatingSystem>();
-            if (os != null)
-                os.SaveIconPosition(GetIconKey(), new Vector2(gridX, gridY));
+            return new Vector2(gridX, gridY);
         }
         
         private string GetIconKey()
