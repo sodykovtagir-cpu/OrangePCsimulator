@@ -58,18 +58,37 @@ namespace PC.Component.Software
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (rectTransform == null) return;
+            if (rectTransform == null || parentRect == null) return;
             
-            // Snap to grid
+            // iconParent has pivot (0.5, 0.5) and anchors stretch (0,0)-(1,1)
+            // anchoredPosition (0,0) = center, (-w/2, h/2) = top-left
+            float pw = parentRect.rect.width;
+            float ph = parentRect.rect.height;
+            
+            // Grid origin (top-left corner in anchored coordinates)
+            float originX = -pw / 2f + padding;
+            float originY = ph / 2f - padding;
+            
+            // Grid bounds (bottom-right, accounting for cell size)
+            float maxX = pw / 2f - padding - cellWidth;
+            float maxY = -ph / 2f + padding + cellHeight;
+            
             Vector2 pos = rectTransform.anchoredPosition;
-            pos.x = padding + Mathf.Round((pos.x - padding) / gridStepX) * gridStepX;
-            pos.y = padding + Mathf.Round((pos.y - padding) / gridStepY) * gridStepY;
-            rectTransform.anchoredPosition = pos;
             
-            // Notify OperatingSystem to save position
+            // Snap to grid relative to origin
+            float gridX = Mathf.Round((pos.x - originX) / gridStepX) * gridStepX + originX;
+            float gridY = Mathf.Round((pos.y - originY) / gridStepY) * gridStepY + originY;
+            
+            // Clamp to bounds
+            gridX = Mathf.Clamp(gridX, originX, maxX);
+            gridY = Mathf.Clamp(gridY, maxY, originY);
+            
+            rectTransform.anchoredPosition = new Vector2(gridX, gridY);
+            
+            // Save position
             var os = GetComponentInParent<OS.OperatingSystem>();
             if (os != null)
-                os.SaveIconPosition(GetIconKey(), pos);
+                os.SaveIconPosition(GetIconKey(), new Vector2(gridX, gridY));
         }
         
         private string GetIconKey()
