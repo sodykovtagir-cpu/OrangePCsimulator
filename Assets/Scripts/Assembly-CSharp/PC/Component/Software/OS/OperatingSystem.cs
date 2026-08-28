@@ -611,12 +611,12 @@ namespace PC.Component.Software.OS
             var iconInstance = Instantiate(fileIconPrefab, iconParent);
             if (iconInstance == null) return;
 
-            // Ensure fresh DesktopIconDragger
-            var oldDragger = iconInstance.GetComponent<DesktopIconDragger>();
-            if (oldDragger != null)
-                DestroyImmediate(oldDragger);
-            var dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
-            dragger.Init();
+            // Ensure DesktopIconDragger exists and is initialized
+            var dragger = iconInstance.GetComponent<DesktopIconDragger>();
+            if (dragger == null)
+                dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
+            // Reinit after a frame to ensure everything is ready
+            StartCoroutine(ReinitDragger(dragger));
 
             iconInstance.Init(file, f =>
             {
@@ -903,6 +903,14 @@ namespace PC.Component.Software.OS
             RefreshDesktopIcon();
         }
 
+
+
+        private System.Collections.IEnumerator ReinitDragger(DesktopIconDragger dragger)
+        {
+            yield return null; // Wait one frame
+            if (dragger != null)
+                dragger.Init();
+        }
 
         private Vector2 FindFreeSpawnPosition()
         {
