@@ -53,8 +53,6 @@ namespace PC.Component.Software
             if (Input.GetMouseButtonDown(0))
             {
                 Debug.Log("[DesktopIconDragger] Mouse down detected");
-            {
-                // Check if click is on this icon
                 Vector2 mousePos = Input.mousePosition;
                 Vector2 localMousePos;
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
