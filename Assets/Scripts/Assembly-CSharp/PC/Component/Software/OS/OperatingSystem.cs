@@ -945,6 +945,8 @@ namespace PC.Component.Software.OS
                 ph = Screen.height;
             }
             
+            Debug.Log($"[FindFreeSpawn] Canvas: {canvas?.name}, pixelRect: {canvas?.pixelRect}, Screen: {Screen.width}x{Screen.height}, Using: {pw}x{ph}");
+            
             float originX = -pw / 2f + padding + cellWidth / 2f;
             float originY = ph / 2f - padding - cellHeight / 2f;
             float maxX = pw / 2f - padding - cellWidth / 2f;
