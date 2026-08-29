@@ -49,17 +49,28 @@ namespace PC.Component.Software
                 return;
             }
 
-            if (Input.GetMouseButtonDown(0) && IsPointerOverIcon())
+            if (Input.GetMouseButtonDown(0))
             {
-                isDragging = true;
-                IsDragging = true;
-                
+                // Check if click is on this icon
                 Vector2 mousePos = Input.mousePosition;
                 Vector2 localMousePos;
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parentRect, mousePos, eventCamera, out localMousePos))
+                    rectTransform, mousePos, eventCamera, out localMousePos))
                 {
-                    dragOffset = localMousePos - rectTransform.anchoredPosition;
+                    float w = rectTransform.rect.width;
+                    float h = rectTransform.rect.height;
+                    if (Mathf.Abs(localMousePos.x) <= w / 2f && Mathf.Abs(localMousePos.y) <= h / 2f)
+                    {
+                        isDragging = true;
+                        IsDragging = true;
+                        
+                        Vector2 parentLocalMousePos;
+                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                            parentRect, mousePos, eventCamera, out parentLocalMousePos))
+                        {
+                            dragOffset = parentLocalMousePos - rectTransform.anchoredPosition;
+                        }
+                    }
                 }
             }
             else if (Input.GetMouseButton(0) && isDragging)
@@ -78,21 +89,6 @@ namespace PC.Component.Software
                 IsDragging = false;
                 OnDragEnd();
             }
-        }
-
-        private bool IsPointerOverIcon()
-        {
-            // Check if mouse is over this icon
-            Vector2 mousePos = Input.mousePosition;
-            Vector2 localMousePos;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                rectTransform, mousePos, eventCamera, out localMousePos))
-            {
-                float w = rectTransform.rect.width;
-                float h = rectTransform.rect.height;
-                return Mathf.Abs(localMousePos.x) <= w / 2f && Mathf.Abs(localMousePos.y) <= h / 2f;
-            }
-            return false;
         }
 
         private void OnDragEnd()
