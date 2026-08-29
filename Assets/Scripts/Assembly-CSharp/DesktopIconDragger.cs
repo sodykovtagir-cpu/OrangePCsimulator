@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace PC.Component.Software
 {
-    public class DesktopIconDragger : MonoBehaviour
+    public class DesktopIconDragger : MonoBehaviour, IPointerDownHandler, IEventSystemHandler
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
@@ -45,39 +46,11 @@ namespace PC.Component.Software
         {
             if (rectTransform == null || parentRect == null)
             {
-                Debug.Log("[DesktopIconDragger] References null, reinit");
                 Init();
                 return;
             }
 
-            if (Input.GetMouseButtonDown(0))
-            {
-                Debug.Log("[DesktopIconDragger] Mouse down detected");
-                Vector2 mousePos = Input.mousePosition;
-                Vector2 localMousePos;
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    rectTransform, mousePos, eventCamera, out localMousePos))
-                {
-                    float w = rectTransform.rect.width;
-                    float h = rectTransform.rect.height;
-                    Debug.Log($"[DesktopIconDragger] Icon size: {w}x{h}, mouse local: {localMousePos}");
-                    if (Mathf.Abs(localMousePos.x) <= w / 2f && Mathf.Abs(localMousePos.y) <= h / 2f)
-                    {
-                        Debug.Log("[DesktopIconDragger] Bounds check passed");
-                        isDragging = true;
-                        IsDragging = true;
-                        Debug.Log("[DesktopIconDragger] Drag started on " + GetIconKey());
-                        
-                        Vector2 parentLocalMousePos;
-                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                            parentRect, mousePos, eventCamera, out parentLocalMousePos))
-                        {
-                            dragOffset = parentLocalMousePos - rectTransform.anchoredPosition;
-                        }
-                    }
-                }
-            }
-            else if (Input.GetMouseButton(0) && isDragging)
+            if (Input.GetMouseButton(0) && isDragging)
             {
                 Vector2 mousePos = Input.mousePosition;
                 Vector2 localMousePos;
@@ -92,6 +65,23 @@ namespace PC.Component.Software
                 isDragging = false;
                 IsDragging = false;
                 OnDragEnd();
+            }
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (rectTransform == null || parentRect == null || eventData == null) return;
+            
+            Debug.Log("[DesktopIconDragger] Pointer down on " + GetIconKey());
+            
+            isDragging = true;
+            IsDragging = true;
+            
+            Vector2 localMousePos;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect, eventData.position, eventCamera, out localMousePos))
+            {
+                dragOffset = localMousePos - rectTransform.anchoredPosition;
             }
         }
 
