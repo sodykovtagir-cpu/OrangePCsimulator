@@ -1068,12 +1068,36 @@ namespace PC.Component.Software.OS
                 AddFileIcon(f);
             }
 
-            // Trigger layout rebuild so resize handler works
+            // Delay layout rebuild to ensure canvas is ready
+            StartCoroutine(DelayedLayoutRebuild());
+        }
+
+        private System.Collections.IEnumerator DelayedLayoutRebuild()
+        {
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForEndOfFrame();
+            
             if (iconParent != null)
             {
                 var rt = iconParent.GetComponent<RectTransform>();
                 if (rt != null)
                     UnityEngine.UI.LayoutRebuilder.MarkLayoutForRebuild(rt);
+            }
+            
+            // Re-apply positions after layout is ready
+            ReapplyIconPositions();
+        }
+
+        private void ReapplyIconPositions()
+        {
+            if (fileIcons == null || iconPositions == null) return;
+            
+            foreach (var kvp in fileIcons)
+            {
+                if (kvp.Value != null && iconPositions.ContainsKey(kvp.Key))
+                {
+                    kvp.Value.SetPosition(iconPositions[kvp.Key]);
+                }
             }
         }
 
