@@ -56,10 +56,10 @@ namespace PC.Component.Software
             {
                 lastParentSize = parentRect.rect.size;
                 
-                // Re-snap to grid within new bounds
+                // Re-snap to grid within new bounds, checking collisions
                 if (!isDragging && !pointerDownReceived)
                 {
-                    Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, false);
+                    Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, true);
                     rectTransform.anchoredPosition = pos;
                     
                     var os = GetComponentInParent<OS.OperatingSystem>();
