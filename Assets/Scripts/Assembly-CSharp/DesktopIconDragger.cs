@@ -57,26 +57,28 @@ namespace PC.Component.Software
             {
             }
 
-            if (Input.GetMouseButton(0) && !hasDragged)
+            if (Input.GetMouseButton(0))
             {
-                // Check if moved enough to be a drag
-                if (Vector2.Distance(Input.mousePosition, pointerDownPos) > 5f)
+                if (!hasDragged)
                 {
-                    hasDragged = true;
-                    isDragging = true;
-                    IsDragging = true;
-                    
-                    // Recalculate drag offset
-                    Vector2 localMousePos;
-                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                        parentRect, Input.mousePosition, null, out localMousePos))
+                    // Check if moved enough to be a drag
+                    if (Vector2.Distance(Input.mousePosition, pointerDownPos) > 5f)
                     {
-                        dragOffset = localMousePos - rectTransform.anchoredPosition;
+                        hasDragged = true;
+                        isDragging = true;
+                        IsDragging = true;
+                        
+                        // Recalculate drag offset
+                        Vector2 localMousePos;
+                        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                            parentRect, Input.mousePosition, null, out localMousePos))
+                        {
+                            dragOffset = localMousePos - rectTransform.anchoredPosition;
+                        }
                     }
                 }
-            }
-            
-            if (Input.GetMouseButton(0) && isDragging)
+                
+                if (isDragging)
             {
                 Vector2 mousePos = Input.mousePosition;
                 Vector2 localMousePos;
@@ -86,6 +88,7 @@ namespace PC.Component.Software
                 {
                     rectTransform.anchoredPosition = localMousePos - dragOffset;
                 }
+            }
             }
             else if (Input.GetMouseButtonUp(0) && isDragging)
             {
@@ -121,6 +124,10 @@ namespace PC.Component.Software
             var os = GetComponentInParent<OS.OperatingSystem>();
             if (os != null)
                 os.SaveIconPosition(GetIconKey(), pos);
+            
+            isDragging = false;
+            hasDragged = false;
+            IsDragging = false;
         }
         
         public Vector2 SnapToGrid(Vector2 pos, bool avoidCollisions = false)
