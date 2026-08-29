@@ -644,6 +644,9 @@ namespace PC.Component.Software.OS
             else
                 iconInstance.Sprite = GetFileSprite(file.path);
 
+            // Add to fileIcons first so FindFreeSpawnPosition can see it
+            fileIcons.Add(key, iconInstance);
+            
             // Restore saved position or find free spawn position
             if (iconPositions != null && iconPositions.ContainsKey(key))
             {
@@ -653,8 +656,6 @@ namespace PC.Component.Software.OS
             {
                 iconInstance.SetPosition(FindFreeSpawnPosition(key));
             }
-
-            fileIcons.Add(key, iconInstance);
         }
 
         public Sprite GetFileSprite(string fileName)
