@@ -58,10 +58,13 @@ namespace PC.Component.Software
             {
                 Vector2 mousePos = Input.mousePosition;
                 Vector2 localMousePos;
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parentRect, mousePos, eventCamera, out localMousePos))
+                bool success = RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, mousePos, eventCamera, out localMousePos);
+                Debug.Log($"[Drag] success={success}, mousePos={mousePos}, localMousePos={localMousePos}, eventCamera={eventCamera}");
+                if (success)
                 {
                     rectTransform.anchoredPosition = localMousePos - dragOffset;
+                    Debug.Log($"[Drag] New position: {rectTransform.anchoredPosition}");
                 }
             }
             else if (Input.GetMouseButtonUp(0) && isDragging)
