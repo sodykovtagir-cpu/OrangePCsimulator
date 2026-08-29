@@ -9,13 +9,13 @@ namespace PC.Component.Software
         private RectTransform rectTransform;
         private RectTransform parentRect;
         private Vector2 dragOffset;
-        private Camera eventCamera;
         private bool isDragging = false;
         
         public static bool IsDragging { get; private set; }
         
         private Vector2 pointerDownPos;
         private bool hasDragged;
+        private bool pointerDownReceived;
         
         [Header("Grid Settings")]
         [SerializeField] private float cellWidth = 70f;
@@ -39,10 +39,6 @@ namespace PC.Component.Software
             var parent = transform.parent;
             if (parent != null)
                 parentRect = parent.GetComponent<RectTransform>();
-            
-            var canvas = GetComponentInParent<Canvas>();
-            if (canvas != null)
-                eventCamera = canvas.worldCamera;
         }
 
         private void Update()
@@ -53,22 +49,18 @@ namespace PC.Component.Software
                 return;
             }
 
-            if (isDragging)
-            {
-            }
+            if (!pointerDownReceived) return;
 
             if (Input.GetMouseButton(0))
             {
                 if (!hasDragged)
                 {
-                    // Check if moved enough to be a drag
                     if (Vector2.Distance(Input.mousePosition, pointerDownPos) > 5f)
                     {
                         hasDragged = true;
                         isDragging = true;
                         IsDragging = true;
                         
-                        // Recalculate drag offset
                         Vector2 localMousePos;
                         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
                             parentRect, Input.mousePosition, null, out localMousePos))
@@ -79,21 +71,17 @@ namespace PC.Component.Software
                 }
                 
                 if (isDragging)
-            {
-                Vector2 mousePos = Input.mousePosition;
-                Vector2 localMousePos;
-                bool success = RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parentRect, mousePos, null, out localMousePos);
-                if (success)
                 {
-                    rectTransform.anchoredPosition = localMousePos - dragOffset;
+                    Vector2 localMousePos;
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        parentRect, Input.mousePosition, null, out localMousePos))
+                    {
+                        rectTransform.anchoredPosition = localMousePos - dragOffset;
+                    }
                 }
-            }
             }
             else if (Input.GetMouseButtonUp(0) && isDragging)
             {
-                isDragging = false;
-                IsDragging = false;
                 OnDragEnd();
             }
         }
@@ -101,19 +89,14 @@ namespace PC.Component.Software
         public void OnPointerDown(PointerEventData eventData)
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
+            if (IsDragging) return; // Another icon is being dragged
             
-            
-            isDragging = true;
-            IsDragging = true;
-            
-            Vector2 localMousePos;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                parentRect, eventData.position, eventCamera, out localMousePos))
-            {
-                dragOffset = localMousePos - rectTransform.anchoredPosition;
-            }
+            pointerDownPos = eventData.position;
+            hasDragged = false;
+            isDragging = false;
+            pointerDownReceived = true;
         }
-
+        
         private void OnDragEnd()
         {
             if (rectTransform == null || parentRect == null) return;
@@ -127,6 +110,7 @@ namespace PC.Component.Software
             
             isDragging = false;
             hasDragged = false;
+            pointerDownReceived = false;
             IsDragging = false;
         }
         
