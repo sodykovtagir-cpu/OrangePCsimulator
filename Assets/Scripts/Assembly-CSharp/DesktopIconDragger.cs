@@ -45,11 +45,14 @@ namespace PC.Component.Software
         {
             if (rectTransform == null || parentRect == null)
             {
+                Debug.Log("[DesktopIconDragger] References null, reinit");
                 Init();
                 return;
             }
 
             if (Input.GetMouseButtonDown(0))
+            {
+                Debug.Log("[DesktopIconDragger] Mouse down detected");
             {
                 // Check if click is on this icon
                 Vector2 mousePos = Input.mousePosition;
@@ -63,6 +66,7 @@ namespace PC.Component.Software
                     {
                         isDragging = true;
                         IsDragging = true;
+                        Debug.Log("[DesktopIconDragger] Drag started on " + GetIconKey());
                         
                         Vector2 parentLocalMousePos;
                         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
