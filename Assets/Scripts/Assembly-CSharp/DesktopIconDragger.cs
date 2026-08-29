@@ -41,12 +41,35 @@ namespace PC.Component.Software
                 parentRect = parent.GetComponent<RectTransform>();
         }
 
+        private Vector2 lastParentSize;
+        
         private void Update()
         {
             if (rectTransform == null || parentRect == null)
             {
                 Init();
                 return;
+            }
+
+            // Check if parent size changed (resize)
+            if (parentRect.rect.size != lastParentSize && lastParentSize != Vector2.zero)
+            {
+                lastParentSize = parentRect.rect.size;
+                
+                // Re-snap to grid within new bounds
+                if (!isDragging && !pointerDownReceived)
+                {
+                    Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, false);
+                    rectTransform.anchoredPosition = pos;
+                    
+                    var os = GetComponentInParent<OS.OperatingSystem>();
+                    if (os != null)
+                        os.SaveIconPosition(GetIconKey(), pos);
+                }
+            }
+            else if (lastParentSize == Vector2.zero)
+            {
+                lastParentSize = parentRect.rect.size;
             }
 
             if (!pointerDownReceived) return;
