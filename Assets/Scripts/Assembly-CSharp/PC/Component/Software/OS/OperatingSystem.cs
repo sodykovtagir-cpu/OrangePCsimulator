@@ -979,29 +979,18 @@ namespace PC.Component.Software.OS
                     newIndex++;
                 }
                 
-                int maxCols = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
+                int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
                 int row = newIndex / maxCols;
                 int col = newIndex % maxCols;
                 
                 float x = originX + col * gridStepX;
                 float y = originY - row * gridStepY;
                 
-                // Check if position is occupied, if yes find next free
-                var pos = new Vector2(x, y);
-                while (occupied.Contains(new Vector2Int(col, row)))
-                {
-                    col++;
-                    if (col >= maxCols)
-                    {
-                        col = 0;
-                        row++;
-                    }
-                    x = originX + col * gridStepX;
-                    y = originY - row * gridStepY;
-                    pos = new Vector2(x, y);
-                }
+                // Clamp to bounds
+                x = Mathf.Clamp(x, originX, maxX);
+                y = Mathf.Clamp(y, maxY, originY);
                 
-                return pos;
+                return new Vector2(x, y);
             }
             
             // Fallback: find first free cell
