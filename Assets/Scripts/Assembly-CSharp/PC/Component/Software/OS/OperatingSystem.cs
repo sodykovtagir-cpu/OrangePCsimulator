@@ -651,7 +651,7 @@ namespace PC.Component.Software.OS
             }
             else
             {
-                iconInstance.SetPosition(FindFreeSpawnPosition());
+                iconInstance.SetPosition(FindFreeSpawnPosition(key));
             }
 
             fileIcons.Add(key, iconInstance);
@@ -912,7 +912,7 @@ namespace PC.Component.Software.OS
                 dragger.Init();
         }
 
-        private Vector2 FindFreeSpawnPosition()
+        private Vector2 FindFreeSpawnPosition(string fileName = null)
         {
             if (iconParent == null) return Vector2.zero;
             
@@ -937,29 +937,80 @@ namespace PC.Component.Software.OS
             float maxX = pw / 2f - padding - cellWidth / 2f;
             float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
             
-            // Get occupied cells
-            var occupied = new HashSet<Vector2Int>();
+            // Get all icons and sort them: apps first (alphabetical), then files/folders (alphabetical)
+            var allIcons = new List<KeyValuePair<string, FileIcon>>();
             foreach (var kvp in fileIcons)
             {
                 if (kvp.Value != null)
+                    allIcons.Add(kvp);
+            }
+            
+            allIcons.Sort((a, b) => {
+                bool aIsApp = a.Key.EndsWith(".exe");
+                bool bIsApp = b.Key.EndsWith(".exe");
+                
+                if (aIsApp && !bIsApp) return -1;
+                if (!aIsApp && bIsApp) return 1;
+                
+                return string.Compare(a.Key, b.Key, System.StringComparison.OrdinalIgnoreCase);
+            });
+            
+            // Get occupied cells
+            var occupied = new HashSet<Vector2Int>();
+            foreach (var kvp in allIcons)
+            {
+                var rt = kvp.Value.GetComponent<RectTransform>();
+                if (rt != null)
                 {
-                    var rt = kvp.Value.GetComponent<RectTransform>();
-                    if (rt != null)
-                    {
-                        int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
-                        int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
-                        occupied.Add(new Vector2Int(col, row));
-                    }
+                    int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
+                    int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
+                    occupied.Add(new Vector2Int(col, row));
                 }
             }
             
-            // Find first free cell (row by row, left to right)
-            int maxCols = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
+            // If this is a new icon, calculate its position based on sorted order
+            if (fileName != null)
+            {
+                int newIndex = 0;
+                for (int i = 0; i < allIcons.Count; i++)
+                {
+                    if (string.Compare(allIcons[i].Key, fileName, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        break;
+                    newIndex++;
+                }
+                
+                int maxCols = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
+                int row = newIndex / maxCols;
+                int col = newIndex % maxCols;
+                
+                float x = originX + col * gridStepX;
+                float y = originY - row * gridStepY;
+                
+                // Check if position is occupied, if yes find next free
+                var pos = new Vector2(x, y);
+                while (occupied.Contains(new Vector2Int(col, row)))
+                {
+                    col++;
+                    if (col >= maxCols)
+                    {
+                        col = 0;
+                        row++;
+                    }
+                    x = originX + col * gridStepX;
+                    y = originY - row * gridStepY;
+                    pos = new Vector2(x, y);
+                }
+                
+                return pos;
+            }
+            
+            // Fallback: find first free cell
+            int maxCols2 = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
             int maxRows = Mathf.FloorToInt((originY - maxY) / gridStepY) + 1;
             
             for (int row = 0; row < maxRows; row++)
             {
-                for (int col = 0; col < maxCols; col++)
+                for (int col = 0; col < maxCols2; col++)
                 {
                     if (!occupied.Contains(new Vector2Int(col, row)))
                     {
@@ -970,7 +1021,7 @@ namespace PC.Component.Software.OS
                 }
             }
             
-            return new Vector2(originX, originY); // Fallback
+            return new Vector2(originX, originY);
         }
 
         public void RefreshDesktopIcon()
