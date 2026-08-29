@@ -14,6 +14,9 @@ namespace PC.Component.Software
         
         public static bool IsDragging { get; private set; }
         
+        private Vector2 pointerDownPos;
+        private bool hasDragged;
+        
         [Header("Grid Settings")]
         [SerializeField] private float cellWidth = 70f;
         [SerializeField] private float cellHeight = 70f;
@@ -54,6 +57,25 @@ namespace PC.Component.Software
             {
             }
 
+            if (Input.GetMouseButton(0) && !hasDragged)
+            {
+                // Check if moved enough to be a drag
+                if (Vector2.Distance(Input.mousePosition, pointerDownPos) > 5f)
+                {
+                    hasDragged = true;
+                    isDragging = true;
+                    IsDragging = true;
+                    
+                    // Recalculate drag offset
+                    Vector2 localMousePos;
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        parentRect, Input.mousePosition, null, out localMousePos))
+                    {
+                        dragOffset = localMousePos - rectTransform.anchoredPosition;
+                    }
+                }
+            }
+            
             if (Input.GetMouseButton(0) && isDragging)
             {
                 Vector2 mousePos = Input.mousePosition;
