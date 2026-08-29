@@ -60,8 +60,10 @@ namespace PC.Component.Software
                 {
                     float w = rectTransform.rect.width;
                     float h = rectTransform.rect.height;
+                    Debug.Log($"[DesktopIconDragger] Icon size: {w}x{h}, mouse local: {localMousePos}");
                     if (Mathf.Abs(localMousePos.x) <= w / 2f && Mathf.Abs(localMousePos.y) <= h / 2f)
                     {
+                        Debug.Log("[DesktopIconDragger] Bounds check passed");
                         isDragging = true;
                         IsDragging = true;
                         Debug.Log("[DesktopIconDragger] Drag started on " + GetIconKey());
