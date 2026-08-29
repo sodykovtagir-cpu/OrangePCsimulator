@@ -930,11 +930,19 @@ namespace PC.Component.Software.OS
             var parentRT = iconParent.GetComponent<RectTransform>();
             if (parentRT == null) return Vector2.zero;
             
-            // Use parent rect size, fallback to screen size
-            float pw = parentRT.rect.width > 0 ? parentRT.rect.width : Screen.width;
-            float ph = parentRT.rect.height > 0 ? parentRT.rect.height : Screen.height;
-            
-            Debug.Log($"[FindFreeSpawn] pw={pw}, ph={ph}, parentRect.size={parentRT.rect.size}");
+            // Get canvas size
+            var canvas = iconParent.GetComponentInParent<Canvas>();
+            float pw, ph;
+            if (canvas != null)
+            {
+                pw = canvas.pixelRect.width;
+                ph = canvas.pixelRect.height;
+            }
+            else
+            {
+                pw = Screen.width;
+                ph = Screen.height;
+            }
             
             float originX = -pw / 2f + padding + cellWidth / 2f;
             float originY = ph / 2f - padding - cellHeight / 2f;
