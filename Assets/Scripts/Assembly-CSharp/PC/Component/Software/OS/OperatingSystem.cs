@@ -933,13 +933,14 @@ namespace PC.Component.Software.OS
             // Get canvas size
             var canvas = iconParent.GetComponentInParent<Canvas>();
             float pw, ph;
-            if (canvas != null)
+            if (canvas != null && canvas.pixelRect.width > 100 && canvas.pixelRect.height > 100)
             {
                 pw = canvas.pixelRect.width;
                 ph = canvas.pixelRect.height;
             }
             else
             {
+                // Fallback to screen size
                 pw = Screen.width;
                 ph = Screen.height;
             }
