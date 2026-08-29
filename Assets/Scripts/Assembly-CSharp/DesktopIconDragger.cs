@@ -52,7 +52,6 @@ namespace PC.Component.Software
 
             if (isDragging)
             {
-                Debug.Log($"[DesktopIconDragger] Update: isDragging=true, mouseButton={Input.GetMouseButton(0)}, mousePos={Input.mousePosition}");
             }
 
             if (Input.GetMouseButton(0) && isDragging)
@@ -77,7 +76,6 @@ namespace PC.Component.Software
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
             
-            Debug.Log("[DesktopIconDragger] Pointer down on " + GetIconKey());
             
             isDragging = true;
             IsDragging = true;
