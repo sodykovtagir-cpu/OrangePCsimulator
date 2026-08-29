@@ -50,6 +50,11 @@ namespace PC.Component.Software
                 return;
             }
 
+            if (isDragging)
+            {
+                Debug.Log($"[DesktopIconDragger] Update: isDragging=true, mouseButton={Input.GetMouseButton(0)}, mousePos={Input.mousePosition}");
+            }
+
             if (Input.GetMouseButton(0) && isDragging)
             {
                 Vector2 mousePos = Input.mousePosition;
