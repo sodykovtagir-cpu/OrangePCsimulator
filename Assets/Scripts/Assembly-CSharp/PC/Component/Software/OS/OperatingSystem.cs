@@ -984,12 +984,16 @@ namespace PC.Component.Software.OS
                 int row = newIndex / maxCols;
                 int col = newIndex % maxCols;
                 
+                Debug.Log($"[FindFreeSpawn] fileName={fileName}, newIndex={newIndex}, maxCols={maxCols}, row={row}, col={col}, originX={originX}, originY={originY}");
+                
                 float x = originX + col * gridStepX;
                 float y = originY - row * gridStepY;
                 
                 // Clamp to bounds
                 x = Mathf.Clamp(x, originX, maxX);
                 y = Mathf.Clamp(y, maxY, originY);
+                
+                Debug.Log($"[FindFreeSpawn] Final position: ({x}, {y})");
                 
                 return new Vector2(x, y);
             }
