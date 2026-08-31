@@ -987,17 +987,17 @@ namespace PC.Component.Software.OS
                 occupied.Add(new Vector2Int(col, row));
             }
             
-            // Find first free cell in grid order (top-to-bottom in first column, then next column)
-            // This matches Windows desktop icon layout
+            // Find first free cell in grid order (left-to-right in first row, then next row down)
+            // This is the standard row-major layout
             int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
             int maxRows = Mathf.Max(1, Mathf.FloorToInt((originY - maxY) / gridStepY) + 1);
             
             Debug.Log($"[FindFreeSpawn] Grid: {maxCols} cols x {maxRows} rows, parentRT: {pw}x{ph}, occupied: {occupied.Count} cells");
             
-            // Column-major order: fill first column top-to-bottom, then next column
-            for (int col = 0; col < maxCols; col++)
+            // Row-major order: fill first row left-to-right, then next row
+            for (int row = 0; row < maxRows; row++)
             {
-                for (int row = 0; row < maxRows; row++)
+                for (int col = 0; col < maxCols; col++)
                 {
                     if (!occupied.Contains(new Vector2Int(col, row)))
                     {
