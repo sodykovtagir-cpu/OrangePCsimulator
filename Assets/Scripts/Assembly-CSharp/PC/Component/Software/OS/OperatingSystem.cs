@@ -1025,9 +1025,70 @@ namespace PC.Component.Software.OS
                 iconPositions.Clear();
             
             PlayerPrefs.DeleteKey(GetIconPositionsKey());
+            currentSortMode = "Name";
             
             Debug.Log("[AutoArrangeIcons] Cleared all saved positions, re-arranging...");
             
+            RefreshDesktopIcon();
+        }
+
+        /// <summary>
+        /// Sort desktop icons by the specified mode and re-arrange them.
+        /// Mode: "Name", "Size", "Type"
+        /// </summary>
+        public void SortDesktopIcons(string mode)
+        {
+            if (iconPositions != null)
+                iconPositions.Clear();
+            
+            PlayerPrefs.DeleteKey(GetIconPositionsKey());
+            currentSortMode = mode;
+            
+            Debug.Log($"[SortDesktopIcons] Sorting by {mode}...");
+            
+            RefreshDesktopIcon();
+        }
+
+        private string currentSortMode = "Name";
+
+        /// <summary>
+        /// Create a new file on the desktop.
+        /// </summary>
+        public void CreateDesktopFile(string name, string content)
+        {
+            if (FileManager == null) return;
+            
+            string finalName = name;
+            int counter = 1;
+            while (FileManager.Exists(0, finalName))
+            {
+                var ext = File.Extension(name);
+                var baseName = File.NameWithoutExtension(name);
+                finalName = $"{baseName} ({counter}){ext}";
+                counter++;
+            }
+            
+            FileManager.Write(0, finalName, content ?? "");
+            RefreshDesktopIcon();
+        }
+
+        /// <summary>
+        /// Create a new folder on the desktop.
+        /// </summary>
+        public void CreateDesktopFolder(string name)
+        {
+            if (FileManager == null) return;
+            
+            string finalName = name;
+            int counter = 1;
+            while (FileManager.Exists(0, finalName))
+            {
+                finalName = $"{name} ({counter})";
+                counter++;
+            }
+            
+            var folder = new File(finalName, "", true, 0);
+            FileManager.Create(0, folder);
             RefreshDesktopIcon();
         }
 
@@ -1060,15 +1121,53 @@ namespace PC.Component.Software.OS
             var files = storage != null ? storage.files : null;
             if (files == null) return;
 
+            // Collect desktop files (not in subdirectories, not System folder)
+            var desktopFiles = new List<File>();
             for (int i = 0; i < files.Count; i++)
             {
                 var f = files[i];
                 if (f == null) continue;
-
                 if (f.path.Contains("/")) continue;
                 if (f.isFolder && f.path == "System") continue;
+                desktopFiles.Add(f);
+            }
 
-                AddFileIcon(f);
+            // Sort by current mode
+            if (!string.IsNullOrEmpty(currentSortMode))
+            {
+                switch (currentSortMode)
+                {
+                    case "Name":
+                        desktopFiles.Sort((a, b) => {
+                            if (a.isFolder && !b.isFolder) return -1;
+                            if (!a.isFolder && b.isFolder) return 1;
+                            return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
+                        });
+                        break;
+                    case "Size":
+                        desktopFiles.Sort((a, b) => {
+                            if (a.isFolder && !b.isFolder) return -1;
+                            if (!a.isFolder && b.isFolder) return 1;
+                            return b.size.CompareTo(a.size); // Descending
+                        });
+                        break;
+                    case "Type":
+                        desktopFiles.Sort((a, b) => {
+                            if (a.isFolder && !b.isFolder) return -1;
+                            if (!a.isFolder && b.isFolder) return 1;
+                            var extA = a.isFolder ? "" : File.Extension(a.path);
+                            var extB = b.isFolder ? "" : File.Extension(b.path);
+                            int cmp = string.Compare(extA, extB, System.StringComparison.OrdinalIgnoreCase);
+                            if (cmp != 0) return cmp;
+                            return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
+                        });
+                        break;
+                }
+            }
+
+            for (int i = 0; i < desktopFiles.Count; i++)
+            {
+                AddFileIcon(desktopFiles[i]);
             }
 
             // Delay layout rebuild to ensure canvas is ready
