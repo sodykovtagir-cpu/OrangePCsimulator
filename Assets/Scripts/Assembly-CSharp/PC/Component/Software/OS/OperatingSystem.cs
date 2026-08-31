@@ -139,6 +139,24 @@ namespace PC.Component.Software.OS
             if (user != null) user.SetActive(false);
             if (loading != null) loading.SetActive(true);
 
+            // Wait for canvas/iconParent to be fully initialized before creating icons.
+            // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).
+            yield return null;
+            yield return null;
+            yield return null;
+
+            // Extra safety: wait until iconParent has a valid rect size
+            if (iconParent != null)
+            {
+                var prt = iconParent.GetComponent<RectTransform>();
+                int safetyCounter = 0;
+                while (prt != null && (prt.rect.width < 50 || prt.rect.height < 50) && safetyCounter < 30)
+                {
+                    yield return null;
+                    safetyCounter++;
+                }
+            }
+
             LoadFilesFromDisk();
 
             storageScore = 0;
@@ -943,11 +961,12 @@ namespace PC.Component.Software.OS
             float pw = parentRT.rect.width;
             float ph = parentRT.rect.height;
             
-            // If parent rect is not yet initialized, wait and return zero
+            // If parent rect is not yet initialized, use screen size as fallback
             if (pw < 100 || ph < 100)
             {
-                Debug.LogWarning($"[FindFreeSpawn] parentRT not ready: {pw}x{ph}");
-                return Vector2.zero;
+                pw = Screen.width;
+                ph = Screen.height;
+                Debug.LogWarning($"[FindFreeSpawn] parentRT not ready ({parentRT.rect.width}x{parentRT.rect.height}), using Screen: {pw}x{ph}");
             }
             
             float originX = -pw / 2f + padding + cellWidth / 2f;

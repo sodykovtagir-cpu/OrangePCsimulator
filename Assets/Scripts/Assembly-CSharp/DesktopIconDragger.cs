@@ -8,6 +8,7 @@ namespace PC.Component.Software
     {
         private RectTransform rectTransform;
         private RectTransform parentRect;
+        private Canvas parentCanvas;
         private Vector2 dragOffset;
         private bool isDragging = false;
         
@@ -38,7 +39,21 @@ namespace PC.Component.Software
             rectTransform = GetComponent<RectTransform>();
             var parent = transform.parent;
             if (parent != null)
+            {
                 parentRect = parent.GetComponent<RectTransform>();
+                parentCanvas = parent.GetComponentInParent<Canvas>();
+            }
+        }
+
+        /// <summary>
+        /// Returns the correct camera for coordinate conversion based on canvas render mode.
+        /// ScreenSpaceOverlay needs null, WorldSpace/ScreenSpaceCamera needs the world camera.
+        /// </summary>
+        private Camera GetRenderCamera()
+        {
+            if (parentCanvas == null) return null;
+            if (parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay) return null;
+            return parentCanvas.worldCamera ?? Camera.main;
         }
 
         private Vector2 lastParentSize;
@@ -52,9 +67,10 @@ namespace PC.Component.Software
                 return;
             }
 
-            // Track parent size changes but do NOT auto-snap or move icons.
-            // Icon positions are saved in anchoredPosition relative to parentRect,
-            // so they remain stable when parent size changes (e.g. entering/exiting monitor).
+            // Track parent size but do NOT auto-snap or reposition icons on resize.
+            // This is critical: when the canvas switches between WorldSpace (monitor view)
+            // and ScreenSpaceOverlay (zoomed-in view), the parent size changes dramatically.
+            // We must NOT move icons — their anchoredPosition is stable.
             if (!parentSizeInitialized)
             {
                 lastParentSize = parentRect.rect.size;
@@ -63,9 +79,7 @@ namespace PC.Component.Software
             else if (parentRect.rect.size != lastParentSize)
             {
                 lastParentSize = parentRect.rect.size;
-                // Do NOT re-snap icons on resize — keep saved positions intact.
-                // Only re-clamp if an icon would be completely outside the parent bounds.
-                ClampIfOutOfBounds();
+                // Do NOT re-snap or move icons. Keep saved positions intact.
             }
 
             if (!pointerDownReceived) return;
@@ -80,9 +94,10 @@ namespace PC.Component.Software
                         isDragging = true;
                         IsDragging = true;
                         
+                        var cam = GetRenderCamera();
                         Vector2 localMousePos;
                         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                            parentRect, Input.mousePosition, null, out localMousePos))
+                            parentRect, Input.mousePosition, cam, out localMousePos))
                         {
                             dragOffset = localMousePos - rectTransform.anchoredPosition;
                         }
@@ -91,9 +106,10 @@ namespace PC.Component.Software
                 
                 if (isDragging)
                 {
+                    var cam = GetRenderCamera();
                     Vector2 localMousePos;
                     if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                        parentRect, Input.mousePosition, null, out localMousePos))
+                        parentRect, Input.mousePosition, cam, out localMousePos))
                     {
                         rectTransform.anchoredPosition = localMousePos - dragOffset;
                     }
@@ -103,35 +119,6 @@ namespace PC.Component.Software
             {
                 OnDragEnd();
             }
-        }
-
-        /// <summary>
-        /// Only clamp the icon position if it would be completely outside the parent bounds.
-        /// Does NOT snap to grid or check collisions — just ensures the icon stays visible.
-        /// </summary>
-        private void ClampIfOutOfBounds()
-        {
-            if (parentRect == null || rectTransform == null) return;
-            
-            float pw = parentRect.rect.width;
-            float ph = parentRect.rect.height;
-            
-            float minX = -pw / 2f + padding + cellWidth / 2f;
-            float maxX = pw / 2f - padding - cellWidth / 2f;
-            float minY = -ph / 2f + bottomPadding + cellHeight / 2f;
-            float maxY = ph / 2f - padding - cellHeight / 2f;
-            
-            var pos = rectTransform.anchoredPosition;
-            
-            // Only clamp if completely outside bounds
-            bool needsClamp = false;
-            if (pos.x < minX - cellWidth) { pos.x = minX; needsClamp = true; }
-            if (pos.x > maxX + cellWidth) { pos.x = maxX; needsClamp = true; }
-            if (pos.y < minY - cellHeight) { pos.y = minY; needsClamp = true; }
-            if (pos.y > maxY + cellHeight) { pos.y = maxY; needsClamp = true; }
-            
-            if (needsClamp)
-                rectTransform.anchoredPosition = pos;
         }
 
         public void OnPointerDown(PointerEventData eventData)
