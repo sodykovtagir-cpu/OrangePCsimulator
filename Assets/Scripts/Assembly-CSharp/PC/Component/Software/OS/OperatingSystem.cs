@@ -943,7 +943,7 @@ namespace PC.Component.Software.OS
         {
             if (iconParent == null) return Vector2.zero;
             
-            float padding = 10f;
+            float padding = 20f;
             float cellWidth = 70f;
             float cellHeight = 70f;
             float spacingX = 20f;
@@ -991,6 +991,8 @@ namespace PC.Component.Software.OS
             // This matches Windows desktop icon layout
             int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
             int maxRows = Mathf.Max(1, Mathf.FloorToInt((originY - maxY) / gridStepY) + 1);
+            
+            Debug.Log($"[FindFreeSpawn] Grid: {maxCols} cols x {maxRows} rows, parentRT: {pw}x{ph}, occupied: {occupied.Count} cells");
             
             // Column-major order: fill first column top-to-bottom, then next column
             for (int col = 0; col < maxCols; col++)
