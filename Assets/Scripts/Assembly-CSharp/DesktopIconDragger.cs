@@ -42,6 +42,7 @@ namespace PC.Component.Software
         }
 
         private Vector2 lastParentSize;
+        private bool parentSizeInitialized = false;
         
         private void Update()
         {
@@ -51,25 +52,20 @@ namespace PC.Component.Software
                 return;
             }
 
-            // Check if parent size changed (resize)
-            if (parentRect.rect.size != lastParentSize && lastParentSize != Vector2.zero)
+            // Track parent size changes but do NOT auto-snap or move icons.
+            // Icon positions are saved in anchoredPosition relative to parentRect,
+            // so they remain stable when parent size changes (e.g. entering/exiting monitor).
+            if (!parentSizeInitialized)
             {
                 lastParentSize = parentRect.rect.size;
-                
-                // Re-snap to grid within new bounds, checking collisions
-                if (!isDragging && !pointerDownReceived)
-                {
-                    Vector2 pos = SnapToGrid(rectTransform.anchoredPosition, true);
-                    rectTransform.anchoredPosition = pos;
-                    
-                    var os = GetComponentInParent<OS.OperatingSystem>();
-                    if (os != null)
-                        os.SaveIconPosition(GetIconKey(), pos);
-                }
+                parentSizeInitialized = true;
             }
-            else if (lastParentSize == Vector2.zero)
+            else if (parentRect.rect.size != lastParentSize)
             {
                 lastParentSize = parentRect.rect.size;
+                // Do NOT re-snap icons on resize — keep saved positions intact.
+                // Only re-clamp if an icon would be completely outside the parent bounds.
+                ClampIfOutOfBounds();
             }
 
             if (!pointerDownReceived) return;
@@ -109,6 +105,35 @@ namespace PC.Component.Software
             }
         }
 
+        /// <summary>
+        /// Only clamp the icon position if it would be completely outside the parent bounds.
+        /// Does NOT snap to grid or check collisions — just ensures the icon stays visible.
+        /// </summary>
+        private void ClampIfOutOfBounds()
+        {
+            if (parentRect == null || rectTransform == null) return;
+            
+            float pw = parentRect.rect.width;
+            float ph = parentRect.rect.height;
+            
+            float minX = -pw / 2f + padding + cellWidth / 2f;
+            float maxX = pw / 2f - padding - cellWidth / 2f;
+            float minY = -ph / 2f + bottomPadding + cellHeight / 2f;
+            float maxY = ph / 2f - padding - cellHeight / 2f;
+            
+            var pos = rectTransform.anchoredPosition;
+            
+            // Only clamp if completely outside bounds
+            bool needsClamp = false;
+            if (pos.x < minX - cellWidth) { pos.x = minX; needsClamp = true; }
+            if (pos.x > maxX + cellWidth) { pos.x = maxX; needsClamp = true; }
+            if (pos.y < minY - cellHeight) { pos.y = minY; needsClamp = true; }
+            if (pos.y > maxY + cellHeight) { pos.y = maxY; needsClamp = true; }
+            
+            if (needsClamp)
+                rectTransform.anchoredPosition = pos;
+        }
+
         public void OnPointerDown(PointerEventData eventData)
         {
             if (rectTransform == null || parentRect == null || eventData == null) return;
@@ -137,6 +162,9 @@ namespace PC.Component.Software
             IsDragging = false;
         }
         
+        /// <summary>
+        /// Snap position to the nearest grid cell. Uses parentRect (iconParent) coordinates.
+        /// </summary>
         public Vector2 SnapToGrid(Vector2 pos, bool avoidCollisions = false)
         {
             if (parentRect == null) return pos;

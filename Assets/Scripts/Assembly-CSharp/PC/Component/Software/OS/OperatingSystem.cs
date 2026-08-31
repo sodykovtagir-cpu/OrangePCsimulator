@@ -862,6 +862,11 @@ namespace PC.Component.Software.OS
         }
 
 
+        private string GetIconPositionsKey()
+        {
+            return "icon_positions_" + SystemId.ToString("X8");
+        }
+
         public void SaveIconPosition(string key, Vector2 position)
         {
             if (string.IsNullOrEmpty(key)) return;
@@ -872,16 +877,18 @@ namespace PC.Component.Software.OS
             foreach (var kvp in iconPositions)
             {
                 if (sb.Length > 0) sb.Append(";");
-                sb.Append(kvp.Key).Append(",").Append(kvp.Value.x).Append(",").Append(kvp.Value.y);
+                sb.Append(kvp.Key).Append(",")
+                  .Append(kvp.Value.x.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",")
+                  .Append(kvp.Value.y.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
-            PlayerPrefs.SetString("icon_positions", sb.ToString());
+            PlayerPrefs.SetString(GetIconPositionsKey(), sb.ToString());
         }
 
         private void LoadIconPositions()
         {
             if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
 
-            var data = PlayerPrefs.GetString("icon_positions", "");
+            var data = PlayerPrefs.GetString(GetIconPositionsKey(), "");
             if (string.IsNullOrEmpty(data)) return;
 
             var entries = data.Split(';');
@@ -892,7 +899,8 @@ namespace PC.Component.Software.OS
                 if (parts.Length == 3)
                 {
                     float x, y;
-                    if (float.TryParse(parts[1], out x) && float.TryParse(parts[2], out y))
+                    if (float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x) &&
+                        float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y))
                         iconPositions[parts[0]] = new Vector2(x, y);
                 }
             }
@@ -930,93 +938,43 @@ namespace PC.Component.Software.OS
             var parentRT = iconParent.GetComponent<RectTransform>();
             if (parentRT == null) return Vector2.zero;
             
-            // Get canvas size
-            var canvas = iconParent.GetComponentInParent<Canvas>();
-            float pw, ph;
-            if (canvas != null && canvas.pixelRect.width > 100 && canvas.pixelRect.height > 100)
-            {
-                pw = canvas.pixelRect.width;
-                ph = canvas.pixelRect.height;
-            }
-            else
-            {
-                // Fallback to screen size
-                pw = Screen.width;
-                ph = Screen.height;
-            }
+            // Use parentRT (iconParent) rect size, NOT canvas.pixelRect.
+            // Icons are positioned relative to iconParent, so we must use its dimensions.
+            float pw = parentRT.rect.width;
+            float ph = parentRT.rect.height;
             
-            Debug.Log($"[FindFreeSpawn] Canvas: {canvas?.name}, pixelRect: {canvas?.pixelRect}, Screen: {Screen.width}x{Screen.height}, Using: {pw}x{ph}");
+            // If parent rect is not yet initialized, wait and return zero
+            if (pw < 100 || ph < 100)
+            {
+                Debug.LogWarning($"[FindFreeSpawn] parentRT not ready: {pw}x{ph}");
+                return Vector2.zero;
+            }
             
             float originX = -pw / 2f + padding + cellWidth / 2f;
             float originY = ph / 2f - padding - cellHeight / 2f;
             float maxX = pw / 2f - padding - cellWidth / 2f;
             float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
             
-            // Get all icons and sort them: apps first (alphabetical), then files/folders (alphabetical)
-            var allIcons = new List<KeyValuePair<string, FileIcon>>();
+            // Get occupied cells from existing icons
+            var occupied = new HashSet<Vector2Int>();
             foreach (var kvp in fileIcons)
             {
-                if (kvp.Value != null)
-                    allIcons.Add(kvp);
-            }
-            
-            allIcons.Sort((a, b) => {
-                bool aIsApp = a.Key.EndsWith(".exe");
-                bool bIsApp = b.Key.EndsWith(".exe");
-                
-                if (aIsApp && !bIsApp) return -1;
-                if (!aIsApp && bIsApp) return 1;
-                
-                return string.Compare(a.Key, b.Key, System.StringComparison.OrdinalIgnoreCase);
-            });
-            
-            // Get occupied cells
-            var occupied = new HashSet<Vector2Int>();
-            foreach (var kvp in allIcons)
-            {
+                if (kvp.Value == null) continue;
                 var rt = kvp.Value.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
-                    int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
-                    occupied.Add(new Vector2Int(col, row));
-                }
+                if (rt == null) continue;
+                
+                int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
+                int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
+                occupied.Add(new Vector2Int(col, row));
             }
             
-            // If this is a new icon, calculate its position based on sorted order
-            if (fileName != null)
-            {
-                int newIndex = 0;
-                for (int i = 0; i < allIcons.Count; i++)
-                {
-                    if (string.Compare(allIcons[i].Key, fileName, System.StringComparison.OrdinalIgnoreCase) >= 0)
-                        break;
-                    newIndex++;
-                }
-                
-                int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
-                int row = newIndex / maxCols;
-                int col = newIndex % maxCols;
-                
-                
-                float x = originX + col * gridStepX;
-                float y = originY - row * gridStepY;
-                
-                // Clamp to bounds
-                x = Mathf.Clamp(x, originX, maxX);
-                y = Mathf.Clamp(y, maxY, originY);
-                
-                
-                return new Vector2(x, y);
-            }
-            
-            // Fallback: find first free cell
-            int maxCols2 = Mathf.FloorToInt((maxX - originX) / gridStepX) + 1;
-            int maxRows = Mathf.FloorToInt((originY - maxY) / gridStepY) + 1;
+            // Find first free cell in grid order (top-left to bottom-right)
+            int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
+            int maxRows = Mathf.Max(1, Mathf.FloorToInt((originY - maxY) / gridStepY) + 1);
             
             for (int row = 0; row < maxRows; row++)
             {
-                for (int col = 0; col < maxCols2; col++)
+                for (int col = 0; col < maxCols; col++)
                 {
                     if (!occupied.Contains(new Vector2Int(col, row)))
                     {
@@ -1027,6 +985,7 @@ namespace PC.Component.Software.OS
                 }
             }
             
+            // Fallback: return origin if all cells are occupied
             return new Vector2(originX, originY);
         }
 
