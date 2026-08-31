@@ -668,11 +668,14 @@ namespace PC.Component.Software.OS
             // Restore saved position or find free spawn position
             if (iconPositions != null && iconPositions.ContainsKey(key))
             {
+                Debug.Log($"[AddFileIcon] '{key}' => RESTORED position: {iconPositions[key]}");
                 iconInstance.SetPosition(iconPositions[key]);
             }
             else
             {
-                iconInstance.SetPosition(FindFreeSpawnPosition(key));
+                var pos = FindFreeSpawnPosition(key);
+                Debug.Log($"[AddFileIcon] '{key}' => NEW position: {pos}");
+                iconInstance.SetPosition(pos);
             }
         }
 
@@ -1010,6 +1013,22 @@ namespace PC.Component.Software.OS
             
             // Fallback: return origin if all cells are occupied
             return new Vector2(originX, originY);
+        }
+
+        /// <summary>
+        /// Reset all icon positions and re-arrange them in grid order (left-to-right, top-to-bottom).
+        /// Clears saved positions from PlayerPrefs.
+        /// </summary>
+        public void AutoArrangeIcons()
+        {
+            if (iconPositions != null)
+                iconPositions.Clear();
+            
+            PlayerPrefs.DeleteKey(GetIconPositionsKey());
+            
+            Debug.Log("[AutoArrangeIcons] Cleared all saved positions, re-arranging...");
+            
+            RefreshDesktopIcon();
         }
 
         public void RefreshDesktopIcon()
