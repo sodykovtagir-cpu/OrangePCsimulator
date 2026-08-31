@@ -987,13 +987,15 @@ namespace PC.Component.Software.OS
                 occupied.Add(new Vector2Int(col, row));
             }
             
-            // Find first free cell in grid order (top-left to bottom-right)
+            // Find first free cell in grid order (top-to-bottom in first column, then next column)
+            // This matches Windows desktop icon layout
             int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
             int maxRows = Mathf.Max(1, Mathf.FloorToInt((originY - maxY) / gridStepY) + 1);
             
-            for (int row = 0; row < maxRows; row++)
+            // Column-major order: fill first column top-to-bottom, then next column
+            for (int col = 0; col < maxCols; col++)
             {
-                for (int col = 0; col < maxCols; col++)
+                for (int row = 0; row < maxRows; row++)
                 {
                     if (!occupied.Contains(new Vector2Int(col, row)))
                     {
