@@ -74,13 +74,13 @@ namespace PC.Component.Software
             menuRect = menuPanel.GetComponent<RectTransform>();
             
             // Build menu items
-            AddMenuItemWithSubmenu(menuPanel, "Упорядочить по", new[] {
+            AddMenuItemWithSubmenu(menuPanel, "Упорядочить по", new (string, System.Action)[] {
                 ("По названию", () => SortIcons(SortMode.Name)),
                 ("По размеру", () => SortIcons(SortMode.Size)),
                 ("По типу", () => SortIcons(SortMode.Type))
             });
             
-            AddMenuItemWithSubmenu(menuPanel, "Создать", new[] {
+            AddMenuItemWithSubmenu(menuPanel, "Создать", new (string, System.Action)[] {
                 ("Текстовый документ", () => CreateFile("Новый документ.txt", "")),
                 ("Папку", () => CreateFolder("Новая папка")),
                 ("Lua-файл", () => CreateFile("script.lua", "-- Lua script\n"))
