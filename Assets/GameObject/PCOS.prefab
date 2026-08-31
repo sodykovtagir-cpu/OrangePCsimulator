@@ -1703,6 +1703,7 @@ GameObject:
   - component: {fileID: 222751043893465562}
   - component: {fileID: 225509922223633548}
   - component: {fileID: 114072440786311434}
+  - component: {fileID: 2643816232795382202}
   m_Layer: 5
   m_Name: Desktop
   m_TagString: Untagged
@@ -1777,6 +1778,20 @@ MonoBehaviour:
       m_Calls: []
   sprite: {fileID: 21300000, guid: aaadb93e88cb19848bdfb09ba7ab925a, type: 2}
   reverse: 0
+--- !u!114 &2643816232795382202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1279525031515029}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd788822c11c8bb42bc2c03e33e3eaf5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  operatingSystem: {fileID: 114115383987692694}
+  canvas: {fileID: 0}
 --- !u!1 &1283446886331299
 GameObject:
   m_ObjectHideFlags: 0
