@@ -28,13 +28,33 @@ namespace PC.Component.Software
                 canvas = GetComponentInParent<Canvas>();
             if (operatingSystem == null)
                 operatingSystem = GetComponentInParent<OperatingSystem>();
+            
+            if (operatingSystem == null)
+                operatingSystem = FindObjectOfType<OperatingSystem>();
+            
+            if (canvas == null)
+            {
+                var canvases = FindObjectsOfType<Canvas>();
+                foreach (var c in canvases)
+                {
+                    if (c.GetComponent<OperatingSystem>() != null || c.GetComponentInChildren<OperatingSystem>() != null)
+                    {
+                        canvas = c;
+                        break;
+                    }
+                }
+                if (canvas == null && canvases.Length > 0)
+                    canvas = canvases[0];
+            }
+            
+            Debug.Log($"[DesktopContextMenu] Awake: canvas={canvas?.name ?? "NULL"}, OS={operatingSystem?.name ?? "NULL"}");
         }
         
         private void Update()
         {
-            // Right-click on PC
             if (Input.GetMouseButtonDown(1))
             {
+                Debug.Log("[DesktopContextMenu] Right-click detected");
                 ShowMenu(Input.mousePosition);
             }
             
@@ -68,7 +88,18 @@ namespace PC.Component.Software
         {
             CloseMenu();
             
-            if (canvas == null || operatingSystem == null) return;
+            if (canvas == null)
+            {
+                Debug.LogError("[DesktopContextMenu] Cannot show menu: canvas is null!");
+                return;
+            }
+            if (operatingSystem == null)
+            {
+                Debug.LogError("[DesktopContextMenu] Cannot show menu: operatingSystem is null!");
+                return;
+            }
+            
+            Debug.Log($"[DesktopContextMenu] Creating menu at {screenPos}, canvas={canvas.name}");
             
             menuPanel = CreateMenuPanel(screenPos, false);
             menuRect = menuPanel.GetComponent<RectTransform>();
