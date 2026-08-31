@@ -23,7 +23,7 @@ namespace PC.Component.Software
         [SerializeField] private float cellHeight = 70f;
         [SerializeField] private float spacingX = 20f;
         [SerializeField] private float spacingY = 20f;
-        [SerializeField] private float padding = 20f;
+        [SerializeField] private float padding = 10f;
         [SerializeField] private float bottomPadding = 60f;
 
         private float gridStepX => cellWidth + spacingX;

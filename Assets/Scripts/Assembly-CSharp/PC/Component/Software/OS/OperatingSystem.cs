@@ -943,7 +943,7 @@ namespace PC.Component.Software.OS
         {
             if (iconParent == null) return Vector2.zero;
             
-            float padding = 20f;
+            float padding = 10f;
             float cellWidth = 70f;
             float cellHeight = 70f;
             float spacingX = 20f;
