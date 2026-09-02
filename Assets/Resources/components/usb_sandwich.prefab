@@ -1,0 +1,185 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1709254077376921
+GameObject:
+  serializedVersion: 6
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Component:
+  - component: {fileID: 4730242686860875}
+  - component: {fileID: 33724804207875695}
+  - component: {fileID: 23618682377417806}
+  - component: {fileID: 114703437598541787}
+  - component: {fileID: 114884547391421755}
+  - component: {fileID: 65099118695303065}
+  - component: {fileID: 54243736805655561}
+  m_Layer: 0
+  m_Name: usb_sandwich
+  m_TagString: USB
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4730242686860875
+Transform:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.98, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -0, z: 0}
+--- !u!33 &33724804207875695
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Mesh: {fileID: 4300000, guid: 142d9c940dbfaa148af614b56e910a8a, type: 2}
+--- !u!23 &23618682377417806
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a0284a4d39fafab46a06a029739bd25e, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 0
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &114703437598541787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  spawnId: usb_sandwich
+  info: '{Flash Drive}'
+  match: 0
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+  capacity: 32000
+  score: 200
+  wattage: 0
+  health: 100
+  breakable: 0
+  uptime: 0
+  storageName: Flash Drive
+  password:
+  files:
+  - path: sandwich.txt
+    content: "hey guys im stuck in pc sim someone let me out please AAAAAAAA\nanyways sandwich approved\n\n\nSandwich Sandwiche Sandwichs Sandwicheth the III"
+    hidden: 0
+    size: 0
+  - path: sandwich.pic
+    content: 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
+    hidden: 0
+    size: 0
+--- !u!114 &114884547391421755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc93f6f4b31c061aeb792dd60e2c2e50, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  attachedCenter: {x: -0.001378357, y: 0.0007353723, z: -0.2564958}
+  attachedSize: {x: 0.7436104, y: 0.3089775, z: 0.530143}
+--- !u!65 &65099118695303065
+BoxCollider:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  m_Size: {x: 0.7436104, y: 0.30897754, z: 0.97406363}
+  m_Center: {x: -0.0013783723, y: 0.00073537976, z: -0.034535483}
+--- !u!54 &54243736805655561
+Rigidbody:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Mass: 0.8
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0

@@ -16,6 +16,7 @@ MonoBehaviour:
   - pageName: Accessory
     item:
     - {fileID: 11400000, guid: 1166012459d3c0540b81b6f89e10ac1d, type: 2}
+    - {fileID: 11400000, guid: 0a6f558889b54ff9baea594fc2761e2f, type: 2}
     - {fileID: 11400000, guid: c61dbee05a8cb7244ac0af15c709fad9, type: 2}
     - {fileID: 11400000, guid: 0c8ac4837b5219b4ea62f5322974b990, type: 2}
   - pageName: Processor
@@ -119,6 +120,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0eac233bf1d382848a6ceff452d6d03d, type: 2}
     - {fileID: 11400000, guid: 732f1c5e168c7e84eb8d00b6de9a5c83, type: 2}
     - {fileID: 11400000, guid: abd1e47e0fd62da4fa2cdd80999d3ad6, type: 2}
+    - {fileID: 11400000, guid: 445fd1cac384431fb0deeb2926dc2872, type: 2}
     - {fileID: 11400000, guid: 0e8a1a9fe856d674b9b96e93ece489b7, type: 2}
     - {fileID: 11400000, guid: c80b8ea82d3201c4e855b9e17744ebd8, type: 2}
   - pageName: Case
