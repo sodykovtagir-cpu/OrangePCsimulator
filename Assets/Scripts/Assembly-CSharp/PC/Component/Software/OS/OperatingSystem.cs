@@ -658,17 +658,7 @@ namespace PC.Component.Software.OS
             {
                 if (f.isFolder)
                 {
-                    if (IsAppInstalled("File Manager", out var prefab))
-                    {
-                        LaunchApp(prefab, "");
-
-                        var existing = GetRunningApp(prefab.AppName);
-                        var fm = existing as PC.Component.Software.FileManager;
-                        if (fm != null)
-                            fm.OpenFolderFromPath(f.path);
-
-                        FocusApp(true);
-                    }
+                    OpenFolder(f);
                     return;
                 }
 
@@ -716,21 +706,18 @@ namespace PC.Component.Software.OS
             }
 
             var ext = File.Extension(fileName);
-            if (installedApps == null || appPrefabs == null) return unknownFileSprite;
+            if (appPrefabs == null) return unknownFileSprite;
 
-            for (int i = 0; i < installedApps.Count; i++)
+            if (ext == ".exe")
             {
-                var appName = installedApps[i];
-                if (!appPrefabs.TryGetValue(appName, out var app) || app == null) continue;
-
-                if (ext == ".exe")
-                {
-                    var name = File.NameWithoutExtension(fileName);
-                    if (string.Equals(name, app.AppName)) return app.Icon;
-                }
-
-                if (!string.IsNullOrEmpty(ext) && string.Equals(app.FileName, ext)) return app.FileIcon;
+                var name = File.NameWithoutExtension(fileName);
+                if (!string.IsNullOrEmpty(name) && appPrefabs.TryGetValue(name, out var exeApp) && exeApp != null)
+                    return exeApp.Icon;
             }
+
+            var associated = FindAppForExtension(ext);
+            if (associated != null && associated.FileIcon != null)
+                return associated.FileIcon;
 
             return unknownFileSprite;
         }
@@ -791,37 +778,87 @@ namespace PC.Component.Software.OS
 
         public bool OpenFile(File file)
         {
-            if (file == null || appPrefabs == null) return false;
+            if (file == null) return false;
+
+            if (file.isFolder)
+                return OpenFolder(file);
+
             if (LuaAppPackage.IsPackage(file.content))
                 return LaunchLuaApp(file.content);
 
-            if (installedApps == null) return false;
             var ext = file.Extension();
+            App prefab = null;
 
-            for (int i = 0; i < installedApps.Count; i++)
+            if (ext == ".exe")
             {
-                var appName = installedApps[i];
-                if (!appPrefabs.TryGetValue(appName, out var prefab) || prefab == null) continue;
-
-                var match = false;
-
-                if (ext == ".exe")
-                {
-                    var name = file.NameWithoutExtension();
-                    if (string.Equals(name, prefab.AppName)) match = true;
-                }
-                else if (!string.IsNullOrEmpty(ext))
-                {
-                    match = prefab.FileName == ext;
-                }
-
-                if (!match) continue;
-
-                LaunchApp(prefab, file.content);
-                return true;
+                var name = file.NameWithoutExtension();
+                if (!string.IsNullOrEmpty(name) && appPrefabs != null)
+                    appPrefabs.TryGetValue(name, out prefab);
+            }
+            else
+            {
+                prefab = FindAppForExtension(ext);
             }
 
-            return false;
+            if (prefab == null)
+            {
+                ShowMessageBox(file.path, "No application is associated with this file.");
+                return false;
+            }
+
+            LaunchApp(prefab, file.content ?? "");
+            return true;
+        }
+
+        private bool OpenFolder(File folder)
+        {
+            if (folder == null || !folder.isFolder) return false;
+
+            App prefab = null;
+            if (!IsAppInstalled("File Manager", out prefab) || prefab == null)
+            {
+                if (appPrefabs == null || !appPrefabs.TryGetValue("File Manager", out prefab) || prefab == null)
+                {
+                    ShowMessageBox(folder.path, "File Manager is not available.");
+                    return false;
+                }
+            }
+
+            LaunchApp(prefab, "");
+
+            var existing = GetRunningApp(prefab.AppName);
+            var fm = existing as PC.Component.Software.FileManager;
+            if (fm != null)
+                fm.OpenFolderFromPath(folder.path);
+
+            FocusApp(true);
+            return true;
+        }
+
+        private App FindAppForExtension(string ext)
+        {
+            if (string.IsNullOrEmpty(ext) || appPrefabs == null) return null;
+
+            if (installedApps != null)
+            {
+                for (int i = 0; i < installedApps.Count; i++)
+                {
+                    if (!appPrefabs.TryGetValue(installedApps[i], out var installed) || installed == null)
+                        continue;
+                    if (string.Equals(installed.FileName, ext, StringComparison.OrdinalIgnoreCase))
+                        return installed;
+                }
+            }
+
+            foreach (var kvp in appPrefabs)
+            {
+                var app = kvp.Value;
+                if (app == null) continue;
+                if (string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase))
+                    return app;
+            }
+
+            return null;
         }
 
         public void ShowMenuBar(App app)
@@ -1379,19 +1416,20 @@ namespace PC.Component.Software.OS
         /// </summary>
         public void CreateDesktopFile(string name, string content)
         {
-            if (FileManager == null) return;
-            
-            string finalName = name;
-            int counter = 1;
-            while (FileManager.Exists(0, finalName))
+            if (FileManager == null || string.IsNullOrEmpty(name)) return;
+
+            string finalName = UniqueDesktopName(name);
+            var body = content ?? "";
+            var created = FileManager.Write(0, finalName, body);
+            if (created == null)
             {
-                var ext = File.Extension(name);
-                var baseName = File.NameWithoutExtension(name);
-                finalName = $"{baseName} ({counter}){ext}";
-                counter++;
+                ShowMessageBox(name, "Could not create the file.");
+                return;
             }
-            
-            FileManager.Write(0, finalName, content ?? "");
+
+            created.hidden = false;
+            created.isFolder = false;
+            created.size = body.Length;
             RefreshDesktopIcon();
         }
 
@@ -1400,19 +1438,37 @@ namespace PC.Component.Software.OS
         /// </summary>
         public void CreateDesktopFolder(string name)
         {
-            if (FileManager == null) return;
-            
+            if (FileManager == null || string.IsNullOrEmpty(name)) return;
+
+            string finalName = UniqueDesktopName(name);
+            var folder = File.MakeFolder(finalName);
+            if (!FileManager.Create(0, folder))
+            {
+                ShowMessageBox(name, "Could not create the folder.");
+                return;
+            }
+
+            RefreshDesktopIcon();
+        }
+
+        private string UniqueDesktopName(string name)
+        {
             string finalName = name;
             int counter = 1;
-            while (FileManager.Exists(0, finalName))
+            var ext = File.Extension(name);
+            var baseName = File.NameWithoutExtension(name);
+            if (string.IsNullOrEmpty(baseName))
+                baseName = name;
+
+            while (FileManager != null && FileManager.Exists(0, finalName))
             {
-                finalName = $"{name} ({counter})";
+                finalName = string.IsNullOrEmpty(ext)
+                    ? string.Format("{0} ({1})", baseName, counter)
+                    : string.Format("{0} ({1}){2}", baseName, counter, ext);
                 counter++;
             }
-            
-            var folder = new File(finalName, "", true, 0);
-            FileManager.Create(0, folder);
-            RefreshDesktopIcon();
+
+            return finalName;
         }
 
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
@@ -1453,7 +1509,8 @@ namespace PC.Component.Software.OS
             {
                 var f = files[i];
                 if (f == null) continue;
-                if (f.path.Contains("/")) continue;
+                if (f.hidden) continue;
+                if (string.IsNullOrEmpty(f.path) || f.path.Contains("/")) continue;
                 if (f.isFolder && f.path == "System") continue;
                 desktopFiles.Add(f);
             }
@@ -1805,8 +1862,7 @@ namespace PC.Component.Software.OS
                 if (existing != null)
                 {
                     existing.transform.SetAsLastSibling();
-                    if (!string.IsNullOrEmpty(content))
-                        existing.Open(content);
+                    existing.Open(content ?? "");
                     FocusApp(true);
                     return;
                 }

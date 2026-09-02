@@ -28,10 +28,17 @@ namespace PC.Component.Software
 		public File(string path, string content = "", bool hidden = false, int size = 0)
         {
 			this.path = path;
-			this.content = content;
+			this.content = content ?? "";
 			this.hidden = hidden;
 			this.size = size;
         }
+
+		public static File MakeFolder(string path)
+		{
+			var file = new File(path, "", false, 0);
+			file.isFolder = true;
+			return file;
+		}
 
 		public string NameWithoutExtension()
 		{

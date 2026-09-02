@@ -667,7 +667,12 @@ namespace PC.Component.Software
 
         public void OpenFolderFromPath(string path)
         {
-            startFolderPath = path;
+            startFolderPath = path ?? "";
+            if (selectedStorage == null) return;
+
+            currentFolder = startFolderPath;
+            UpdatePathText();
+            RefreshItem();
         }
 
         public override void Close()
