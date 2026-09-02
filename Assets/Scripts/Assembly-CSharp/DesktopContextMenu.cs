@@ -151,7 +151,6 @@ namespace PC.Component.Software
             if (results.Count == 0)
                 return false;
 
-            bool sawDesktop = false;
             for (int i = 0; i < results.Count; i++)
             {
                 var go = results[i].gameObject;
@@ -167,26 +166,27 @@ namespace PC.Component.Software
                 if (go.GetComponentInParent<FileManager>() != null)
                     return false;
 
+                if (go.transform == transform || go.transform.IsChildOf(transform))
+                    return true;
+
+                if (operatingSystem != null && operatingSystem.IsDesktopContextTarget(go))
+                    return true;
+
                 if (go.GetComponentInParent<App>() != null)
                     return false;
 
                 if (operatingSystem != null && operatingSystem.BlocksDesktopMenu(go))
                     return false;
 
-                if (go.transform == transform || go.transform.IsChildOf(transform))
-                    sawDesktop = true;
-                else if (operatingSystem != null && operatingSystem.IsDesktopContextTarget(go))
-                    sawDesktop = true;
+                if (operatingSystem != null && go.transform.IsChildOf(operatingSystem.transform))
+                    return false;
             }
 
-            return sawDesktop;
+            return false;
         }
 
         private void OpenContextAt(Vector2 screenPos)
         {
-            if (Time.unscaledTime - lastMenuTime < 0.05f)
-                return;
-
             if (IsPointerOverMenu(screenPos))
                 return;
 
@@ -231,13 +231,9 @@ namespace PC.Component.Software
             if (menuPanel != null || renamePanel != null)
             {
                 if (Input.GetKeyDown(KeyCode.Escape))
-                {
                     CloseMenu();
-                }
-                else if (PointerInput.PressedThisFrame() && !IsPointerOverMenu(PointerInput.ScreenPosition()))
-                {
+                else if (Input.GetMouseButtonDown(0) && !IsPointerOverMenu(Input.mousePosition))
                     CloseMenu();
-                }
             }
 
             if (Input.GetMouseButtonDown(1))
@@ -246,33 +242,25 @@ namespace PC.Component.Software
                 return;
             }
 
-            if (PointerInput.PressedThisFrame())
-            {
-                pointerDownTime = Time.unscaledTime;
-                pointerDownPos = PointerInput.ScreenPosition();
-                isPointerDown = true;
-            }
-
-            if (!PointerInput.Held())
-                isPointerDown = false;
-
             if (isPointerDown && Time.unscaledTime - pointerDownTime > longPressDuration)
             {
-                if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
+                if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold)
                 {
                     isPointerDown = false;
                     PointerInput.ConsumedClick = true;
                     OpenContextAt(pointerDownPos);
-                }
-                else
-                {
-                    isPointerDown = false;
                 }
             }
         }
 
         public void OnPointerDown(PointerEventData eventData)
         {
+            if (!PointerInput.IsPrimary(eventData))
+                return;
+
+            pointerDownTime = Time.unscaledTime;
+            pointerDownPos = eventData.position;
+            isPointerDown = true;
         }
 
         public void OnPointerUp(PointerEventData eventData)

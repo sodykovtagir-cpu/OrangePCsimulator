@@ -101,7 +101,6 @@ namespace PC.Component.Software
         {
 			this.system = system;
 			var window = transform as RectTransform;
-			WindowChrome.Apply(window);
 			if (isActiveAndEnabled)
 				StartCoroutine(WindowChrome.PlayOpen(window));
         }
