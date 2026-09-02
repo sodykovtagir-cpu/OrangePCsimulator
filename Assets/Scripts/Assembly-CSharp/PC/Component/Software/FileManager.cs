@@ -163,8 +163,11 @@ namespace PC.Component.Software
             if (!Input.GetMouseButtonDown(1))
                 return;
 
-            if (IsPointerOverEmptyPane(Input.mousePosition) && DesktopContextMenu.Instance != null)
-                DesktopContextMenu.Instance.ShowExplorerMenu(this, Input.mousePosition);
+            if (IsPointerOverEmptyPane(Input.mousePosition))
+            {
+                var menu = DesktopContextMenu.For(this);
+                if (menu != null) menu.ShowExplorerMenu(this, Input.mousePosition);
+            }
         }
 
         private bool IsPointerOverEmptyPane(Vector2 screenPos)
@@ -183,6 +186,8 @@ namespace PC.Component.Software
             {
                 var go = results[i].gameObject;
                 if (go == null) continue;
+                var hitOs = go.GetComponentInParent<PC.Component.Software.OS.OperatingSystem>();
+                if (hitOs != null && hitOs != system) continue;
                 if (go.transform == fileParent)
                     overParent = true;
                 else if (go.transform.IsChildOf(fileParent))
@@ -633,8 +638,9 @@ namespace PC.Component.Software
 
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
-            if (DesktopContextMenu.Instance != null)
-                DesktopContextMenu.Instance.ShowExplorerMenu(explorer, pointerDownPos);
+            var menu = DesktopContextMenu.For(explorer != null ? (Component)explorer : this);
+            if (menu != null)
+                menu.ShowExplorerMenu(explorer, pointerDownPos);
         }
     }
 
@@ -676,8 +682,9 @@ namespace PC.Component.Software
             if (eventData == null || file == null) return;
             if (eventData.button != PointerEventData.InputButton.Right) return;
             openedMenu = true;
-            if (DesktopContextMenu.Instance != null)
-                DesktopContextMenu.Instance.ShowFileMenu(file, eventData.position);
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null)
+                menu.ShowFileMenu(file, eventData.position);
         }
 
         private void Update()
@@ -689,8 +696,9 @@ namespace PC.Component.Software
             openedMenu = true;
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
-            if (DesktopContextMenu.Instance != null)
-                DesktopContextMenu.Instance.ShowFileMenu(file, pointerDownPos);
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null)
+                menu.ShowFileMenu(file, pointerDownPos);
         }
     }
 }

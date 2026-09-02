@@ -13,6 +13,28 @@ namespace PC.Component.Software
         [SerializeField] private OperatingSystem operatingSystem;
         [SerializeField] private Canvas canvas;
 
+        public static DesktopContextMenu For(Component c)
+        {
+            if (c == null) return null;
+
+            var os = c.GetComponentInParent<OperatingSystem>();
+            if (os != null)
+            {
+                var menus = os.GetComponentsInChildren<DesktopContextMenu>(true);
+                if (menus != null)
+                {
+                    for (int i = 0; i < menus.Length; i++)
+                    {
+                        if (menus[i] != null) return menus[i];
+                    }
+                }
+            }
+
+            var local = c.GetComponentInParent<DesktopContextMenu>();
+            if (local != null) return local;
+            return Instance;
+        }
+
         private GameObject menuPanel;
         private GameObject submenuPanel;
         private GameObject renamePanel;
@@ -40,23 +62,10 @@ namespace PC.Component.Software
             if (operatingSystem == null)
                 operatingSystem = GetComponentInParent<OperatingSystem>();
 
-            if (operatingSystem == null)
-                operatingSystem = FindObjectOfType<OperatingSystem>();
-
-            if (canvas == null)
+            if (canvas == null && operatingSystem != null)
             {
-                var canvases = FindObjectsOfType<Canvas>();
-                foreach (var c in canvases)
-                {
-                    if (c.GetComponent<OperatingSystem>() != null || c.GetComponentInChildren<OperatingSystem>() != null)
-                    {
-                        canvas = c;
-                        break;
-                    }
-                }
-
-                if (canvas == null && canvases.Length > 0)
-                    canvas = canvases[0];
+                canvas = operatingSystem.GetComponent<Canvas>();
+                if (canvas == null) canvas = operatingSystem.GetComponentInParent<Canvas>();
             }
 
             canvasRect = canvas != null ? canvas.transform as RectTransform : null;
@@ -130,13 +139,36 @@ namespace PC.Component.Software
             return false;
         }
 
-        private FileIcon FindFileIconAt(Vector2 screenPos)
+        private bool IsForeignOs(GameObject go)
+        {
+            if (go == null || operatingSystem == null) return false;
+            var os = go.GetComponentInParent<OperatingSystem>();
+            return os != null && os != operatingSystem;
+        }
+
+        private bool PointerHitsThisOs(Vector2 screenPos)
         {
             var results = RaycastAt(screenPos);
             for (int i = 0; i < results.Count; i++)
             {
                 var go = results[i].gameObject;
                 if (go == null) continue;
+                if (IsMenuElement(go)) return true;
+                var os = go.GetComponentInParent<OperatingSystem>();
+                if (os != null) return os == operatingSystem;
+                if (canvas != null && (go == canvas.gameObject || go.transform.IsChildOf(canvas.transform)))
+                    return true;
+            }
+            return false;
+        }
+
+        private FileIcon FindFileIconAt(Vector2 screenPos)
+        {
+            var results = RaycastAt(screenPos);
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go == null || IsForeignOs(go)) continue;
                 var icon = go.GetComponentInParent<FileIcon>();
                 if (icon != null && icon.File != null)
                     return icon;
@@ -155,6 +187,9 @@ namespace PC.Component.Software
             {
                 var go = results[i].gameObject;
                 if (go == null)
+                    continue;
+
+                if (IsForeignOs(go))
                     continue;
 
                 if (IsMenuElement(go))
@@ -238,7 +273,8 @@ namespace PC.Component.Software
 
             if (Input.GetMouseButtonDown(1))
             {
-                OpenContextAt(Input.mousePosition);
+                if (PointerHitsThisOs(Input.mousePosition))
+                    OpenContextAt(Input.mousePosition);
                 return;
             }
 
