@@ -302,7 +302,7 @@ namespace PC.Component.Software
 
             var text = textGo.AddComponent<Text>();
             text.text = label;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = 14;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
@@ -348,7 +348,7 @@ namespace PC.Component.Software
 
             var text = textGo.AddComponent<Text>();
             text.text = label;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = 14;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
@@ -364,7 +364,7 @@ namespace PC.Component.Software
 
             var arrowText = arrowGo.AddComponent<Text>();
             arrowText.text = "▶";
-            arrowText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            arrowText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             arrowText.fontSize = 10;
             arrowText.color = Color.black;
             arrowText.alignment = TextAnchor.MiddleCenter;

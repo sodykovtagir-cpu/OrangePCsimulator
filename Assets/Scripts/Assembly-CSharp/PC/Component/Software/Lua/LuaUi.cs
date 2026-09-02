@@ -53,7 +53,7 @@ namespace PC.Component.Software.Lua
 		public LuaUi(RectTransform root, Font font, PcosLua vm)
 		{
 			this.root = root;
-			this.font = font != null ? font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+			this.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 			this.vm = vm;
 			if (root != null)
 			{

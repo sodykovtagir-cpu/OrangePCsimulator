@@ -284,7 +284,7 @@ namespace PC.Component.Software
 			tr.offsetMin = new Vector2(8, 0);
 			tr.offsetMax = new Vector2(-8, 0);
 			var tt = title.GetComponent<Text>();
-			tt.font = titleText != null ? titleText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+			tt.font = titleText != null ? titleText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 			tt.fontSize = 14;
 			tt.color = new Color(0.7f, 1f, 0.7f, 1f);
 			tt.alignment = TextAnchor.MiddleLeft;
