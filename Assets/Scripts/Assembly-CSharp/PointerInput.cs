@@ -5,7 +5,7 @@ namespace PC.Component.Software
 {
     public static class PointerInput
     {
-        public const float Slop = 28f;
+        public const float Slop = 24f;
         public const float LongPress = 0.45f;
 
         public static bool ConsumedClick;
@@ -20,27 +20,11 @@ namespace PC.Component.Software
 
         public static Vector2 ScreenPosition()
         {
+            if (Input.GetMouseButton(0) || Input.GetMouseButtonDown(0) || Input.GetMouseButtonUp(0))
+                return Input.mousePosition;
             if (Input.touchCount > 0)
                 return Input.GetTouch(0).position;
             return Input.mousePosition;
-        }
-
-        public static bool PressedThisFrame()
-        {
-            if (Input.touchCount > 0)
-                return Input.GetTouch(0).phase == TouchPhase.Began;
-            return Input.GetMouseButtonDown(0);
-        }
-
-        public static bool Held()
-        {
-            if (Input.touchCount > 0)
-            {
-                var phase = Input.GetTouch(0).phase;
-                return phase != TouchPhase.Ended && phase != TouchPhase.Canceled;
-            }
-
-            return Input.GetMouseButton(0);
         }
     }
 }
