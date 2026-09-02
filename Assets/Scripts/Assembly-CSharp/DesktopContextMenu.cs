@@ -289,7 +289,8 @@ namespace PC.Component.Software
                 }
             }
 
-            AddMenuItem(menuPanel, "Скопировать", () => operatingSystem.CopyToClipboard(file));
+            if (operatingSystem.CanCopyFile(file))
+                AddMenuItem(menuPanel, "Скопировать", () => operatingSystem.CopyToClipboard(file));
 
             bool protect = operatingSystem.IsProtectedFile(file);
             if (!protect)

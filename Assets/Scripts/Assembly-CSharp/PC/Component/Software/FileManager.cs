@@ -285,8 +285,6 @@ namespace PC.Component.Software
                     text.text = file.isFolder ? "📁 " + displayName : displayName;
                 }
 
-                bool protect = IsProtectedFile(file);
-
                 if (text != null)
                 {
                     if (file.isFolder)
@@ -295,7 +293,7 @@ namespace PC.Component.Software
                     }
                     else
                     {
-                        float v = protect ? 0.5f : 0f;
+                        float v = file.hidden ? 0.5f : 0f;
                         text.color = new Color(v, v, v, 1f);
                     }
                 }
@@ -466,7 +464,7 @@ namespace PC.Component.Software
             bool protect = IsProtectedFile(file);
 
             if (cutButton != null) cutButton.interactable = !protect;
-            if (copyButton != null) copyButton.interactable = !protect;
+            if (copyButton != null) copyButton.interactable = system != null && system.CanCopyFile(file);
             if (renameButton != null) renameButton.interactable = !protect;
             if (deleteButton != null) deleteButton.interactable = !protect;
 
@@ -506,7 +504,7 @@ namespace PC.Component.Software
         public void Copy()
         {
             var file = GetSelectedFile();
-            if (file == null || system == null) return;
+            if (file == null || system == null || !system.CanCopyFile(file)) return;
             system.CopyToClipboard(file);
             UpdatePasteButton();
         }

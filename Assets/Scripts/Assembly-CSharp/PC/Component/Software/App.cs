@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Runtime.CompilerServices;
 using PC.Component.Software.OS;
 using UnityEngine;
@@ -54,6 +55,8 @@ namespace PC.Component.Software
 
 		protected bool canMaximize = true;
 
+		private bool closing;
+
 		protected virtual bool ShowMenuBar => true;
 
 		public virtual bool SingleInstance => true;
@@ -97,6 +100,10 @@ namespace PC.Component.Software
 		public void Init(OS.OperatingSystem system)
         {
 			this.system = system;
+			var window = transform as RectTransform;
+			WindowChrome.Apply(window);
+			if (isActiveAndEnabled)
+				StartCoroutine(WindowChrome.PlayOpen(window));
         }
 
 		public virtual void Open(string content)
@@ -198,6 +205,22 @@ namespace PC.Component.Software
 		}
 
 		public virtual void Close()
+		{
+			if (closing) return;
+			closing = true;
+			if (isActiveAndEnabled)
+				StartCoroutine(CloseAnimated());
+			else
+				FinishClose();
+		}
+
+		private IEnumerator CloseAnimated()
+		{
+			yield return WindowChrome.PlayClose(transform as RectTransform);
+			FinishClose();
+		}
+
+		private void FinishClose()
 		{
 			var obj = gameObject;
 			Destroy(obj);

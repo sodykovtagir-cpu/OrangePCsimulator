@@ -87,6 +87,7 @@ namespace PC.Component.Software.OS
         private bool busy;
         private bool error;
         private bool startMenuOpened;
+        private Coroutine startMenuRoutine;
         private bool running;
         private int storageScore;
         private CoverImage background;
@@ -1508,9 +1509,18 @@ namespace PC.Component.Software.OS
             return false;
         }
 
+        public bool CanCopyFile(File file)
+        {
+            if (file == null || string.IsNullOrEmpty(file.path)) return false;
+            if (file.path == "System" || file.path.StartsWith("System/")) return false;
+            if (file.Extension() == ".exe")
+                return LuaAppPackage.IsPackage(file.content);
+            return true;
+        }
+
         public void CopyToClipboard(File file)
         {
-            if (file == null) return;
+            if (!CanCopyFile(file)) return;
             clipboard = new ClipboardEntry { file = file, cut = false };
         }
 
@@ -1772,6 +1782,9 @@ namespace PC.Component.Software.OS
                 var explorer = runningApps[i] as PC.Component.Software.FileManager;
                 if (explorer != null) explorer.RefreshView();
             }
+
+            if (startMenuOpened)
+                RefreshStartMenu();
         }
 
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
@@ -2032,43 +2045,30 @@ namespace PC.Component.Software.OS
 
         private void ToggleStartMenu()
         {
-#if UNITY_EDITOR
-            UnityEngine.Debug.Log("StartMenu Animator = " + startMenuAnimator);
-            UnityEngine.Debug.Log("Controller = " +
-                (startMenuAnimator != null
-                    ? startMenuAnimator.runtimeAnimatorController
-                    : null));
-#endif
             if (startMenu == null)
                 return;
 
             startMenuOpened = !startMenuOpened;
 
+            if (startMenuAnimator != null)
+                startMenuAnimator.enabled = false;
+
+            if (startMenuRoutine != null)
+                StopCoroutine(startMenuRoutine);
+
+            var menuRt = startMenu.transform as RectTransform;
+
             if (startMenuOpened)
             {
                 startMenu.SetActive(true);
                 startMenu.transform.SetAsLastSibling();
-
-                if (startMenuAnimator != null)
-                    startMenuAnimator.SetBool("Open", true);
-
                 RefreshStartMenu();
+                startMenuRoutine = StartCoroutine(PC.Component.Software.WindowChrome.PlayStartMenu(menuRt, true));
             }
             else
             {
-                if (startMenuAnimator != null)
-                    startMenuAnimator.SetBool("Open", false);
-
-                StartCoroutine(HideStartAfterAnim());
+                startMenuRoutine = StartCoroutine(PC.Component.Software.WindowChrome.PlayStartMenu(menuRt, false));
             }
-        }
-
-        private IEnumerator HideStartAfterAnim()
-        {
-            yield return new WaitForSeconds(0.3f);
-
-            if (!startMenuOpened && startMenu != null)
-                startMenu.SetActive(false);
         }
 
         private void RefreshStartMenu()
@@ -2105,6 +2105,67 @@ namespace PC.Component.Software.OS
                     ToggleStartMenu();
                 });
             }
+
+            var luaApps = ListLuaAppFiles();
+            for (int i = 0; i < luaApps.Count; i++)
+            {
+                var file = luaApps[i];
+                if (file == null || installedAppButtonPrefab == null) continue;
+
+                var pack = LuaAppPackage.Parse(file.content);
+                var btn = Instantiate(installedAppButtonPrefab, installedAppsContainer);
+                if (btn == null) continue;
+
+                Sprite icon = unknownFileSprite;
+                App luaPrefab;
+                if (appPrefabs != null && appPrefabs.TryGetValue("Lua App", out luaPrefab) && luaPrefab != null && luaPrefab.Icon != null)
+                    icon = luaPrefab.Icon;
+                if (pack != null)
+                    icon = pack.MakeIcon(icon);
+
+                if (btn.transform.childCount > 0)
+                {
+                    var img = btn.transform.GetChild(0).GetComponent<Image>();
+                    if (img != null && icon != null)
+                        img.sprite = icon;
+                }
+
+                if (btn.transform.childCount > 1)
+                {
+                    var txt = btn.transform.GetChild(1).GetComponent<Text>();
+                    if (txt != null)
+                        txt.text = pack != null && !string.IsNullOrEmpty(pack.name) ? pack.name : file.NameWithoutExtension();
+                }
+
+                var captured = file;
+                btn.onClick.AddListener(() =>
+                {
+                    OpenFile(captured);
+                    if (startMenuOpened)
+                        ToggleStartMenu();
+                });
+            }
+        }
+
+        private List<File> ListLuaAppFiles()
+        {
+            var result = new List<File>();
+            var all = AllStorage;
+            if (all == null || all.Count == 0 || all[0] == null || all[0].files == null)
+                return result;
+
+            var files = all[0].files;
+            for (int i = 0; i < files.Count; i++)
+            {
+                var f = files[i];
+                if (f == null || f.hidden || f.isFolder) continue;
+                if (string.IsNullOrEmpty(f.path) || f.path == "System" || f.path.StartsWith("System/")) continue;
+                if (f.Extension() != ".exe") continue;
+                if (!LuaAppPackage.IsPackage(f.content)) continue;
+                result.Add(f);
+            }
+
+            return result;
         }
 
         private void RegisterRunningApp(App app)
