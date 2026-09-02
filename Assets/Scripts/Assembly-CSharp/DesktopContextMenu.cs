@@ -8,11 +8,14 @@ namespace PC.Component.Software
 {
     public class DesktopContextMenu : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
+        public static DesktopContextMenu Instance { get; private set; }
+
         [SerializeField] private OperatingSystem operatingSystem;
         [SerializeField] private Canvas canvas;
 
         private GameObject menuPanel;
         private GameObject submenuPanel;
+        private GameObject renamePanel;
         private RectTransform menuRect;
         private RectTransform submenuRect;
         private RectTransform canvasRect;
@@ -23,11 +26,13 @@ namespace PC.Component.Software
 
         private const float longPressDuration = 0.5f;
         private const float pointerMoveThreshold = 10f;
-        private const float menuWidth = 200f;
+        private const float menuWidth = 220f;
         private const float submenuOffset = 5f;
 
         private void Awake()
         {
+            Instance = this;
+
             if (canvas == null)
                 canvas = GetComponentInParent<Canvas>();
 
@@ -54,7 +59,6 @@ namespace PC.Component.Software
             }
 
             canvasRect = canvas != null ? canvas.transform as RectTransform : null;
-            Debug.Log($"[DesktopContextMenu] Awake: canvas={canvas?.name ?? "NULL"}, OS={operatingSystem?.name ?? "NULL"}");
         }
 
         private void OnDisable()
@@ -64,6 +68,8 @@ namespace PC.Component.Software
 
         private void OnDestroy()
         {
+            if (Instance == this)
+                Instance = null;
             CloseMenu();
         }
 
@@ -93,6 +99,8 @@ namespace PC.Component.Software
                 return true;
             if (submenuPanel != null && (go == submenuPanel || go.transform.IsChildOf(submenuPanel.transform)))
                 return true;
+            if (renamePanel != null && (go == renamePanel || go.transform.IsChildOf(renamePanel.transform)))
+                return true;
             return false;
         }
 
@@ -106,6 +114,34 @@ namespace PC.Component.Software
             }
 
             return false;
+        }
+
+        private bool IsOverFileManager(Vector2 screenPos)
+        {
+            var results = RaycastAt(screenPos);
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go != null && go.GetComponentInParent<FileManager>() != null)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private FileIcon FindFileIconAt(Vector2 screenPos)
+        {
+            var results = RaycastAt(screenPos);
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go == null) continue;
+                var icon = go.GetComponentInParent<FileIcon>();
+                if (icon != null && icon.File != null)
+                    return icon;
+            }
+
+            return null;
         }
 
         private bool CanOpenMenuAt(Vector2 screenPos)
@@ -126,6 +162,9 @@ namespace PC.Component.Software
                 if (go.GetComponentInParent<FileIcon>() != null)
                     return false;
 
+                if (go.GetComponentInParent<FileManager>() != null)
+                    return false;
+
                 if (go.transform == transform || go.transform.IsChildOf(transform))
                     return true;
 
@@ -138,7 +177,7 @@ namespace PC.Component.Software
 
         private void Update()
         {
-            if (menuPanel != null)
+            if (menuPanel != null || renamePanel != null)
             {
                 if (Input.GetKeyDown(KeyCode.Escape))
                 {
@@ -152,10 +191,16 @@ namespace PC.Component.Software
 
             if (Input.GetMouseButtonDown(1))
             {
-                Debug.Log("[DesktopContextMenu] Right-click detected");
+                var icon = FindFileIconAt(Input.mousePosition);
+                if (icon != null)
+                {
+                    ShowFileMenu(icon.File, Input.mousePosition);
+                    return;
+                }
+
                 if (CanOpenMenuAt(Input.mousePosition))
-                    ShowMenu(Input.mousePosition);
-                else
+                    ShowDesktopMenu(Input.mousePosition);
+                else if (!IsPointerOverMenu(Input.mousePosition))
                     CloseMenu();
             }
 
@@ -163,7 +208,7 @@ namespace PC.Component.Software
             {
                 if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold && CanOpenMenuAt(pointerDownPos))
                 {
-                    ShowMenu(pointerDownPos);
+                    ShowDesktopMenu(pointerDownPos);
                     isPointerDown = false;
                 }
             }
@@ -190,29 +235,12 @@ namespace PC.Component.Software
             isPointerDown = false;
         }
 
-        private void ShowMenu(Vector2 screenPos)
+        public void ShowDesktopMenu(Vector2 screenPos)
         {
             CloseMenu();
 
-            if (canvas == null)
-            {
-                Debug.LogError("[DesktopContextMenu] Cannot show menu: canvas is null!");
+            if (!PrepareMenu(screenPos, false))
                 return;
-            }
-
-            if (operatingSystem == null)
-            {
-                Debug.LogError("[DesktopContextMenu] Cannot show menu: operatingSystem is null!");
-                return;
-            }
-
-            if (!CanOpenMenuAt(screenPos))
-                return;
-
-            Debug.Log($"[DesktopContextMenu] Creating menu at {screenPos}, canvas={canvas.name}");
-
-            menuPanel = CreateMenuPanel(false);
-            menuRect = menuPanel.GetComponent<RectTransform>();
 
             AddMenuItem(menuPanel, "Автоупорядочить", AutoArrangeIcons);
             AddMenuItemWithSubmenu(menuPanel, "Упорядочить по", new (string, System.Action)[] {
@@ -220,26 +248,111 @@ namespace PC.Component.Software
                 ("По размеру", () => SortIcons(SortMode.Size)),
                 ("По типу", () => SortIcons(SortMode.Type))
             });
-            AddMenuItemWithSubmenu(menuPanel, "Создать", new (string, System.Action)[] {
-                ("Текстовый документ", () => CreateFile("Новый документ.txt", "")),
-                ("Папку", () => CreateFolder("Новая папка")),
-                ("Lua-файл", () => CreateFile("script.lua", "-- Lua script\n"))
-            });
+            AddCreateSubmenu(menuPanel, "");
+            if (operatingSystem != null && operatingSystem.HasClipboard)
+                AddMenuItem(menuPanel, "Вставить", () => operatingSystem.PasteClipboard(""));
             AddMenuItem(menuPanel, "Обновить", RefreshDesktop);
             AddMenuItem(menuPanel, "Персонализация", OpenPersonalization);
 
             PositionMenu(menuRect, screenPos);
         }
 
-        private void CloseMenu()
+        public void ShowFileMenu(File file, Vector2 screenPos)
+        {
+            if (file == null) return;
+            CloseMenu();
+
+            if (!PrepareMenu(screenPos, true))
+                return;
+
+            AddMenuItem(menuPanel, "Открыть", () =>
+            {
+                if (operatingSystem == null) return;
+                operatingSystem.OpenFile(file);
+            });
+
+            if (!file.isFolder)
+            {
+                var apps = operatingSystem.GetOpenWithApps(file);
+                if (apps != null && apps.Count > 0)
+                {
+                    var items = new List<(string, System.Action)>();
+                    for (int i = 0; i < apps.Count; i++)
+                    {
+                        var app = apps[i];
+                        if (app == null) continue;
+                        items.Add((app.AppName, () => operatingSystem.OpenFileWith(file, app)));
+                    }
+
+                    if (items.Count > 0)
+                        AddMenuItemWithSubmenu(menuPanel, "Открыть с помощью", items.ToArray());
+                }
+            }
+
+            AddMenuItem(menuPanel, "Скопировать", () => operatingSystem.CopyToClipboard(file));
+
+            bool protect = operatingSystem.IsProtectedFile(file);
+            if (!protect)
+            {
+                AddMenuItem(menuPanel, "Вырезать", () => operatingSystem.CutToClipboard(file));
+                AddMenuItem(menuPanel, "Переименовать", () => ShowRenameDialog(file, screenPos), false);
+                AddMenuItem(menuPanel, "Скрыть", () => operatingSystem.HideUserFile(file));
+                AddMenuItem(menuPanel, "Удалить", () => operatingSystem.DeleteUserFile(file));
+            }
+
+            PositionMenu(menuRect, screenPos);
+        }
+
+        public void ShowExplorerMenu(FileManager explorer, Vector2 screenPos)
+        {
+            if (explorer == null) return;
+            CloseMenu();
+
+            if (!PrepareMenu(screenPos, true))
+                return;
+
+            string folder = explorer.CurrentFolder ?? "";
+            AddCreateSubmenu(menuPanel, folder);
+            if (operatingSystem != null && operatingSystem.HasClipboard)
+                AddMenuItem(menuPanel, "Вставить", () => operatingSystem.PasteClipboard(folder));
+            AddMenuItem(menuPanel, "Обновить", () => explorer.RefreshView());
+
+            PositionMenu(menuRect, screenPos);
+        }
+
+        private void AddCreateSubmenu(GameObject parent, string folder)
+        {
+            AddMenuItemWithSubmenu(parent, "Создать", new (string, System.Action)[] {
+                ("Текстовый документ", () => operatingSystem.CreateFileAt(folder, "Новый документ.txt", "")),
+                ("Папку", () => operatingSystem.CreateFolderAt(folder, "Новая папка")),
+                ("Lua-файл", () => operatingSystem.CreateFileAt(folder, "script.lua", "-- Lua script\n"))
+            });
+        }
+
+        private bool PrepareMenu(Vector2 screenPos, bool skipDesktopCheck)
+        {
+            if (canvas == null || operatingSystem == null)
+                return false;
+
+            if (!skipDesktopCheck && !CanOpenMenuAt(screenPos))
+                return false;
+
+            menuPanel = CreateMenuPanel(false);
+            menuRect = menuPanel.GetComponent<RectTransform>();
+            return true;
+        }
+
+        public void CloseMenu()
         {
             CancelInvoke(nameof(CloseSubmenuIfNotHovered));
 
             if (menuPanel != null) Destroy(menuPanel);
             if (submenuPanel != null) Destroy(submenuPanel);
+            if (renamePanel != null) Destroy(renamePanel);
 
             menuPanel = null;
             submenuPanel = null;
+            renamePanel = null;
             menuRect = null;
             submenuRect = null;
         }
@@ -277,7 +390,12 @@ namespace PC.Component.Software
             return panel;
         }
 
-        private void AddMenuItem(GameObject parent, string label, System.Action onClick)
+        private Font MenuFont()
+        {
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        private void AddMenuItem(GameObject parent, string label, System.Action onClick, bool closeAfter = true)
         {
             var item = new GameObject("MenuItem");
             item.transform.SetParent(parent.transform, false);
@@ -302,7 +420,7 @@ namespace PC.Component.Software
 
             var text = textGo.AddComponent<Text>();
             text.text = label;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = MenuFont();
             text.fontSize = 14;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
@@ -319,7 +437,8 @@ namespace PC.Component.Software
             button.onClick.AddListener(() =>
             {
                 onClick?.Invoke();
-                CloseMenu();
+                if (closeAfter)
+                    CloseMenu();
             });
         }
 
@@ -348,7 +467,7 @@ namespace PC.Component.Software
 
             var text = textGo.AddComponent<Text>();
             text.text = label;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = MenuFont();
             text.fontSize = 14;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
@@ -364,7 +483,7 @@ namespace PC.Component.Software
 
             var arrowText = arrowGo.AddComponent<Text>();
             arrowText.text = "▶";
-            arrowText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            arrowText.font = MenuFont();
             arrowText.fontSize = 10;
             arrowText.color = Color.black;
             arrowText.alignment = TextAnchor.MiddleCenter;
@@ -420,6 +539,104 @@ namespace PC.Component.Software
             if (submenuPanel != null) Destroy(submenuPanel);
             submenuPanel = null;
             submenuRect = null;
+        }
+
+        private void ShowRenameDialog(File file, Vector2 screenPos)
+        {
+            CloseMenu();
+            if (canvas == null || file == null || operatingSystem == null) return;
+
+            renamePanel = new GameObject("RenameDialog");
+            renamePanel.transform.SetParent(canvas.transform, false);
+            renamePanel.transform.SetAsLastSibling();
+
+            var rt = renamePanel.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0, 1);
+            rt.sizeDelta = new Vector2(240f, 78f);
+
+            var image = renamePanel.AddComponent<Image>();
+            image.color = new Color(0.95f, 0.95f, 0.95f, 0.98f);
+
+            var outline = renamePanel.AddComponent<Outline>();
+            outline.effectColor = new Color(0.3f, 0.3f, 0.3f, 1f);
+            outline.effectDistance = new Vector2(1, -1);
+
+            var titleGo = new GameObject("Title");
+            titleGo.transform.SetParent(renamePanel.transform, false);
+            var titleRt = titleGo.AddComponent<RectTransform>();
+            titleRt.anchorMin = new Vector2(0f, 1f);
+            titleRt.anchorMax = new Vector2(1f, 1f);
+            titleRt.pivot = new Vector2(0.5f, 1f);
+            titleRt.sizeDelta = new Vector2(-16f, 22f);
+            titleRt.anchoredPosition = new Vector2(0f, -6f);
+            var title = titleGo.AddComponent<Text>();
+            title.text = "Переименовать";
+            title.font = MenuFont();
+            title.fontSize = 14;
+            title.color = Color.black;
+            title.alignment = TextAnchor.MiddleLeft;
+
+            var inputGo = new GameObject("Input");
+            inputGo.transform.SetParent(renamePanel.transform, false);
+            var inputRt = inputGo.AddComponent<RectTransform>();
+            inputRt.anchorMin = new Vector2(0f, 0f);
+            inputRt.anchorMax = new Vector2(1f, 0f);
+            inputRt.pivot = new Vector2(0.5f, 0f);
+            inputRt.sizeDelta = new Vector2(-16f, 28f);
+            inputRt.anchoredPosition = new Vector2(0f, 10f);
+            var inputImage = inputGo.AddComponent<Image>();
+            inputImage.color = Color.white;
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(inputGo.transform, false);
+            var textRt = textGo.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = new Vector2(6f, 2f);
+            textRt.offsetMax = new Vector2(-6f, -2f);
+            var text = textGo.AddComponent<Text>();
+            text.font = MenuFont();
+            text.fontSize = 14;
+            text.color = Color.black;
+            text.alignment = TextAnchor.MiddleLeft;
+            text.supportRichText = false;
+
+            var input = inputGo.AddComponent<InputField>();
+            input.textComponent = text;
+            input.lineType = InputField.LineType.SingleLine;
+
+            string display = file.path;
+            int slash = display.LastIndexOf('/');
+            if (slash >= 0) display = display.Substring(slash + 1);
+            if (!file.isFolder)
+            {
+                var ext = File.Extension(display);
+                display = File.NameWithoutExtension(display);
+                input.text = display;
+                input.onEndEdit.AddListener(value =>
+                {
+                    if (!string.IsNullOrEmpty(value))
+                        operatingSystem.RenameUserFile(file, value + ext);
+                    CloseMenu();
+                });
+            }
+            else
+            {
+                input.text = display;
+                input.onEndEdit.AddListener(value =>
+                {
+                    if (!string.IsNullOrEmpty(value))
+                        operatingSystem.RenameUserFile(file, value);
+                    CloseMenu();
+                });
+            }
+
+            Vector2 localPoint;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, GetEventCamera(), out localPoint);
+            rt.anchoredPosition = localPoint;
+            input.ActivateInputField();
         }
 
         private void PositionMenu(RectTransform menu, Vector2 screenPos)
@@ -517,22 +734,11 @@ namespace PC.Component.Software
             operatingSystem.RefreshDesktopIcon();
         }
 
-        private void CreateFile(string name, string content)
-        {
-            if (operatingSystem == null) return;
-            operatingSystem.CreateDesktopFile(name, content);
-        }
-
-        private void CreateFolder(string name)
-        {
-            if (operatingSystem == null) return;
-            operatingSystem.CreateDesktopFolder(name);
-        }
-
         private void OpenPersonalization()
         {
             if (operatingSystem == null) return;
-            operatingSystem.TryLaunchApp("Personalization");
+            if (!operatingSystem.TryLaunchApp("Personalization"))
+                operatingSystem.ShowRequires("Personalization");
         }
     }
 }

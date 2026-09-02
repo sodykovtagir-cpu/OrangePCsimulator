@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using PC.Component;
 using PC.Component.Software.Lua;
 using UnityEngine;
 using UnityEngine.UI;
@@ -792,36 +793,60 @@ namespace PC.Component.Software.OS
             if (ext == ".exe")
             {
                 var name = file.NameWithoutExtension();
-                if (!string.IsNullOrEmpty(name) && appPrefabs != null)
-                    appPrefabs.TryGetValue(name, out prefab);
-            }
-            else
-            {
-                prefab = FindAppForExtension(ext);
-            }
+                if (IsAppInstalled(name, out prefab) && prefab != null)
+                {
+                    LaunchApp(prefab, file.content ?? "");
+                    return true;
+                }
 
-            if (prefab == null)
-            {
-                ShowMessageBox(file.path, "No application is associated with this file.");
+                ShowRequires(string.IsNullOrEmpty(name) ? "приложение" : name);
                 return false;
             }
 
-            LaunchApp(prefab, file.content ?? "");
+            prefab = FindInstalledAppForExtension(ext);
+            if (prefab != null)
+            {
+                LaunchApp(prefab, file.content ?? "");
+                return true;
+            }
+
+            var needed = FindAppForExtension(ext);
+            ShowRequires(needed != null ? needed.AppName : "приложение");
+            return false;
+        }
+
+        public bool OpenFileWith(File file, App app)
+        {
+            if (file == null || app == null) return false;
+            if (file.isFolder)
+                return OpenFolder(file);
+
+            if (!IsAppInstalled(app.AppName))
+            {
+                ShowRequires(app.AppName);
+                return false;
+            }
+
+            LaunchApp(app, file.content ?? "");
             return true;
+        }
+
+        public void ShowRequires(string appName)
+        {
+            if (string.IsNullOrEmpty(appName))
+                appName = "приложение";
+            ShowMessageBox("Ошибка", "Требует " + appName);
         }
 
         private bool OpenFolder(File folder)
         {
             if (folder == null || !folder.isFolder) return false;
 
-            App prefab = null;
+            App prefab;
             if (!IsAppInstalled("File Manager", out prefab) || prefab == null)
             {
-                if (appPrefabs == null || !appPrefabs.TryGetValue("File Manager", out prefab) || prefab == null)
-                {
-                    ShowMessageBox(folder.path, "File Manager is not available.");
-                    return false;
-                }
+                ShowRequires("File Manager");
+                return false;
             }
 
             LaunchApp(prefab, "");
@@ -835,20 +860,70 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        public List<App> GetOpenWithApps(File file)
+        {
+            var result = new List<App>();
+            if (file == null || file.isFolder || appPrefabs == null)
+                return result;
+
+            var ext = file.Extension();
+            if (string.IsNullOrEmpty(ext))
+                return result;
+
+            void Add(string name)
+            {
+                if (string.IsNullOrEmpty(name) || !appPrefabs.TryGetValue(name, out var app) || app == null)
+                    return;
+                if (!result.Contains(app))
+                    result.Add(app);
+            }
+
+            foreach (var kvp in appPrefabs)
+            {
+                var app = kvp.Value;
+                if (app == null || string.IsNullOrEmpty(app.FileName)) continue;
+                if (string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase))
+                    Add(app.AppName);
+            }
+
+            if (IsTextLikeExtension(ext))
+            {
+                Add("Text Editor");
+                Add("Lua Editor");
+            }
+
+            return result;
+        }
+
+        private static bool IsTextLikeExtension(string ext)
+        {
+            if (string.IsNullOrEmpty(ext)) return false;
+            return ext.Equals(".txt", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".lua", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".tmn", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private App FindInstalledAppForExtension(string ext)
+        {
+            if (string.IsNullOrEmpty(ext) || appPrefabs == null || installedApps == null) return null;
+
+            for (int i = 0; i < installedApps.Count; i++)
+            {
+                if (!appPrefabs.TryGetValue(installedApps[i], out var installed) || installed == null)
+                    continue;
+                if (string.Equals(installed.FileName, ext, StringComparison.OrdinalIgnoreCase))
+                    return installed;
+            }
+
+            return null;
+        }
+
         private App FindAppForExtension(string ext)
         {
             if (string.IsNullOrEmpty(ext) || appPrefabs == null) return null;
 
-            if (installedApps != null)
-            {
-                for (int i = 0; i < installedApps.Count; i++)
-                {
-                    if (!appPrefabs.TryGetValue(installedApps[i], out var installed) || installed == null)
-                        continue;
-                    if (string.Equals(installed.FileName, ext, StringComparison.OrdinalIgnoreCase))
-                        return installed;
-                }
-            }
+            var installed = FindInstalledAppForExtension(ext);
+            if (installed != null) return installed;
 
             foreach (var kvp in appPrefabs)
             {
@@ -1411,19 +1486,161 @@ namespace PC.Component.Software.OS
 
         private string currentSortMode = DefaultSortMode;
 
-        /// <summary>
-        /// Create a new file on the desktop.
-        /// </summary>
-        public void CreateDesktopFile(string name, string content)
+        private class ClipboardEntry
+        {
+            public File file;
+            public bool cut;
+        }
+
+        private ClipboardEntry clipboard;
+
+        public bool HasClipboard
+        {
+            get { return clipboard != null && clipboard.file != null; }
+        }
+
+        public bool IsProtectedFile(File file)
+        {
+            if (file == null) return true;
+            if (string.IsNullOrEmpty(file.path)) return true;
+            if (file.path == "System" || file.path.StartsWith("System/")) return true;
+            if (file.Extension() == ".exe" && !LuaAppPackage.IsPackage(file.content)) return true;
+            return false;
+        }
+
+        public void CopyToClipboard(File file)
+        {
+            if (file == null) return;
+            clipboard = new ClipboardEntry { file = file, cut = false };
+        }
+
+        public void CutToClipboard(File file)
+        {
+            if (file == null || IsProtectedFile(file)) return;
+            clipboard = new ClipboardEntry { file = file, cut = true };
+        }
+
+        public bool PasteClipboard(string targetFolder)
+        {
+            if (!HasClipboard || AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null)
+                return false;
+
+            var storage = AllStorage[0];
+            var src = clipboard.file;
+            if (src == null || storage.files == null) return false;
+            if (!storage.files.Contains(src) && clipboard.cut)
+            {
+                clipboard = null;
+                return false;
+            }
+
+            string srcFolder = GetFolderPath(src.path);
+            string destFolder = targetFolder ?? "";
+            if (clipboard.cut && srcFolder == destFolder)
+            {
+                clipboard = null;
+                return true;
+            }
+
+            if (src.isFolder && !string.IsNullOrEmpty(destFolder) &&
+                (destFolder == src.path || destFolder.StartsWith(src.path + "/")))
+                return false;
+
+            string destPath = UniquePath(CombinePath(destFolder, GetFileName(src.path)));
+
+            if (clipboard.cut)
+            {
+                string oldPath = src.path;
+                src.path = destPath;
+                if (src.isFolder)
+                    RelocateChildren(storage, oldPath, destPath);
+                clipboard = null;
+            }
+            else
+            {
+                DuplicateTree(storage, src, destPath);
+            }
+
+            RefreshDesktopIcon();
+            RefreshRunningFileManagers();
+            return true;
+        }
+
+        public void HideUserFile(File file)
+        {
+            if (file == null || IsProtectedFile(file)) return;
+            file.hidden = true;
+            RefreshDesktopIcon();
+            RefreshRunningFileManagers();
+        }
+
+        public void DeleteUserFile(File file)
+        {
+            if (file == null || IsProtectedFile(file)) return;
+            if (AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null) return;
+
+            var storage = AllStorage[0];
+            if (storage.files == null) return;
+
+            if (file.isFolder)
+            {
+                for (int i = storage.files.Count - 1; i >= 0; i--)
+                {
+                    var f = storage.files[i];
+                    if (f != null && f.path != null && f.path.StartsWith(file.path + "/"))
+                        storage.files.RemoveAt(i);
+                }
+            }
+
+            storage.files.Remove(file);
+            if (clipboard != null && clipboard.file == file)
+                clipboard = null;
+
+            RefreshDesktopIcon();
+            RefreshRunningFileManagers();
+        }
+
+        public bool RenameUserFile(File file, string newName)
+        {
+            if (file == null || IsProtectedFile(file) || string.IsNullOrEmpty(newName)) return false;
+            if (AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null) return false;
+
+            newName = newName.Trim();
+            if (string.IsNullOrEmpty(newName)) return false;
+            foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+                newName = newName.Replace(c, '_');
+
+            if (!file.isFolder)
+            {
+                var oldExt = File.Extension(file.path);
+                if (!string.IsNullOrEmpty(oldExt) && File.Extension(newName) == "")
+                    newName += oldExt;
+            }
+
+            string dest = CombinePath(GetFolderPath(file.path), newName);
+            if (dest != file.path && FileManager != null && FileManager.Exists(0, dest))
+                dest = UniquePath(dest);
+            if (dest == file.path) return true;
+
+            string oldPath = file.path;
+            file.path = dest;
+            if (file.isFolder)
+                RelocateChildren(AllStorage[0], oldPath, dest);
+
+            RefreshDesktopIcon();
+            RefreshRunningFileManagers();
+            return true;
+        }
+
+        public void CreateFileAt(string folder, string name, string content)
         {
             if (FileManager == null || string.IsNullOrEmpty(name)) return;
-
-            string finalName = UniqueDesktopName(name);
+            string path = UniquePath(CombinePath(folder, name));
             var body = content ?? "";
-            var created = FileManager.Write(0, finalName, body);
+            var created = FileManager.Write(0, path, body);
             if (created == null)
             {
-                ShowMessageBox(name, "Could not create the file.");
+                ShowMessageBox(name, "Не удалось создать файл.");
                 return;
             }
 
@@ -1431,44 +1648,130 @@ namespace PC.Component.Software.OS
             created.isFolder = false;
             created.size = body.Length;
             RefreshDesktopIcon();
+            RefreshRunningFileManagers();
         }
 
-        /// <summary>
-        /// Create a new folder on the desktop.
-        /// </summary>
-        public void CreateDesktopFolder(string name)
+        public void CreateFolderAt(string folder, string name)
         {
             if (FileManager == null || string.IsNullOrEmpty(name)) return;
-
-            string finalName = UniqueDesktopName(name);
-            var folder = File.MakeFolder(finalName);
-            if (!FileManager.Create(0, folder))
+            string path = UniquePath(CombinePath(folder, name));
+            if (!FileManager.Create(0, File.MakeFolder(path)))
             {
-                ShowMessageBox(name, "Could not create the folder.");
+                ShowMessageBox(name, "Не удалось создать папку.");
                 return;
             }
 
             RefreshDesktopIcon();
+            RefreshRunningFileManagers();
         }
 
-        private string UniqueDesktopName(string name)
+        public void CreateDesktopFile(string name, string content)
         {
-            string finalName = name;
-            int counter = 1;
-            var ext = File.Extension(name);
-            var baseName = File.NameWithoutExtension(name);
-            if (string.IsNullOrEmpty(baseName))
-                baseName = name;
+            CreateFileAt("", name, content);
+        }
 
-            while (FileManager != null && FileManager.Exists(0, finalName))
+        public void CreateDesktopFolder(string name)
+        {
+            CreateFolderAt("", name);
+        }
+
+        public string UniquePath(string path)
+        {
+            if (string.IsNullOrEmpty(path) || FileManager == null || !FileManager.Exists(0, path))
+                return path;
+
+            var ext = File.Extension(path);
+            var folder = GetFolderPath(path);
+            var baseName = File.NameWithoutExtension(GetFileName(path));
+            if (string.IsNullOrEmpty(baseName))
+                baseName = GetFileName(path);
+
+            int counter = 1;
+            string candidate;
+            do
             {
-                finalName = string.IsNullOrEmpty(ext)
+                string name = string.IsNullOrEmpty(ext)
                     ? string.Format("{0} ({1})", baseName, counter)
                     : string.Format("{0} ({1}){2}", baseName, counter, ext);
+                candidate = CombinePath(folder, name);
                 counter++;
+            } while (FileManager.Exists(0, candidate));
+
+            return candidate;
+        }
+
+        private static string GetFolderPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            int slash = path.LastIndexOf('/');
+            return slash <= 0 ? "" : path.Substring(0, slash);
+        }
+
+        private static string GetFileName(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            int slash = path.LastIndexOf('/');
+            return slash < 0 ? path : path.Substring(slash + 1);
+        }
+
+        private static string CombinePath(string folder, string name)
+        {
+            if (string.IsNullOrEmpty(folder)) return name ?? "";
+            if (string.IsNullOrEmpty(name)) return folder;
+            return folder + "/" + name;
+        }
+
+        private static void RelocateChildren(Storage storage, string oldPath, string newPath)
+        {
+            if (storage == null || storage.files == null || string.IsNullOrEmpty(oldPath)) return;
+            string prefix = oldPath + "/";
+            for (int i = 0; i < storage.files.Count; i++)
+            {
+                var f = storage.files[i];
+                if (f == null || string.IsNullOrEmpty(f.path)) continue;
+                if (f.path.StartsWith(prefix))
+                    f.path = newPath + f.path.Substring(oldPath.Length);
+            }
+        }
+
+        private static void DuplicateTree(Storage storage, File src, string destPath)
+        {
+            if (storage == null || storage.files == null || src == null) return;
+
+            var clone = new File(destPath, src.content, src.hidden, src.size);
+            clone.isFolder = src.isFolder;
+            storage.AddFile(clone);
+
+            if (!src.isFolder) return;
+
+            string prefix = src.path + "/";
+            var extras = new List<File>();
+            for (int i = 0; i < storage.files.Count; i++)
+            {
+                var f = storage.files[i];
+                if (f == null || f == src || string.IsNullOrEmpty(f.path)) continue;
+                if (!f.path.StartsWith(prefix)) continue;
+                extras.Add(f);
             }
 
-            return finalName;
+            for (int i = 0; i < extras.Count; i++)
+            {
+                var f = extras[i];
+                var childDest = destPath + f.path.Substring(src.path.Length);
+                var childClone = new File(childDest, f.content, f.hidden, f.size);
+                childClone.isFolder = f.isFolder;
+                storage.AddFile(childClone);
+            }
+        }
+
+        private void RefreshRunningFileManagers()
+        {
+            if (runningApps == null) return;
+            for (int i = 0; i < runningApps.Count; i++)
+            {
+                var explorer = runningApps[i] as PC.Component.Software.FileManager;
+                if (explorer != null) explorer.RefreshView();
+            }
         }
 
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using System.Linq;
 using PC.Component.Software.Lua;
@@ -70,15 +71,7 @@ namespace PC.Component.Software
         [SerializeField]
         private Color folderColor = new Color(1f, 0.9f, 0.6f);
 
-        private bool copy;
-
-        private int sourceFileIndex;
-
-        private Storage sourceStorage;
-
         private string startFolderPath;
-
-        private string sourceFolder;
 
         private int selectedFile = -1;
 
@@ -90,7 +83,8 @@ namespace PC.Component.Software
 
         private string currentFolder = "";
 
-        // Системные папки
+        public string CurrentFolder => currentFolder ?? "";
+
         private readonly string[] systemFolders = new string[] { "System" };
 
         protected override void Start()
@@ -129,7 +123,8 @@ namespace PC.Component.Software
 
             SelectStorage(0);
             InitializeSystemFolders();
-            
+            EnsureExplorerPane();
+
             if (!string.IsNullOrEmpty(startFolderPath))
             {
                 currentFolder = startFolderPath;
@@ -138,33 +133,75 @@ namespace PC.Component.Software
             }
         }
 
-        private void CreateFolder()
+        public void RefreshView()
         {
-            if (selectedStorage == null) return;
+            RefreshItem();
+            UpdatePasteButton();
+        }
 
-            string baseName = "New Folder";
-            string folderName = baseName;
-            int counter = 1;
+        private void EnsureExplorerPane()
+        {
+            if (fileParent == null) return;
 
-            while (selectedStorage.files.Any(f => f != null &&
-                   f.path == (string.IsNullOrEmpty(currentFolder)
-                   ? folderName
-                   : currentFolder + "/" + folderName)))
+            if (fileParent.GetComponent<Graphic>() == null)
             {
-                folderName = baseName + " (" + counter + ")";
-                counter++;
+                var img = fileParent.gameObject.AddComponent<Image>();
+                img.color = new Color(0f, 0f, 0f, 0f);
+                img.raycastTarget = true;
             }
 
-            string newPath = string.IsNullOrEmpty(currentFolder)
-                ? folderName
-                : currentFolder + "/" + folderName;
+            var pane = fileParent.GetComponent<ExplorerPane>();
+            if (pane == null)
+                pane = fileParent.gameObject.AddComponent<ExplorerPane>();
+            pane.Init(this);
+        }
 
-            var folder = new File(newPath, "", false, 0);
-            folder.isFolder = true;
+        private void Update()
+        {
+            UpdatePasteButton();
 
-            selectedStorage.AddFile(folder);
+            if (!Input.GetMouseButtonDown(1))
+                return;
 
-            RefreshItem();
+            if (IsPointerOverEmptyPane(Input.mousePosition) && DesktopContextMenu.Instance != null)
+                DesktopContextMenu.Instance.ShowExplorerMenu(this, Input.mousePosition);
+        }
+
+        private bool IsPointerOverEmptyPane(Vector2 screenPos)
+        {
+            if (fileParent == null || EventSystem.current == null)
+                return false;
+
+            var results = new List<RaycastResult>();
+            var pointer = new PointerEventData(EventSystem.current);
+            pointer.position = screenPos;
+            EventSystem.current.RaycastAll(pointer, results);
+
+            bool overParent = false;
+            bool overChild = false;
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go == null) continue;
+                if (go.transform == fileParent)
+                    overParent = true;
+                else if (go.transform.IsChildOf(fileParent))
+                    overChild = true;
+            }
+
+            return overParent && !overChild;
+        }
+
+        private void UpdatePasteButton()
+        {
+            if (pasteButton != null)
+                pasteButton.interactable = system != null && system.HasClipboard;
+        }
+
+        private void CreateFolder()
+        {
+            if (system == null) return;
+            system.CreateFolderAt(currentFolder, "New Folder");
         }
 
         private void InitializeSystemFolders()
@@ -172,7 +209,6 @@ namespace PC.Component.Software
             var storage = selectedStorage;
             if (storage == null || storage.files == null) return;
 
-            // Создаём системные папки если их нет
             foreach (var folder in systemFolders)
             {
                 bool exists = storage.files.Any(f => f != null && f.path == folder && f.isFolder);
@@ -226,6 +262,10 @@ namespace PC.Component.Software
                 if (prefab == null) prefab = filePrefab;
 
                 var button = Instantiate(prefab, fileParent);
+                var itemHook = button.gameObject.GetComponent<ExplorerFileItem>();
+                if (itemHook == null)
+                    itemHook = button.gameObject.AddComponent<ExplorerFileItem>();
+                itemHook.Init(file, this);
                 int capturedIndex = index;
 
                 if (file.isFolder)
@@ -269,6 +309,7 @@ namespace PC.Component.Software
 
             SelectFile(-1);
             UpdateBackButton();
+            UpdatePasteButton();
         }
 
         private void OnItemClicked(int index)
@@ -301,16 +342,11 @@ namespace PC.Component.Software
             {
                 if (file == null) continue;
 
-                string filePath = file.path;
-                string fileFolder = GetFolderPath(filePath);
-
+                string fileFolder = GetFolderPath(file.path);
                 if (fileFolder == currentFolder)
-                {
                     result.Add(file);
-                }
             }
 
-            // Сортируем: сначала папки, потом файлы
             return result.OrderByDescending(f => f.isFolder).ThenBy(f => f.path).ToList();
         }
 
@@ -375,9 +411,7 @@ namespace PC.Component.Software
         private void UpdateBackButton()
         {
             if (backButton != null)
-            {
                 backButton.interactable = !string.IsNullOrEmpty(currentFolder);
-            }
         }
 
         private void UpdatePathText()
@@ -449,6 +483,7 @@ namespace PC.Component.Software
             if (file == null || file.isFolder) return;
 
             file.hidden = hidden;
+            if (system != null) system.RefreshDesktopIcon();
 
             if (fileBlocks == null || selectedFile < 0 || selectedFile >= fileBlocks.Count) return;
 
@@ -462,92 +497,24 @@ namespace PC.Component.Software
 
         public void Cut()
         {
-            copy = false;
-            sourceFileIndex = selectedFile;
-            sourceStorage = selectedStorage;
-            sourceFolder = currentFolder;
-            if (pasteButton != null) pasteButton.interactable = true;
+            var file = GetSelectedFile();
+            if (file == null || system == null) return;
+            system.CutToClipboard(file);
+            UpdatePasteButton();
         }
 
         public void Copy()
         {
-            copy = true;
-            sourceFileIndex = selectedFile;
-            sourceStorage = selectedStorage;
-            sourceFolder = currentFolder;
-            if (pasteButton != null) pasteButton.interactable = true;
+            var file = GetSelectedFile();
+            if (file == null || system == null) return;
+            system.CopyToClipboard(file);
+            UpdatePasteButton();
         }
 
         public void Paste()
         {
-            var srcStorage = sourceStorage;
-            if (srcStorage == null || srcStorage.files == null) return;
-
-            var sourceFiles = GetFilesInFolder(srcStorage, sourceFolder);
-            if (sourceFileIndex < 0 || sourceFileIndex >= sourceFiles.Count) return;
-
-            var srcFile = sourceFiles[sourceFileIndex];
-            var target = selectedStorage;
-            if (srcFile == null || target == null) return;
-
-            string newPath = string.IsNullOrEmpty(currentFolder)
-                ? GetDisplayName(srcFile.path)
-                : currentFolder + "/" + GetDisplayName(srcFile.path);
-
-            if (!copy)
-            {
-                // Перемещение
-                var actualFile = srcStorage.files.FirstOrDefault(f => f != null && f.path == srcFile.path);
-                if (actualFile != null)
-                {
-                    srcStorage.files.Remove(actualFile);
-                    string oldPath = actualFile.path;
-                    actualFile.path = newPath;
-
-                    // Если папка — обновляем пути вложенных файлов
-                    if (actualFile.isFolder)
-                    {
-                        foreach (var f in srcStorage.files)
-                        {
-                            if (f == null) continue;
-                            if (f.path.StartsWith(oldPath + "/"))
-                            {
-                                f.path = newPath + f.path.Substring(oldPath.Length);
-                            }
-                        }
-                    }
-                    target.AddFile(actualFile);
-                }
-
-                if (pasteButton != null) pasteButton.interactable = false;
-                RefreshItem();
-                return;
-            }
-
-            // Копирование
-            var clone = new File(newPath, srcFile.content, srcFile.hidden, srcFile.size);
-            clone.isFolder = srcFile.isFolder;
-
-            target.AddFile(clone);
-            RefreshItem();
-        }
-
-        private List<File> GetFilesInFolder(Storage storage, string folder)
-        {
-            if (storage == null || storage.files == null) return new List<File>();
-
-            var result = new List<File>();
-            foreach (var file in storage.files)
-            {
-                if (file == null) continue;
-                string fileFolder = GetFolderPath(file.path);
-                if (fileFolder == folder)
-                {
-                    result.Add(file);
-                }
-            }
-
-            return result.OrderByDescending(f => f.isFolder).ThenBy(f => f.path).ToList();
+            if (system == null) return;
+            system.PasteClipboard(currentFolder);
         }
 
         public void Rename()
@@ -571,8 +538,7 @@ namespace PC.Component.Software
             }
             else
             {
-                var nameWithoutExt = File.NameWithoutExtension(displayName);
-                fileNameInput.text = nameWithoutExt;
+                fileNameInput.text = File.NameWithoutExtension(displayName);
                 extension = File.Extension(displayName);
             }
 
@@ -589,73 +555,16 @@ namespace PC.Component.Software
             inputGo.SetActive(false);
 
             var file = GetSelectedFile();
-            if (file == null) return;
+            if (file == null || system == null) return;
 
-            Storage storage = selectedStorage;   // ✅ ОБЯЗАТЕЛЬНО
-            if (storage == null || storage.files == null) return;
-
-            var newName = fileNameInput.text + extension;
-
-            string newPath = string.IsNullOrEmpty(currentFolder)
-                ? newName
-                : currentFolder + "/" + newName;
-
-            var actualFile = storage.files.FirstOrDefault(f => f != null && f.path == file.path);
-            if (actualFile == null) return;
-
-            string oldPath = actualFile.path;
-            actualFile.path = newPath;
-
-            // ✅ если папка — обновляем вложенные пути
-            if (actualFile.isFolder)
-            {
-                foreach (var f in storage.files)
-                {
-                    if (f == null) continue;
-
-                    if (f.path.StartsWith(oldPath + "/"))
-                    {
-                        f.path = newPath + f.path.Substring(oldPath.Length);
-                    }
-                }
-            }
-
-            RefreshItem();
+            system.RenameUserFile(file, fileNameInput.text + extension);
         }
 
         public void Delete()
         {
             var file = GetSelectedFile();
-            if (file == null) return;
-
-            var storage = selectedStorage;
-            if (storage == null || storage.files == null) return;
-
-            var actualFile = storage.files.FirstOrDefault(f => f != null && f.path == file.path);
-            if (actualFile == null) return;
-
-            // Если это папка, удаляем все файлы внутри
-            if (actualFile.isFolder)
-            {
-                var filesToDelete = storage.files.Where(f =>
-                    f != null && f.path.StartsWith(actualFile.path + "/")).ToList();
-
-                foreach (var f in filesToDelete)
-                {
-                    storage.files.Remove(f);
-                }
-            }
-
-            storage.files.Remove(actualFile);
-
-            if (fileBlocks != null && selectedFile >= 0 && selectedFile < fileBlocks.Count)
-            {
-                var fb = fileBlocks[selectedFile];
-                if (fb.block != null) Destroy(fb.block.gameObject);
-            }
-
-            if (system != null) system.RefreshDesktopIcon();
-            RefreshItem();
+            if (file == null || system == null) return;
+            system.DeleteUserFile(file);
         }
 
         private File GetSelectedFile()
@@ -683,6 +592,101 @@ namespace PC.Component.Software
                 os.ReleaseResource();
                 base.Close();
             }
+        }
+    }
+
+    public class ExplorerPane : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+    {
+        private FileManager explorer;
+        private float pointerDownTime;
+        private Vector2 pointerDownPos;
+        private bool isPointerDown;
+
+        public void Init(FileManager fileManager)
+        {
+            explorer = fileManager;
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.button == PointerEventData.InputButton.Right)
+                return;
+
+            isPointerDown = true;
+            pointerDownTime = Time.unscaledTime;
+            pointerDownPos = eventData.position;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            isPointerDown = false;
+        }
+
+        private void Update()
+        {
+            if (!isPointerDown || explorer == null)
+                return;
+
+            if (Time.unscaledTime - pointerDownTime <= 0.5f)
+                return;
+            if (Vector2.Distance(Input.mousePosition, pointerDownPos) >= 10f)
+                return;
+
+            isPointerDown = false;
+            if (DesktopContextMenu.Instance != null)
+                DesktopContextMenu.Instance.ShowExplorerMenu(explorer, pointerDownPos);
+        }
+    }
+
+    public class ExplorerFileItem : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerClickHandler
+    {
+        private File file;
+        private float pointerDownTime;
+        private Vector2 pointerDownPos;
+        private bool isPointerDown;
+        private bool openedMenu;
+
+        public void Init(File target, FileManager unused)
+        {
+            file = target;
+            openedMenu = false;
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
+                return;
+
+            isPointerDown = true;
+            openedMenu = false;
+            pointerDownTime = Time.unscaledTime;
+            pointerDownPos = eventData.position;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            isPointerDown = false;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData == null || file == null) return;
+            if (eventData.button != PointerEventData.InputButton.Right) return;
+            openedMenu = true;
+            if (DesktopContextMenu.Instance != null)
+                DesktopContextMenu.Instance.ShowFileMenu(file, eventData.position);
+        }
+
+        private void Update()
+        {
+            if (!isPointerDown || openedMenu || file == null) return;
+            if (Time.unscaledTime - pointerDownTime <= 0.5f) return;
+            if (Vector2.Distance(Input.mousePosition, pointerDownPos) >= 10f) return;
+
+            openedMenu = true;
+            isPointerDown = false;
+            if (DesktopContextMenu.Instance != null)
+                DesktopContextMenu.Instance.ShowFileMenu(file, pointerDownPos);
         }
     }
 }
