@@ -20,8 +20,8 @@ namespace PC.Component.Software
         private bool isPointerDown;
         private bool openedMenu;
 
-        private const float longPressDuration = 0.5f;
-        private const float pointerMoveThreshold = 10f;
+        private const float longPressDuration = PointerInput.LongPress;
+        private const float pointerMoveThreshold = PointerInput.Slop;
 
         public File File { get; private set; }
 
@@ -81,10 +81,11 @@ namespace PC.Component.Software
             }
 
             if (Time.unscaledTime - pointerDownTime > longPressDuration
-                && Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold)
+                && Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
             {
                 openedMenu = true;
                 isPointerDown = false;
+                PointerInput.ConsumedClick = true;
                 if (DesktopContextMenu.Instance != null && File != null)
                     DesktopContextMenu.Instance.ShowFileMenu(File, pointerDownPos);
             }
@@ -92,9 +93,10 @@ namespace PC.Component.Software
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
+            if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            PointerInput.ConsumedClick = false;
             pointerDownTime = Time.unscaledTime;
             pointerDownPos = eventData.position;
             isPointerDown = true;
@@ -111,7 +113,7 @@ namespace PC.Component.Software
             if (eventData == null) return;
             if (eventData.dragging) return;
             if (DesktopIconDragger.IsDragging) return;
-            if (openedMenu) return;
+            if (openedMenu || PointerInput.ConsumedClick) return;
 
             if (eventData.button == PointerEventData.InputButton.Right)
             {

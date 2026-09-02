@@ -88,7 +88,7 @@ namespace PC.Component.Software
             {
                 if (!hasDragged)
                 {
-                    if (Vector2.Distance(Input.mousePosition, pointerDownPos) > 5f)
+                    if (Vector2.Distance(Input.mousePosition, pointerDownPos) > PointerInput.Slop)
                     {
                         hasDragged = true;
                         isDragging = true;

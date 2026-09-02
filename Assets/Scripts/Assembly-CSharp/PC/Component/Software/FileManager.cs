@@ -607,9 +607,10 @@ namespace PC.Component.Software
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (eventData == null || eventData.button == PointerEventData.InputButton.Right)
+            if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            PointerInput.ConsumedClick = false;
             isPointerDown = true;
             pointerDownTime = Time.unscaledTime;
             pointerDownPos = eventData.position;
@@ -625,12 +626,13 @@ namespace PC.Component.Software
             if (!isPointerDown || explorer == null)
                 return;
 
-            if (Time.unscaledTime - pointerDownTime <= 0.5f)
+            if (Time.unscaledTime - pointerDownTime <= PointerInput.LongPress)
                 return;
-            if (Vector2.Distance(Input.mousePosition, pointerDownPos) >= 10f)
+            if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) >= PointerInput.Slop)
                 return;
 
             isPointerDown = false;
+            PointerInput.ConsumedClick = true;
             if (DesktopContextMenu.Instance != null)
                 DesktopContextMenu.Instance.ShowExplorerMenu(explorer, pointerDownPos);
         }
@@ -644,6 +646,8 @@ namespace PC.Component.Software
         private bool isPointerDown;
         private bool openedMenu;
 
+        public File File => file;
+
         public void Init(File target, FileManager unused)
         {
             file = target;
@@ -652,9 +656,10 @@ namespace PC.Component.Software
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
+            if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            PointerInput.ConsumedClick = false;
             isPointerDown = true;
             openedMenu = false;
             pointerDownTime = Time.unscaledTime;
@@ -678,11 +683,12 @@ namespace PC.Component.Software
         private void Update()
         {
             if (!isPointerDown || openedMenu || file == null) return;
-            if (Time.unscaledTime - pointerDownTime <= 0.5f) return;
-            if (Vector2.Distance(Input.mousePosition, pointerDownPos) >= 10f) return;
+            if (Time.unscaledTime - pointerDownTime <= PointerInput.LongPress) return;
+            if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) >= PointerInput.Slop) return;
 
             openedMenu = true;
             isPointerDown = false;
+            PointerInput.ConsumedClick = true;
             if (DesktopContextMenu.Instance != null)
                 DesktopContextMenu.Instance.ShowFileMenu(file, pointerDownPos);
         }

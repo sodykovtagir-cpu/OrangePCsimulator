@@ -1787,40 +1787,102 @@ namespace PC.Component.Software.OS
                 RefreshStartMenu();
         }
 
+        public bool BlocksDesktopMenu(GameObject go)
+        {
+            if (go == null) return false;
+            if (go.GetComponentInParent<App>() != null) return true;
+            if (startMenu != null && startMenu.activeInHierarchy &&
+                (go.transform == startMenu.transform || go.transform.IsChildOf(startMenu.transform)))
+                return true;
+            if (taskbar != null && (go.transform == taskbar.transform || go.transform.IsChildOf(taskbar.transform)))
+                return true;
+            if (menuBar != null && go.transform.IsChildOf(menuBar.transform))
+                return true;
+            if (popup != null && go.transform.IsChildOf(popup.transform))
+                return true;
+            return false;
+        }
+
+        public bool IsDesktopContextTarget(GameObject go)
+        {
+            if (go == null || BlocksDesktopMenu(go)) return false;
+            if (iconParent != null && (go.transform == iconParent || go.transform.IsChildOf(iconParent)))
+                return true;
+            if (desktop != null && (go == desktop.gameObject || go.transform.IsChildOf(desktop.transform)))
+                return true;
+            return false;
+        }
+
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
         {
-            // Collect positions before destroying icons
-            if (fileIcons != null)
+            if (fileIcons == null)
+                fileIcons = new Dictionary<string, FileIcon>();
+
+            if (preserveCurrentPositions && iconPositions != null)
             {
-                if (preserveCurrentPositions && iconPositions != null)
+                foreach (var kvp in fileIcons)
                 {
-                    foreach (var kvp in fileIcons)
+                    if (kvp.Value != null)
+                        iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                }
+            }
+
+            var desktopFiles = CollectDesktopFiles();
+
+            if (!preserveCurrentPositions)
+            {
+                fileIcons.Clear();
+                if (iconParent != null)
+                {
+                    for (int i = iconParent.childCount - 1; i >= 0; i--)
                     {
-                        if (kvp.Value != null)
-                            iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                        var c = iconParent.GetChild(i);
+                        if (c != null) Destroy(c.gameObject);
                     }
                 }
-                fileIcons.Clear();
             }
-
-            if (iconParent != null)
+            else
             {
-                for (int i = iconParent.childCount - 1; i >= 0; i--)
+                var wanted = new HashSet<string>();
+                for (int i = 0; i < desktopFiles.Count; i++)
                 {
-                    var c = iconParent.GetChild(i);
-                    if (c != null) DestroyImmediate(c.gameObject);
+                    var file = desktopFiles[i];
+                    if (file != null && !string.IsNullOrEmpty(file.path))
+                        wanted.Add(file.path);
+                }
+
+                var stale = new List<string>();
+                foreach (var kvp in fileIcons)
+                {
+                    if (kvp.Value == null || !wanted.Contains(kvp.Key))
+                        stale.Add(kvp.Key);
+                }
+
+                for (int i = 0; i < stale.Count; i++)
+                {
+                    FileIcon icon;
+                    if (fileIcons.TryGetValue(stale[i], out icon) && icon != null)
+                        Destroy(icon.gameObject);
+                    fileIcons.Remove(stale[i]);
                 }
             }
 
+            for (int i = 0; i < desktopFiles.Count; i++)
+                AddFileIcon(desktopFiles[i]);
+
+            StartCoroutine(DelayedLayoutRebuild());
+        }
+
+        private List<File> CollectDesktopFiles()
+        {
+            var desktopFiles = new List<File>();
             var all = AllStorage;
-            if (all == null || all.Count == 0) return;
+            if (all == null || all.Count == 0) return desktopFiles;
 
             var storage = all[0];
             var files = storage != null ? storage.files : null;
-            if (files == null) return;
+            if (files == null) return desktopFiles;
 
-            // Collect desktop files (not in subdirectories, not System folder)
-            var desktopFiles = new List<File>();
             for (int i = 0; i < files.Count; i++)
             {
                 var f = files[i];
@@ -1831,46 +1893,39 @@ namespace PC.Component.Software.OS
                 desktopFiles.Add(f);
             }
 
-            // Sort by current mode
-            if (!string.IsNullOrEmpty(currentSortMode))
+            if (string.IsNullOrEmpty(currentSortMode))
+                return desktopFiles;
+
+            switch (currentSortMode)
             {
-                switch (currentSortMode)
-                {
-                    case "Name":
-                        desktopFiles.Sort((a, b) => {
-                            if (a.isFolder && !b.isFolder) return -1;
-                            if (!a.isFolder && b.isFolder) return 1;
-                            return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
-                        });
-                        break;
-                    case "Size":
-                        desktopFiles.Sort((a, b) => {
-                            if (a.isFolder && !b.isFolder) return -1;
-                            if (!a.isFolder && b.isFolder) return 1;
-                            return b.size.CompareTo(a.size); // Descending
-                        });
-                        break;
-                    case "Type":
-                        desktopFiles.Sort((a, b) => {
-                            if (a.isFolder && !b.isFolder) return -1;
-                            if (!a.isFolder && b.isFolder) return 1;
-                            var extA = a.isFolder ? "" : File.Extension(a.path);
-                            var extB = b.isFolder ? "" : File.Extension(b.path);
-                            int cmp = string.Compare(extA, extB, System.StringComparison.OrdinalIgnoreCase);
-                            if (cmp != 0) return cmp;
-                            return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
-                        });
-                        break;
-                }
+                case "Name":
+                    desktopFiles.Sort((a, b) => {
+                        if (a.isFolder && !b.isFolder) return -1;
+                        if (!a.isFolder && b.isFolder) return 1;
+                        return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
+                    });
+                    break;
+                case "Size":
+                    desktopFiles.Sort((a, b) => {
+                        if (a.isFolder && !b.isFolder) return -1;
+                        if (!a.isFolder && b.isFolder) return 1;
+                        return b.size.CompareTo(a.size);
+                    });
+                    break;
+                case "Type":
+                    desktopFiles.Sort((a, b) => {
+                        if (a.isFolder && !b.isFolder) return -1;
+                        if (!a.isFolder && b.isFolder) return 1;
+                        var extA = a.isFolder ? "" : File.Extension(a.path);
+                        var extB = b.isFolder ? "" : File.Extension(b.path);
+                        int cmp = string.Compare(extA, extB, System.StringComparison.OrdinalIgnoreCase);
+                        if (cmp != 0) return cmp;
+                        return string.Compare(a.path, b.path, System.StringComparison.OrdinalIgnoreCase);
+                    });
+                    break;
             }
 
-            for (int i = 0; i < desktopFiles.Count; i++)
-            {
-                AddFileIcon(desktopFiles[i]);
-            }
-
-            // Delay layout rebuild to ensure canvas is ready
-            StartCoroutine(DelayedLayoutRebuild());
+            return desktopFiles;
         }
 
         private System.Collections.IEnumerator DelayedLayoutRebuild()

@@ -24,10 +24,11 @@ namespace PC.Component.Software
         private Vector2 pointerDownPos;
         private bool isPointerDown;
 
-        private const float longPressDuration = 0.5f;
-        private const float pointerMoveThreshold = 10f;
+        private const float longPressDuration = PointerInput.LongPress;
+        private const float pointerMoveThreshold = PointerInput.Slop;
         private const float menuWidth = 220f;
         private const float submenuOffset = 5f;
+        private float lastMenuTime;
 
         private void Awake()
         {
@@ -150,6 +151,7 @@ namespace PC.Component.Software
             if (results.Count == 0)
                 return false;
 
+            bool sawDesktop = false;
             for (int i = 0; i < results.Count; i++)
             {
                 var go = results[i].gameObject;
@@ -165,14 +167,63 @@ namespace PC.Component.Software
                 if (go.GetComponentInParent<FileManager>() != null)
                     return false;
 
-                if (go.transform == transform || go.transform.IsChildOf(transform))
-                    return true;
-
-                if (operatingSystem != null && go.transform.IsChildOf(operatingSystem.transform))
+                if (go.GetComponentInParent<App>() != null)
                     return false;
+
+                if (operatingSystem != null && operatingSystem.BlocksDesktopMenu(go))
+                    return false;
+
+                if (go.transform == transform || go.transform.IsChildOf(transform))
+                    sawDesktop = true;
+                else if (operatingSystem != null && operatingSystem.IsDesktopContextTarget(go))
+                    sawDesktop = true;
             }
 
-            return false;
+            return sawDesktop;
+        }
+
+        private void OpenContextAt(Vector2 screenPos)
+        {
+            if (Time.unscaledTime - lastMenuTime < 0.05f)
+                return;
+
+            if (IsPointerOverMenu(screenPos))
+                return;
+
+            var icon = FindFileIconAt(screenPos);
+            if (icon != null)
+            {
+                ShowFileMenu(icon.File, screenPos);
+                return;
+            }
+
+            var results = RaycastAt(screenPos);
+            FileManager explorer = null;
+            ExplorerFileItem item = null;
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go == null) continue;
+                if (item == null)
+                    item = go.GetComponentInParent<ExplorerFileItem>();
+                if (explorer == null)
+                    explorer = go.GetComponentInParent<FileManager>();
+            }
+
+            if (item != null && item.File != null)
+            {
+                ShowFileMenu(item.File, screenPos);
+                return;
+            }
+
+            if (explorer != null)
+            {
+                ShowExplorerMenu(explorer, screenPos);
+                return;
+            }
+
+            if (CanOpenMenuAt(screenPos))
+                ShowDesktopMenu(screenPos, true);
         }
 
         private void Update()
@@ -183,7 +234,7 @@ namespace PC.Component.Software
                 {
                     CloseMenu();
                 }
-                else if (Input.GetMouseButtonDown(0) && !IsPointerOverMenu(Input.mousePosition))
+                else if (PointerInput.PressedThisFrame() && !IsPointerOverMenu(PointerInput.ScreenPosition()))
                 {
                     CloseMenu();
                 }
@@ -191,24 +242,30 @@ namespace PC.Component.Software
 
             if (Input.GetMouseButtonDown(1))
             {
-                var icon = FindFileIconAt(Input.mousePosition);
-                if (icon != null)
-                {
-                    ShowFileMenu(icon.File, Input.mousePosition);
-                    return;
-                }
-
-                if (CanOpenMenuAt(Input.mousePosition))
-                    ShowDesktopMenu(Input.mousePosition);
-                else if (!IsPointerOverMenu(Input.mousePosition))
-                    CloseMenu();
+                OpenContextAt(Input.mousePosition);
+                return;
             }
+
+            if (PointerInput.PressedThisFrame())
+            {
+                pointerDownTime = Time.unscaledTime;
+                pointerDownPos = PointerInput.ScreenPosition();
+                isPointerDown = true;
+            }
+
+            if (!PointerInput.Held())
+                isPointerDown = false;
 
             if (isPointerDown && Time.unscaledTime - pointerDownTime > longPressDuration)
             {
-                if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold && CanOpenMenuAt(pointerDownPos))
+                if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
                 {
-                    ShowDesktopMenu(pointerDownPos);
+                    isPointerDown = false;
+                    PointerInput.ConsumedClick = true;
+                    OpenContextAt(pointerDownPos);
+                }
+                else
+                {
                     isPointerDown = false;
                 }
             }
@@ -216,18 +273,6 @@ namespace PC.Component.Software
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (eventData == null || eventData.button == PointerEventData.InputButton.Right)
-                return;
-
-            if (!CanOpenMenuAt(eventData.position))
-            {
-                isPointerDown = false;
-                return;
-            }
-
-            pointerDownTime = Time.unscaledTime;
-            pointerDownPos = eventData.position;
-            isPointerDown = true;
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -237,9 +282,15 @@ namespace PC.Component.Software
 
         public void ShowDesktopMenu(Vector2 screenPos)
         {
-            CloseMenu();
+            ShowDesktopMenu(screenPos, false);
+        }
 
-            if (!PrepareMenu(screenPos, false))
+        public void ShowDesktopMenu(Vector2 screenPos, bool skipDesktopCheck)
+        {
+            CloseMenu();
+            lastMenuTime = Time.unscaledTime;
+
+            if (!PrepareMenu(screenPos, skipDesktopCheck))
                 return;
 
             AddMenuItem(menuPanel, "Автоупорядочить", AutoArrangeIcons);
@@ -261,6 +312,7 @@ namespace PC.Component.Software
         {
             if (file == null) return;
             CloseMenu();
+            lastMenuTime = Time.unscaledTime;
 
             if (!PrepareMenu(screenPos, true))
                 return;
@@ -488,6 +540,11 @@ namespace PC.Component.Software
             arrowText.fontSize = 10;
             arrowText.color = Color.black;
             arrowText.alignment = TextAnchor.MiddleCenter;
+
+            var button = item.AddComponent<Button>();
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => ShowSubmenu(item, submenuItems));
 
             var trigger = item.AddComponent<EventTrigger>();
 
