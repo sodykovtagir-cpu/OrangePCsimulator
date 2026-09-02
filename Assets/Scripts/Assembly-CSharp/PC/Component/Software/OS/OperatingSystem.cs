@@ -934,7 +934,19 @@ namespace PC.Component.Software.OS
         {
             var canvas = GetDesktopCanvas();
             if (canvas == null) return DefaultIconLayoutContext;
-            return canvas.renderMode == RenderMode.ScreenSpaceOverlay ? DefaultIconLayoutContext : MonitorIconLayoutContext;
+            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay) return DefaultIconLayoutContext;
+
+            var board = Board;
+            var monitor = board != null ? board.monitor : null;
+            if (monitor != null && monitor.Id != 0)
+                return MonitorIconLayoutContext + "_" + monitor.Id.ToString("X8");
+
+            return MonitorIconLayoutContext;
+        }
+
+        private bool IsMonitorLayoutContext(string layoutContext)
+        {
+            return NormalizeLayoutContext(layoutContext).StartsWith(MonitorIconLayoutContext, StringComparison.Ordinal);
         }
 
         private string GetLegacyIconPositionsKey()
@@ -942,9 +954,19 @@ namespace PC.Component.Software.OS
             return "icon_positions_" + SystemId.ToString("X8");
         }
 
+        private string GetLegacyMonitorIconPositionsKey()
+        {
+            return "icon_positions_" + SystemId.ToString("X8") + "_" + MonitorIconLayoutContext;
+        }
+
         private string GetIconPositionsKey(string layoutContext = null)
         {
             return "icon_positions_" + SystemId.ToString("X8") + "_" + NormalizeLayoutContext(layoutContext ?? currentLayoutContext);
+        }
+
+        private string GetLegacyMonitorSortModeKey()
+        {
+            return "icon_sort_mode_" + SystemId.ToString("X8") + "_" + MonitorIconLayoutContext;
         }
 
         private string GetIconSortModeKey(string layoutContext = null)
@@ -954,7 +976,12 @@ namespace PC.Component.Software.OS
 
         private void LoadCurrentSortMode()
         {
-            currentSortMode = PlayerPrefs.GetString(GetIconSortModeKey(), DefaultSortMode);
+            var layoutContext = NormalizeLayoutContext(currentLayoutContext ?? ResolveIconLayoutContext());
+            currentSortMode = PlayerPrefs.GetString(GetIconSortModeKey(layoutContext), "");
+
+            if (string.IsNullOrEmpty(currentSortMode) && IsMonitorLayoutContext(layoutContext))
+                currentSortMode = PlayerPrefs.GetString(GetLegacyMonitorSortModeKey(), "");
+
             if (string.IsNullOrEmpty(currentSortMode))
                 currentSortMode = DefaultSortMode;
         }
@@ -1019,6 +1046,11 @@ namespace PC.Component.Software.OS
 
             var data = PlayerPrefs.GetString(GetIconPositionsKey(), "");
             bool migratedLegacy = false;
+            if (string.IsNullOrEmpty(data) && IsMonitorLayoutContext(currentLayoutContext))
+            {
+                data = PlayerPrefs.GetString(GetLegacyMonitorIconPositionsKey(), "");
+                migratedLegacy = !string.IsNullOrEmpty(data);
+            }
             if (string.IsNullOrEmpty(data))
             {
                 data = PlayerPrefs.GetString(GetLegacyIconPositionsKey(), "");
