@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using PC.Component.Software.OS;
 
 namespace PC.Component.Software
@@ -10,28 +10,33 @@ namespace PC.Component.Software
     {
         [SerializeField] private OperatingSystem operatingSystem;
         [SerializeField] private Canvas canvas;
-        
+
         private GameObject menuPanel;
         private GameObject submenuPanel;
         private RectTransform menuRect;
         private RectTransform submenuRect;
-        
+        private RectTransform canvasRect;
+
         private float pointerDownTime;
         private Vector2 pointerDownPos;
         private bool isPointerDown;
+
         private const float longPressDuration = 0.5f;
         private const float pointerMoveThreshold = 10f;
-        
+        private const float menuWidth = 200f;
+        private const float submenuOffset = 5f;
+
         private void Awake()
         {
             if (canvas == null)
                 canvas = GetComponentInParent<Canvas>();
+
             if (operatingSystem == null)
                 operatingSystem = GetComponentInParent<OperatingSystem>();
-            
+
             if (operatingSystem == null)
                 operatingSystem = FindObjectOfType<OperatingSystem>();
-            
+
             if (canvas == null)
             {
                 var canvases = FindObjectsOfType<Canvas>();
@@ -43,356 +48,487 @@ namespace PC.Component.Software
                         break;
                     }
                 }
+
                 if (canvas == null && canvases.Length > 0)
                     canvas = canvases[0];
             }
-            
+
+            canvasRect = canvas != null ? canvas.transform as RectTransform : null;
             Debug.Log($"[DesktopContextMenu] Awake: canvas={canvas?.name ?? "NULL"}, OS={operatingSystem?.name ?? "NULL"}");
         }
-        
+
+        private void OnDisable()
+        {
+            CloseMenu();
+        }
+
+        private void OnDestroy()
+        {
+            CloseMenu();
+        }
+
+        private Camera GetEventCamera()
+        {
+            if (canvas == null) return null;
+            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay) return null;
+            return canvas.worldCamera;
+        }
+
+        private List<RaycastResult> RaycastAt(Vector2 screenPos)
+        {
+            var results = new List<RaycastResult>();
+            if (EventSystem.current == null)
+                return results;
+
+            var pointer = new PointerEventData(EventSystem.current);
+            pointer.position = screenPos;
+            EventSystem.current.RaycastAll(pointer, results);
+            return results;
+        }
+
+        private bool IsMenuElement(GameObject go)
+        {
+            if (go == null) return false;
+            if (menuPanel != null && (go == menuPanel || go.transform.IsChildOf(menuPanel.transform)))
+                return true;
+            if (submenuPanel != null && (go == submenuPanel || go.transform.IsChildOf(submenuPanel.transform)))
+                return true;
+            return false;
+        }
+
+        private bool IsPointerOverMenu(Vector2 screenPos)
+        {
+            var results = RaycastAt(screenPos);
+            for (int i = 0; i < results.Count; i++)
+            {
+                if (IsMenuElement(results[i].gameObject))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool CanOpenMenuAt(Vector2 screenPos)
+        {
+            var results = RaycastAt(screenPos);
+            if (results.Count == 0)
+                return false;
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                var go = results[i].gameObject;
+                if (go == null)
+                    continue;
+
+                if (IsMenuElement(go))
+                    return false;
+
+                if (go.GetComponentInParent<FileIcon>() != null)
+                    return false;
+
+                if (go.transform == transform || go.transform.IsChildOf(transform))
+                    return true;
+
+                if (operatingSystem != null && go.transform.IsChildOf(operatingSystem.transform))
+                    return false;
+            }
+
+            return false;
+        }
+
         private void Update()
         {
+            if (menuPanel != null)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    CloseMenu();
+                }
+                else if (Input.GetMouseButtonDown(0) && !IsPointerOverMenu(Input.mousePosition))
+                {
+                    CloseMenu();
+                }
+            }
+
             if (Input.GetMouseButtonDown(1))
             {
                 Debug.Log("[DesktopContextMenu] Right-click detected");
-                ShowMenu(Input.mousePosition);
+                if (CanOpenMenuAt(Input.mousePosition))
+                    ShowMenu(Input.mousePosition);
+                else
+                    CloseMenu();
             }
-            
-            // Long press detection for mobile
+
             if (isPointerDown && Time.unscaledTime - pointerDownTime > longPressDuration)
             {
-                if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold)
+                if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold && CanOpenMenuAt(pointerDownPos))
                 {
                     ShowMenu(pointerDownPos);
                     isPointerDown = false;
                 }
             }
         }
-        
+
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (eventData.button == PointerEventData.InputButton.Right)
-                return; // Right-click handled in Update
-            
+            if (eventData == null || eventData.button == PointerEventData.InputButton.Right)
+                return;
+
+            if (!CanOpenMenuAt(eventData.position))
+            {
+                isPointerDown = false;
+                return;
+            }
+
             pointerDownTime = Time.unscaledTime;
             pointerDownPos = eventData.position;
             isPointerDown = true;
         }
-        
+
         public void OnPointerUp(PointerEventData eventData)
         {
             isPointerDown = false;
         }
-        
+
         private void ShowMenu(Vector2 screenPos)
         {
             CloseMenu();
-            
+
             if (canvas == null)
             {
                 Debug.LogError("[DesktopContextMenu] Cannot show menu: canvas is null!");
                 return;
             }
+
             if (operatingSystem == null)
             {
                 Debug.LogError("[DesktopContextMenu] Cannot show menu: operatingSystem is null!");
                 return;
             }
-            
+
+            if (!CanOpenMenuAt(screenPos))
+                return;
+
             Debug.Log($"[DesktopContextMenu] Creating menu at {screenPos}, canvas={canvas.name}");
-            
-            menuPanel = CreateMenuPanel(screenPos, false);
+
+            menuPanel = CreateMenuPanel(false);
             menuRect = menuPanel.GetComponent<RectTransform>();
-            
-            // Build menu items
+
+            AddMenuItem(menuPanel, "Автоупорядочить", AutoArrangeIcons);
             AddMenuItemWithSubmenu(menuPanel, "Упорядочить по", new (string, System.Action)[] {
                 ("По названию", () => SortIcons(SortMode.Name)),
                 ("По размеру", () => SortIcons(SortMode.Size)),
                 ("По типу", () => SortIcons(SortMode.Type))
             });
-            
             AddMenuItemWithSubmenu(menuPanel, "Создать", new (string, System.Action)[] {
                 ("Текстовый документ", () => CreateFile("Новый документ.txt", "")),
                 ("Папку", () => CreateFolder("Новая папка")),
                 ("Lua-файл", () => CreateFile("script.lua", "-- Lua script\n"))
             });
-            
-            AddMenuItem(menuPanel, "Персонализация", () => OpenPersonalization());
-            
-            // Position menu
-            PositionMenu(menuRect, screenPos, false);
+            AddMenuItem(menuPanel, "Обновить", RefreshDesktop);
+            AddMenuItem(menuPanel, "Персонализация", OpenPersonalization);
+
+            PositionMenu(menuRect, screenPos);
         }
-        
+
         private void CloseMenu()
         {
+            CancelInvoke(nameof(CloseSubmenuIfNotHovered));
+
             if (menuPanel != null) Destroy(menuPanel);
             if (submenuPanel != null) Destroy(submenuPanel);
+
             menuPanel = null;
             submenuPanel = null;
             menuRect = null;
             submenuRect = null;
         }
-        
-        private GameObject CreateMenuPanel(Vector2 pos, bool isSubmenu)
+
+        private GameObject CreateMenuPanel(bool isSubmenu)
         {
             var panel = new GameObject(isSubmenu ? "Submenu" : "ContextMenu");
             panel.transform.SetParent(canvas.transform, false);
-            
+            panel.transform.SetAsLastSibling();
+
             var rt = panel.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0, 1);
-            rt.sizeDelta = new Vector2(200, 0); // Height auto
-            
-            var vlg = panel.AddComponent<VerticalLayoutGroup>();
-            vlg.childControlWidth = true;
-            vlg.childControlHeight = true;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
-            vlg.spacing = 2;
-            vlg.padding = new RectOffset(4, 4, 4, 4);
-            
-            var csf = panel.AddComponent<ContentSizeFitter>();
-            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            
-            var img = panel.AddComponent<Image>();
-            img.color = new Color(0.95f, 0.95f, 0.95f, 0.98f);
-            
+            rt.sizeDelta = new Vector2(menuWidth, 0f);
+
+            var layout = panel.AddComponent<VerticalLayoutGroup>();
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.spacing = 2;
+            layout.padding = new RectOffset(4, 4, 4, 4);
+
+            var fitter = panel.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var image = panel.AddComponent<Image>();
+            image.color = new Color(0.95f, 0.95f, 0.95f, 0.98f);
+
             var outline = panel.AddComponent<Outline>();
             outline.effectColor = new Color(0.3f, 0.3f, 0.3f, 1f);
             outline.effectDistance = new Vector2(1, -1);
-            
+
             return panel;
         }
-        
+
         private void AddMenuItem(GameObject parent, string label, System.Action onClick)
         {
             var item = new GameObject("MenuItem");
             item.transform.SetParent(parent.transform, false);
-            
+
             var rt = item.AddComponent<RectTransform>();
             rt.sizeDelta = new Vector2(0, 30);
-            
-            var le = item.AddComponent<LayoutElement>();
-            le.preferredHeight = 30;
-            
-            var img = item.AddComponent<Image>();
-            img.color = new Color(1, 1, 1, 0);
-            
-            var text = new GameObject("Text");
-            text.transform.SetParent(item.transform, false);
-            var trt = text.AddComponent<RectTransform>();
-            trt.anchorMin = Vector2.zero;
-            trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(10, 0);
-            trt.offsetMax = new Vector2(-10, 0);
-            
-            var txt = text.AddComponent<Text>();
-            txt.text = label;
-            txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            txt.fontSize = 14;
-            txt.color = Color.black;
-            txt.alignment = TextAnchor.MiddleLeft;
-            
-            var btn = item.AddComponent<Button>();
-            btn.transition = Selectable.Transition.ColorTint;
-            btn.targetGraphic = img;
-            var colors = btn.colors;
+
+            var layoutElement = item.AddComponent<LayoutElement>();
+            layoutElement.preferredHeight = 30;
+
+            var image = item.AddComponent<Image>();
+            image.color = new Color(1f, 1f, 1f, 0f);
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(item.transform, false);
+
+            var textRt = textGo.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = new Vector2(10f, 0f);
+            textRt.offsetMax = new Vector2(-10f, 0f);
+
+            var text = textGo.AddComponent<Text>();
+            text.text = label;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.black;
+            text.alignment = TextAnchor.MiddleLeft;
+
+            var button = item.AddComponent<Button>();
+            button.transition = Selectable.Transition.ColorTint;
+            button.targetGraphic = image;
+
+            var colors = button.colors;
             colors.highlightedColor = new Color(0.7f, 0.85f, 1f, 1f);
             colors.pressedColor = new Color(0.5f, 0.7f, 0.9f, 1f);
-            btn.colors = colors;
-            
-            btn.onClick.AddListener(() => {
+            button.colors = colors;
+
+            button.onClick.AddListener(() =>
+            {
                 onClick?.Invoke();
                 CloseMenu();
             });
         }
-        
+
         private void AddMenuItemWithSubmenu(GameObject parent, string label, (string label, System.Action action)[] submenuItems)
         {
             var item = new GameObject("MenuItemWithSubmenu");
             item.transform.SetParent(parent.transform, false);
-            
+
             var rt = item.AddComponent<RectTransform>();
             rt.sizeDelta = new Vector2(0, 30);
-            
-            var le = item.AddComponent<LayoutElement>();
-            le.preferredHeight = 30;
-            
-            var img = item.AddComponent<Image>();
-            img.color = new Color(1, 1, 1, 0);
-            
-            var text = new GameObject("Text");
-            text.transform.SetParent(item.transform, false);
-            var trt = text.AddComponent<RectTransform>();
-            trt.anchorMin = Vector2.zero;
-            trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(10, 0);
-            trt.offsetMax = new Vector2(-30, 0);
-            
-            var txt = text.AddComponent<Text>();
-            txt.text = label;
-            txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            txt.fontSize = 14;
-            txt.color = Color.black;
-            txt.alignment = TextAnchor.MiddleLeft;
-            
-            var arrow = new GameObject("Arrow");
-            arrow.transform.SetParent(item.transform, false);
-            var art = arrow.AddComponent<RectTransform>();
-            art.anchorMin = new Vector2(1, 0.5f);
-            art.anchorMax = new Vector2(1, 0.5f);
-            art.sizeDelta = new Vector2(20, 20);
-            art.anchoredPosition = new Vector2(-10, 0);
-            
-            var arrowTxt = arrow.AddComponent<Text>();
-            arrowTxt.text = "▶";
-            arrowTxt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            arrowTxt.fontSize = 10;
-            arrowTxt.color = Color.black;
-            arrowTxt.alignment = TextAnchor.MiddleCenter;
-            
+
+            var layoutElement = item.AddComponent<LayoutElement>();
+            layoutElement.preferredHeight = 30;
+
+            var image = item.AddComponent<Image>();
+            image.color = new Color(1f, 1f, 1f, 0f);
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(item.transform, false);
+
+            var textRt = textGo.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = new Vector2(10f, 0f);
+            textRt.offsetMax = new Vector2(-30f, 0f);
+
+            var text = textGo.AddComponent<Text>();
+            text.text = label;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.black;
+            text.alignment = TextAnchor.MiddleLeft;
+
+            var arrowGo = new GameObject("Arrow");
+            arrowGo.transform.SetParent(item.transform, false);
+
+            var arrowRt = arrowGo.AddComponent<RectTransform>();
+            arrowRt.anchorMin = new Vector2(1f, 0.5f);
+            arrowRt.anchorMax = new Vector2(1f, 0.5f);
+            arrowRt.sizeDelta = new Vector2(20f, 20f);
+            arrowRt.anchoredPosition = new Vector2(-10f, 0f);
+
+            var arrowText = arrowGo.AddComponent<Text>();
+            arrowText.text = "▶";
+            arrowText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            arrowText.fontSize = 10;
+            arrowText.color = Color.black;
+            arrowText.alignment = TextAnchor.MiddleCenter;
+
             var trigger = item.AddComponent<EventTrigger>();
-            
+
             var enterEntry = new EventTrigger.Entry();
             enterEntry.eventID = EventTriggerType.PointerEnter;
-            enterEntry.callback.AddListener((data) => {
-                img.color = new Color(0.7f, 0.85f, 1f, 1f);
+            enterEntry.callback.AddListener((data) =>
+            {
+                image.color = new Color(0.7f, 0.85f, 1f, 1f);
                 ShowSubmenu(item, submenuItems);
             });
             trigger.triggers.Add(enterEntry);
-            
+
             var exitEntry = new EventTrigger.Entry();
             exitEntry.eventID = EventTriggerType.PointerExit;
-            exitEntry.callback.AddListener((data) => {
-                img.color = new Color(1, 1, 1, 0);
-                // Delay closing to allow moving to submenu
+            exitEntry.callback.AddListener((data) =>
+            {
+                image.color = new Color(1f, 1f, 1f, 0f);
                 Invoke(nameof(CloseSubmenuIfNotHovered), 0.1f);
             });
             trigger.triggers.Add(exitEntry);
         }
-        
+
         private void ShowSubmenu(GameObject parentItem, (string label, System.Action action)[] items)
         {
+            CancelInvoke(nameof(CloseSubmenuIfNotHovered));
+
             if (submenuPanel != null) Destroy(submenuPanel);
-            
-            submenuPanel = CreateMenuPanel(Vector2.zero, true);
+
+            submenuPanel = CreateMenuPanel(true);
             submenuRect = submenuPanel.GetComponent<RectTransform>();
-            
-            foreach (var (label, action) in items)
-            {
-                AddMenuItem(submenuPanel, label, action);
-            }
-            
-            // Position submenu relative to parent item
+
+            for (int i = 0; i < items.Length; i++)
+                AddMenuItem(submenuPanel, items[i].label, items[i].action);
+
             PositionSubmenu(parentItem);
         }
-        
+
         private void CloseSubmenuIfNotHovered()
         {
-            // Check if mouse is over submenu
-            if (submenuPanel != null && submenuRect != null)
+            if (EventSystem.current == null)
+                return;
+
+            var results = RaycastAt(Input.mousePosition);
+            for (int i = 0; i < results.Count; i++)
             {
-                var pointer = new PointerEventData(EventSystem.current);
-                pointer.position = Input.mousePosition;
-                var results = new List<RaycastResult>();
-                EventSystem.current.RaycastAll(pointer, results);
-                
-                foreach (var result in results)
-                {
-                    if (result.gameObject.transform.IsChildOf(submenuPanel.transform) ||
-                        result.gameObject == submenuPanel)
-                        return; // Still hovering submenu
-                }
-                
-                // Check if hovering parent menu item
-                if (menuPanel != null)
-                {
-                    foreach (var result in results)
-                    {
-                        if (result.gameObject.transform.IsChildOf(menuPanel.transform))
-                            return; // Hovering main menu
-                    }
-                }
+                if (IsMenuElement(results[i].gameObject))
+                    return;
             }
-            
+
             if (submenuPanel != null) Destroy(submenuPanel);
             submenuPanel = null;
             submenuRect = null;
         }
-        
-        private void PositionMenu(RectTransform menu, Vector2 screenPos, bool isSubmenu)
+
+        private void PositionMenu(RectTransform menu, Vector2 screenPos)
         {
+            if (menu == null || canvasRect == null)
+                return;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(menu);
+
             Vector2 localPoint;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                canvas.transform as RectTransform, screenPos, canvas.worldCamera, out localPoint);
-            
-            var canvasRect = canvas.transform as RectTransform;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, GetEventCamera(), out localPoint);
+
             var canvasSize = canvasRect.rect.size;
-            
-            // Convert to anchored position
             var anchoredPos = localPoint;
-            
-            // Check if menu would go off-screen
-            float menuWidth = 200;
-            float menuHeight = menu.sizeDelta.y > 0 ? menu.sizeDelta.y : 120;
-            
-            // Right edge
-            if (anchoredPos.x + menuWidth > canvasSize.x / 2)
-                anchoredPos.x = canvasSize.x / 2 - menuWidth;
-            
-            // Bottom edge
-            if (anchoredPos.y - menuHeight < -canvasSize.y / 2)
-                anchoredPos.y = -canvasSize.y / 2 + menuHeight;
-            
+
+            float width = menu.rect.width > 0f ? menu.rect.width : menuWidth;
+            float height = menu.rect.height > 0f ? menu.rect.height : 120f;
+
+            if (anchoredPos.x + width > canvasSize.x / 2f)
+                anchoredPos.x = canvasSize.x / 2f - width;
+            if (anchoredPos.x < -canvasSize.x / 2f)
+                anchoredPos.x = -canvasSize.x / 2f;
+
+            if (anchoredPos.y - height < -canvasSize.y / 2f)
+                anchoredPos.y = -canvasSize.y / 2f + height;
+            if (anchoredPos.y > canvasSize.y / 2f)
+                anchoredPos.y = canvasSize.y / 2f;
+
             menu.anchoredPosition = anchoredPos;
         }
-        
+
         private void PositionSubmenu(GameObject parentItem)
         {
-            if (submenuRect == null || menuRect == null) return;
-            
+            if (submenuRect == null || parentItem == null || canvasRect == null)
+                return;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(submenuRect);
+
             var parentRect = parentItem.GetComponent<RectTransform>();
-            var parentPos = parentRect.position;
-            
-            Vector2 localPoint;
+            if (parentRect == null)
+                return;
+
+            var corners = new Vector3[4];
+            parentRect.GetWorldCorners(corners);
+
+            Vector2 topLeftLocal;
+            Vector2 topRightLocal;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                canvas.transform as RectTransform, parentPos, canvas.worldCamera, out localPoint);
-            
-            var canvasRect = canvas.transform as RectTransform;
+                canvasRect,
+                RectTransformUtility.WorldToScreenPoint(GetEventCamera(), corners[1]),
+                GetEventCamera(),
+                out topLeftLocal);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect,
+                RectTransformUtility.WorldToScreenPoint(GetEventCamera(), corners[2]),
+                GetEventCamera(),
+                out topRightLocal);
+
             var canvasSize = canvasRect.rect.size;
-            
-            float submenuWidth = 200;
-            float menuRight = menuRect.anchoredPosition.x + menuRect.rect.width;
-            
-            // Try to place submenu to the right of main menu
-            float submenuX = menuRight + 5;
-            
-            // If no space on right, place on left
-            if (submenuX + submenuWidth > canvasSize.x / 2)
-                submenuX = menuRect.anchoredPosition.x - submenuWidth - 5;
-            
-            submenuRect.anchoredPosition = new Vector2(submenuX, localPoint.y);
+            float width = submenuRect.rect.width > 0f ? submenuRect.rect.width : menuWidth;
+            float height = submenuRect.rect.height > 0f ? submenuRect.rect.height : 120f;
+
+            float x = topRightLocal.x + submenuOffset;
+            if (x + width > canvasSize.x / 2f)
+                x = topLeftLocal.x - width - submenuOffset;
+
+            float y = topLeftLocal.y;
+            if (y - height < -canvasSize.y / 2f)
+                y = -canvasSize.y / 2f + height;
+            if (y > canvasSize.y / 2f)
+                y = canvasSize.y / 2f;
+
+            submenuRect.anchoredPosition = new Vector2(x, y);
         }
-        
+
         private enum SortMode { Name, Size, Type }
-        
+
         private void SortIcons(SortMode mode)
         {
             if (operatingSystem == null) return;
             operatingSystem.SortDesktopIcons(mode.ToString());
         }
-        
+
+        private void AutoArrangeIcons()
+        {
+            if (operatingSystem == null) return;
+            operatingSystem.AutoArrangeIcons();
+        }
+
+        private void RefreshDesktop()
+        {
+            if (operatingSystem == null) return;
+            operatingSystem.RefreshDesktopIcon();
+        }
+
         private void CreateFile(string name, string content)
         {
             if (operatingSystem == null) return;
             operatingSystem.CreateDesktopFile(name, content);
         }
-        
+
         private void CreateFolder(string name)
         {
             if (operatingSystem == null) return;
             operatingSystem.CreateDesktopFolder(name);
         }
-        
+
         private void OpenPersonalization()
         {
             if (operatingSystem == null) return;

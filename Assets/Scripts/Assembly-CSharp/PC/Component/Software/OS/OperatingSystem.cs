@@ -12,24 +12,28 @@ namespace PC.Component.Software.OS
     public class OperatingSystem : ComputerSystem
     {
 
-    void Start()
-    {
-        LoadIconPositions();
-        // Disable ReorderableList layout on iconParent for free icon positioning
-        if (iconParent != null)
+        void Start()
         {
-            var rl = iconParent.GetComponent<UnityEngine.UI.Extensions.ReorderableList>();
-            if (rl != null)
+            currentLayoutContext = ResolveIconLayoutContext();
+            LoadIconPositions();
+            LoadCurrentSortMode();
+            TrackIconParentSize(true);
+
+            // Disable ReorderableList layout on iconParent for free icon positioning
+            if (iconParent != null)
             {
-                rl.IsDraggable = false;
-                rl.enabled = false;
+                var rl = iconParent.GetComponent<UnityEngine.UI.Extensions.ReorderableList>();
+                if (rl != null)
+                {
+                    rl.IsDraggable = false;
+                    rl.enabled = false;
+                }
+                
+                var lg = iconParent.GetComponent<UnityEngine.UI.LayoutGroup>();
+                if (lg != null)
+                    lg.enabled = false;
             }
-            
-            var lg = iconParent.GetComponent<UnityEngine.UI.LayoutGroup>();
-            if (lg != null)
-                lg.enabled = false;
         }
-    }
         [Serializable]
         private class User
         {
@@ -89,6 +93,20 @@ namespace PC.Component.Software.OS
         private List<string> installedApps = new List<string>();
         private Dictionary<string, FileIcon> fileIcons = new Dictionary<string, FileIcon>();
         private Dictionary<string, Vector2> iconPositions = new Dictionary<string, Vector2>();
+        private Canvas desktopCanvas;
+        private string currentLayoutContext;
+        private Vector2 lastKnownIconParentSize;
+        private bool iconParentSizeInitialized;
+        private bool layoutSwitchPending;
+        private const string DefaultIconLayoutContext = "system";
+        private const string MonitorIconLayoutContext = "monitor";
+        private const string DefaultSortMode = "Name";
+        private const float IconGridPadding = 20f;
+        private const float IconGridCellWidth = 70f;
+        private const float IconGridCellHeight = 70f;
+        private const float IconGridSpacingX = 20f;
+        private const float IconGridSpacingY = 20f;
+        private const float IconGridBottomPadding = 60f;
         private const string userFilePath = "System/user";
         private User userData;
 
@@ -666,17 +684,21 @@ namespace PC.Component.Software.OS
             fileIcons.Add(key, iconInstance);
             
             // Restore saved position or find free spawn position
+            Vector2 finalPos;
             if (iconPositions != null && iconPositions.ContainsKey(key))
             {
-                Debug.Log($"[AddFileIcon] '{key}' => RESTORED position: {iconPositions[key]}");
-                iconInstance.SetPosition(iconPositions[key]);
+                finalPos = iconPositions[key];
+                Debug.Log($"[AddFileIcon] '{key}' => RESTORED position: {finalPos}");
             }
             else
             {
-                var pos = FindFreeSpawnPosition(key);
-                Debug.Log($"[AddFileIcon] '{key}' => NEW position: {pos}");
-                iconInstance.SetPosition(pos);
+                finalPos = FindFreeSpawnPosition(key);
+                Debug.Log($"[AddFileIcon] '{key}' => NEW position: {finalPos}");
             }
+
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+            iconPositions[key] = finalPos;
+            iconInstance.SetPosition(finalPos);
         }
 
         public Sprite GetFileSprite(string fileName)
@@ -883,16 +905,71 @@ namespace PC.Component.Software.OS
         }
 
 
-        private string GetIconPositionsKey()
+        private struct IconGridMetrics
+        {
+            public float originX;
+            public float originY;
+            public float maxX;
+            public float maxY;
+            public float stepX;
+            public float stepY;
+            public int maxCols;
+            public int maxRows;
+        }
+
+        private string NormalizeLayoutContext(string layoutContext)
+        {
+            return string.IsNullOrEmpty(layoutContext) ? DefaultIconLayoutContext : layoutContext;
+        }
+
+        private Canvas GetDesktopCanvas()
+        {
+            if (desktopCanvas != null) return desktopCanvas;
+            if (iconParent != null) desktopCanvas = iconParent.GetComponentInParent<Canvas>();
+            if (desktopCanvas == null && desktop != null) desktopCanvas = desktop.GetComponentInParent<Canvas>();
+            return desktopCanvas;
+        }
+
+        private string ResolveIconLayoutContext()
+        {
+            var canvas = GetDesktopCanvas();
+            if (canvas == null) return DefaultIconLayoutContext;
+            return canvas.renderMode == RenderMode.ScreenSpaceOverlay ? DefaultIconLayoutContext : MonitorIconLayoutContext;
+        }
+
+        private string GetLegacyIconPositionsKey()
         {
             return "icon_positions_" + SystemId.ToString("X8");
         }
 
-        public void SaveIconPosition(string key, Vector2 position)
+        private string GetIconPositionsKey(string layoutContext = null)
         {
-            if (string.IsNullOrEmpty(key)) return;
-            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
-            iconPositions[key] = position;
+            return "icon_positions_" + SystemId.ToString("X8") + "_" + NormalizeLayoutContext(layoutContext ?? currentLayoutContext);
+        }
+
+        private string GetIconSortModeKey(string layoutContext = null)
+        {
+            return "icon_sort_mode_" + SystemId.ToString("X8") + "_" + NormalizeLayoutContext(layoutContext ?? currentLayoutContext);
+        }
+
+        private void LoadCurrentSortMode()
+        {
+            currentSortMode = PlayerPrefs.GetString(GetIconSortModeKey(), DefaultSortMode);
+            if (string.IsNullOrEmpty(currentSortMode))
+                currentSortMode = DefaultSortMode;
+        }
+
+        private void SaveCurrentSortMode()
+        {
+            if (string.IsNullOrEmpty(currentSortMode))
+                currentSortMode = DefaultSortMode;
+            PlayerPrefs.SetString(GetIconSortModeKey(), currentSortMode);
+        }
+
+        private void PersistIconPositions()
+        {
+            if (iconPositions == null)
+                iconPositions = new Dictionary<string, Vector2>();
 
             var sb = new System.Text.StringBuilder();
             foreach (var kvp in iconPositions)
@@ -905,26 +982,280 @@ namespace PC.Component.Software.OS
             PlayerPrefs.SetString(GetIconPositionsKey(), sb.ToString());
         }
 
-        private void LoadIconPositions()
+        private void ParseIconPositions(string data, Dictionary<string, Vector2> target)
         {
-            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
-
-            var data = PlayerPrefs.GetString(GetIconPositionsKey(), "");
-            if (string.IsNullOrEmpty(data)) return;
+            if (target == null || string.IsNullOrEmpty(data)) return;
 
             var entries = data.Split(';');
             foreach (var entry in entries)
             {
                 if (string.IsNullOrEmpty(entry)) continue;
                 var parts = entry.Split(',');
-                if (parts.Length == 3)
+                if (parts.Length != 3) continue;
+
+                float x, y;
+                if (float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x) &&
+                    float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y))
                 {
-                    float x, y;
-                    if (float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x) &&
-                        float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y))
-                        iconPositions[parts[0]] = new Vector2(x, y);
+                    target[parts[0]] = new Vector2(x, y);
                 }
             }
+        }
+
+        public void SaveIconPosition(string key, Vector2 position)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+            iconPositions[key] = position;
+            PersistIconPositions();
+        }
+
+        private void LoadIconPositions()
+        {
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+            else iconPositions.Clear();
+
+            currentLayoutContext = NormalizeLayoutContext(currentLayoutContext ?? ResolveIconLayoutContext());
+
+            var data = PlayerPrefs.GetString(GetIconPositionsKey(), "");
+            bool migratedLegacy = false;
+            if (string.IsNullOrEmpty(data))
+            {
+                data = PlayerPrefs.GetString(GetLegacyIconPositionsKey(), "");
+                migratedLegacy = !string.IsNullOrEmpty(data);
+            }
+
+            ParseIconPositions(data, iconPositions);
+
+            if (migratedLegacy && iconPositions.Count > 0)
+                PersistIconPositions();
+        }
+
+        private Dictionary<string, Vector2> CaptureVisibleIconPositions()
+        {
+            var result = new Dictionary<string, Vector2>();
+            if (fileIcons == null) return result;
+
+            foreach (var kvp in fileIcons)
+            {
+                if (kvp.Value != null)
+                    result[kvp.Key] = kvp.Value.GetPosition();
+            }
+
+            return result;
+        }
+
+        private void SaveCapturedPositionsToCurrentLayout(Dictionary<string, Vector2> capturedPositions)
+        {
+            if (capturedPositions == null) return;
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+
+            foreach (var kvp in capturedPositions)
+                iconPositions[kvp.Key] = kvp.Value;
+
+            PersistIconPositions();
+        }
+
+        private Vector2 GetIconParentSize()
+        {
+            if (iconParent != null)
+            {
+                var parentRT = iconParent.GetComponent<RectTransform>();
+                if (parentRT != null && parentRT.rect.width >= 100f && parentRT.rect.height >= 100f)
+                    return parentRT.rect.size;
+            }
+
+            return new Vector2(Screen.width, Screen.height);
+        }
+
+        private void TrackIconParentSize(bool force = false)
+        {
+            var size = GetIconParentSize();
+            if (size.x <= 0f || size.y <= 0f) return;
+
+            if (force || !iconParentSizeInitialized || size != lastKnownIconParentSize)
+            {
+                lastKnownIconParentSize = size;
+                iconParentSizeInitialized = true;
+            }
+        }
+
+        private IconGridMetrics BuildIconGridMetrics(Vector2 size)
+        {
+            float pw = size.x;
+            float ph = size.y;
+
+            if (pw < 100f || ph < 100f)
+            {
+                pw = Screen.width;
+                ph = Screen.height;
+            }
+
+            var metrics = new IconGridMetrics();
+            metrics.stepX = IconGridCellWidth + IconGridSpacingX;
+            metrics.stepY = IconGridCellHeight + IconGridSpacingY;
+            metrics.originX = -pw / 2f + IconGridPadding + IconGridCellWidth / 2f;
+            metrics.originY = ph / 2f - IconGridPadding - IconGridCellHeight / 2f;
+            metrics.maxX = pw / 2f - IconGridPadding - IconGridCellWidth / 2f;
+            metrics.maxY = -ph / 2f + IconGridBottomPadding + IconGridCellHeight / 2f;
+            metrics.maxCols = Mathf.Max(1, Mathf.FloorToInt((metrics.maxX - metrics.originX) / metrics.stepX) + 1);
+            metrics.maxRows = Mathf.Max(1, Mathf.FloorToInt((metrics.originY - metrics.maxY) / metrics.stepY) + 1);
+            return metrics;
+        }
+
+        private Vector2Int ClampGridCell(Vector2Int cell, IconGridMetrics metrics)
+        {
+            return new Vector2Int(
+                Mathf.Clamp(cell.x, 0, metrics.maxCols - 1),
+                Mathf.Clamp(cell.y, 0, metrics.maxRows - 1));
+        }
+
+        private Vector2Int GetGridCellFromPosition(Vector2 position, IconGridMetrics metrics)
+        {
+            int col = Mathf.RoundToInt((position.x - metrics.originX) / metrics.stepX);
+            int row = Mathf.RoundToInt((metrics.originY - position.y) / metrics.stepY);
+            return ClampGridCell(new Vector2Int(col, row), metrics);
+        }
+
+        private Vector2 GetPositionFromGridCell(Vector2Int cell, IconGridMetrics metrics)
+        {
+            var clampedCell = ClampGridCell(cell, metrics);
+            float x = metrics.originX + clampedCell.x * metrics.stepX;
+            float y = metrics.originY - clampedCell.y * metrics.stepY;
+            return new Vector2(x, y);
+        }
+
+        private Vector2 FindFreeCellPosition(Vector2Int desiredCell, IconGridMetrics metrics, HashSet<Vector2Int> occupied)
+        {
+            var clampedDesired = ClampGridCell(desiredCell, metrics);
+            if (occupied == null) occupied = new HashSet<Vector2Int>();
+
+            if (!occupied.Contains(clampedDesired))
+            {
+                occupied.Add(clampedDesired);
+                return GetPositionFromGridCell(clampedDesired, metrics);
+            }
+
+            int maxSearch = Mathf.Max(metrics.maxCols, metrics.maxRows) + 8;
+            for (int radius = 1; radius <= maxSearch; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        if (Mathf.Abs(dx) != radius && Mathf.Abs(dy) != radius)
+                            continue;
+
+                        var cell = ClampGridCell(new Vector2Int(clampedDesired.x + dx, clampedDesired.y + dy), metrics);
+                        if (occupied.Contains(cell))
+                            continue;
+
+                        occupied.Add(cell);
+                        return GetPositionFromGridCell(cell, metrics);
+                    }
+                }
+            }
+
+            return GetPositionFromGridCell(clampedDesired, metrics);
+        }
+
+        private Vector2 AdaptPositionToCurrentLayout(Vector2 sourcePosition, Vector2 sourceSize, HashSet<Vector2Int> occupied)
+        {
+            var sourceMetrics = BuildIconGridMetrics(sourceSize);
+            var targetMetrics = BuildIconGridMetrics(GetIconParentSize());
+            var desiredCell = GetGridCellFromPosition(sourcePosition, sourceMetrics);
+            return FindFreeCellPosition(desiredCell, targetMetrics, occupied);
+        }
+
+        private Vector2 FitPositionToCurrentLayout(Vector2 position, HashSet<Vector2Int> occupied)
+        {
+            var targetMetrics = BuildIconGridMetrics(GetIconParentSize());
+            var desiredCell = GetGridCellFromPosition(position, targetMetrics);
+            return FindFreeCellPosition(desiredCell, targetMetrics, occupied);
+        }
+
+        private IEnumerator ApplyLayoutContextChange(string newLayoutContext, Vector2 sourceSize, Dictionary<string, Vector2> sourcePositions)
+        {
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            yield return new WaitForEndOfFrame();
+
+            currentLayoutContext = NormalizeLayoutContext(newLayoutContext);
+            LoadIconPositions();
+            LoadCurrentSortMode();
+
+            if (fileIcons != null && fileIcons.Count > 0)
+            {
+                var orderedKeys = new List<string>(fileIcons.Keys);
+                orderedKeys.Sort(StringComparer.OrdinalIgnoreCase);
+
+                var occupied = new HashSet<Vector2Int>();
+                bool changed = false;
+
+                for (int i = 0; i < orderedKeys.Count; i++)
+                {
+                    var key = orderedKeys[i];
+                    if (!fileIcons.TryGetValue(key, out var icon) || icon == null)
+                        continue;
+
+                    Vector2 nextPos;
+                    if (iconPositions.TryGetValue(key, out var savedPos))
+                    {
+                        nextPos = FitPositionToCurrentLayout(savedPos, occupied);
+                        if (savedPos != nextPos)
+                        {
+                            iconPositions[key] = nextPos;
+                            changed = true;
+                        }
+                    }
+                    else if (sourcePositions != null && sourcePositions.TryGetValue(key, out var previousPos))
+                    {
+                        nextPos = AdaptPositionToCurrentLayout(previousPos, sourceSize, occupied);
+                        iconPositions[key] = nextPos;
+                        changed = true;
+                    }
+                    else
+                    {
+                        nextPos = FindFreeCellPosition(new Vector2Int(0, 0), BuildIconGridMetrics(GetIconParentSize()), occupied);
+                        iconPositions[key] = nextPos;
+                        changed = true;
+                    }
+
+                    icon.SetPosition(nextPos);
+                }
+
+                if (changed)
+                    PersistIconPositions();
+            }
+
+            TrackIconParentSize(true);
+            layoutSwitchPending = false;
+        }
+
+        private void CheckForLayoutContextChange()
+        {
+            if (!Ready || layoutSwitchPending)
+                return;
+
+            var layoutContext = ResolveIconLayoutContext();
+            if (string.IsNullOrEmpty(currentLayoutContext))
+            {
+                currentLayoutContext = NormalizeLayoutContext(layoutContext);
+                LoadIconPositions();
+                LoadCurrentSortMode();
+                return;
+            }
+
+            if (layoutContext == currentLayoutContext)
+                return;
+
+            var sourceSize = iconParentSizeInitialized ? lastKnownIconParentSize : GetIconParentSize();
+            var sourcePositions = CaptureVisibleIconPositions();
+            SaveCapturedPositionsToCurrentLayout(sourcePositions);
+            SaveCurrentSortMode();
+
+            layoutSwitchPending = true;
+            StartCoroutine(ApplyLayoutContextChange(layoutContext, sourceSize, sourcePositions));
         }
 
         private IEnumerator WaitRefresh()
@@ -945,74 +1276,32 @@ namespace PC.Component.Software.OS
         private Vector2 FindFreeSpawnPosition(string fileName = null)
         {
             if (iconParent == null) return Vector2.zero;
-            
-            float padding = 20f;
-            float cellWidth = 70f;
-            float cellHeight = 70f;
-            float spacingX = 20f;
-            float spacingY = 20f;
-            float bottomPadding = 60f;
-            
-            float gridStepX = cellWidth + spacingX;
-            float gridStepY = cellHeight + spacingY;
-            
-            var parentRT = iconParent.GetComponent<RectTransform>();
-            if (parentRT == null) return Vector2.zero;
-            
-            // Use parentRT (iconParent) rect size, NOT canvas.pixelRect.
-            // Icons are positioned relative to iconParent, so we must use its dimensions.
-            float pw = parentRT.rect.width;
-            float ph = parentRT.rect.height;
-            
-            // If parent rect is not yet initialized, use screen size as fallback
-            if (pw < 100 || ph < 100)
-            {
-                pw = Screen.width;
-                ph = Screen.height;
-                Debug.LogWarning($"[FindFreeSpawn] parentRT not ready ({parentRT.rect.width}x{parentRT.rect.height}), using Screen: {pw}x{ph}");
-            }
-            
-            float originX = -pw / 2f + padding + cellWidth / 2f;
-            float originY = ph / 2f - padding - cellHeight / 2f;
-            float maxX = pw / 2f - padding - cellWidth / 2f;
-            float maxY = -ph / 2f + bottomPadding + cellHeight / 2f;
-            
-            // Get occupied cells from existing icons
+
+            var metrics = BuildIconGridMetrics(GetIconParentSize());
             var occupied = new HashSet<Vector2Int>();
             foreach (var kvp in fileIcons)
             {
                 if (kvp.Value == null) continue;
                 var rt = kvp.Value.GetComponent<RectTransform>();
                 if (rt == null) continue;
-                
-                int col = Mathf.RoundToInt((rt.anchoredPosition.x - originX) / gridStepX);
-                int row = Mathf.RoundToInt((originY - rt.anchoredPosition.y) / gridStepY);
-                occupied.Add(new Vector2Int(col, row));
+                occupied.Add(GetGridCellFromPosition(rt.anchoredPosition, metrics));
             }
-            
-            // Find first free cell in grid order (left-to-right in first row, then next row down)
-            // This is the standard row-major layout
-            int maxCols = Mathf.Max(1, Mathf.FloorToInt((maxX - originX) / gridStepX) + 1);
-            int maxRows = Mathf.Max(1, Mathf.FloorToInt((originY - maxY) / gridStepY) + 1);
-            
-            Debug.Log($"[FindFreeSpawn] Grid: {maxCols} cols x {maxRows} rows, parentRT: {pw}x{ph}, occupied: {occupied.Count} cells");
-            
-            // Row-major order: fill first row left-to-right, then next row
-            for (int row = 0; row < maxRows; row++)
+
+            Debug.Log($"[FindFreeSpawn] Grid: {metrics.maxCols} cols x {metrics.maxRows} rows, occupied: {occupied.Count} cells");
+
+            for (int row = 0; row < metrics.maxRows; row++)
             {
-                for (int col = 0; col < maxCols; col++)
+                for (int col = 0; col < metrics.maxCols; col++)
                 {
-                    if (!occupied.Contains(new Vector2Int(col, row)))
-                    {
-                        float x = originX + col * gridStepX;
-                        float y = originY - row * gridStepY;
-                        return new Vector2(x, y);
-                    }
+                    var cell = new Vector2Int(col, row);
+                    if (occupied.Contains(cell))
+                        continue;
+
+                    return GetPositionFromGridCell(cell, metrics);
                 }
             }
-            
-            // Fallback: return origin if all cells are occupied
-            return new Vector2(originX, originY);
+
+            return GetPositionFromGridCell(new Vector2Int(0, 0), metrics);
         }
 
         /// <summary>
@@ -1025,11 +1314,12 @@ namespace PC.Component.Software.OS
                 iconPositions.Clear();
             
             PlayerPrefs.DeleteKey(GetIconPositionsKey());
-            currentSortMode = "Name";
+            currentSortMode = DefaultSortMode;
+            SaveCurrentSortMode();
             
-            Debug.Log("[AutoArrangeIcons] Cleared all saved positions, re-arranging...");
+            Debug.Log("[AutoArrangeIcons] Cleared current layout positions, re-arranging...");
             
-            RefreshDesktopIcon();
+            RefreshDesktopIcon(false);
         }
 
         /// <summary>
@@ -1042,14 +1332,15 @@ namespace PC.Component.Software.OS
                 iconPositions.Clear();
             
             PlayerPrefs.DeleteKey(GetIconPositionsKey());
-            currentSortMode = mode;
+            currentSortMode = string.IsNullOrEmpty(mode) ? DefaultSortMode : mode;
+            SaveCurrentSortMode();
             
-            Debug.Log($"[SortDesktopIcons] Sorting by {mode}...");
+            Debug.Log($"[SortDesktopIcons] Sorting current layout by {currentSortMode}...");
             
-            RefreshDesktopIcon();
+            RefreshDesktopIcon(false);
         }
 
-        private string currentSortMode = "Name";
+        private string currentSortMode = DefaultSortMode;
 
         /// <summary>
         /// Create a new file on the desktop.
@@ -1092,15 +1383,18 @@ namespace PC.Component.Software.OS
             RefreshDesktopIcon();
         }
 
-        public void RefreshDesktopIcon()
+        public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
         {
             // Collect positions before destroying icons
-            if (fileIcons != null && iconPositions != null)
+            if (fileIcons != null)
             {
-                foreach (var kvp in fileIcons)
+                if (preserveCurrentPositions && iconPositions != null)
                 {
-                    if (kvp.Value != null)
-                        iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                    foreach (var kvp in fileIcons)
+                    {
+                        if (kvp.Value != null)
+                            iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                    }
                 }
                 fileIcons.Clear();
             }
@@ -1194,13 +1488,18 @@ namespace PC.Component.Software.OS
         {
             if (fileIcons == null || iconPositions == null) return;
             
+            var occupied = new HashSet<Vector2Int>();
             foreach (var kvp in fileIcons)
             {
-                if (kvp.Value != null && iconPositions.ContainsKey(kvp.Key))
-                {
-                    kvp.Value.SetPosition(iconPositions[kvp.Key]);
-                }
+                if (kvp.Value == null || !iconPositions.ContainsKey(kvp.Key))
+                    continue;
+
+                var fitted = FitPositionToCurrentLayout(iconPositions[kvp.Key], occupied);
+                iconPositions[kvp.Key] = fitted;
+                kvp.Value.SetPosition(fitted);
             }
+
+            PersistIconPositions();
         }
 
         public List<DeviceDetail> ListInstalledDevices()
@@ -1327,6 +1626,9 @@ namespace PC.Component.Software.OS
 
         private void Update()
         {
+            CheckForLayoutContextChange();
+            TrackIconParentSize();
+
             if (!Ready) return;
 
             if (clockText != null)
