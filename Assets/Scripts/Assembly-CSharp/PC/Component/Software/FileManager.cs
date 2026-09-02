@@ -618,7 +618,7 @@ namespace PC.Component.Software
             PointerInput.ConsumedClick = false;
             isPointerDown = true;
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = eventData.position;
+            pointerDownPos = PointerInput.ScreenPosition();
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -669,7 +669,7 @@ namespace PC.Component.Software
             isPointerDown = true;
             openedMenu = false;
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = eventData.position;
+            pointerDownPos = PointerInput.ScreenPosition();
         }
 
         public void OnPointerUp(PointerEventData eventData)

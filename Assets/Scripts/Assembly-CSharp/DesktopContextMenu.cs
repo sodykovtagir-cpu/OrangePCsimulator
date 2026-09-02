@@ -55,17 +55,21 @@ namespace PC.Component.Software
         private void Awake()
         {
             Instance = this;
+            EnsureRefs();
+        }
 
-            if (canvas == null)
-                canvas = GetComponentInParent<Canvas>();
-
+        void EnsureRefs()
+        {
             if (operatingSystem == null)
                 operatingSystem = GetComponentInParent<OperatingSystem>();
 
+            if (canvas == null)
+                canvas = GetComponentInParent<Canvas>();
             if (canvas == null && operatingSystem != null)
             {
-                canvas = operatingSystem.GetComponent<Canvas>();
-                if (canvas == null) canvas = operatingSystem.GetComponentInParent<Canvas>();
+                canvas = operatingSystem.GetComponentInParent<Canvas>();
+                if (canvas == null)
+                    canvas = operatingSystem.GetComponentInChildren<Canvas>(true);
             }
 
             canvasRect = canvas != null ? canvas.transform as RectTransform : null;
@@ -222,9 +226,6 @@ namespace PC.Component.Software
 
         private void OpenContextAt(Vector2 screenPos)
         {
-            if (!PointerHitsThisOs(screenPos))
-                return;
-
             if (IsPointerOverMenu(screenPos))
                 return;
 
@@ -283,11 +284,11 @@ namespace PC.Component.Software
 
             if (isPointerDown && Time.unscaledTime - pointerDownTime > longPressDuration)
             {
-                if (Vector2.Distance(Input.mousePosition, pointerDownPos) < pointerMoveThreshold)
+                if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
                 {
                     isPointerDown = false;
                     PointerInput.ConsumedClick = true;
-                    OpenContextAt(pointerDownPos);
+                    ShowDesktopMenu(pointerDownPos, true);
                 }
             }
         }
@@ -298,7 +299,7 @@ namespace PC.Component.Software
                 return;
 
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = eventData.position;
+            pointerDownPos = PointerInput.ScreenPosition();
             isPointerDown = true;
         }
 
@@ -411,6 +412,7 @@ namespace PC.Component.Software
 
         private bool PrepareMenu(Vector2 screenPos, bool skipDesktopCheck)
         {
+            EnsureRefs();
             if (canvas == null || operatingSystem == null)
                 return false;
 

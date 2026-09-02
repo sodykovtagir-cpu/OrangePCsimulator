@@ -88,7 +88,7 @@ namespace PC.Component.Software
                 PointerInput.ConsumedClick = true;
                 var menu = DesktopContextMenu.For(this);
                 if (menu != null && File != null)
-                    menu.ShowFileMenu(File, pointerDownPos);
+                    menu.ShowFileMenu(File, PointerInput.ScreenPosition());
             }
         }
 
