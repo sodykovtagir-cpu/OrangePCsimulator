@@ -638,7 +638,7 @@ namespace PC.Component.Software
 
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
-            var menu = DesktopContextMenu.For(explorer != null ? (Component)explorer : this);
+            var menu = DesktopContextMenu.For(explorer != null ? (UnityEngine.Component)explorer : this);
             if (menu != null)
                 menu.ShowExplorerMenu(explorer, pointerDownPos);
         }

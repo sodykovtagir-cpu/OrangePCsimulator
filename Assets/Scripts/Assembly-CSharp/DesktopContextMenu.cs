@@ -13,7 +13,7 @@ namespace PC.Component.Software
         [SerializeField] private OperatingSystem operatingSystem;
         [SerializeField] private Canvas canvas;
 
-        public static DesktopContextMenu For(Component c)
+        public static DesktopContextMenu For(UnityEngine.Component c)
         {
             if (c == null) return null;
 
@@ -222,6 +222,9 @@ namespace PC.Component.Software
 
         private void OpenContextAt(Vector2 screenPos)
         {
+            if (!PointerHitsThisOs(screenPos))
+                return;
+
             if (IsPointerOverMenu(screenPos))
                 return;
 
@@ -238,7 +241,7 @@ namespace PC.Component.Software
             for (int i = 0; i < results.Count; i++)
             {
                 var go = results[i].gameObject;
-                if (go == null) continue;
+                if (go == null || IsForeignOs(go)) continue;
                 if (item == null)
                     item = go.GetComponentInParent<ExplorerFileItem>();
                 if (explorer == null)
