@@ -61,6 +61,8 @@ namespace PC.Component.Software
 
 		public virtual bool SingleInstance => true;
 
+		public virtual bool CanOpenExtension(string ext) => false;
+
 		public bool IsDraggable => canDrag;
 
 		public bool IsMaximizable => canMaximize;

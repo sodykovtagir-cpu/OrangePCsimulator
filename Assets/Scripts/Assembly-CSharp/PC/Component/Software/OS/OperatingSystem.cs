@@ -504,7 +504,30 @@ namespace PC.Component.Software.OS
             }
 
             RefreshDesktopIcon();
+            EnsureViewer();
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
+        }
+
+        private void EnsureViewer()
+        {
+            if (appPrefabs == null || !appPrefabs.TryGetValue("Viewer", out var prefab) || prefab == null)
+                return;
+            if (FileManager == null) return;
+
+            if (!FileManager.Exists(0, "Viewer.exe"))
+            {
+                var file = new File("Viewer.exe", "", true, prefab.size > 0 ? prefab.size : 128);
+                FileManager.Create(0, file);
+            }
+            else
+            {
+                File existing;
+                if (FileManager.TryGetFile(0, "Viewer.exe", out existing) && existing != null)
+                    existing.hidden = true;
+            }
+
+            if (!IsAppInstalled("Viewer"))
+                AddApp("Viewer");
         }
 
         private void EnsureLuaEditor()
@@ -882,10 +905,16 @@ namespace PC.Component.Software.OS
             foreach (var kvp in appPrefabs)
             {
                 var app = kvp.Value;
-                if (app == null || string.IsNullOrEmpty(app.FileName)) continue;
-                if (string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase))
-                    Add(app.AppName);
+                if (app == null) continue;
+                bool match = !string.IsNullOrEmpty(app.FileName)
+                    && string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase);
+                if (!match) match = app.CanOpenExtension(ext);
+                if (match) Add(app.AppName);
             }
+
+            if (ext.Equals(".pic", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase))
+                Add("Viewer");
 
             if (IsTextLikeExtension(ext))
             {
