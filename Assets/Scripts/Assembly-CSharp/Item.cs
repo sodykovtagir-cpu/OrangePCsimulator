@@ -60,10 +60,15 @@ public class Item : MonoBehaviour, ISave
 
     public virtual string GetInfo()
 	{
-		if (string.IsNullOrEmpty(info))
-			return info;
+		return TranslateBracket(info);
+	}
 
-		string result = info;
+	public static string TranslateBracket(string str)
+	{
+		if (string.IsNullOrEmpty(str))
+			return str;
+
+		string result = str;
 		int start = result.IndexOf('{');
 
 		while (start != -1)
