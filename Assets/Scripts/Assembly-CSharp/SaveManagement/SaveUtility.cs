@@ -129,8 +129,20 @@ namespace SaveManagement
 			return diff == 0;
 		}
 
+		private static readonly Regex illegalName = new Regex(
+			@"[<>:""/\\|?*\x00-\x1F]",
+			RegexOptions.Compiled
+		);
+
+		public static string GetSafeFileName(string input)
+		{
+			if (string.IsNullOrEmpty(input)) return input;
+			return illegalName.Replace(input, "");
+		}
+
 		public static string GetNewPath(string name)
 		{
+			name = GetSafeFileName(name);
 			string folder = GetFolderPath();
 			string baseName = name;
 			int currentIndex = 0;

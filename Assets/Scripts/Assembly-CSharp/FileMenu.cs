@@ -78,6 +78,7 @@ public class FileMenu : MonoBehaviour
 			var x = Instantiate(pref, parent, false);
 			x.Find("Name").GetComponent<Text>().text = l.GameData.roomName;
 			x.Find("Hardcore").gameObject.SetActive(l.GameData.hardcore == true);
+			ApplySaveIcon(x, l.GameData);
 			ApplyPublishedMark(x, IsPublished(l.GameData));
 			// add to load list
 			Load v = new Load();
@@ -129,7 +130,38 @@ public class FileMenu : MonoBehaviour
 		var x = load.graphic.transform;
 		x.Find("Name").GetComponent<Text>().text = load.loader.GameData.roomName;
 		x.Find("Hardcore").gameObject.SetActive(load.loader.GameData.hardcore == true);
+		ApplySaveIcon(x, load.loader.GameData);
 		ApplyPublishedMark(x, IsPublished(load.loader.GameData));
+	}
+
+	private static void ApplySaveIcon(Transform row, GameData g)
+	{
+		if (row == null) return;
+		Texture tex = null;
+		if (g != null && !string.IsNullOrEmpty(g.icon))
+		{
+			try { tex = FormatConverter.StringToTexture(g.icon); }
+			catch { tex = null; }
+		}
+
+		var icon = row.Find("Icon");
+		if (icon == null)
+		{
+			var go = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
+			go.transform.SetParent(row, false);
+			var rt = go.GetComponent<RectTransform>();
+			rt.anchorMin = new Vector2(0f, 0.5f);
+			rt.anchorMax = new Vector2(0f, 0.5f);
+			rt.pivot = new Vector2(0.5f, 0.5f);
+			rt.sizeDelta = new Vector2(48f, 48f);
+			rt.anchoredPosition = new Vector2(32f, 0f);
+			icon = go.transform;
+		}
+
+		var raw = icon.GetComponent<RawImage>();
+		if (raw == null) return;
+		raw.texture = tex;
+		raw.enabled = tex != null;
 	}
 
 	private static bool IsPublished(GameData g)

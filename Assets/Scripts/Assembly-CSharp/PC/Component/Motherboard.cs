@@ -39,6 +39,9 @@ namespace PC.Component
 		[HideInInspector]
 		public Display monitor;
 
+		[SerializeField]
+		private GameObject explode;
+
 		public Bios.BiosSettings BiosSettings;
 
 		private List<External> externals = new List<External>();
@@ -114,6 +117,13 @@ namespace PC.Component
 				+ " ("
 				+ requiredW.ToString()
 				+ "W)</color>";
+		}
+
+		public void Explode()
+		{
+			if (explode != null)
+				Instantiate(explode, transform.position, transform.rotation);
+			Damage();
 		}
 
 		public void SwitchSystem(int storage, ComputerSystem cs)

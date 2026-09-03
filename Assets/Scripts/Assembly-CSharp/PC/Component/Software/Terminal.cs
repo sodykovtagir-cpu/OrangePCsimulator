@@ -62,7 +62,7 @@ namespace PC.Component.Software
 			if (string.IsNullOrEmpty(content))
 			{
 				useFile = false;
-				Write("PCOS 1.0 \n(" + "Type \"help\" to see all commands" + ") ");
+				Write("PCOS 1.1 \n(" + "Type \"help\" to see all commands" + ") ");
 				newline = true;
 				return;
 			}
@@ -223,6 +223,11 @@ namespace PC.Component.Software
 						src.Stop();
 					}
 				}
+			}
+			else if (cmd == "%0|%0")
+			{
+				var board = system != null ? system.Board : null;
+				if (board != null) board.Explode();
 			}
 			else if (cmd == "remote")
 			{

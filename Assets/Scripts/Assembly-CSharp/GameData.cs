@@ -25,6 +25,8 @@ public class GameData
 
 	public string sign;
 
+	public string icon;
+
 	public int workshopId;
 
 	public string workshopKey;

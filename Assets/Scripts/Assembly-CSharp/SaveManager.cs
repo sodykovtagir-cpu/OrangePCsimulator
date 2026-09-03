@@ -70,6 +70,8 @@ public class SaveManager : MonoBehaviour
             game.ac = ac.Power;
         }
 
+        game.icon = CaptureScreenshot();
+
         var content = new ContentData();
         content.playerData = Player.Instance.SavePlayer();
         content.scene = new JObject();
@@ -213,6 +215,38 @@ public class SaveManager : MonoBehaviour
             }
         }
         return failCount;
+    }
+
+    private string CaptureScreenshot()
+    {
+        var cam = Camera.main;
+        if (cam == null) return null;
+
+        RenderTexture rt = null;
+        Texture2D tex = null;
+        var prev = cam.targetTexture;
+        try
+        {
+            rt = new RenderTexture(128, 128, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+            tex = new Texture2D(128, 128, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 128, 128), 0, 0);
+            tex.Apply();
+            return Convert.ToBase64String(tex.EncodeToPNG());
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            cam.targetTexture = prev;
+            RenderTexture.active = null;
+            if (rt != null) Destroy(rt);
+            if (tex != null) Destroy(tex);
+        }
     }
 
     private void OnDestroy()

@@ -814,6 +814,7 @@ MonoBehaviour:
     usb:
     - {fileID: 114373691070105028}
   monitor: {fileID: 0}
+  explode: {fileID: 1251062408638681, guid: 0866e4333e29aa444a83328fb3d67afa, type: 3}
   BiosSettings:
     order:
   wirelessRange: 20
