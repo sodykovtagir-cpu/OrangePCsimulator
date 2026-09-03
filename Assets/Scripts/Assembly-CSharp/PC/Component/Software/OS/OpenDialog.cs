@@ -34,6 +34,11 @@ namespace PC.Component.Software.OS
 
 		public void SelectFile(string extension, Action<File> fileSelected)
 		{
+			SelectFile(new[] { extension }, fileSelected);
+		}
+
+		public void SelectFile(string[] extensions, Action<File> fileSelected)
+		{
 			this.fileSelected = fileSelected;
 
 			var lv = listView;
@@ -51,13 +56,20 @@ namespace PC.Component.Software.OS
 			if (src == null) return;
 
 			var list = new List<File>();
-			bool any = extension == "*";
+			bool any = extensions == null || extensions.Length == 0;
+			if (!any)
+			{
+				for (int i = 0; i < extensions.Length; i++)
+				{
+					if (extensions[i] == "*") { any = true; break; }
+				}
+			}
 
 			for (int i = 0; i < src.Count; i++)
 			{
 				var f = src[i];
-				if (f == null) continue;
-				if (any || string.Equals(f.Extension(), extension)) list.Add(f);
+				if (f == null || f.hidden) continue;
+				if (any || MatchesAny(f.Extension(), extensions)) list.Add(f);
 			}
 
 			files = list.ToArray();
@@ -71,6 +83,17 @@ namespace PC.Component.Software.OS
 
 			var go = gameObject;
 			if (go != null) go.SetActive(true);
+		}
+
+		private static bool MatchesAny(string ext, string[] extensions)
+		{
+			if (extensions == null) return false;
+			for (int i = 0; i < extensions.Length; i++)
+			{
+				if (string.Equals(ext, extensions[i], StringComparison.OrdinalIgnoreCase))
+					return true;
+			}
+			return false;
 		}
 
 		public void Select()

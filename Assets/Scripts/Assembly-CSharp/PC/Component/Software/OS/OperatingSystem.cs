@@ -531,6 +531,12 @@ namespace PC.Component.Software.OS
             if (dlg != null) dlg.SelectFile(extension, callback);
         }
 
+        public void SelectFile(string[] extensions, Action<File> callback)
+        {
+            var dlg = fileDialog;
+            if (dlg != null) dlg.SelectFile(extensions, callback);
+        }
+
         private void LoadFilesFromDisk()
         {
             if (installedApps == null) return;
@@ -1011,6 +1017,20 @@ namespace PC.Component.Software.OS
 
             var installed = FindInstalledAppForExtension(ext);
             if (installed != null) return installed;
+
+            // Ищем приложение, которое заявляет поддержку расширения
+            // через CanOpenExtension (например, Viewer для .pic/.mov).
+            if (installedApps != null && appPrefabs != null)
+            {
+                for (int i = 0; i < installedApps.Count; i++)
+                {
+                    App cand;
+                    if (!appPrefabs.TryGetValue(installedApps[i], out cand) || cand == null)
+                        continue;
+                    if (cand.CanOpenExtension(ext))
+                        return cand;
+                }
+            }
 
             foreach (var kvp in appPrefabs)
             {
