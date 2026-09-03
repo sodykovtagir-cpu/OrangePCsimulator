@@ -42,8 +42,11 @@ namespace PC.Component.Software.OS
             public string userName;
             public int background;
 
-            // Сохранение пути к кастомным обоям
+            // Orange custom wallpaper path
             public string customBackgroundPath;
+            // 1.8.3 custom wallpaper path (same file; both written on save)
+            public string bgPath;
+            public int wallpaperMode;
         }
 
         [SerializeField] private UnityEngine.Animator animator;
@@ -216,6 +219,8 @@ namespace PC.Component.Software.OS
             }
 
             userData = ud;
+            if (NormalizeWallpaperFields(userData))
+                SaveUserData();
 
             var tex = UserPicture();
             if (userPicture != null) userPicture.texture = tex;
@@ -249,32 +254,9 @@ namespace PC.Component.Software.OS
 #if UNITY_EDITOR
             UnityEngine.Debug.Log("customBackgroundPath = " + userData.customBackgroundPath);
 #endif
-            if (userData == null || texDesktop == null) return;
+            if (userData == null) return;
 
-            // Логика загрузки обоев (стандартные или кастомные)
-            if (background != null)
-            {
-                bool customLoaded = false;
-
-                if (!string.IsNullOrEmpty(userData.customBackgroundPath))
-                {
-                    Sprite customSprite = LoadSpriteFromInGameFile(userData.customBackgroundPath);
-                    if (customSprite != null)
-                    {
-                        background.Sprite = customSprite;
-                        customLoaded = true;
-                    }
-                }
-
-                if (!customLoaded)
-                {
-                    int index = (int)userData.background;
-                    if (index >= 0 && index < texDesktop.Length)
-                    {
-                        background.Sprite = texDesktop[index];
-                    }
-                }
-            }
+            ApplyWallpaper();
 
             if (animator != null) animator.SetTrigger("Enter");
             if (desktop != null) desktop.blocksRaycasts = true;
@@ -303,45 +285,120 @@ namespace PC.Component.Software.OS
         public void SetCustomBackgroundPath(string path)
         {
             if (userData == null) return;
-            userData.customBackgroundPath = path;
+            userData.customBackgroundPath = path ?? "";
+            userData.bgPath = userData.customBackgroundPath;
+            userData.background = -1;
             SaveUserData();
-            Desktop();
+            ApplyWallpaper();
+        }
+
+        public int WallpaperMode
+        {
+            get { return userData != null ? userData.wallpaperMode : 0; }
+            set
+            {
+                if (userData == null) return;
+                userData.wallpaperMode = value;
+                SaveUserData();
+                ApplyWallpaper();
+            }
+        }
+
+        private static bool NormalizeWallpaperFields(User u)
+        {
+            if (u == null) return false;
+            bool changed = false;
+            if (string.IsNullOrEmpty(u.customBackgroundPath) && !string.IsNullOrEmpty(u.bgPath))
+            {
+                u.customBackgroundPath = u.bgPath;
+                changed = true;
+            }
+            else if (string.IsNullOrEmpty(u.bgPath) && !string.IsNullOrEmpty(u.customBackgroundPath))
+            {
+                u.bgPath = u.customBackgroundPath;
+                changed = true;
+            }
+            return changed;
+        }
+
+        private void ApplyWallpaper()
+        {
+            if (background == null || userData == null) return;
+
+            int mode = userData.wallpaperMode;
+            if (mode < 0 || mode > 4) mode = 0;
+            background.FitMode = (CoverImage.WallpaperFit)mode;
+
+            string customPath = userData.customBackgroundPath;
+            if (string.IsNullOrEmpty(customPath))
+                customPath = userData.bgPath;
+
+            if (!string.IsNullOrEmpty(customPath))
+            {
+                Sprite customSprite = LoadSpriteFromInGameFile(customPath);
+                if (customSprite != null)
+                {
+                    background.Sprite = customSprite;
+                    return;
+                }
+            }
+
+            if (texDesktop == null) return;
+            int index = userData.background;
+            if (index >= 0 && index < texDesktop.Length)
+                background.Sprite = texDesktop[index];
         }
 
         // Вспомогательный метод для превращения внутриигрового файла в Sprite
         private Sprite LoadSpriteFromInGameFile(string path)
         {
-            if (FileManager == null) return null;
+            if (FileManager == null || string.IsNullOrEmpty(path)) return null;
             if (!FileManager.TryGetFile(0, path, out var file) || file == null) return null;
+            if (string.IsNullOrEmpty(file.content)) return null;
 
             try
             {
-                byte[] data = Convert.FromBase64String(file.content);
-                Texture2D tex = new Texture2D(2, 2);
+                var tex = FormatConverter.StringToTexture(file.content);
+                if (tex == null) return null;
                 tex.filterMode = FilterMode.Bilinear;
-                if (tex.LoadImage(data))
-                {
-                    return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-                }
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.Apply();
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
             }
             catch
             {
                 return null;
             }
-            return null;
         }
 
         public void UpdateBackground(int index)
         {
-            var user = userData;
-            var sprites = texDesktop;
-            if (user == null || sprites == null) return;
+            if (userData == null) return;
 
-            user.background = index;
-            user.customBackgroundPath = ""; // Очищаем кастомные при выборе стандарта
+            if (index >= 0)
+            {
+                userData.background = index;
+                userData.customBackgroundPath = "";
+                userData.bgPath = "";
+            }
+            else
+            {
+                userData.background = -1;
+                NormalizeWallpaperFields(userData);
+            }
 
             SaveUserData();
-            Desktop();
+            ApplyWallpaper();
+        }
+
+        public void UpdateBackground(int index, string path)
+        {
+            if (userData == null) return;
+            userData.bgPath = path ?? "";
+            userData.customBackgroundPath = userData.bgPath;
+            userData.background = index;
+            SaveUserData();
+            ApplyWallpaper();
         }
 
         public void Login()
@@ -2329,7 +2386,7 @@ namespace PC.Component.Software.OS
 
         public void ImportWallpaperFromDevice(byte[] imageBytes)
         {
-            if (FileManager == null || imageBytes == null)
+            if (FileManager == null || imageBytes == null || userData == null)
                 return;
 
             string content = Convert.ToBase64String(imageBytes);
@@ -2337,8 +2394,10 @@ namespace PC.Component.Software.OS
             FileManager.Write(0, "System/Wallpaper.pic", content);
 
             userData.customBackgroundPath = "System/Wallpaper.pic";
+            userData.bgPath = "System/Wallpaper.pic";
+            userData.background = -1;
             SaveUserData();
-            Desktop();
+            ApplyWallpaper();
         }
 
         private void EnableTaskbar()
