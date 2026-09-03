@@ -116,6 +116,7 @@ public class WorkshopClient : MonoBehaviour
 	};
 
 	public static string UploadKey = "f52aa253f7ee050a6069d858473880982acb4c5de7a929e3";
+	public const int MaxSaveBytes = 10 * 1024 * 1024;
 	private static string byetCookie;
 	private static string workingUrl;
 
@@ -500,9 +501,10 @@ public class WorkshopClient : MonoBehaviour
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
-				if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
+				string text;
+				if (TryJsonBody(req, out text))
 				{
-					done(req.downloadHandler.text, null);
+					done(text, null);
 					yield break;
 				}
 				Debug.LogWarning("[Account] POST " + baseUrl + " -> " + req.error);
@@ -542,7 +544,7 @@ public class WorkshopClient : MonoBehaviour
 		if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
 		{
 			var bytes = File.ReadAllBytes(localPath);
-			if (bytes.Length > 1048576) { done(0, null, "file > 1MB"); yield break; }
+			if (bytes.Length > MaxSaveBytes) { done(0, null, "file > 10MB"); yield break; }
 			form.Add(new MultipartFormFileSection("file", bytes, Path.GetFileName(localPath), "application/octet-stream"));
 		}
 		if (coverJpg != null && coverJpg.Length > 0)
@@ -632,10 +634,11 @@ public class WorkshopClient : MonoBehaviour
 				var op = SafeSend(req);
 				if (op == null) continue;
 				yield return op;
-				if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler.text))
+				string text;
+				if (TryJsonBody(req, out text))
 				{
 					workingUrl = baseUrl;
-					done(req.downloadHandler.text, null);
+					done(text, null);
 					yield break;
 				}
 				Debug.LogWarning("[Workshop] POST " + baseUrl + " -> " + req.error);
@@ -659,6 +662,20 @@ public class WorkshopClient : MonoBehaviour
 		int b = raw.LastIndexOf('}');
 		if (a >= 0 && b > a) return raw.Substring(a, b - a + 1);
 		return raw;
+	}
+
+	/// <summary>
+	/// Unity treats HTTP 4xx as ProtocolError and used to drop the JSON body.
+	/// Byethost/PHP still send {"ok":false,...} — read it anyway.
+	/// </summary>
+	private static bool TryJsonBody(UnityWebRequest req, out string text)
+	{
+		text = null;
+		if (req == null || req.downloadHandler == null) return false;
+		text = req.downloadHandler.text;
+		if (string.IsNullOrEmpty(text)) return false;
+		if (text.IndexOf("toNumbers") >= 0) return false;
+		return text.IndexOf('{') >= 0;
 	}
 
 	private static void ApplyCookie(UnityWebRequest req)

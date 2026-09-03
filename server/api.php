@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 $cfgPath = __DIR__ . '/config.php';
 if (is_file($cfgPath)) require $cfgPath;
-if (!defined('MAX_BYTES')) define('MAX_BYTES', 1048576);
+if (!defined('MAX_BYTES')) define('MAX_BYTES', 10485760); // 10 MB
 if (!defined('MAX_COVER')) define('MAX_COVER', 300000);
 if (!defined('RATE_PER_HOUR')) define('RATE_PER_HOUR', 8);
 if (!defined('UPLOAD_KEY')) define('UPLOAD_KEY', '');
@@ -180,7 +180,10 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (is_file($rateFile) && filemtime($rateFile) > time() - 3600) $hits = (int)file_get_contents($rateFile);
     if ($hits >= RATE_PER_HOUR) json_out(['ok' => false, 'error' => 'rate limit'], 429);
 
-    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) json_out(['ok' => false, 'error' => 'no file'], 400);
+    if (!isset($_FILES['file'])) json_out(['ok' => false, 'error' => 'no file'], 400);
+    $ferr = $_FILES['file']['error'];
+    if ($ferr === UPLOAD_ERR_INI_SIZE || $ferr === UPLOAD_ERR_FORM_SIZE) json_out(['ok' => false, 'error' => 'too big'], 400);
+    if ($ferr !== UPLOAD_ERR_OK) json_out(['ok' => false, 'error' => 'no file'], 400);
     if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
 
     $title = clean(isset($_POST['title']) ? $_POST['title'] : 'Save', 80);

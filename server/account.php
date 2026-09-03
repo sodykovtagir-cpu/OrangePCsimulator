@@ -225,9 +225,9 @@ if ($action === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $users = users();
     $byName = find_by_name($name);
-    if ($byName >= 0 && !empty($users[$byName]['verified'])) json_out(['ok' => false, 'error' => 'name taken'], 409);
+    if ($byName >= 0 && !empty($users[$byName]['verified'])) json_out(['ok' => false, 'error' => 'name taken']);
     $byEmail = find_by_email($email);
-    if ($byEmail >= 0 && !empty($users[$byEmail]['verified'])) json_out(['ok' => false, 'error' => 'email taken'], 409);
+    if ($byEmail >= 0 && !empty($users[$byEmail]['verified'])) json_out(['ok' => false, 'error' => 'email taken']);
 
     // Переиспользуем/обновляем незавершённую регистрацию (тот же email или имя)
     $i = $byName >= 0 ? $byName : $byEmail;
@@ -265,7 +265,7 @@ if ($action === 'verify' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $i = $email !== '' ? find_by_email($email) : find_by_name($name);
     if ($i < 0) json_out(['ok' => false, 'error' => 'no account'], 404);
     $u = &$users[$i];
-    if (!empty($u['verified'])) json_out(['ok' => false, 'error' => 'already'], 409);
+    if (!empty($u['verified'])) json_out(['ok' => false, 'error' => 'already']);
     if (time() > (int)$u['code_expires']) json_out(['ok' => false, 'error' => 'expired'], 410);
     if (!password_verify($code, $u['code_hash'])) json_out(['ok' => false, 'error' => 'bad code'], 401);
 
@@ -304,7 +304,7 @@ if ($action === 'resend' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $users = users();
     $i = find_by_email($email);
     if ($i < 0) json_out(['ok' => false, 'error' => 'no account'], 404);
-    if (!empty($users[$i]['verified'])) json_out(['ok' => false, 'error' => 'already'], 409);
+    if (!empty($users[$i]['verified'])) json_out(['ok' => false, 'error' => 'already']);
     $code = gen_code();
     $users[$i]['code_hash'] = password_hash($code, PASSWORD_DEFAULT);
     $users[$i]['code_expires'] = time() + CODE_TTL;
@@ -412,7 +412,7 @@ if ($action === 'tg_bonus' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $users = users();
     $i = find_by_token($token);
     if ($i < 0) json_out(['ok' => false, 'error' => 'no session'], 401);
-    if (!empty($users[$i]['tg_bonus'])) json_out(['ok' => false, 'error' => 'already'], 409);
+    if (!empty($users[$i]['tg_bonus'])) json_out(['ok' => false, 'error' => 'already']);
     $users[$i]['tg_bonus'] = true;
     save_users($users);
     json_out(['ok' => true, 'granted' => true, 'btc' => 5]);
