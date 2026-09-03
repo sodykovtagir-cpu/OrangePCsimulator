@@ -38,7 +38,32 @@ namespace PC.Component.Software
             base.Open(content);
             rect = GetComponent<RectTransform>();
             EnsureUi();
-            LoadContent(content);
+
+            if (!string.IsNullOrEmpty(content))
+            {
+                LoadContent(content);
+                return;
+            }
+
+            // Запуск с иконки/меню без файла — сразу предлагаем выбрать файл,
+            // как это делает блокнот. Viewer принимает только .pic и .mov.
+            LoadContent(null);
+            PromptPickFile();
+        }
+
+        /// <summary>
+        /// Открывает системный диалог выбора файла, отфильтрованный по .pic и .mov.
+        /// </summary>
+        public void PromptPickFile()
+        {
+            var os = system;
+            if (os == null) return;
+
+            os.SelectFile(new[] { ".pic", ".mov" }, file =>
+            {
+                if (file == null) return;
+                LoadContent(file.content);
+            });
         }
 
         void Update()

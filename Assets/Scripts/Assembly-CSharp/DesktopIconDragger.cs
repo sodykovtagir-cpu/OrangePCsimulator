@@ -115,10 +115,37 @@ namespace PC.Component.Software
                     }
                 }
             }
-            else if (Input.GetMouseButtonUp(0) && isDragging)
+            else
             {
-                OnDragEnd();
+                // Кнопка отпущена.
+                if (isDragging)
+                {
+                    OnDragEnd();
+                }
+                else
+                {
+                    // Обычный клик (без перетаскивания): снимаем «залипшее»
+                    // состояние, иначе следующий драг — уже внутри открытого
+                    // приложения — ошибочно воспринимался как драг иконки.
+                    ResetPointerState();
+                }
             }
+        }
+
+        private void ResetPointerState()
+        {
+            pointerDownReceived = false;
+            hasDragged = false;
+            isDragging = false;
+        }
+
+        private void OnDisable()
+        {
+            // На всякий случай сбрасываем глобальный флаг, если компонент
+            // отключили/уничтожили прямо во время перетаскивания.
+            if (IsDragging)
+                IsDragging = false;
+            ResetPointerState();
         }
 
         public void OnPointerDown(PointerEventData eventData)
