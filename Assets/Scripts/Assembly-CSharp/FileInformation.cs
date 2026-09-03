@@ -601,15 +601,18 @@ public class FileInformation : MonoBehaviour
 		var inner = panel != null ? panel.Find("Panel") : null;
 		if (inner == null) return;
 
-		if (inner.GetComponent<HorizontalLayoutGroup>() == null)
+		if (inner.GetComponent<LayoutGroup>() == null)
 		{
 			var h = inner.gameObject.AddComponent<HorizontalLayoutGroup>();
-			h.spacing = 8f;
-			h.childAlignment = TextAnchor.MiddleCenter;
-			h.childControlWidth = false;
-			h.childControlHeight = true;
-			h.childForceExpandWidth = false;
-			h.childForceExpandHeight = true;
+			if (h != null)
+			{
+				h.spacing = 8f;
+				h.childAlignment = TextAnchor.MiddleCenter;
+				h.childControlWidth = false;
+				h.childControlHeight = true;
+				h.childForceExpandWidth = false;
+				h.childForceExpandHeight = true;
+			}
 		}
 		if (inner.GetComponent<ContentSizeFitter>() == null)
 		{

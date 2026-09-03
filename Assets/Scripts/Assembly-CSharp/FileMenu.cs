@@ -147,21 +147,32 @@ public class FileMenu : MonoBehaviour
 		var icon = row.Find("Icon");
 		if (icon == null)
 		{
-			var go = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
+			var go = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(FadedCoverImage));
 			go.transform.SetParent(row, false);
+			go.transform.SetAsFirstSibling();
 			var rt = go.GetComponent<RectTransform>();
-			rt.anchorMin = new Vector2(0f, 0.5f);
-			rt.anchorMax = new Vector2(0f, 0.5f);
-			rt.pivot = new Vector2(0.5f, 0.5f);
-			rt.sizeDelta = new Vector2(48f, 48f);
-			rt.anchoredPosition = new Vector2(32f, 0f);
+			rt.anchorMin = new Vector2(0f, 0f);
+			rt.anchorMax = new Vector2(0f, 1f);
+			rt.pivot = new Vector2(0f, 0.5f);
+			rt.sizeDelta = new Vector2(220f, 0f);
+			rt.anchoredPosition = new Vector2(0f, 0f);
 			icon = go.transform;
 		}
 
+		var faded = icon.GetComponent<FadedCoverImage>();
+		if (faded == null)
+			faded = icon.gameObject.AddComponent<FadedCoverImage>();
+
 		var raw = icon.GetComponent<RawImage>();
-		if (raw == null) return;
-		raw.texture = tex;
-		raw.enabled = tex != null;
+		if (raw != null) raw.enabled = false;
+		var img = icon.GetComponent<Image>();
+		if (img != null) img.enabled = false;
+
+		faded.raycastTarget = false;
+		faded.FadeStart = 0.4f;
+		faded.color = Color.white;
+		faded.Texture = tex;
+		faded.enabled = tex != null;
 	}
 
 	private static bool IsPublished(GameData g)
