@@ -18,8 +18,8 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
     private Camera uiCamera;
     private Vector2 pointerOffset;
 
-    private static readonly Vector3[] cornerBuffer = new Vector3[4];
-    private static readonly Vector3[] windowCornerBuffer = new Vector3[4];
+    private static readonly Vector3[] handleCorners = new Vector3[4];
+    private static readonly Vector3[] windowCorners = new Vector3[4];
 
     void Awake()
     {
@@ -68,7 +68,7 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
 
         // Сначала ставим окно под курсор, затем жёстко удерживаем ЗАГОЛОВОК внутри.
         window.anchoredPosition = localPointerPos - pointerOffset;
-        ClampHandleInside();
+        ClampInside();
     }
 
     /// <summary>
@@ -82,25 +82,28 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
     }
 
     /// <summary>
-    /// Удерживает ЗАГОЛОВОК (handle) целиком в пределах рабочей области по всем
-    /// сторонам; снизу — с отступом под панель задач. Считает реальные мировые
-    /// углы заголовка и переводит их в координаты родителя, поэтому корректно
-    /// работает при любом pivot/anchor и любом режиме канваса.
+    /// Удерживает заголовок (handle) и корпус окна в пределах рабочего
+    /// прямоугольника родителя: по горизонтали корпус не выходит за боковые
+    /// края, по вертикали верх заголовка не уходит за экран, а низ — под
+    /// панель задач. Считает реальные мировые углы и переводит их в координаты
+    /// родителя, поэтому корректно работает при любом pivot/anchor.
+    /// Важно: bounds — это прямой родитель окна (всегда тот же масштаб),
+    /// поэтому вычисленный сдвиг в локальных единицах равен смещению
+    /// anchoredPosition окна.
     /// </summary>
-    private void ClampHandleInside()
+    private void ClampInside()
     {
         Rect pr = parentRect.rect;
 
         var rt = handle != null ? handle : window;
-        rt.GetWorldCorners(cornerBuffer);
-        window.GetWorldCorners(windowCornerBuffer);
+        rt.GetWorldCorners(handleCorners);
+        window.GetWorldCorners(windowCorners);
 
-        // Углы заголовка в координатах родителя: [0] — низ-лево, [2] — верх-право.
-        Vector2 titleBL = parentRect.InverseTransformPoint(cornerBuffer[0]);
-        Vector2 titleTR = parentRect.InverseTransformPoint(cornerBuffer[2]);
-        // Углы всего окна (для боковых границ).
-        Vector2 winBL = parentRect.InverseTransformPoint(windowCornerBuffer[0]);
-        Vector2 winTR = parentRect.InverseTransformPoint(windowCornerBuffer[2]);
+        // [0] — низ-лево, [2] — верх-право.
+        Vector2 titleBL = parentRect.InverseTransformPoint(handleCorners[0]);
+        Vector2 titleTR = parentRect.InverseTransformPoint(handleCorners[2]);
+        Vector2 winBL = parentRect.InverseTransformPoint(windowCorners[0]);
+        Vector2 winTR = parentRect.InverseTransformPoint(windowCorners[2]);
 
         float leftBound = pr.xMin + SideInset;
         float rightBound = pr.xMax - SideInset;
@@ -112,8 +115,7 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
         float winW = winTR.x - winBL.x;
         float titleH = titleTR.y - titleBL.y;
 
-        // Горизонталь — держим КОРПУС окна (он шире заголовка), чтобы за боковые
-        // края не вылезало вообще ничего.
+        // Горизонталь — держим КОРПУС окна (он шире заголовка).
         bool fitsX = winW <= (rightBound - leftBound);
         if (fitsX)
         {
@@ -129,8 +131,6 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
             else if (titleTR.y > topBound) shift.y -= titleTR.y - topBound;
         }
 
-        // Заголовок жёстко привязан к окну, поэтому сдвиг в локальных единицах
-        // родителя равен смещению anchoredPosition окна.
         if (shift != Vector2.zero)
             window.anchoredPosition += shift;
     }
