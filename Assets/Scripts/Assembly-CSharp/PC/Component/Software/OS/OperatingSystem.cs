@@ -2174,6 +2174,9 @@ namespace PC.Component.Software.OS
 
         private List<App> runningApps = new List<App>();
 
+        // Кнопки запущенных приложений в панели задач (для анимации сворачивания).
+        private readonly Dictionary<App, Button> runningAppButtons = new Dictionary<App, Button>();
+
         private bool taskbarInitialized;
 
         private void InitializeTaskbar()
@@ -2350,6 +2353,7 @@ namespace PC.Component.Software.OS
 
             for (int i = runningAppsContainer.childCount - 1; i >= 0; i--)
                 Destroy(runningAppsContainer.GetChild(i).gameObject);
+            runningAppButtons.Clear();
 
             foreach (var app in runningApps)
             {
@@ -2358,6 +2362,8 @@ namespace PC.Component.Software.OS
                 var img = btn.GetComponent<Image>();
                 if (img != null)
                     img.sprite = app.Icon;
+
+                runningAppButtons[app] = btn;
 
                 var captured = app;
                 btn.onClick.AddListener(() =>
@@ -2423,6 +2429,34 @@ namespace PC.Component.Software.OS
         public void OnAppRestored(App app)
         {
             RefreshRunningAppsUI();
+        }
+
+        /// <summary>
+        /// Мировая позиция кнопки приложения в панели задач — точка, в которую
+        /// «улетает» окно при сворачивании и из которой появляется при развороте.
+        /// Если кнопка/таскбар не найдены, возвращает низ-центр экрана.
+        /// </summary>
+        public Vector3 GetTaskbarIconWorldPos(App app)
+        {
+            Button btn = null;
+            if (app != null && runningAppButtons != null)
+                runningAppButtons.TryGetValue(app, out btn);
+
+            if (btn != null)
+            {
+                var brt = btn.transform as RectTransform;
+                if (brt != null) return brt.position;
+                return btn.transform.position;
+            }
+
+            // Фолбэк: середина панели задач.
+            if (taskbar != null)
+            {
+                var trt = taskbar.transform as RectTransform;
+                if (trt != null) return trt.position;
+                return taskbar.transform.position;
+            }
+            return Vector3.zero;
         }
 
         private App GetRunningApp(string appName)
