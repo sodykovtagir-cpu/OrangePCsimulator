@@ -2366,17 +2366,42 @@ namespace PC.Component.Software.OS
 
                     if (captured.IsMinimized)
                     {
-                        // Свернутое окно — разворачиваем и выводим на передний план.
+                        // Свёрнутое окно — разворачиваем и выводим на передний план.
                         captured.Restore();
                         FocusApp(true);
+                        return;
                     }
+
+                    // Активное (самое верхнее на экране) окно кликом сворачиваем;
+                    // окно на фоне — поднимаем на передний план.
+                    if (IsTopmostWindow(captured))
+                        captured.Minimize();
                     else
                     {
-                        // Активное окно повторный клик по его кнопке сворачивает.
-                        captured.Minimize();
+                        captured.transform.SetAsLastSibling();
+                        FocusApp(true);
                     }
                 });
             }
+        }
+
+        private bool IsTopmostWindow(App app)
+        {
+            if (app == null || appParent == null) return false;
+            var target = app.transform;
+            int topIndex = -1;
+            Transform top = null;
+            for (int i = 0; i < appParent.childCount; i++)
+            {
+                var child = appParent.GetChild(i);
+                if (child == null || !child.gameObject.activeSelf) continue;
+                if (child.GetSiblingIndex() > topIndex)
+                {
+                    topIndex = child.GetSiblingIndex();
+                    top = child;
+                }
+            }
+            return top == target;
         }
 
         public void OnAppMinimized(App app)
