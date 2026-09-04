@@ -3,16 +3,19 @@ using UnityEngine.EventSystems;
 
 public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
 {
-    // Отступы рабочей области, за пределы которой окно утащить нельзя.
-    // Снизу отступ больше — чтобы заголовок окна не уходил за панель задач.
-    private const float EdgeInset = 8f;
-    private const float BottomInset = 60f;
+    // Отступы от краёв рабочей области, за которые окно утащить нельзя.
+    // Снизу отступ больше — чтобы окно (и заголовок) не уходило за панель задач.
+    private const float SideInset = 16f;
+    private const float TopInset = 16f;
+    private const float BottomInset = 64f;
 
     private RectTransform window;
     private RectTransform parentRect;
     private Canvas canvas;
     private Camera uiCamera;
     private Vector2 pointerOffset;
+
+    private static readonly Vector3[] cornerBuffer = new Vector3[4];
 
     void Awake()
     {
@@ -53,8 +56,9 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
                 parentRect, eventData.position, uiCamera, out localPointerPos))
             return;
 
-        Vector2 target = localPointerPos - pointerOffset;
-        window.anchoredPosition = ClampToParent(target);
+        // Сначала ставим окно под курсор, затем жёстко удерживаем его внутри.
+        window.anchoredPosition = localPointerPos - pointerOffset;
+        ClampInsideParent();
     }
 
     /// <summary>
@@ -68,29 +72,46 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
     }
 
     /// <summary>
-    /// Ограничивает позицию окна так, чтобы оно целиком (вместе с заголовком)
-    /// оставалось в пределах родителя и не уходило за панель задач.
-    /// Работает в координатах anchoredPosition (учитывает pivot окна).
+    /// Удерживает окно ЦЕЛИКОМ в пределах родителя по всем четырём сторонам
+    /// (снизу — с учётом панели задач). Считает реальные мировые углы окна и
+    /// переводит их в координаты родителя, поэтому корректно работает при любом
+    /// pivot/anchor и любом масштабе канваса (WorldSpace и ScreenSpaceOverlay).
     /// </summary>
-    private Vector2 ClampToParent(Vector2 pos)
+    private void ClampInsideParent()
     {
         Rect pr = parentRect.rect;
-        Rect wr = window.rect;
 
-        Vector2 pivot = window.pivot;
+        window.GetWorldCorners(cornerBuffer);
+        // [0] — низ-лево, [2] — верх-право.
+        Vector2 bl = parentRect.InverseTransformPoint(cornerBuffer[0]);
+        Vector2 tr = parentRect.InverseTransformPoint(cornerBuffer[2]);
 
-        // Допустимый диапазон позиции якоря (pivot) окна внутри родителя.
-        float minX = pr.xMin + EdgeInset + pivot.x * wr.width;
-        float maxX = pr.xMax - EdgeInset - (1f - pivot.x) * wr.width;
-        float minY = pr.yMin + BottomInset + pivot.y * wr.height;
-        float maxY = pr.yMax - EdgeInset - (1f - pivot.y) * wr.height;
+        float leftBound = pr.xMin + SideInset;
+        float rightBound = pr.xMax - SideInset;
+        float bottomBound = pr.yMin + BottomInset;
+        float topBound = pr.yMax - TopInset;
 
-        // Если окно больше рабочей области — хотя бы не даём ему уехать полностью.
-        if (minX > maxX) { float c = (minX + maxX) * 0.5f; minX = maxX = c; }
-        if (minY > maxY) { float c = (minY + maxY) * 0.5f; minY = maxY = c; }
+        Vector2 shift = Vector2.zero;
 
-        return new Vector2(
-            Mathf.Clamp(pos.x, minX, maxX),
-            Mathf.Clamp(pos.y, minY, maxY));
+        // Если окно шире/выше доступной области — по этой оси не зажимаем,
+        // чтобы два противоположных ограничителя не конфликтовали.
+        bool fitsX = (tr.x - bl.x) <= (rightBound - leftBound);
+        bool fitsY = (tr.y - bl.y) <= (topBound - bottomBound);
+
+        if (fitsX)
+        {
+            if (bl.x < leftBound) shift.x += leftBound - bl.x;
+            else if (tr.x > rightBound) shift.x -= tr.x - rightBound;
+        }
+
+        if (fitsY)
+        {
+            if (bl.y < bottomBound) shift.y += bottomBound - bl.y;
+            else if (tr.y > topBound) shift.y -= tr.y - topBound;
+        }
+
+        // Сдвиг в локальных единицах родителя равен смещению anchoredPosition.
+        if (shift != Vector2.zero)
+            window.anchoredPosition += shift;
     }
 }
