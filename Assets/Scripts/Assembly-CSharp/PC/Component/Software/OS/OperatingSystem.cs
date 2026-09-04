@@ -2359,12 +2359,45 @@ namespace PC.Component.Software.OS
                 if (img != null)
                     img.sprite = app.Icon;
 
+                var captured = app;
                 btn.onClick.AddListener(() =>
                 {
-                    if (app != null)
-                        app.transform.SetAsLastSibling();
+                    if (captured == null) return;
+
+                    if (captured.IsMinimized)
+                    {
+                        // Свернутое окно — разворачиваем и выводим на передний план.
+                        captured.Restore();
+                        FocusApp(true);
+                    }
+                    else
+                    {
+                        // Активное окно повторный клик по его кнопке сворачивает.
+                        captured.Minimize();
+                    }
                 });
             }
+        }
+
+        public void OnAppMinimized(App app)
+        {
+            if (menuBar != null)
+            {
+                // Меню-бар (если показан) прячем при сворачивании активного окна.
+                bool anyActive = false;
+                for (int i = 0; i < runningApps.Count; i++)
+                {
+                    if (runningApps[i] != null && !runningApps[i].IsMinimized)
+                    { anyActive = true; break; }
+                }
+                if (!anyActive) menuBar.gameObject.SetActive(false);
+            }
+            RefreshRunningAppsUI();
+        }
+
+        public void OnAppRestored(App app)
+        {
+            RefreshRunningAppsUI();
         }
 
         private App GetRunningApp(string appName)
@@ -2386,8 +2419,10 @@ namespace PC.Component.Software.OS
                 var existing = GetRunningApp(prefab.AppName);
                 if (existing != null)
                 {
+                    if (existing.IsMinimized)
+                        existing.Restore();
                     existing.transform.SetAsLastSibling();
-                    existing.Open(content ?? "");
+                    if (!string.IsNullOrEmpty(content)) existing.Open(content);
                     FocusApp(true);
                     return;
                 }
