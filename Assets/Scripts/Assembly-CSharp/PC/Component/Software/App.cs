@@ -47,15 +47,30 @@ namespace PC.Component.Software
 
 		protected bool maximized;
 
+		private bool minimized;
+
 		protected RectTransform rect;
 
 		protected Vector2 defaultSize;
+
+		// Сохранённое состояние окна перед разворотом на весь экран.
+		private Vector2 restoreAnchorMin;
+		private Vector2 restoreAnchorMax;
+		private Vector2 restorePivot;
+		private Vector2 restorePosition;
+		private Vector2 restoreSize;
+		private bool hasRestoreState;
 
 		protected bool canDrag = true;
 
 		protected bool canMaximize = true;
 
 		private bool closing;
+
+		// Отступы полноэкранного окна от краёв экрана (снизу — под панель задач).
+		private const float MaximizeSideInset = 6f;
+		private const float MaximizeTopInset = 6f;
+		private const float MaximizeBottomInset = 58f;
 
 		protected virtual bool ShowMenuBar => true;
 
@@ -68,6 +83,8 @@ namespace PC.Component.Software
 		public bool IsMaximizable => canMaximize;
 
 		public bool IsMaximized => maximized;
+
+		public bool IsMinimized => minimized;
 
 		public Sprite FileIcon
 		{
@@ -131,19 +148,100 @@ namespace PC.Component.Software
 
 			if (!wasMaximized)
 			{
-				rect.anchorMin = Vector2.zero;
-				rect.anchorMax = Vector2.one;
-				rect.anchoredPosition = Vector2.zero;
-				rect.sizeDelta = Vector2.zero;
+				// Запоминаем текущее состояние, чтобы потом восстановить.
+				restoreAnchorMin = rect.anchorMin;
+				restoreAnchorMax = rect.anchorMax;
+				restorePivot = rect.pivot;
+				restorePosition = rect.anchoredPosition;
+				restoreSize = rect.sizeDelta;
+				hasRestoreState = true;
+
+				// Растягиваем окно на весь экран (с отступами и без панели задач).
+				var parent = rect.parent as RectTransform;
+				var center = new Vector2(0.5f, 0.5f);
+				rect.pivot = center;
+				rect.anchorMin = center;
+				rect.anchorMax = center;
+
+				Vector2 size;
+				Vector2 pos;
+				if (parent != null)
+				{
+					var s = parent.rect.size;
+					size = new Vector2(
+						Mathf.Max(200f, s.x - MaximizeSideInset * 2f),
+						Mathf.Max(140f, s.y - MaximizeTopInset - MaximizeBottomInset));
+					pos = new Vector2(0f, (MaximizeBottomInset - MaximizeTopInset) * 0.5f);
+				}
+				else
+				{
+					size = new Vector2(900f, 600f);
+					pos = Vector2.zero;
+				}
+				rect.sizeDelta = size;
+				rect.anchoredPosition = pos;
+
+				SetDraggable(false);
 				if (windowState != null && normalSprite != null) windowState.sprite = normalSprite;
+			}
+			else
+			{
+				RestoreWindowRect();
+				SetDraggable(true);
+				if (windowState != null && maximizeSprite != null) windowState.sprite = maximizeSprite;
+			}
+		}
+
+		/// <summary>
+		/// Сворачивает окно (прячет его, в таскбаре остаётся кнопка восстановления).
+		/// </summary>
+		public virtual void Minimize()
+		{
+			if (closing) return;
+			minimized = true;
+			gameObject.SetActive(false);
+			var os = system;
+			if (os != null) os.OnAppMinimized(this);
+		}
+
+		/// <summary>
+		/// Разворачивает свёрнутое окно обратно и выводит его на передний план.
+		/// </summary>
+		public virtual void Restore()
+		{
+			if (closing) return;
+			bool wasHidden = minimized;
+			minimized = false;
+			if (!gameObject.activeSelf)
+				gameObject.SetActive(true);
+			if (wasHidden)
+			{
+				var os = system;
+				if (os != null) os.OnAppRestored(this);
+			}
+			var rt = transform as RectTransform;
+			if (rt != null) rt.SetAsLastSibling();
+		}
+
+		private void RestoreWindowRect()
+		{
+			if (rect == null) return;
+			if (hasRestoreState)
+			{
+				rect.anchorMin = restoreAnchorMin;
+				rect.anchorMax = restoreAnchorMax;
+				rect.pivot = restorePivot;
+				rect.sizeDelta = restoreSize;
+				rect.anchoredPosition = restorePosition;
 			}
 			else
 			{
 				var center = new Vector2(0.5f, 0.5f);
 				rect.anchorMin = center;
 				rect.anchorMax = center;
+				rect.pivot = center;
 				rect.sizeDelta = defaultSize;
-				if (windowState != null && maximizeSprite != null) windowState.sprite = maximizeSprite;
+				rect.anchoredPosition = Vector2.zero;
 			}
 		}
 
