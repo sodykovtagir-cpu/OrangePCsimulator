@@ -49,6 +49,8 @@ namespace PC.Component.Software
 
 		private bool minimized;
 
+		private bool animating;
+
 		protected RectTransform rect;
 
 		protected Vector2 defaultSize;
@@ -61,16 +63,20 @@ namespace PC.Component.Software
 		private Vector2 restoreSize;
 		private bool hasRestoreState;
 
+		// Сохранённая раскладка на момент сворачивания (чтобы восстановить как было,
+		// даже если окно было развёрнуто на весь экран).
+		private Vector2 minAnchorMin;
+		private Vector2 minAnchorMax;
+		private Vector2 minPivot;
+		private Vector2 minPosition;
+		private Vector2 minSize;
+		private bool wasMaximizedWhenMinimized;
+
 		protected bool canDrag = true;
 
 		protected bool canMaximize = true;
 
 		private bool closing;
-
-		// Отступы полноэкранного окна от краёв экрана (снизу — под панель задач).
-		private const float MaximizeSideInset = 6f;
-		private const float MaximizeTopInset = 6f;
-		private const float MaximizeBottomInset = 58f;
 
 		protected virtual bool ShowMenuBar => true;
 
@@ -156,30 +162,13 @@ namespace PC.Component.Software
 				restoreSize = rect.sizeDelta;
 				hasRestoreState = true;
 
-				// Растягиваем окно на весь экран (с отступами и без панели задач).
-				var parent = rect.parent as RectTransform;
-				var center = new Vector2(0.5f, 0.5f);
-				rect.pivot = center;
-				rect.anchorMin = center;
-				rect.anchorMax = center;
-
-				Vector2 size;
-				Vector2 pos;
-				if (parent != null)
-				{
-					var s = parent.rect.size;
-					size = new Vector2(
-						Mathf.Max(200f, s.x - MaximizeSideInset * 2f),
-						Mathf.Max(140f, s.y - MaximizeTopInset - MaximizeBottomInset));
-					pos = new Vector2(0f, (MaximizeBottomInset - MaximizeTopInset) * 0.5f);
-				}
-				else
-				{
-					size = new Vector2(900f, 600f);
-					pos = Vector2.zero;
-				}
-				rect.sizeDelta = size;
-				rect.anchoredPosition = pos;
+				// Разворачиваем окно НА ВЕСЬ экран без отступов.
+				// Панель задач рисуется поверх окон, поэтому остаётся видимой.
+				rect.pivot = new Vector2(0.5f, 0.5f);
+				rect.anchorMin = Vector2.zero;
+				rect.anchorMax = Vector2.one;
+				rect.anchoredPosition = Vector2.zero;
+				rect.sizeDelta = Vector2.zero;
 
 				SetDraggable(false);
 				if (windowState != null && normalSprite != null) windowState.sprite = normalSprite;
@@ -193,34 +182,173 @@ namespace PC.Component.Software
 		}
 
 		/// <summary>
-		/// Сворачивает окно (прячет его, в таскбаре остаётся кнопка восстановления).
+		/// Сворачивает окно: проигрывает анимацию «улёта» в иконку панели задач,
+		/// после чего прячет окно (кнопка в таскбаре остаётся).
 		/// </summary>
 		public virtual void Minimize()
 		{
-			if (closing) return;
+			if (closing || minimized) return;
+			if (animating) return;
+
 			minimized = true;
-			gameObject.SetActive(false);
+			wasMaximizedWhenMinimized = maximized;
+
+			// Запоминаем текущую раскладку, чтобы вернуться к ней при разворачивании.
+			var rt = rect != null ? rect : (transform as RectTransform);
+			if (rt != null)
+			{
+				minAnchorMin = rt.anchorMin;
+				minAnchorMax = rt.anchorMax;
+				minPivot = rt.pivot;
+				minPosition = rt.anchoredPosition;
+				minSize = rt.sizeDelta;
+			}
+
+			StartCoroutine(MinimizeRoutine());
+		}
+
+		private IEnumerator MinimizeRoutine()
+		{
+			animating = true;
+
+			var rt = transform as RectTransform;
 			var os = system;
+			Vector3 target = os != null ? os.GetTaskbarIconWorldPos(this) : Vector3.zero;
+
+			var cg = WindowChromeGroup();
+			cg.alpha = 1f;
+
+			// Сразу создаём/обновляем кнопку в таскбаре, чтобы было к чему лететь.
 			if (os != null) os.OnAppMinimized(this);
+
+			float duration = 0.22f;
+			float t = 0f;
+			Vector3 startPos = rt != null ? rt.position : Vector3.zero;
+			Vector3 startScale = rt != null ? rt.localScale : Vector3.one;
+			Vector3 endScale = startScale * 0.12f;
+
+			while (t < duration && rt != null)
+			{
+				t += Time.unscaledDeltaTime;
+				float k = Mathf.Clamp01(t / duration);
+				float e = 1f - (1f - k) * (1f - k); // ease-out quad
+				rt.position = Vector3.Lerp(startPos, target, e);
+				rt.localScale = Vector3.LerpUnclamped(startScale, endScale, e);
+				cg.alpha = 1f - k * 0.9f;
+				yield return null;
+			}
+
+			animating = false;
+			gameObject.SetActive(false);
+
+			// Возвращаем трансформ в исходную раскладку (визуально не видно — окно скрыто).
+			if (rt != null)
+			{
+				rt.anchorMin = minAnchorMin;
+				rt.anchorMax = minAnchorMax;
+				rt.pivot = minPivot;
+				rt.sizeDelta = minSize;
+				rt.anchoredPosition = minPosition;
+				rt.localScale = Vector3.one;
+			}
+			cg.alpha = 1f;
 		}
 
 		/// <summary>
 		/// Разворачивает свёрнутое окно обратно и выводит его на передний план.
+		/// Если окно было свёрнуто в развёрнутом состоянии — вернёт развёрнутый вид.
 		/// </summary>
 		public virtual void Restore()
 		{
 			if (closing) return;
-			bool wasHidden = minimized;
+
+			bool wasHidden = minimized || !gameObject.activeSelf;
 			minimized = false;
-			if (!gameObject.activeSelf)
-				gameObject.SetActive(true);
+
+			var rt = rect != null ? rect : (transform as RectTransform);
+
+			// Раскладку восстанавливаем только если окно реально сворачивали
+			// (сохранённое состояние валидно).
+			if (wasHidden && rt != null)
+			{
+				rt.anchorMin = minAnchorMin;
+				rt.anchorMax = minAnchorMax;
+				rt.pivot = minPivot;
+				rt.sizeDelta = minSize;
+				rt.anchoredPosition = minPosition;
+				rt.localScale = Vector3.one;
+			}
+			if (wasHidden)
+				maximized = wasMaximizedWhenMinimized;
+
+			gameObject.SetActive(true);
+			if (rt != null) rt.SetAsLastSibling();
+
+			// Синхронизируем перетаскивание и иконку кнопки с состоянием окна.
+			SetDraggable(!maximized);
+			if (windowState != null)
+			{
+				var spr = maximized ? normalSprite : maximizeSprite;
+				if (spr != null) windowState.sprite = spr;
+			}
+
 			if (wasHidden)
 			{
 				var os = system;
 				if (os != null) os.OnAppRestored(this);
+				StartCoroutine(RestoreRoutine());
 			}
+		}
+
+		private IEnumerator RestoreRoutine()
+		{
+			animating = true;
+
 			var rt = transform as RectTransform;
-			if (rt != null) rt.SetAsLastSibling();
+			var os = system;
+			Vector3 target = os != null ? os.GetTaskbarIconWorldPos(this) : Vector3.zero;
+
+			var cg = WindowChromeGroup();
+
+			float duration = 0.22f;
+			float t = 0f;
+			Vector3 endPos = rt != null ? rt.position : Vector3.zero;
+			Vector3 endScale = rt != null ? rt.localScale : Vector3.one;
+			Vector3 startScale = endScale * 0.12f;
+
+			// Стартуем из иконки таскбара.
+			if (rt != null)
+			{
+				rt.position = target;
+				rt.localScale = startScale;
+			}
+			cg.alpha = 0.1f;
+
+			while (t < duration && rt != null)
+			{
+				t += Time.unscaledDeltaTime;
+				float k = Mathf.Clamp01(t / duration);
+				float e = k * k; // ease-in
+				rt.position = Vector3.Lerp(target, endPos, e);
+				rt.localScale = Vector3.LerpUnclamped(startScale, endScale, e);
+				cg.alpha = 0.1f + k * 0.9f;
+				yield return null;
+			}
+
+			if (rt != null)
+			{
+				rt.position = endPos;
+				rt.localScale = endScale;
+			}
+			cg.alpha = 1f;
+			animating = false;
+		}
+
+		private CanvasGroup WindowChromeGroup()
+		{
+			var cg = GetComponent<CanvasGroup>();
+			if (cg == null) cg = gameObject.AddComponent<CanvasGroup>();
+			return cg;
 		}
 
 		private void RestoreWindowRect()
