@@ -1,15 +1,17 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
 /// Делает панель (Image) «матовым стеклом»: размывает то, что отрисовано её
 /// канвасом под панелью, и слегка тонирует.
-/// Работает в двух режимах:
+/// Режимы:
 ///  - канвас рендерится камерой в RenderTexture (монитор/проектор): берётся
 ///    размытая копия этого RT -> настоящее размытие фона;
-///  - канвас ScreenSpaceOverlay (режим зума, камеры нет): подаётся белая
-///    текстура -> просто светлое полупрозрачное стекло (без черноты).
-/// Вешается на тот же объект, что и фоновый Image панели.
+///  - канвас ScreenSpaceOverlay (режим зума, камеры нет): экран захватывается
+///    в конце кадра (WaitForEndOfFrame), даунсэмплится и размывается.
+/// Частота обновления блюра задаётся в секундах (blurRefreshInterval) и не
+/// зависит от fps.
 /// </summary>
 [RequireComponent(typeof(Image))]
 [ExecuteAlways]
@@ -21,12 +23,17 @@ public class FrostedGlass : MonoBehaviour
     [Range(0.05f, 6f)] public float noiseFreq = 2f;
     [Range(0f, 1f)] public float blurMix = 0.85f;
     [Range(1, 16)] public int blurDownscale = 6;
+    // Период обновления блюра в секундах (для overlay/зум). Не зависит от fps:
+    // 0.05 = ~20 раз в секунду при любом фреймрейте.
+    [Range(0.016f, 0.5f)] public float blurRefreshInterval = 0.05f;
 
     private Image image;
     private Material mat;
     private RenderTexture blurRT;
     private Texture2D whiteTex;
-    private Texture2D overlayCapture;
+    private Texture2D overlayCapture;   // последний захваченный кадр (заполняется в конце кадра)
+    private Coroutine captureRoutine;
+    private double lastBlurTime;
     private static Material blurMat;
 
     private void Awake()
@@ -37,6 +44,8 @@ public class FrostedGlass : MonoBehaviour
     private void OnEnable()
     {
         Apply();
+        if (Application.isPlaying && captureRoutine == null)
+            captureRoutine = StartCoroutine(CaptureLoop());
     }
 
     private void Reset()
@@ -96,6 +105,46 @@ public class FrostedGlass : MonoBehaviour
         return whiteTex;
     }
 
+    /// <summary>
+    /// Захват экрана строго в конце кадра: в этот момент активный рендер-таргет
+    /// — экран (backbuffer), поэтому нет ошибки «region exceeds active Render
+    /// Target». Делаем это по реальному времени, а не по номеру кадра.
+    /// </summary>
+    private IEnumerator CaptureLoop()
+    {
+        var wait = new WaitForEndOfFrame();
+        while (true)
+        {
+            yield return wait;
+
+            if (!isActiveAndEnabled || !Application.isPlaying) continue;
+
+            // Захват только когда реально нужен overlay-режим (нет камеры с RT).
+            var canvas = GetComponentInParent<Canvas>();
+            Camera cam = null;
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                cam = canvas.worldCamera;
+            if (cam != null && cam.targetTexture != null) continue; // монитор: блюр из RT
+
+            // Частота по времени (не зависит от fps).
+            double now = Time.unscaledTime;
+            if (now - lastCaptureTime < Mathf.Max(0.016f, blurRefreshInterval)) continue;
+            lastCaptureTime = now;
+
+            Texture2D oldCap = overlayCapture;
+            Texture2D cap = null;
+            try { cap = ScreenCapture.CaptureScreenshotAsTexture(); }
+            catch { cap = null; }
+            if (cap != null)
+            {
+                overlayCapture = cap;
+                if (oldCap != null) Destroy(oldCap);
+            }
+        }
+    }
+
+    private double lastCaptureTime;
+
     private void LateUpdate()
     {
         var m = mat;
@@ -124,37 +173,26 @@ public class FrostedGlass : MonoBehaviour
         var bm = GetBlurMat();
 
         // Ветка 1: монитор/проектор — канвас рендерится камерой в RenderTexture.
-        // Берём размытую копию именно этого экрана (динамически, каждый кадр).
         if (screenRT != null)
         {
-            int bw = Mathf.Max(64, screenRT.width / Mathf.Max(1, blurDownscale));
-            int bh = Mathf.Max(64, screenRT.height / Mathf.Max(1, blurDownscale));
-            EnsureBlur(bw, bh);
-            if (bm != null) Graphics.Blit(screenRT, blurRT, bm);
-            else Graphics.Blit(screenRT, blurRT);
-            m.SetTexture("_BlurTex", blurRT);
+            // Обновляем блюр тоже по времени (дешевле и плавно по нагрузке).
+            double now = Time.unscaledTime;
+            if (now - lastBlurTime >= Mathf.Max(0.016f, blurRefreshInterval))
+            {
+                lastBlurTime = now;
+                int bw = Mathf.Max(64, screenRT.width / Mathf.Max(1, blurDownscale));
+                int bh = Mathf.Max(64, screenRT.height / Mathf.Max(1, blurDownscale));
+                EnsureBlur(bw, bh);
+                if (bm != null) Graphics.Blit(screenRT, blurRT, bm);
+                else Graphics.Blit(screenRT, blurRT);
+            }
+            m.SetTexture("_BlurTex", blurRT != null ? blurRT : (Texture)GetWhite());
             return;
         }
 
-        // Ветка 2: зум/overlay — камеры с RT нет. Захватываем экран
-        // периодически, чтобы блюр был ДИНАМИЧЕСКИМ (а не одним кадром, снятым
-        // до входа в монитор, где была видна 3D-комната/игра).
-        const int captureEvery = 5;
-        if (Time.frameCount % captureEvery == 0)
-        {
-            Texture2D oldCap = overlayCapture;
-            try { overlayCapture = ScreenCapture.CaptureScreenshotAsTexture(); }
-            catch { overlayCapture = null; }
-            if (oldCap != null)
-            {
-                if (Application.isPlaying) Object.Destroy(oldCap);
-                else Object.DestroyImmediate(oldCap);
-            }
-        }
-
+        // Ветка 2: зум/overlay — используем кадр, захваченный в конце кадра.
         if (overlayCapture != null)
         {
-            // Даунсэмпл захваченного кадра -> сильное и дешёвое размытие.
             int cw = Mathf.Max(64, overlayCapture.width / Mathf.Max(1, blurDownscale));
             int ch = Mathf.Max(64, overlayCapture.height / Mathf.Max(1, blurDownscale));
             EnsureBlur(cw, ch);
@@ -181,19 +219,20 @@ public class FrostedGlass : MonoBehaviour
 
     private void ReleaseBlur()
     {
-        if (blurRT != null) { blurRT.Release(); Object.DestroyImmediate(blurRT); blurRT = null; }
-        if (overlayCapture != null) { Object.DestroyImmediate(overlayCapture); overlayCapture = null; }
+        if (blurRT != null) { blurRT.Release(); DestroyImmediate(blurRT); blurRT = null; }
+        if (overlayCapture != null) { DestroyImmediate(overlayCapture); overlayCapture = null; }
     }
 
     private void OnDisable()
     {
+        if (captureRoutine != null) { StopCoroutine(captureRoutine); captureRoutine = null; }
         ReleaseBlur();
     }
 
     private void OnDestroy()
     {
+        if (captureRoutine != null) { StopCoroutine(captureRoutine); captureRoutine = null; }
         ReleaseBlur();
-        if (mat != null) Object.DestroyImmediate(mat);
-        if (blurMat != null) { /* shared across instances; destroyed on scene unload */ }
+        if (mat != null) DestroyImmediate(mat);
     }
 }
