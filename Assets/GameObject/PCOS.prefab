@@ -8337,6 +8337,7 @@ MonoBehaviour:
   grain: 0.02
   noiseFreq: 2
   blurMix: 0.9
+  frost: 0.78
   blurDownscale: 10
   blurSpread: 2.5
   blurPasses: 3
@@ -8358,6 +8359,7 @@ MonoBehaviour:
   grain: 0.02
   noiseFreq: 2
   blurMix: 0.9
+  frost: 0.78
   blurDownscale: 10
   blurSpread: 2.5
   blurPasses: 3

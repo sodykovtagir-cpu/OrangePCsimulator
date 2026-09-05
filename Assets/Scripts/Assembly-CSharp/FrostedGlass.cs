@@ -28,6 +28,7 @@ public class FrostedGlass : MonoBehaviour
     [Range(0f, 0.5f)] public float grain = 0.02f;
     [Range(0.05f, 6f)] public float noiseFreq = 2f;
     [Range(0f, 1f)] public float blurMix = 0.9f;
+    [Range(0f, 1f)] public float frost = 0.75f;   // молочное вымывание: больше -> текст за стеклом не читается
     [Range(2, 16)] public int blurDownscale = 10;
     [Range(0.5f, 6f)] public float blurSpread = 2.5f;
     [Range(1, 3)] public int blurPasses = 3;
@@ -101,6 +102,7 @@ public class FrostedGlass : MonoBehaviour
             m.SetFloat("_NoiseAmount", grain);
             m.SetFloat("_NoiseFreq", noiseFreq);
             m.SetFloat("_BlurAmount", blurMix);
+            m.SetFloat("_Frost", frost);
         }
         else
         {
@@ -135,6 +137,7 @@ public class FrostedGlass : MonoBehaviour
         m.SetFloat("_NoiseAmount", grain);
         m.SetFloat("_NoiseFreq", noiseFreq);
         m.SetFloat("_BlurAmount", blurMix);
+        m.SetFloat("_Frost", frost);
 
         var canvas = GetComponentInParent<Canvas>();
         if (canvas == null || !Application.isPlaying)
