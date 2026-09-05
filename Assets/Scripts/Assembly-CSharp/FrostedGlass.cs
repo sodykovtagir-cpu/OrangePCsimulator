@@ -112,47 +112,61 @@ public class FrostedGlass : MonoBehaviour
         if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             cam = canvas.worldCamera;
 
-        Texture screen = (cam != null) ? cam.targetTexture : null;
+        RenderTexture screenRT = (cam != null) ? cam.targetTexture : null;
 
-        // Зум/overlay: камеры с RT нет — пробуем захват экрана (раз в несколько
-        // кадров, чтобы не грузить устройство).
-        if (screen == null)
+        // В редакторе вне Play-режима ничего не захватываем/не блюрим.
+        if (!Application.isPlaying)
         {
-            if (overlayCapture == null && Time.frameCount % 6 == 0)
-            {
-                try { overlayCapture = ScreenCapture.CaptureScreenshotAsTexture(); }
-                catch { overlayCapture = null; }
-            }
-
-            if (overlayCapture != null)
-            {
-                EnsureBlur(overlayCapture.width, overlayCapture.height);
-                var capMat = GetBlurMat();
-                if (capMat != null) Graphics.Blit(overlayCapture, blurRT, capMat);
-                else Graphics.Blit(overlayCapture, blurRT);
-                m.SetTexture("_BlurTex", blurRT);
-            }
-            else
-            {
-                // Захвата ещё нет — светлое стекло (без черноты).
-                m.SetTexture("_BlurTex", GetWhite());
-            }
+            m.SetTexture("_BlurTex", GetWhite());
             return;
         }
 
-        // Создаём/обновляем размытую копию (сильный даунсэмпл уже размывает).
-        int bw = Mathf.Max(64, screen.width / Mathf.Max(1, blurDownscale));
-        int bh = Mathf.Max(64, screen.height / Mathf.Max(1, blurDownscale));
-        EnsureBlur(bw, bh);
-
-        // Размываем текущий кадр канваса. Камера отрисована до UI-пасса,
-        // поэтому в targetTexture уже есть контент. Блюр-шейдер делает box blur
-        // поверх сильного даунсэмпла.
         var bm = GetBlurMat();
-        if (bm != null) Graphics.Blit(screen, blurRT, bm);
-        else Graphics.Blit(screen, blurRT);
 
-        m.SetTexture("_BlurTex", blurRT);
+        // Ветка 1: монитор/проектор — канвас рендерится камерой в RenderTexture.
+        // Берём размытую копию именно этого экрана (динамически, каждый кадр).
+        if (screenRT != null)
+        {
+            int bw = Mathf.Max(64, screenRT.width / Mathf.Max(1, blurDownscale));
+            int bh = Mathf.Max(64, screenRT.height / Mathf.Max(1, blurDownscale));
+            EnsureBlur(bw, bh);
+            if (bm != null) Graphics.Blit(screenRT, blurRT, bm);
+            else Graphics.Blit(screenRT, blurRT);
+            m.SetTexture("_BlurTex", blurRT);
+            return;
+        }
+
+        // Ветка 2: зум/overlay — камеры с RT нет. Захватываем экран
+        // периодически, чтобы блюр был ДИНАМИЧЕСКИМ (а не одним кадром, снятым
+        // до входа в монитор, где была видна 3D-комната/игра).
+        const int captureEvery = 5;
+        if (Time.frameCount % captureEvery == 0)
+        {
+            Texture2D oldCap = overlayCapture;
+            try { overlayCapture = ScreenCapture.CaptureScreenshotAsTexture(); }
+            catch { overlayCapture = null; }
+            if (oldCap != null)
+            {
+                if (Application.isPlaying) Object.Destroy(oldCap);
+                else Object.DestroyImmediate(oldCap);
+            }
+        }
+
+        if (overlayCapture != null)
+        {
+            // Даунсэмпл захваченного кадра -> сильное и дешёвое размытие.
+            int cw = Mathf.Max(64, overlayCapture.width / Mathf.Max(1, blurDownscale));
+            int ch = Mathf.Max(64, overlayCapture.height / Mathf.Max(1, blurDownscale));
+            EnsureBlur(cw, ch);
+            if (bm != null) Graphics.Blit(overlayCapture, blurRT, bm);
+            else Graphics.Blit(overlayCapture, blurRT);
+            m.SetTexture("_BlurTex", blurRT);
+        }
+        else
+        {
+            // Захват ещё не готов — светлое стекло (без черноты).
+            m.SetTexture("_BlurTex", GetWhite());
+        }
     }
 
     private void EnsureBlur(int width, int height)
