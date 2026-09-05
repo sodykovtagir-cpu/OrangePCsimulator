@@ -32,6 +32,10 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Button playPauseButton;
 
+		[Tooltip("Значок паузы поверх видео: виден, когда видео на паузе, и скрыт при воспроизведении.")]
+		[SerializeField]
+		private GameObject pauseIndicator;
+
 		private VideoPlayer player;
 		private RenderTexture render;
 
@@ -74,6 +78,8 @@ namespace PC.Component.Software
 			}
 			if (playPauseButton != null)
 				playPauseButton.onClick.AddListener(TogglePlayPause);
+			if (pauseIndicator != null)
+				pauseIndicator.SetActive(false);
 		}
 
 		private void Update()
@@ -91,6 +97,14 @@ namespace PC.Component.Software
 			}
 			if (timeText != null)
 				timeText.text = FormatTime(t) + " / " + FormatTime(length);
+
+			// Значок паузы виден, когда видео поставлено на паузу.
+			if (pauseIndicator != null)
+			{
+				bool paused = !player.isPlaying;
+				if (pauseIndicator.activeSelf != paused)
+					pauseIndicator.SetActive(paused);
+			}
 		}
 
 		public void GetVideo()
@@ -113,6 +127,7 @@ namespace PC.Component.Software
 				output.texture = render;
 			}
 			if (warning != null) warning.SetActive(false);
+			if (pauseIndicator != null) pauseIndicator.SetActive(false);
 		}
 
 		/// <summary>Пауза/воспроизведение (назначьте на кнопку или на сам RawImage).</summary>

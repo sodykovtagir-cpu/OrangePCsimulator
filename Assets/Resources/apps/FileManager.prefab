@@ -1329,8 +1329,8 @@ MonoBehaviour:
   hiddenToggle: {fileID: 114681123064644107}
   selectedColor: {r: 0.7490196, g: 0.90588236, b: 1, a: 1}
   folderColor: {r: 1, g: 0.9, b: 0.6, a: 1}
-maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
-normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}
+maximizeSprite: {fileID: 21300000, guid: 158e7d25edc752d429e03328f498ffa1, type: 2}
+normalSprite: {fileID: 21300000, guid: a6b226f7c9f75c54fbb97753085375d0, type: 2}
 windowState: {fileID: 8911595751943069878}
 
 --- !u!1 &1492655008421711
@@ -1497,7 +1497,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 4cba97a34d17b9c4fb2aca3ff5ce02c0, type: 2}
+  m_Sprite: {fileID: 21300000, guid: 559963f8d0cad1049b445e0b2149695c, type: 2}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2866,7 +2866,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
+  m_Sprite: {fileID: 21300000, guid: 158e7d25edc752d429e03328f498ffa1, type: 2}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3544,7 +3544,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: bb0f5908d2d446f085cf605d2613be08, type: 2}
+  m_Sprite: {fileID: 21300000, guid: ff0cf4ed393c49bb9c96c60cbccdbddc, type: 2}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
