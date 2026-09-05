@@ -6,6 +6,7 @@ Shader "UI/FrostedGlass"
         _Color ("Tint", Color) = (1,1,1,1)
         _BlurTex ("Background Blur", 2D) = "white" {}
         _BlurAmount ("Blur Mix", Range(0,1)) = 0.85
+        _Frost ("Frost (wash toward tint)", Range(0,1)) = 0.7
         _NoiseAmount ("Noise Amount", Range(0,1)) = 0.025
         _NoiseFreq ("Noise Density", Range(0.01, 6)) = 2.0
     }
@@ -63,6 +64,7 @@ Shader "UI/FrostedGlass"
             sampler2D _BlurTex;
             fixed4 _Color;
             float _BlurAmount;
+            float _Frost;
             float _NoiseAmount;
             float _NoiseFreq;
             float4 _ClipRect;
@@ -109,9 +111,15 @@ Shader "UI/FrostedGlass"
                 float2 suv = i.screenPos.xy / i.screenPos.w;
                 fixed4 blur = tex2D(_BlurTex, suv);
 
-                // Лёгкая тонировка поверх размытого фона.
+                // Размытый фон под стеклом.
                 fixed3 bg = blur.rgb;
-                fixed3 rgb = lerp(base.rgb, bg, _BlurAmount);
+                // Подмешиваем размытый фон к цвету панели.
+                fixed3 glass = lerp(base.rgb, bg, _BlurAmount);
+                // «Матово-вымывающее» молочко: поднимаем результат к светлому
+                // тинту (darken-контраст синего стола и чёрных букв исчезает ->
+                // текст/иконки рабочего стола за панелью не читаются).
+                fixed3 frostCol = lerp(_Color.rgb, fixed3(1,1,1), 0.5);
+                fixed3 rgb = lerp(glass, frostCol, _Frost);
 
                 // Очень мелкое зерно.
                 float2 np = i.worldPosition.xy * max(_NoiseFreq, 0.0001);
