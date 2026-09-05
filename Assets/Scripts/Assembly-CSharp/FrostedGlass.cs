@@ -127,8 +127,8 @@ public class FrostedGlass : MonoBehaviour
             if (overlayCapture != null)
             {
                 EnsureBlur(overlayCapture.width, overlayCapture.height);
-                var bm = GetBlurMat();
-                if (bm != null) Graphics.Blit(overlayCapture, blurRT, bm);
+                var capMat = GetBlurMat();
+                if (capMat != null) Graphics.Blit(overlayCapture, blurRT, capMat);
                 else Graphics.Blit(overlayCapture, blurRT);
                 m.SetTexture("_BlurTex", blurRT);
             }
