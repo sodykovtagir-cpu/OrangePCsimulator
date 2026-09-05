@@ -6,7 +6,7 @@ Shader "UI/FrostedGlass"
         _Color ("Tint", Color) = (1,1,1,1)
         _BlurTex ("Background Blur", 2D) = "white" {}
         _BlurAmount ("Blur Mix", Range(0,1)) = 0.85
-        _Frost ("Frost (wash toward tint)", Range(0,1)) = 0.7
+        _Frost ("Frost (wash toward tint)", Range(0,1)) = 0.3
         _NoiseAmount ("Noise Amount", Range(0,1)) = 0.025
         _NoiseFreq ("Noise Density", Range(0.01, 6)) = 2.0
     }
