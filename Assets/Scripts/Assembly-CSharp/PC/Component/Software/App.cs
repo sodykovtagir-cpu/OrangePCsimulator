@@ -70,6 +70,8 @@ namespace PC.Component.Software
 		private Vector2 minPivot;
 		private Vector2 minPosition;
 		private Vector2 minSize;
+		private Vector2 minOffsetMin;
+		private Vector2 minOffsetMax;
 		private bool wasMaximizedWhenMinimized;
 
 		protected bool canDrag = true;
@@ -122,11 +124,15 @@ namespace PC.Component.Software
 
 		public event Action AppClosed;
 
-		public void Init(OS.OperatingSystem system)
+        public void Init(OS.OperatingSystem system)
         {
 			this.system = system;
 			var window = transform as RectTransform;
-			if (isActiveAndEnabled)
+			// Анимацию открытия всегда запускаем (PlayOpen сам ставит стартовые
+			// alpha/scale). Раньше она была только под isActiveAndEnabled, и окна,
+			// которые догружают контент и активируются с задержкой (например,
+			// онлайн-магазин), появлялись «скачком» без анимации.
+			if (window != null)
 				StartCoroutine(WindowChrome.PlayOpen(window));
         }
 
@@ -162,13 +168,18 @@ namespace PC.Component.Software
 				restoreSize = rect.sizeDelta;
 				hasRestoreState = true;
 
-				// Разворачиваем окно НА ВЕСЬ экран без отступов.
-				// Панель задач рисуется поверх окон, поэтому остаётся видимой.
-				rect.pivot = new Vector2(0.5f, 0.5f);
+				// Разворачиваем окно почти на весь экран: верх и бока в край экрана,
+				// а низ заканчивается НАД панелью задач (окно не уходит под таскбар).
+				float bottomInset = 0f;
+				if (system != null) bottomInset = system.GetTaskbarInsetLocalHeight();
+				float side = 0f;
+				float top = 0f;
+
+				rect.pivot = new Vector2(0f, 0f);
 				rect.anchorMin = Vector2.zero;
 				rect.anchorMax = Vector2.one;
-				rect.anchoredPosition = Vector2.zero;
-				rect.sizeDelta = Vector2.zero;
+				rect.offsetMin = new Vector2(side, bottomInset);
+				rect.offsetMax = new Vector2(-side, -top);
 
 				SetDraggable(false);
 				if (windowState != null && normalSprite != null) windowState.sprite = normalSprite;
@@ -202,6 +213,8 @@ namespace PC.Component.Software
 				minPivot = rt.pivot;
 				minPosition = rt.anchoredPosition;
 				minSize = rt.sizeDelta;
+				minOffsetMin = rt.offsetMin;
+				minOffsetMax = rt.offsetMax;
 			}
 
 			StartCoroutine(MinimizeRoutine());
@@ -221,11 +234,12 @@ namespace PC.Component.Software
 			// Сразу создаём/обновляем кнопку в таскбаре, чтобы было к чему лететь.
 			if (os != null) os.OnAppMinimized(this);
 
+			// Та же длительность и кривая, что у меню «Пуск»/открытия окон.
 			const float duration = 0.2f;
 			float t = 0f;
 			Vector3 startPos = rt != null ? rt.position : Vector3.zero;
 			Vector3 startScale = rt != null ? rt.localScale : Vector3.one;
-			Vector3 endScale = startScale * 0.12f;
+			Vector3 endScale = startScale * 0.2f;
 
 			while (t < duration && rt != null)
 			{
@@ -284,6 +298,8 @@ namespace PC.Component.Software
 				rt.pivot = minPivot;
 				rt.sizeDelta = minSize;
 				rt.anchoredPosition = minPosition;
+				rt.offsetMin = minOffsetMin;
+				rt.offsetMax = minOffsetMax;
 				rt.localScale = Vector3.one;
 			}
 			if (wasHidden)

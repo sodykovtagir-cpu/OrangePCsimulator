@@ -2432,6 +2432,35 @@ namespace PC.Component.Software.OS
         }
 
         /// <summary>
+        /// Высота нижнего отступа под панель задач, в локальных координатах
+        /// контейнера окон (appParent). Нужна, чтобы развёрнутое окно не пряталось
+        /// под панель задач.
+        /// </summary>
+        public float GetTaskbarInsetLocalHeight()
+        {
+            if (taskbar == null) return 48f;
+
+            var taskbarRt = taskbar.transform as RectTransform;
+            var appRt = appParent as RectTransform;
+            if (taskbarRt == null || appRt == null) return 48f;
+
+            // Мировая высота панели задач -> локальная высота в координатах appParent.
+            var wb = new Vector3[4];
+            taskbarRt.GetWorldCorners(wb);
+            float worldHeight = Vector3.Distance(wb[0], wb[1]);
+
+            var ab = new Vector3[4];
+            appRt.GetWorldCorners(ab);
+            float worldAppHeight = Vector3.Distance(ab[0], ab[1]);
+            float localAppHeight = appRt.rect.height;
+
+            if (worldAppHeight <= 0.001f || localAppHeight <= 0.001f)
+                return taskbarRt.rect.height;
+
+            return worldHeight * (localAppHeight / worldAppHeight) + 6f;
+        }
+
+        /// <summary>
         /// Мировая позиция кнопки приложения в панели задач — точка, в которую
         /// «улетает» окно при сворачивании и из которой появляется при развороте.
         /// Если кнопка/таскбар не найдены, возвращает низ-центр экрана.
