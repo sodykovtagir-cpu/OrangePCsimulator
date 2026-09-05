@@ -8337,6 +8337,7 @@ MonoBehaviour:
   grain: 0.025
   noiseFreq: 2
   blurMix: 0.85
+  blurDownscale: 6
 
 --- !u!114 &3610103133035125543
 MonoBehaviour:
@@ -8355,4 +8356,5 @@ MonoBehaviour:
   grain: 0.025
   noiseFreq: 2
   blurMix: 0.85
+  blurDownscale: 6
 
