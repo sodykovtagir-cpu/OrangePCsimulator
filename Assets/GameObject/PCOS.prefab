@@ -8332,10 +8332,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bb30a4f4de2496b8f7d2b81158cd143, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  opacity: 0.75
-  tint: {r: 0.92, g: 0.94, b: 0.98, a: 1}
-  grain: 0.07
-  noiseFreq: 0.5
+  opacity: 0.55
+  tint: {r: 0.95, g: 0.97, b: 1, a: 1}
+  grain: 0.025
+  noiseFreq: 2
+  blurMix: 0.85
 
 --- !u!114 &3610103133035125543
 MonoBehaviour:
@@ -8349,8 +8350,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bb30a4f4de2496b8f7d2b81158cd143, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  opacity: 0.75
-  tint: {r: 0.92, g: 0.94, b: 0.98, a: 1}
-  grain: 0.07
-  noiseFreq: 0.5
+  opacity: 0.55
+  tint: {r: 0.95, g: 0.97, b: 1, a: 1}
+  grain: 0.025
+  noiseFreq: 2
+  blurMix: 0.85
 
