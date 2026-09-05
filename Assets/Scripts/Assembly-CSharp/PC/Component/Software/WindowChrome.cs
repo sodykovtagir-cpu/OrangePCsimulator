@@ -53,7 +53,9 @@ namespace PC.Component.Software
             float t = 0f;
             while (t < OpenTime && window != null)
             {
-                t += Time.unscaledDeltaTime;
+                // Не больше 25% длительности за кадр: фриз/лаг не должен
+                // «телепортировать» анимацию в конец (иначе окно появляется скачком).
+                t += Mathf.Min(Time.unscaledDeltaTime, OpenTime * 0.25f);
                 float k = Mathf.Clamp01(t / OpenTime);
                 k = 1f - (1f - k) * (1f - k);
                 cg.alpha = k;
@@ -76,7 +78,7 @@ namespace PC.Component.Software
             float t = 0f;
             while (t < CloseTime && window != null)
             {
-                t += Time.unscaledDeltaTime;
+                t += Mathf.Min(Time.unscaledDeltaTime, CloseTime * 0.25f);
                 float k = Mathf.Clamp01(t / CloseTime);
                 k = k * k;
                 cg.alpha = Mathf.Lerp(fromAlpha, 0f, k);
@@ -105,7 +107,7 @@ namespace PC.Component.Software
             float t = 0f;
             while (t < time && menu != null)
             {
-                t += Time.unscaledDeltaTime;
+                t += Mathf.Min(Time.unscaledDeltaTime, time * 0.25f);
                 float k = Mathf.Clamp01(t / time);
                 k = open ? (1f - (1f - k) * (1f - k)) : (k * k);
                 cg.alpha = Mathf.Lerp(fromA, toA, k);
