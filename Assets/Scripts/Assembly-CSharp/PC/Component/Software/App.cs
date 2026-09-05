@@ -51,6 +51,15 @@ namespace PC.Component.Software
 
 		private bool animating;
 
+		// Токен «поколения» анимации окна. Каждое новое сворачивание/
+		// разворачивание/открытие увеличивает его; корутина завершает финализацию
+		// (SetActive(false) и т.п.), только если её токен ещё актуален. Это чинит
+		// гонку при быстром сворачивании/разворачивании, когда устаревшая корутина
+		// успевала спрятать уже развёрнутое окно.
+		private int animId;
+
+		private Coroutine animCoroutine;
+
 		protected RectTransform rect;
 
 		protected Vector2 defaultSize;
@@ -133,8 +142,16 @@ namespace PC.Component.Software
 			// которые догружают контент и активируются с задержкой (например,
 			// онлайн-магазин), появлялись «скачком» без анимации.
 			if (window != null)
-				StartCoroutine(WindowChrome.PlayOpen(window));
+				BeginAnim(OpenRoutine(window), true);
         }
+
+		private IEnumerator OpenRoutine(RectTransform window)
+		{
+			yield return WindowChrome.PlayOpen(window);
+			// Достигается только если анимацию не перебили (StopCoroutine).
+			animating = false;
+			animCoroutine = null;
+		}
 
 		public virtual void Open(string content)
 		{
@@ -199,7 +216,6 @@ namespace PC.Component.Software
 		public virtual void Minimize()
 		{
 			if (closing || minimized) return;
-			if (animating) return;
 
 			minimized = true;
 			wasMaximizedWhenMinimized = maximized;
@@ -217,12 +233,15 @@ namespace PC.Component.Software
 				minOffsetMax = rt.offsetMax;
 			}
 
-			StartCoroutine(MinimizeRoutine());
+			BeginAnim(MinimizeRoutine(), true);
 		}
 
 		private IEnumerator MinimizeRoutine()
 		{
+			int id = animId;
 			animating = true;
+
+			// Нужна корректная раскладка до начала анимации.
 
 			var rt = transform as RectTransform;
 			var os = system;
@@ -243,7 +262,8 @@ namespace PC.Component.Software
 
 			while (t < duration && rt != null)
 			{
-				t += Time.unscaledDeltaTime;
+				if (id != animId) yield break; // нас перебили (развернули)
+				t += Mathf.Min(Time.unscaledDeltaTime, duration * 0.25f);
 				float k = Mathf.Clamp01(t / duration);
 				float e = 1f - (1f - k) * (1f - k); // ease-out quad
 				rt.position = Vector3.Lerp(startPos, target, e);
@@ -252,6 +272,7 @@ namespace PC.Component.Software
 				yield return null;
 			}
 
+			if (id != animId) yield break; // не финализируем устаревшую анимацию
 			animating = false;
 			gameObject.SetActive(false);
 
@@ -263,6 +284,8 @@ namespace PC.Component.Software
 				rt.pivot = minPivot;
 				rt.sizeDelta = minSize;
 				rt.anchoredPosition = minPosition;
+				rt.offsetMin = minOffsetMin;
+				rt.offsetMax = minOffsetMax;
 				rt.localScale = Vector3.one;
 			}
 			cg.alpha = 1f;
@@ -286,6 +309,7 @@ namespace PC.Component.Software
 				flyTarget = system.GetTaskbarIconWorldPos(this);
 
 			minimized = false;
+			int id = ++animId; // отменяем любую текущую анимацию окна
 
 			var rt = rect != null ? rect : (transform as RectTransform);
 
@@ -320,11 +344,11 @@ namespace PC.Component.Software
 			{
 				var os = system;
 				if (os != null) os.OnAppRestored(this);
-				StartCoroutine(RestoreRoutine(flyTarget));
+				BeginAnim(RestoreRoutine(flyTarget, id));
 			}
 		}
 
-		private IEnumerator RestoreRoutine(Vector3 target)
+		private IEnumerator RestoreRoutine(Vector3 target, int id)
 		{
 			animating = true;
 
@@ -348,7 +372,8 @@ namespace PC.Component.Software
 
 			while (t < duration)
 			{
-				t += Time.unscaledDeltaTime;
+				if (id != animId) yield break; // нас перебили (свернули)
+				t += Mathf.Min(Time.unscaledDeltaTime, duration * 0.25f);
 				float k = Mathf.Clamp01(t / duration);
 				float e = 1f - (1f - k) * (1f - k); // ease-out quad (как PlayOpen/PlayStartMenu)
 				rt.position = Vector3.Lerp(target, endPos, e);
@@ -357,10 +382,24 @@ namespace PC.Component.Software
 				yield return null;
 			}
 
+			if (id != animId) yield break;
 			rt.position = endPos;
 			rt.localScale = endScale;
 			cg.alpha = 1f;
 			animating = false;
+		}
+
+		/// <summary>
+		/// Запускает новую анимацию окна, отменяя предыдущую (свернуть/развернуть
+		/// больше не дерутся за трансформ и не прячут уже развёрнутое окно).
+		/// </summary>
+		private Coroutine BeginAnim(IEnumerator routine, bool newGeneration = false)
+		{
+			if (animCoroutine != null) StopCoroutine(animCoroutine);
+			if (newGeneration) animId++;
+			animating = true;
+			animCoroutine = StartCoroutine(routine);
+			return animCoroutine;
 		}
 
 		private CanvasGroup WindowChromeGroup()
