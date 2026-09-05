@@ -176,7 +176,12 @@ public class WorkshopClient : MonoBehaviour
 
 	public void Download(WorkshopItem item, Action<string, string> done)
 	{
-		StartCoroutine(DownloadCo(item, done));
+		Download(item, null, done);
+	}
+
+	public void Download(WorkshopItem item, Action<float> progress, Action<string, string> done)
+	{
+		StartCoroutine(DownloadCo(item, progress, done));
 	}
 
 	/// <summary>
@@ -200,11 +205,14 @@ public class WorkshopClient : MonoBehaviour
 		done(parsed, null);
 	}
 
-	private IEnumerator DownloadCo(WorkshopItem item, Action<string, string> done)
+	private IEnumerator DownloadCo(WorkshopItem item, Action<float> progress, Action<string, string> done)
 	{
 		byte[] bytes = null;
 		string err = null;
-		yield return RequestBytes("?action=download&id=" + item.id + "&i=1", (b, e) => { bytes = b; err = e; });
+		if (progress != null)
+			yield return DownloadBytesProgress("?action=download&id=" + item.id + "&i=1", progress, (b, e) => { bytes = b; err = e; });
+		else
+			yield return RequestBytes("?action=download&id=" + item.id + "&i=1", (b, e) => { bytes = b; err = e; });
 		if (err != null) { done(null, err); yield break; }
 		if (bytes == null || bytes.Length < 8) { done(null, "empty file"); yield break; }
 		string title = string.IsNullOrEmpty(item.title) ? "workshop" : item.title;
@@ -592,6 +600,38 @@ public class WorkshopClient : MonoBehaviour
 					yield break;
 				}
 				Debug.LogWarning("[Workshop] " + baseUrl + " -> " + req.error);
+			}
+		}
+		done(null, "Empty reply from server");
+	}
+
+	private IEnumerator DownloadBytesProgress(string query, Action<float> onProgress, Action<byte[], string> done)
+	{
+		yield return BypassByethost();
+		foreach (var baseUrl in UrlOrder())
+		{
+			using (var req = UnityWebRequest.Get(baseUrl + query))
+			{
+				ApplyCookie(req);
+				req.timeout = 60;
+				req.certificateHandler = new AcceptAllCerts();
+				var op = SafeSend(req);
+				if (op == null) continue;
+				while (!op.isDone)
+				{
+					float p = req.downloadProgress;
+					if (p < 0f) p = 0f;
+					if (p > 1f) p = 1f;
+					if (onProgress != null) onProgress(p);
+					yield return null;
+				}
+				if (onProgress != null) onProgress(1f);
+				if (req.result == UnityWebRequest.Result.Success && req.downloadHandler.data != null && req.downloadHandler.data.Length > 0)
+				{
+					workingUrl = baseUrl;
+					done(req.downloadHandler.data, null);
+					yield break;
+				}
 			}
 		}
 		done(null, "Empty reply from server");

@@ -324,8 +324,11 @@ public class WorkshopMenu : MonoBehaviour
 
 	public void DownloadAndPlay(WorkshopItem item)
 	{
-		SetStatus(Tr("Downloading..."));
-		WorkshopClient.Instance.Download(item, (path, err) =>
+		SetStatus(Tr("Downloading... {0}%", 0));
+		WorkshopClient.Instance.Download(item, p =>
+		{
+			SetStatus(Tr("Downloading... {0}%", Mathf.RoundToInt(p * 100f)));
+		}, (path, err) =>
 		{
 			if (err != null) { SetStatus(Tr("Download: {0}", err)); return; }
 			try
@@ -343,8 +346,11 @@ public class WorkshopMenu : MonoBehaviour
 
 	public void DownloadOnly(WorkshopItem item)
 	{
-		SetStatus(Tr("Downloading..."));
-		WorkshopClient.Instance.Download(item, (path, err) =>
+		SetStatus(Tr("Downloading... {0}%", 0));
+		WorkshopClient.Instance.Download(item, p =>
+		{
+			SetStatus(Tr("Downloading... {0}%", Mathf.RoundToInt(p * 100f)));
+		}, (path, err) =>
 		{
 			if (err != null) { SetStatus(Tr("Download: {0}", err)); return; }
 			if (FileMenu.Instance != null) FileMenu.Instance.RebuildList();

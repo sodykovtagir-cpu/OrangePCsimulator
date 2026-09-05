@@ -185,14 +185,15 @@ namespace PC.Component.Software
 				restoreSize = rect.sizeDelta;
 				hasRestoreState = true;
 
-				// Контейнер окон тянется на весь экран, включая область под
-				// панелью задач. Панель непрозрачная и рисуется ПОВЕРХ окон, поэтому
-				// заполняем до самого низа — нижнюю кромку перекроет таскбар (без
-				// полосы рабочего стола между окном и панелью).
+				// Контейнер окон тянется на весь экран, включая область под панелью
+				// задач. Чтобы низ развёрнутого окна был ВПРИТЫК к верхнему краю
+				// панели (без захода под неё и без полосы рабочего стола), поднимаем
+				// нижний край ровно на высоту панели задач.
+				float bottomInset = system != null ? system.GetTaskbarInsetLocalHeight() : 0f;
 				rect.pivot = new Vector2(0f, 0f);
 				rect.anchorMin = Vector2.zero;
 				rect.anchorMax = Vector2.one;
-				rect.offsetMin = Vector2.zero;
+				rect.offsetMin = new Vector2(0f, bottomInset);
 				rect.offsetMax = Vector2.zero;
 
 				SetDraggable(false);
