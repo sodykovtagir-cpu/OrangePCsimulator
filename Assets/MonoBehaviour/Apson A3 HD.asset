@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 5000
   bitcoin: 10
   sprite: {fileID: 21300000, guid: 9277d4e5958ccd244abef715fe4595cc, type: 2}
-  spawn: {fileID: 1384044390745990, guid: 532183b4ad5ec6d41beb152726f7c35e, type: 3}
+  spawn: {fileID: 1384044390745990, guid: 6e81d0e0c266c2242ae05d21ae705b4c, type: 3}
   large: 1
   translateDescription: 1
   description: Can print 1024x1024 max

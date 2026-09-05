@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: RotatingDisplayStand
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   itemName: Rotating Display Stand
   price: 150
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: f95a714661e785e47b5af76d6bad557e, type: 2}
-  spawn: {fileID: 1709254077376921, guid: 48a49fc33341f1243b9a3f2fcf3a04ff, type: 2}
+  sprite: {fileID: 21300000, guid: 960417343d32b8d48a5d2817923bcbd7, type: 3}
+  spawn: {fileID: 1709254077376921, guid: 48a49fc33341f1243b9a3f2fcf3a04ff, type: 3}
   large: 1
   translateDescription: 0
   description: Motorized rotating display platform.
