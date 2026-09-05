@@ -360,7 +360,9 @@ namespace PC.Component.Software.OS
             {
                 var tex = FormatConverter.StringToTexture(file.content);
                 if (tex == null) return null;
-                tex.filterMode = FilterMode.Bilinear;
+                // Родной режим 1.8.3 рендерит внутриигровые обои точечной фильтрацией
+                // (пиксель-арт чёткий). Bilinear их замыливал («шакальные обои»).
+                tex.filterMode = FilterMode.Point;
                 tex.wrapMode = TextureWrapMode.Clamp;
                 tex.Apply();
                 return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
@@ -2457,7 +2459,10 @@ namespace PC.Component.Software.OS
             if (worldAppHeight <= 0.001f || localAppHeight <= 0.001f)
                 return taskbarRt.rect.height;
 
-            return worldHeight * (localAppHeight / worldAppHeight) + 6f;
+            // Точная высота панели в локальных единицах контейнера окон (без
+            // дополнительных отступов — низ развёрнутого окна совпадает с
+            // верхним краем панели задач впритык).
+            return worldHeight * (localAppHeight / worldAppHeight);
         }
 
         /// <summary>
