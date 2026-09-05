@@ -11,11 +11,12 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class FrostedGlass : MonoBehaviour
 {
-    [Range(0f, 1f)] public float opacity = 0.72f;
-    public Color tint = new Color(0.92f, 0.94f, 0.98f, 1f);
-    [Range(0f, 0.5f)] public float grain = 0.05f;
-    // Плотность зерна: чем больше, тем мельче «песчинки» (клетка ~1/плотность ед.).
-    [Range(0.05f, 3f)] public float noiseFreq = 0.5f;
+    [Range(0f, 1f)] public float opacity = 0.55f;
+    public Color tint = new Color(0.95f, 0.97f, 1f, 1f);
+    [Range(0f, 0.5f)] public float grain = 0.025f;
+    // Плотность зерна: больше = мельче «песчинки».
+    [Range(0.05f, 6f)] public float noiseFreq = 2f;
+    [Range(0f, 1f)] public float blurMix = 0.85f;
 
     private static Material sharedGlass;
 
@@ -57,6 +58,7 @@ public class FrostedGlass : MonoBehaviour
             image.material.SetColor("_Color", new Color(tint.r, tint.g, tint.b, opacity));
             image.material.SetFloat("_NoiseAmount", grain);
             image.material.SetFloat("_NoiseFreq", noiseFreq);
+            image.material.SetFloat("_BlurAmount", blurMix);
             // Чтобы цвет/альфа шли из материала, а не из Image.
             image.color = Color.white;
         }

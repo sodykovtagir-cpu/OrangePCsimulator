@@ -4,8 +4,9 @@ Shader "UI/FrostedGlass"
     {
         _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
-        _NoiseAmount ("Noise Amount", Range(0,1)) = 0.05
-        _NoiseFreq ("Noise Density", Range(0.01, 4)) = 0.5
+        _BlurAmount ("Blur Mix", Range(0,1)) = 0.85
+        _NoiseAmount ("Noise Amount", Range(0,1)) = 0.025
+        _NoiseFreq ("Noise Density", Range(0.01, 6)) = 2.0
     }
     SubShader
     {
@@ -51,11 +52,16 @@ Shader "UI/FrostedGlass"
                 fixed4 color    : COLOR;
                 float2 texcoord : TEXCOORD0;
                 float4 worldPosition : TEXCOORD1;
+                float4 screenPos : TEXCOORD2;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler2D _MainTex;
+            // Глобальная размытая копия экрана (заполняется DisplayManager).
+            // Если её нет — используем белый (будет просто тинт).
+            sampler2D _UIScreenBlur;
             fixed4 _Color;
+            float _BlurAmount;
             float _NoiseAmount;
             float _NoiseFreq;
             float4 _ClipRect;
@@ -68,12 +74,12 @@ Shader "UI/FrostedGlass"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.worldPosition = v.vertex;
                 o.vertex = UnityObjectToClipPos(v.vertex);
+                o.screenPos = ComputeScreenPos(o.vertex);
                 o.texcoord = v.texcoord;
                 o.color = v.color;
                 return o;
             }
 
-            // Детерминированный хеш.
             float hash21(float2 p)
             {
                 p = frac(p * float2(123.34, 456.21));
@@ -81,7 +87,6 @@ Shader "UI/FrostedGlass"
                 return frac(p.x * p.y);
             }
 
-            // Плавное value-noise (с интерполяцией) — мягкое зерно стекла.
             float vnoise(float2 p)
             {
                 float2 i = floor(p);
@@ -96,16 +101,25 @@ Shader "UI/FrostedGlass"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                // Базовый цвет Image/спрайта (для панели без спрайта — белый).
-                fixed4 tex = tex2D(_MainTex, i.texcoord);
-                fixed4 base = tex * _Color * i.color;
+                fixed4 base = tex2D(_MainTex, i.texcoord) * _Color * i.color;
 
-                // Мелкое зерно: частота в локальных единицах (клетка ~1/частота).
+                // Размытый фон под панелью (экранные UV). Размытие снимается кадром
+                // ранее — окна, открытые ДО появления панели, уже попадают в блюр.
+                float2 suv = i.screenPos.xy / i.screenPos.w;
+                fixed4 blur = tex2D(_UIScreenBlur, suv);
+                // Если блюр чёрный/пустой (нет провайдера) — не подмешиваем его.
+                float hasBlur = (blur.a > 0.001) ? 1.0 : 0.0;
+                fixed3 bg = blur.rgb;
+
+                // Смешиваем тинт панели с размытым фоном.
+                fixed3 rgb = lerp(base.rgb, bg, _BlurAmount * hasBlur);
+
+                // Очень мелкое зерно.
                 float2 np = i.worldPosition.xy * max(_NoiseFreq, 0.0001);
                 float n = vnoise(np) * 0.7 + hash21(floor(np)) * 0.3;
                 float grain = (n - 0.5) * _NoiseAmount;
+                rgb += grain;
 
-                fixed3 rgb = base.rgb + grain;
                 fixed4 outCol = fixed4(rgb, base.a);
 
                 #ifdef UNITY_UI_CLIP_RECT
