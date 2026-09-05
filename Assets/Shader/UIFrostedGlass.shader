@@ -4,6 +4,7 @@ Shader "UI/FrostedGlass"
     {
         _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
+        _BlurTex ("Background Blur", 2D) = "white" {}
         _BlurAmount ("Blur Mix", Range(0,1)) = 0.85
         _NoiseAmount ("Noise Amount", Range(0,1)) = 0.025
         _NoiseFreq ("Noise Density", Range(0.01, 6)) = 2.0
@@ -57,9 +58,9 @@ Shader "UI/FrostedGlass"
             };
 
             sampler2D _MainTex;
-            // Глобальная размытая копия экрана (заполняется DisplayManager).
-            // Если её нет — используем белый (будет просто тинт).
-            sampler2D _UIScreenBlur;
+            // Локальная размытая копия экрана камеры канваса.
+            // В режиме без блюра это белая текстура (просто светлое стекло).
+            sampler2D _BlurTex;
             fixed4 _Color;
             float _BlurAmount;
             float _NoiseAmount;
@@ -103,16 +104,14 @@ Shader "UI/FrostedGlass"
             {
                 fixed4 base = tex2D(_MainTex, i.texcoord) * _Color * i.color;
 
-                // Размытый фон под панелью (экранные UV). Размытие снимается кадром
-                // ранее — окна, открытые ДО появления панели, уже попадают в блюр.
+                // Размытый фон камеры канваса (экранные UV). В оверлее/зуме
+                // сюда подаётся белая текстура -> просто светлое стекло, не чёрное.
                 float2 suv = i.screenPos.xy / i.screenPos.w;
-                fixed4 blur = tex2D(_UIScreenBlur, suv);
-                // Если блюр чёрный/пустой (нет провайдера) — не подмешиваем его.
-                float hasBlur = (blur.a > 0.001) ? 1.0 : 0.0;
-                fixed3 bg = blur.rgb;
+                fixed4 blur = tex2D(_BlurTex, suv);
 
-                // Смешиваем тинт панели с размытым фоном.
-                fixed3 rgb = lerp(base.rgb, bg, _BlurAmount * hasBlur);
+                // Лёгкая тонировка поверх размытого фона.
+                fixed3 bg = blur.rgb;
+                fixed3 rgb = lerp(base.rgb, bg, _BlurAmount);
 
                 // Очень мелкое зерно.
                 float2 np = i.worldPosition.xy * max(_NoiseFreq, 0.0001);
