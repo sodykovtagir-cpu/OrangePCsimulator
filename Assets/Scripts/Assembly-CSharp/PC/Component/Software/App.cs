@@ -221,7 +221,7 @@ namespace PC.Component.Software
 			// Сразу создаём/обновляем кнопку в таскбаре, чтобы было к чему лететь.
 			if (os != null) os.OnAppMinimized(this);
 
-			float duration = 0.22f;
+			const float duration = 0.2f;
 			float t = 0f;
 			Vector3 startPos = rt != null ? rt.position : Vector3.zero;
 			Vector3 startScale = rt != null ? rt.localScale : Vector3.one;
@@ -263,6 +263,14 @@ namespace PC.Component.Software
 			if (closing) return;
 
 			bool wasHidden = minimized || !gameObject.activeSelf;
+
+			// Точку вылета (иконку в таскбаре) захватываем ДО пересоздания кнопок:
+			// свежесозданная кнопка в этом кадре ещё не разложена LayoutGroup'ом
+			// и вернула бы неверную позицию (у правого края, возле часов).
+			Vector3 flyTarget = Vector3.zero;
+			if (wasHidden && system != null)
+				flyTarget = system.GetTaskbarIconWorldPos(this);
+
 			minimized = false;
 
 			var rt = rect != null ? rect : (transform as RectTransform);
@@ -296,50 +304,45 @@ namespace PC.Component.Software
 			{
 				var os = system;
 				if (os != null) os.OnAppRestored(this);
-				StartCoroutine(RestoreRoutine());
+				StartCoroutine(RestoreRoutine(flyTarget));
 			}
 		}
 
-		private IEnumerator RestoreRoutine()
+		private IEnumerator RestoreRoutine(Vector3 target)
 		{
 			animating = true;
 
 			var rt = transform as RectTransform;
-			var os = system;
-			Vector3 target = os != null ? os.GetTaskbarIconWorldPos(this) : Vector3.zero;
+			if (rt == null) { animating = false; yield break; }
 
 			var cg = WindowChromeGroup();
 
-			float duration = 0.22f;
+			// Та же кривая/длительность, что у открытия окон и меню «Пуск».
+			const float duration = 0.2f;
 			float t = 0f;
-			Vector3 endPos = rt != null ? rt.position : Vector3.zero;
-			Vector3 endScale = rt != null ? rt.localScale : Vector3.one;
-			Vector3 startScale = endScale * 0.12f;
 
-			// Стартуем из иконки таскбара.
-			if (rt != null)
-			{
-				rt.position = target;
-				rt.localScale = startScale;
-			}
-			cg.alpha = 0.1f;
+			Vector3 endPos = rt.position;
+			Vector3 endScale = rt.localScale;
+			Vector3 startScale = endScale * 0.2f;
 
-			while (t < duration && rt != null)
+			// Стартуем прямо из иконки таскбара (до первого кадра — без мелькания).
+			rt.position = target;
+			rt.localScale = startScale;
+			cg.alpha = 0f;
+
+			while (t < duration)
 			{
 				t += Time.unscaledDeltaTime;
 				float k = Mathf.Clamp01(t / duration);
-				float e = k * k; // ease-in
+				float e = 1f - (1f - k) * (1f - k); // ease-out quad (как PlayOpen/PlayStartMenu)
 				rt.position = Vector3.Lerp(target, endPos, e);
 				rt.localScale = Vector3.LerpUnclamped(startScale, endScale, e);
-				cg.alpha = 0.1f + k * 0.9f;
+				cg.alpha = k;
 				yield return null;
 			}
 
-			if (rt != null)
-			{
-				rt.position = endPos;
-				rt.localScale = endScale;
-			}
+			rt.position = endPos;
+			rt.localScale = endScale;
 			cg.alpha = 1f;
 			animating = false;
 		}
