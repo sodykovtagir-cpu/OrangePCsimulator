@@ -1,17 +1,18 @@
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Делает панель (Image) «матовым стеклом»: размывает то, что отрисовано её
-/// канвасом под панелью, и слегка тонирует.
-/// Режимы:
-///  - канвас рендерится камерой в RenderTexture (монитор/проектор): берётся
-///    размытая копия этого RT -> настоящее размытие фона;
-///  - канвас ScreenSpaceOverlay (режим зума, камеры нет): экран захватывается
-///    в конце кадра (WaitForEndOfFrame), даунсэмплится и размывается.
-/// Частота обновления блюра задаётся в секундах (blurRefreshInterval) и не
-/// зависит от fps.
+/// «Матовое стекло» для панели (Image). Размывает то, что отрисовано канвасом
+/// ПОД панелью.
+///
+/// Чтобы в размытии не оставалось следов самой панели (часы, иконки, кнопка
+/// Пуск «растекаются» ореолом за край), источник блюра рендерится отдельным
+/// проходом камеры, которая НЕ рисует слой GlassBlur — на нём лежат Taskbar и
+/// StartMenu. Поэтому в блюр попадает только рабочий стол/окна.
+///
+/// Обновление — КАЖДЫЙ кадр (синхронно с r/vsync): 180 fps => блюр 180 раз/сек.
+/// Работает и для монитора (камера в RenderTexture), и для зума (overlay).
 /// </summary>
 [RequireComponent(typeof(Image))]
 [ExecuteAlways]
@@ -21,36 +22,42 @@ public class FrostedGlass : MonoBehaviour
     public Color tint = new Color(0.97f, 0.98f, 1f, 1f);
     [Range(0f, 0.5f)] public float grain = 0.025f;
     [Range(0.05f, 6f)] public float noiseFreq = 2f;
-    [Range(0f, 1f)] public float blurMix = 0.85f;
-    [Range(1, 16)] public int blurDownscale = 6;
-    // Период обновления блюра в секундах (для overlay/зум). Не зависит от fps:
-    // 0.05 = ~20 раз в секунду при любом фреймрейте.
-    [Range(0.016f, 0.5f)] public float blurRefreshInterval = 0.05f;
+    [Range(0f, 1f)] public float blurMix = 0.9f;
+    [Range(2, 16)] public int blurDownscale = 8;   // сильнее даунсэмпл = сильнее блюр
+    [Range(1f, 6f)] public float blurSpread = 3f;  // ширина выборки одного прохода
+    [Range(1, 4)] public int blurPasses = 2;       // кол-во проходов размытия
 
     private Image image;
     private Material mat;
-    private RenderTexture blurRT;
     private Texture2D whiteTex;
-    private Texture2D overlayCapture;   // последний захваченный кадр (заполняется в конце кадра)
-    private Coroutine captureRoutine;
-    private double lastBlurTime;
+
     private static Material blurMat;
+    private static int glassLayer = -1;
+    private static int uiLayer = 5;
 
-    private void Awake()
+    // --- Глобальный координатор: один источник блюра на канвас за кадр. ---
+    private static Canvas doneCanvas;
+    private static int doneFrame = -1;
+    private static readonly Dictionary<Canvas, BlurSet> sets = new Dictionary<Canvas, BlurSet>();
+    private static Camera overlayBlurCam;
+
+    private class BlurSet
     {
-        Apply();
+        public RenderTexture a;
+        public RenderTexture b;
     }
 
-    private void OnEnable()
-    {
-        Apply();
-        if (Application.isPlaying && captureRoutine == null)
-            captureRoutine = StartCoroutine(CaptureLoop());
-    }
+    private void Awake() { Apply(); }
+    private void OnEnable() { Apply(); }
+    private void Reset() { Apply(); }
 
-    private void Reset()
+    private static int GlassLayer
     {
-        Apply();
+        get
+        {
+            if (glassLayer < 0) glassLayer = LayerMask.NameToLayer("GlassBlur");
+            return glassLayer;
+        }
     }
 
     private Material GetMaterial()
@@ -77,7 +84,6 @@ public class FrostedGlass : MonoBehaviour
     {
         image = GetComponent<Image>();
         if (image == null) return;
-
         var m = GetMaterial();
         if (m != null)
         {
@@ -105,134 +111,166 @@ public class FrostedGlass : MonoBehaviour
         return whiteTex;
     }
 
-    /// <summary>
-    /// Захват экрана строго в конце кадра: в этот момент активный рендер-таргет
-    /// — экран (backbuffer), поэтому нет ошибки «region exceeds active Render
-    /// Target». Делаем это по реальному времени, а не по номеру кадра.
-    /// </summary>
-    private IEnumerator CaptureLoop()
+    private static void SetLayerRecursive(Transform t, int layer)
     {
-        var wait = new WaitForEndOfFrame();
-        while (true)
-        {
-            yield return wait;
-
-            if (!isActiveAndEnabled || !Application.isPlaying) continue;
-
-            // Захват только когда реально нужен overlay-режим (нет камеры с RT).
-            var canvas = GetComponentInParent<Canvas>();
-            Camera cam = null;
-            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                cam = canvas.worldCamera;
-            if (cam != null && cam.targetTexture != null) continue; // монитор: блюр из RT
-
-            // Частота по времени (не зависит от fps).
-            double now = Time.unscaledTime;
-            if (now - lastCaptureTime < Mathf.Max(0.016f, blurRefreshInterval)) continue;
-            lastCaptureTime = now;
-
-            Texture2D oldCap = overlayCapture;
-            Texture2D cap = null;
-            try { cap = ScreenCapture.CaptureScreenshotAsTexture(); }
-            catch { cap = null; }
-            if (cap != null)
-            {
-                overlayCapture = cap;
-                if (oldCap != null) Destroy(oldCap);
-            }
-        }
+        if (t.gameObject.layer != layer) t.gameObject.layer = layer;
+        for (int i = 0; i < t.childCount; i++)
+            SetLayerRecursive(t.GetChild(i), layer);
     }
-
-    private double lastCaptureTime;
 
     private void LateUpdate()
     {
         var m = mat;
         if (m == null) { Apply(); m = mat; if (m == null) return; }
 
-        // Синхронизируем параметры (на случай правок в инспекторе).
         m.SetColor("_Color", new Color(tint.r, tint.g, tint.b, opacity));
         m.SetFloat("_NoiseAmount", grain);
         m.SetFloat("_NoiseFreq", noiseFreq);
         m.SetFloat("_BlurAmount", blurMix);
 
         var canvas = GetComponentInParent<Canvas>();
-        Camera cam = null;
-        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-            cam = canvas.worldCamera;
-
-        RenderTexture screenRT = (cam != null) ? cam.targetTexture : null;
-
-        // В редакторе вне Play-режима ничего не захватываем/не блюрим.
-        if (!Application.isPlaying)
+        if (canvas == null || !Application.isPlaying)
         {
             m.SetTexture("_BlurTex", GetWhite());
             return;
         }
 
-        var bm = GetBlurMat();
+        // Панель и всё её дерево — на слой GlassBlur, чтобы не попадать в блюр.
+        int gl = GlassLayer;
+        if (gl >= 0) SetLayerRecursive(transform, gl);
 
-        // Ветка 1: монитор/проектор — канвас рендерится камерой в RenderTexture.
-        if (screenRT != null)
+        // Источник блюра для этого канваса строим один раз за кадр.
+        if (!(doneCanvas == canvas && doneFrame == Time.frameCount))
         {
-            // Обновляем блюр тоже по времени (дешевле и плавно по нагрузке).
-            double now = Time.unscaledTime;
-            if (now - lastBlurTime >= Mathf.Max(0.016f, blurRefreshInterval))
-            {
-                lastBlurTime = now;
-                int bw = Mathf.Max(64, screenRT.width / Mathf.Max(1, blurDownscale));
-                int bh = Mathf.Max(64, screenRT.height / Mathf.Max(1, blurDownscale));
-                EnsureBlur(bw, bh);
-                if (bm != null) Graphics.Blit(screenRT, blurRT, bm);
-                else Graphics.Blit(screenRT, blurRT);
-            }
-            m.SetTexture("_BlurTex", blurRT != null ? blurRT : (Texture)GetWhite());
-            return;
+            doneCanvas = canvas;
+            doneFrame = Time.frameCount;
+            BuildBlur(canvas);
         }
 
-        // Ветка 2: зум/overlay — используем кадр, захваченный в конце кадра.
-        if (overlayCapture != null)
+        if (sets.TryGetValue(canvas, out var bs) && bs != null && bs.a != null)
+            m.SetTexture("_BlurTex", bs.a);
+        else
+            m.SetTexture("_BlurTex", GetWhite());
+    }
+
+    private void BuildBlur(Canvas canvas)
+    {
+        var bm = GetBlurMat();
+        if (bm == null) return;
+
+        Camera cam = canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        RenderTexture displayRT = (cam != null) ? cam.targetTexture : null;
+
+        int srcW, srcH;
+        if (displayRT != null) { srcW = displayRT.width; srcH = displayRT.height; }
+        else { srcW = Screen.width; srcH = Screen.height; }
+
+        int bw = Mathf.Max(64, srcW / Mathf.Max(2, blurDownscale));
+        int bh = Mathf.Max(64, srcH / Mathf.Max(2, blurDownscale));
+
+        if (!sets.TryGetValue(canvas, out var bs) || bs == null) { bs = new BlurSet(); sets[canvas] = bs; }
+        EnsureRT(ref bs.a, bw, bh);
+        EnsureRT(ref bs.b, bw, bh);
+
+        bm.SetFloat("_Spread", blurSpread);
+
+        int uiMask = 1 << uiLayer;
+        int glassMask = (GlassLayer >= 0) ? (1 << GlassLayer) : 0;
+
+        RenderTexture prevActive = RenderTexture.active;
+
+        if (displayRT != null && cam != null)
         {
-            int cw = Mathf.Max(64, overlayCapture.width / Mathf.Max(1, blurDownscale));
-            int ch = Mathf.Max(64, overlayCapture.height / Mathf.Max(1, blurDownscale));
-            EnsureBlur(cw, ch);
-            if (bm != null) Graphics.Blit(overlayCapture, blurRT, bm);
-            else Graphics.Blit(overlayCapture, blurRT);
-            m.SetTexture("_BlurTex", blurRT);
+            // --- Монитор/проектор: рисуем UI камерой канваса, но без слоя панелей.
+            // Камера должна показывать панели в норме -> маска UI|Glass; на время
+            // блюр-захвата временно оставляем только UI.
+            int savedMask = cam.cullingMask;
+            cam.cullingMask = uiMask;          // без GlassBlur => нет ореолов панели
+            var savedTarget = cam.targetTexture;
+            cam.targetTexture = bs.a;          // сразу в низкое разрешение (дёшево)
+            cam.Render();
+            cam.targetTexture = savedTarget;
+            // после восстановления гарантируем, что панели рисуются на экране:
+            cam.cullingMask = uiMask | glassMask;
+            // savedMask тоже уже включает UI|Glass после первого кадра — не теряем.
         }
         else
         {
-            // Захват ещё не готов — светлое стекло (без черноты).
-            m.SetTexture("_BlurTex", GetWhite());
+            // --- Зум (overlay): отдельная камера, временно переключаем канвас на
+            // ScreenSpaceCamera, рендерим UI без слоя панелей, возвращаем overlay.
+            Camera bc = GetOverlayBlurCam();
+            Camera mainCam = Camera.main;
+            if (bc == null || mainCam == null)
+            {
+                RenderTexture.active = prevActive;
+                return;
+            }
+
+            bc.CopyFrom(mainCam);
+            bc.transform.SetPositionAndRotation(mainCam.transform.position, mainCam.transform.rotation);
+            bc.cullingMask = uiMask;           // только UI, без GlassBlur
+            bc.clearFlags = CameraClearFlags.SolidColor;
+            bc.backgroundColor = new Color(0.1f, 0.2f, 0.4f, 1f);
+            bc.targetTexture = bs.a;
+            bc.enabled = false;
+
+            var savedMode = canvas.renderMode;
+            Camera savedWorld = canvas.worldCamera;
+            try
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = bc;
+                bc.Render();
+            }
+            finally
+            {
+                canvas.worldCamera = savedWorld;
+                canvas.renderMode = savedMode;
+                bc.targetTexture = null;
+            }
         }
+
+        RenderTexture.active = prevActive;
+
+        // Многопроходное размытие (пинг-понг A<->B), результат остаётся в A.
+        RenderTexture src = bs.a, dst = bs.b;
+        for (int p = 0; p < Mathf.Max(1, blurPasses); p++)
+        {
+            Graphics.Blit(src, dst, bm);
+            var t = src; src = dst; dst = t;
+        }
+        // Если итог оказался в B — копируем в A (на неё ссылается материал).
+        if (src == bs.b) Graphics.Blit(bs.b, bs.a);
     }
 
-    private void EnsureBlur(int width, int height)
+    private static Camera GetOverlayBlurCam()
     {
-        if (blurRT != null && blurRT.width == width && blurRT.height == height)
-            return;
-        if (blurRT != null) blurRT.Release();
-        blurRT = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
-        blurRT.filterMode = FilterMode.Bilinear;
-        blurRT.wrapMode = TextureWrapMode.Clamp;
+        if (overlayBlurCam == null)
+        {
+            var go = new GameObject("GlassBlurCam");
+            go.hideFlags = HideFlags.HideAndDontSave;
+            overlayBlurCam = go.AddComponent<Camera>();
+            overlayBlurCam.enabled = false;
+        }
+        return overlayBlurCam;
     }
 
-    private void ReleaseBlur()
+    private static void EnsureRT(ref RenderTexture rt, int w, int h)
     {
-        if (blurRT != null) { blurRT.Release(); DestroyImmediate(blurRT); blurRT = null; }
-        if (overlayCapture != null) { DestroyImmediate(overlayCapture); overlayCapture = null; }
+        if (rt != null && rt.width == w && rt.height == h) return;
+        if (rt != null) { rt.Release(); DestroyImmediate(rt); }
+        rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32);
+        rt.filterMode = FilterMode.Bilinear;
+        rt.wrapMode = TextureWrapMode.Clamp;
     }
 
     private void OnDisable()
     {
-        if (captureRoutine != null) { StopCoroutine(captureRoutine); captureRoutine = null; }
-        ReleaseBlur();
+        // Не чистим общие RT — за канвасом следит координатор; здесь ничего не нужно.
     }
 
     private void OnDestroy()
     {
-        if (captureRoutine != null) { StopCoroutine(captureRoutine); captureRoutine = null; }
-        ReleaseBlur();
         if (mat != null) DestroyImmediate(mat);
     }
 }
