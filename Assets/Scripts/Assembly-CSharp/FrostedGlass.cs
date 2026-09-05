@@ -23,14 +23,14 @@ using UnityEngine.UI;
 [ExecuteAlways]
 public class FrostedGlass : MonoBehaviour
 {
-    [Range(0f, 1f)] public float opacity = 0.62f;
-    public Color tint = new Color(0.97f, 0.98f, 1f, 1f);
-    [Range(0f, 0.5f)] public float grain = 0.025f;
+    [Range(0f, 1f)] public float opacity = 0.92f;
+    public Color tint = new Color(0.96f, 0.97f, 1f, 1f);
+    [Range(0f, 0.5f)] public float grain = 0.02f;
     [Range(0.05f, 6f)] public float noiseFreq = 2f;
     [Range(0f, 1f)] public float blurMix = 0.9f;
-    [Range(2, 16)] public int blurDownscale = 8;
-    [Range(0.5f, 6f)] public float blurSpread = 2f;
-    [Range(1, 3)] public int blurPasses = 2;
+    [Range(2, 16)] public int blurDownscale = 10;
+    [Range(0.5f, 6f)] public float blurSpread = 2.5f;
+    [Range(1, 3)] public int blurPasses = 3;
 
     private Image image;
     private Material mat;
