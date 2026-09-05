@@ -51,6 +51,11 @@ namespace PC.Component.Software
 
 		private bool animating;
 
+		// true, пока окно «вылетает» из иконки таскбара при разворачивании
+		// (эта анимация двигает позицию окна). Анимация открытия/закрытия
+		// двигает только масштаб/прозрачность, позицию не трогает.
+		private bool restoreFlying;
+
 		// Токен «поколения» анимации окна. Каждое новое сворачивание/
 		// разворачивание/открытие увеличивает его; корутина завершает финализацию
 		// (SetActive(false) и т.п.), только если её токен ещё актуален. Это чинит
@@ -82,6 +87,9 @@ namespace PC.Component.Software
 		private Vector2 minOffsetMin;
 		private Vector2 minOffsetMax;
 		private bool wasMaximizedWhenMinimized;
+		// true, когда min* поля содержат валидную раскладку (окно хоть раз
+		// корректно свернули из «покоя»).
+		private bool hasMinState;
 
 		protected bool canDrag = true;
 
@@ -218,10 +226,23 @@ namespace PC.Component.Software
 			minimized = true;
 			wasMaximizedWhenMinimized = maximized;
 
-			// Запоминаем текущую раскладку, чтобы вернуться к ней при разворачивании.
 			var rt = rect != null ? rect : (transform as RectTransform);
-			if (rt != null)
+
+			// КЛЮЧЕВОЙ ФИКС: не запоминаем раскладку, пока окно «вылетает» из
+			// иконки таскбара при разворачивании — в этот момент у него
+			// полусмещённая позиция и уменьшенный масштаб. Если записать их как
+			// «нормальные», окно навсегда останется в этой точке и при
+			// многократных сворачиваниях будет уезжать (в т.ч. в развёрнутом
+			// виде). В этом случае оставляем уже сохранённую раскладку (min*).
+			if (rt != null && (!restoreFlying || !hasMinState))
 			{
+				// Возвращаем визуальные свойства в покой (анимация могла
+				// оставить промежуточный масштаб/прозрачность), затем
+				// запоминаем фактическую раскладку.
+				rt.localScale = Vector3.one;
+				var cg0 = WindowChromeGroup();
+				if (cg0 != null) cg0.alpha = 1f;
+
 				minAnchorMin = rt.anchorMin;
 				minAnchorMax = rt.anchorMax;
 				minPivot = rt.pivot;
@@ -229,6 +250,7 @@ namespace PC.Component.Software
 				minSize = rt.sizeDelta;
 				minOffsetMin = rt.offsetMin;
 				minOffsetMax = rt.offsetMax;
+				hasMinState = true;
 			}
 
 			BeginAnim(MinimizeRoutine(), true);
@@ -312,8 +334,8 @@ namespace PC.Component.Software
 			var rt = rect != null ? rect : (transform as RectTransform);
 
 			// Раскладку восстанавливаем только если окно реально сворачивали
-			// (сохранённое состояние валидно).
-			if (wasHidden && rt != null)
+			// и у нас есть валидная сохранённая раскладка.
+			if (wasHidden && hasMinState && rt != null)
 			{
 				rt.anchorMin = minAnchorMin;
 				rt.anchorMax = minAnchorMax;
@@ -338,10 +360,11 @@ namespace PC.Component.Software
 				if (spr != null) windowState.sprite = spr;
 			}
 
-			if (wasHidden)
+			if (wasHidden && hasMinState)
 			{
 				var os = system;
 				if (os != null) os.OnAppRestored(this);
+				restoreFlying = true;
 				BeginAnim(RestoreRoutine(flyTarget, id));
 			}
 		}
@@ -351,7 +374,7 @@ namespace PC.Component.Software
 			animating = true;
 
 			var rt = transform as RectTransform;
-			if (rt == null) { animating = false; yield break; }
+			if (rt == null) { animating = false; restoreFlying = false; yield break; }
 
 			var cg = WindowChromeGroup();
 
@@ -370,7 +393,7 @@ namespace PC.Component.Software
 
 			while (t < duration)
 			{
-				if (id != animId) yield break; // нас перебили (свернули)
+				if (id != animId) { restoreFlying = false; yield break; } // нас перебили (свернули)
 				t += Mathf.Min(Time.unscaledDeltaTime, duration * 0.25f);
 				float k = Mathf.Clamp01(t / duration);
 				float e = 1f - (1f - k) * (1f - k); // ease-out quad (как PlayOpen/PlayStartMenu)
@@ -380,11 +403,12 @@ namespace PC.Component.Software
 				yield return null;
 			}
 
-			if (id != animId) yield break;
+			if (id != animId) { restoreFlying = false; yield break; }
 			rt.position = endPos;
 			rt.localScale = endScale;
 			cg.alpha = 1f;
 			animating = false;
+			restoreFlying = false;
 		}
 
 		/// <summary>
