@@ -3,7 +3,6 @@ Shader "Hidden/UiScreenBlur"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _Spread ("Spread", Float) = 3.0
     }
     SubShader
     {
@@ -21,7 +20,9 @@ Shader "Hidden/UiScreenBlur"
 
             sampler2D _MainTex;
             float4 _MainTex_TexelSize;
-            float _Spread;
+            // Направление размытия в текселях: (spread,0) — горизонталь,
+            // (0,spread) — вертикаль. Сепарабельный гаусс (H/V проходы).
+            float4 _BlurDir;
 
             v2f vert(appdata v)
             {
@@ -33,22 +34,24 @@ Shader "Hidden/UiScreenBlur"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                float2 ts = _MainTex_TexelSize.xy * _Spread;
-                fixed4 col = 0;
+                float2 dir = _BlurDir.xy * _MainTex_TexelSize.xy;
 
-                // 9-tap box blur (сильный даунсэмпл + несколько проходов дают
-                // интенсивное «матовое» размытие).
-                static const float W = 1.0 / 9.0;
-                [unroll]
-                for (int y = -1; y <= 1; y++)
-                {
-                    [unroll]
-                    for (int x = -1; x <= 1; x++)
-                    {
-                        float2 o = float2(x, y) * ts;
-                        col += tex2D(_MainTex, i.uv + o) * W;
-                    }
-                }
+                // 9-tap Gaussian weights (гладко, без «квадратов» box blur).
+                static const half w0 = 0.2270270270;
+                static const half w1 = 0.1945945946;
+                static const half w2 = 0.1216216216;
+                static const half w3 = 0.0540540541;
+                static const half w4 = 0.0162162162;
+
+                fixed4 col = tex2D(_MainTex, i.uv) * w0;
+                col += tex2D(_MainTex, i.uv + dir * 1.0) * w1;
+                col += tex2D(_MainTex, i.uv - dir * 1.0) * w1;
+                col += tex2D(_MainTex, i.uv + dir * 2.0) * w2;
+                col += tex2D(_MainTex, i.uv - dir * 2.0) * w2;
+                col += tex2D(_MainTex, i.uv + dir * 3.0) * w3;
+                col += tex2D(_MainTex, i.uv - dir * 3.0) * w3;
+                col += tex2D(_MainTex, i.uv + dir * 4.0) * w4;
+                col += tex2D(_MainTex, i.uv - dir * 4.0) * w4;
                 return col;
             }
             ENDCG
