@@ -1834,8 +1834,8 @@ MonoBehaviour:
   - {fileID: 114060080641062733}
   - {fileID: 114281885823625111}
   text_mark: {fileID: 114401818633494945}
-maximizeSprite: {fileID: 21300000, guid: 158e7d25edc752d429e03328f498ffa1, type: 2}
-normalSprite: {fileID: 21300000, guid: a6b226f7c9f75c54fbb97753085375d0, type: 2}
+maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
+normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}
 windowState: {fileID: 1807518801763319149}
 
 --- !u!1 &1916764239177554
@@ -2239,7 +2239,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 158e7d25edc752d429e03328f498ffa1, type: 2}
+  m_Sprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -2376,7 +2376,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ff0cf4ed393c49bb9c96c60cbccdbddc, type: 2}
+  m_Sprite: {fileID: 21300000, guid: bb0f5908d2d446f085cf605d2613be08, type: 2}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
