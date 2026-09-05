@@ -2,6 +2,7 @@ Shader "UI/FrostedGlass"
 {
     Properties
     {
+        _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
         _NoiseAmount ("Noise Amount", Range(0,1)) = 0.08
         _NoiseScale ("Noise Scale", Range(1,400)) = 80
@@ -53,6 +54,7 @@ Shader "UI/FrostedGlass"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
+            sampler2D _MainTex;
             fixed4 _Color;
             float _NoiseAmount;
             float _NoiseScale;
@@ -81,7 +83,9 @@ Shader "UI/FrostedGlass"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                fixed4 base = _Color * i.color;
+                // Базовый цвет Image/спрайта (для панели без спрайта — белый).
+                fixed4 tex = tex2D(_MainTex, i.texcoord);
+                fixed4 base = tex * _Color * i.color;
 
                 // Шум в координатах объекта (устойчив к движению панели).
                 float2 np = i.worldPosition.xy / max(_NoiseScale, 0.0001);
