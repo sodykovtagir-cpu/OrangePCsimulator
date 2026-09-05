@@ -13,8 +13,9 @@ public class FrostedGlass : MonoBehaviour
 {
     [Range(0f, 1f)] public float opacity = 0.72f;
     public Color tint = new Color(0.92f, 0.94f, 0.98f, 1f);
-    [Range(0f, 0.5f)] public float grain = 0.06f;
-    public float noiseScale = 120f;
+    [Range(0f, 0.5f)] public float grain = 0.05f;
+    // Плотность зерна: чем больше, тем мельче «песчинки» (клетка ~1/плотность ед.).
+    [Range(0.05f, 3f)] public float noiseFreq = 0.5f;
 
     private static Material sharedGlass;
 
@@ -55,7 +56,7 @@ public class FrostedGlass : MonoBehaviour
             image.material = sharedGlass;
             image.material.SetColor("_Color", new Color(tint.r, tint.g, tint.b, opacity));
             image.material.SetFloat("_NoiseAmount", grain);
-            image.material.SetFloat("_NoiseScale", noiseScale);
+            image.material.SetFloat("_NoiseFreq", noiseFreq);
             // Чтобы цвет/альфа шли из материала, а не из Image.
             image.color = Color.white;
         }
