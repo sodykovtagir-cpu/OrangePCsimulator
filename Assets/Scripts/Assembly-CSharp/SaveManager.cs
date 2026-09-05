@@ -105,9 +105,14 @@ public class SaveManager : MonoBehaviour
 
     public int LoadData()
     {
-        bool readOnly = false;
-        if (string.IsNullOrEmpty(Loader.Path)) readOnly = true;
-        if (!string.IsNullOrEmpty(Loader.GameData.sign)) readOnly = true;
+        // Read-only (как «пример») — ТОЛЬКО встроенные пресеты, которые грузятся
+        // из Resources/стриминга без файла на диске (Path пуст). Скачанные из
+        // мастерской сборки лежат локальным файлом (Path задан), поэтому в них
+        // МОЖНО играть и сохраняться — даже если у чужой сборки заполнена
+        // авторская подпись (sign). Раньше непустой sign ошибочно делал любой
+        // воркшоп-сейв read-only, из-за чего сборку нельзя было пересохранить
+        // и ломался механизм обновления.
+        bool readOnly = string.IsNullOrEmpty(Loader.Path);
 
 		Main.Instance.example = readOnly;
 		if (Main.Instance.example && saveButton != null) saveButton.SetActive(false);
