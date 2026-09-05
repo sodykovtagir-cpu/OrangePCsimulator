@@ -3,7 +3,7 @@ Shader "Hidden/UiScreenBlur"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _Spread ("Spread", Float) = 2.0
+        _Spread ("Spread", Float) = 3.0
     }
     SubShader
     {
@@ -36,15 +36,16 @@ Shader "Hidden/UiScreenBlur"
                 float2 ts = _MainTex_TexelSize.xy * _Spread;
                 fixed4 col = 0;
 
-                // 4x4 box blur (основное размытие даёт сильный даунсэмпл).
-                static const float W = 1.0 / 16.0;
+                // 9-tap box blur (сильный даунсэмпл + несколько проходов дают
+                // интенсивное «матовое» размытие).
+                static const float W = 1.0 / 9.0;
                 [unroll]
-                for (int y = 0; y < 4; y++)
+                for (int y = -1; y <= 1; y++)
                 {
                     [unroll]
-                    for (int x = 0; x < 4; x++)
+                    for (int x = -1; x <= 1; x++)
                     {
-                        float2 o = (float2(x, y) - 1.5) * ts;
+                        float2 o = float2(x, y) * ts;
                         col += tex2D(_MainTex, i.uv + o) * W;
                     }
                 }
