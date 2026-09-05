@@ -8335,7 +8335,7 @@ MonoBehaviour:
   opacity: 0.75
   tint: {r: 0.92, g: 0.94, b: 0.98, a: 1}
   grain: 0.07
-  noiseScale: 120
+  noiseFreq: 0.5
 
 --- !u!114 &3610103133035125543
 MonoBehaviour:
@@ -8352,5 +8352,5 @@ MonoBehaviour:
   opacity: 0.75
   tint: {r: 0.92, g: 0.94, b: 0.98, a: 1}
   grain: 0.07
-  noiseScale: 120
+  noiseFreq: 0.5
 

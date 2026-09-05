@@ -4,8 +4,8 @@ Shader "UI/FrostedGlass"
     {
         _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
-        _NoiseAmount ("Noise Amount", Range(0,1)) = 0.08
-        _NoiseScale ("Noise Scale", Range(1,400)) = 80
+        _NoiseAmount ("Noise Amount", Range(0,1)) = 0.05
+        _NoiseFreq ("Noise Density", Range(0.01, 4)) = 0.5
     }
     SubShader
     {
@@ -57,7 +57,7 @@ Shader "UI/FrostedGlass"
             sampler2D _MainTex;
             fixed4 _Color;
             float _NoiseAmount;
-            float _NoiseScale;
+            float _NoiseFreq;
             float4 _ClipRect;
 
             v2f vert(appdata_t v)
@@ -73,12 +73,25 @@ Shader "UI/FrostedGlass"
                 return o;
             }
 
-            // Детерминированное зерно «матового стекла».
+            // Детерминированный хеш.
             float hash21(float2 p)
             {
                 p = frac(p * float2(123.34, 456.21));
                 p += dot(p, p + 45.32);
                 return frac(p.x * p.y);
+            }
+
+            // Плавное value-noise (с интерполяцией) — мягкое зерно стекла.
+            float vnoise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                float2 u = f * f * (3.0 - 2.0 * f);
+                float a = hash21(i);
+                float b = hash21(i + float2(1, 0));
+                float c = hash21(i + float2(0, 1));
+                float d = hash21(i + float2(1, 1));
+                return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
             }
 
             fixed4 frag(v2f i) : SV_Target
@@ -87,9 +100,9 @@ Shader "UI/FrostedGlass"
                 fixed4 tex = tex2D(_MainTex, i.texcoord);
                 fixed4 base = tex * _Color * i.color;
 
-                // Шум в координатах объекта (устойчив к движению панели).
-                float2 np = i.worldPosition.xy / max(_NoiseScale, 0.0001);
-                float n = hash21(floor(np));
+                // Мелкое зерно: частота в локальных единицах (клетка ~1/частота).
+                float2 np = i.worldPosition.xy * max(_NoiseFreq, 0.0001);
+                float n = vnoise(np) * 0.7 + hash21(floor(np)) * 0.3;
                 float grain = (n - 0.5) * _NoiseAmount;
 
                 fixed3 rgb = base.rgb + grain;
