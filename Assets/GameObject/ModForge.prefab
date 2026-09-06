@@ -1562,6 +1562,10 @@ MonoBehaviour:
   - {fileID: 114243736805655561, guid: 0b37984ec900a4c4090ac559fc2d1fee, type: 3}
   - {fileID: 114243736805655561, guid: 0b3d38ef5e0c6564f8d6915b6dc929cf, type: 3}
   prices: 7800000064000000500000003c000000
+  hdSurcharge: 500
+  previewSpinSpeed: 40
+  previewLayer: -1
+  previewRigPrefab: {fileID: 100000, guid: f9860650cce6454589dbc0c8fe092e43, type: 3}
 --- !u!1 &1724804207875695
 GameObject:
   m_ObjectHideFlags: 0
