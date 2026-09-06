@@ -30,8 +30,13 @@ namespace PC.Component.Software
 
 			System.Action<Device> cb = device =>
 			{
-				int width = resolution.x;
-				int height = resolution.y;
+				// Разрешение берём с самой камеры (товар с тем или иным разрешением),
+				// а поле приложения оставляем как запасной вариант.
+				var camDev0 = device as CameraDevice;
+				var res = (camDev0 != null && camDev0.Resolution.x > 0 && camDev0.Resolution.y > 0)
+					? camDev0.Resolution : resolution;
+				int width = res.x;
+				int height = res.y;
 
 				var rtex = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
 				rt = rtex;
@@ -61,8 +66,10 @@ namespace PC.Component.Software
 
 		public void TakePicture()
 		{
-			int width = resolution.x;
-			int height = resolution.y;
+			var devRes = (camDevice != null && camDevice.Resolution.x > 0 && camDevice.Resolution.y > 0)
+				? camDevice.Resolution : resolution;
+			int width = devRes.x;
+			int height = devRes.y;
 
 			var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
 			RenderTexture.active = rt;

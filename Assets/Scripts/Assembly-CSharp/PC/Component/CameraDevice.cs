@@ -10,8 +10,14 @@ namespace PC.Component
 	public class CameraDevice : Device
 	{
 
-		[SerializeField]
+			[SerializeField]
 		private float fps;
+
+		[Tooltip("Разрешение снимка этой камеры (товара). В маркете можно делать камеры с разным разрешением (обычная/HD), копируя префаб и меняя это поле.")]
+		[SerializeField]
+		private Vector2Int resolution = new Vector2Int(640, 480);
+
+		public Vector2Int Resolution => resolution;
 
 		[SerializeField]
 		private Camera cam;
