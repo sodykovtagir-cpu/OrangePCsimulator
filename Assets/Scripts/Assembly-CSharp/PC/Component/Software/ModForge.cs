@@ -179,6 +179,10 @@ public class ModForge : Website
         if (previewLayer >= 0)
             SetLayerRecursively(previewInstance, previewLayer);
 
+        // Превью — витрина, а не реальный предмет: глушим физику, чтобы крышка
+        // не падала под гравитацией и не разлеталась.
+        SetKinematicRecursively(previewInstance);
+
         var cp = previewInstance.GetComponent<CustomPaint>();
         if (cp != null)
         {
@@ -232,6 +236,22 @@ public class ModForge : Website
         // Ссылки указывали внутрь будки — сбрасываем (на следующем превью найдём заново).
         previewCamera = null;
         previewStage = null;
+    }
+
+    private static void SetKinematicRecursively(GameObject go)
+    {
+        if (go == null) return;
+        var rb = go.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.useGravity = false;
+            rb.isKinematic = true;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.detectCollisions = false;
+        }
+        foreach (Transform t in go.transform)
+            SetKinematicRecursively(t.gameObject);
     }
 
     private static void SetLayerRecursively(GameObject go, int layer)
