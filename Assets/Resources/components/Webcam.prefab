@@ -134,6 +134,7 @@ MonoBehaviour:
   deviceType: 3
   customName:
   fps: 10
+  resolution: {x: 32, y: 32}
   cam: {fileID: 20924090511409894}
 --- !u!114 &114561073633307953
 MonoBehaviour:
