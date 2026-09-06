@@ -73,6 +73,20 @@ namespace PC.Component.Software
 
 		public override void Close()
 		{
+			StopBeep();
+			base.Close();
+		}
+
+		// Система выключается/ломается — глушим возможный «писк» на аудиоисточнике,
+		// чтобы на мёртвом ПК не остался зацикленный звук.
+		public override void OnSystemStop()
+		{
+			base.OnSystemStop();
+			StopBeep();
+		}
+
+		private void StopBeep()
+		{
 			if (playing)
 			{
 				StopAllCoroutines();
@@ -80,7 +94,6 @@ namespace PC.Component.Software
 				if (src != null) src.Stop();
 				playing = false;
 			}
-			base.Close();
 		}
 
 		public void Enter()
