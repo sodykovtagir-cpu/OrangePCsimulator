@@ -234,14 +234,6 @@ public class ModForge : Website
         previewStage = null;
     }
 
-    public override void Close()
-    {
-        StopPreview();
-        ReleasePreviewTexture();
-        DisposeRig();
-        base.Close();
-    }
-
     private static void SetLayerRecursively(GameObject go, int layer)
     {
         if (go == null) return;
