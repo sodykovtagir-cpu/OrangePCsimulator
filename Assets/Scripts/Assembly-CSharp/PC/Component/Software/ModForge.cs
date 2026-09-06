@@ -34,10 +34,14 @@ public class ModForge : Website
     [Tooltip("Слой для превью (например, номер отдельного слоя). Крышка на превью и её дети кладутся на этот слой, а у previewCamera Culling Mask должен включать ТОЛЬКО его — тогда крышку видно только в превью, а не в комнате. -1 = не менять слой.")]
     [SerializeField] private int previewLayer = -1;
 
+    [Tooltip("ПРЕФАБ-будка превью (настрой один раз): внутри Camera, пустышка-стадия и свет. Если назначен, скрипт сам создаёт будку при открытии ModForge и удаляет при закрытии — ничего не нужно ставить на каждую сцену. Камера должна смотреть на стадию и видеть только слой превью. Поля previewCamera/previewStage можно оставить пустыми — они возьмутся из префаба автоматически.")]
+    [SerializeField] private GameObject previewRigPrefab;
+
     private File selectedFile;
     private int selectedProduct;
 
     private GameObject previewInstance;
+    private GameObject runtimeRig;
     private RenderTexture previewRT;
     private bool previewActive;
     private Texture2D previewTexture;
@@ -64,6 +68,7 @@ public class ModForge : Website
     {
         StopPreview();
         ReleasePreviewTexture();
+        DisposeRig();
     }
 
     public void SelectFile()
@@ -153,6 +158,7 @@ public class ModForge : Website
     {
         StopPreview();
         ReleasePreviewTexture();
+        EnsureRig();
 
         if (coverPrefabs == null || selectedProduct < 0 || selectedProduct >= coverPrefabs.Length) return;
         var prefab = coverPrefabs[selectedProduct];
@@ -186,6 +192,55 @@ public class ModForge : Website
         EnsureRenderTarget();
     }
 
+
+    private void EnsureRig()
+    {
+        // Если камера/стадия назначены в инспекторе вручную — будку не создаём.
+        if (previewCamera != null && previewStage != null) return;
+        if (previewRigPrefab == null || runtimeRig != null) return;
+
+        var rig = Instantiate(previewRigPrefab);
+        // Будку держим вне окна: сворачивание/деактивация окна сайта её не трогают.
+        rig.transform.SetParent(null, false);
+        // Ставим далеко в сторону — даже если слой не настроен, в основной камерой не мешает.
+        rig.transform.position = new Vector3(0f, -5000f, 0f);
+        rig.transform.rotation = Quaternion.identity;
+
+        if (previewCamera == null)
+            previewCamera = rig.GetComponentInChildren<Camera>(true);
+
+        if (previewStage == null)
+        {
+            Transform stage = rig.transform.Find("Stage");
+            if (stage == null)
+            {
+                var all = rig.GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                    if (all[i].name == "Stage") { stage = all[i]; break; }
+            }
+            previewStage = stage != null ? stage : rig.transform;
+        }
+
+        runtimeRig = rig;
+    }
+
+    private void DisposeRig()
+    {
+        if (runtimeRig == null) return;
+        Destroy(runtimeRig);
+        runtimeRig = null;
+        // Ссылки указывали внутрь будки — сбрасываем (на следующем превью найдём заново).
+        previewCamera = null;
+        previewStage = null;
+    }
+
+    public override void Close()
+    {
+        StopPreview();
+        ReleasePreviewTexture();
+        DisposeRig();
+        base.Close();
+    }
 
     private static void SetLayerRecursively(GameObject go, int layer)
     {
