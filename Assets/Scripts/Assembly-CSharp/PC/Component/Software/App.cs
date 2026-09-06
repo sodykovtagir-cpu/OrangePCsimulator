@@ -475,6 +475,16 @@ namespace PC.Component.Software
 			rect.anchoredPosition = new Vector2(0f, (padBottom - padTop) * 0.5f);
 		}
 
+		/// <summary>
+		/// Система останавливается (выключение ПК или «синий экран»/поломка).
+		/// Приложение должно немедленно заглушить любые самостоятельные медиа/звук,
+		/// которые продолжают играть вне окна (например, VideoPlayer на отдельном
+		/// хосте). База ничего не делает; медиаприложения переопределяют.
+		/// </summary>
+		public virtual void OnSystemStop()
+		{
+		}
+
 		public virtual void SetDraggable(bool on)
 		{
 			canDrag = on;

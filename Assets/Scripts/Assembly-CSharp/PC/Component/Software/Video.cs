@@ -40,7 +40,12 @@ namespace PC.Component.Software
 		private RenderTexture render;
 
 		// Хост вне окна: при сворачивании окно деактивируется (SetActive(false)),
-		// а этот объект живёт — видео продолжает играть.
+		// а этот объект живёт — видео продолжает играть. Но он НЕ должен висеть в
+		// корне сцены: при поломке/выключении компа система (System) уничтожается,
+		// а объект, припарентенный к null, пережил бы это и видео/звук играли бы
+		// на выключенном ПК. Поэтому вешаем его под корень системы (компьютера) —
+		// сворачивание окна его не трогает (деактивируется только окно), а при
+		// уничтожении компа он удаляется вместе с ним. Доп. подстраховка — OnDestroy.
 		private GameObject host;
 
 		private bool hasVideo;
@@ -53,7 +58,12 @@ namespace PC.Component.Software
 			render = new RenderTexture(256, 256, 0);
 
 			host = new GameObject("VideoRuntime_" + GetInstanceID());
-			host.transform.SetParent(null);
+			// Привязываем к корню системы (компьютера), а НЕ к null: хост переживёт
+			// сворачивание окна, но будет уничтожен вместе с ПК при выключении/поломке.
+			var sys = system != null ? system.transform : null;
+			var parentRoot = sys != null ? sys.root : null;
+			if (parentRoot != null) host.transform.SetParent(parentRoot, false);
+			else host.transform.SetParent(null);
 			player = host.AddComponent<VideoPlayer>();
 			player.playOnAwake = false;
 			player.source = VideoSource.Url;
@@ -173,10 +183,60 @@ namespace PC.Component.Software
 
 		public override void Close()
 		{
-			var p = player;
-			if (p != null) p.Stop();
-			if (host != null) Destroy(host);
+			TeardownHost();
 			base.Close();
+		}
+
+		// Система выключается/ломается — немедленно глушим воспроизведение
+		// (видео не должно играть на выключенном/сломанном ПК). Окно не закрываем:
+		// при выключении объект и так уничтожится вместе с системой.
+		public override void OnSystemStop()
+		{
+			base.OnSystemStop();
+			var p = player;
+			if (p != null)
+			{
+				try { p.Pause(); } catch { }
+			}
+		}
+
+		// Гарантированно гасим видео/звук и освобождаем ресурсы. Вызывается и при
+		// закрытии окна, и при уничтожении приложения (выключение/поломка ПК),
+		// чтобы VideoPlayer/RenderTexture не «висели» и не играли после гибели ПК.
+		private bool tornDown;
+
+		private void TeardownHost()
+		{
+			if (tornDown) return;
+			tornDown = true;
+
+			try
+			{
+				var p = player;
+				if (p != null) p.Stop();
+			}
+			catch { /* плеер мог быть уже уничтожен вместе с хостом */ }
+
+			try
+			{
+				if (render != null)
+				{
+					render.Release();
+					if (Application.isPlaying) Destroy(render);
+				}
+			}
+			catch { }
+
+			if (host != null)
+			{
+				if (Application.isPlaying) Destroy(host);
+				else DestroyImmediate(host);
+			}
+		}
+
+		private void OnDestroy()
+		{
+			TeardownHost();
 		}
 	}
 }

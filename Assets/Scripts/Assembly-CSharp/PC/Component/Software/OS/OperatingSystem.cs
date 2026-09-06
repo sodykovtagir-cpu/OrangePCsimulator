@@ -477,6 +477,20 @@ namespace PC.Component.Software.OS
             running = false;
             Ready = false;
 
+            // Гасим самостоятельные медиа/звук всех открытых приложений (видео и
+            // т.п.), чтобы на выключенном/сломанном ПК ничего не продолжало играть.
+            if (runningApps != null)
+            {
+                for (int i = 0; i < runningApps.Count; i++)
+                {
+                    var a = runningApps[i];
+                    if (a != null)
+                    {
+                        try { a.OnSystemStop(); } catch { }
+                    }
+                }
+            }
+
             if (desktop != null) desktop.blocksRaycasts = false;
 
             if (iconParent != null)
