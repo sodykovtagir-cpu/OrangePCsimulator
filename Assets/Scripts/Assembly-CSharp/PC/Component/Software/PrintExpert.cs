@@ -23,9 +23,25 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Button purchaseButton;
 
+		[Tooltip("Галочка «HD»: баннер 128×280 за доплату 500$ (обычный 32×70 за 200$).")]
+		[SerializeField]
+		private Toggle hdToggle;
+
 		private File selectedFile;
 
 		private const int bannerPrice = 200;
+		private const int hdSurcharge = 500;
+
+		// Обычный баннер 32×70, HD — в 4 раза больше (128×280).
+		private const int bannerW = 32;
+		private const int bannerH = 70;
+		private const int bannerHdW = 128;
+		private const int bannerHdH = 280;
+
+		private bool Hd => hdToggle != null && hdToggle.isOn;
+		private int CurrentPrice => bannerPrice + (Hd ? hdSurcharge : 0);
+		private int CurrentW => Hd ? bannerHdW : bannerW;
+		private int CurrentH => Hd ? bannerHdH : bannerH;
 
 		public void SelectFile()
 		{
@@ -52,19 +68,23 @@ namespace PC.Component.Software
 			var tex = FormatConverter.StringToTexture(file.content);
 			if (tex == null) return;
 
-			if (tex.width == 32 && tex.height == 70)
+			int needW = CurrentW;
+			int needH = CurrentH;
+
+			if (tex.width == needW && tex.height == needH)
 			{
 				var m = Main.Instance;
 				if (m == null) return;
 
-				if (m.Money < bannerPrice)
+				int price = CurrentPrice;
+				if (m.Money < price)
 				{
 					var msg = "<color=red>" + "Not enough cash" + "</color>";
 					m.FadeText(msg);
 					return;
 				}
 
-				m.Spend(bannerPrice);
+				m.Spend(price);
 				var data = ImageConversion.EncodeToPNG(tex);
 				tex.Apply(false, true);
 				TextureLoader l = Instantiate(bannerPrefab).GetComponent<TextureLoader>();
@@ -78,7 +98,7 @@ namespace PC.Component.Software
 				return;
 			}
 
-			var txt = string.Format("Only supports {0}x{1} resolution", "32", "70");
+			var txt = string.Format("Only supports {0}x{1} resolution", needW.ToString(), needH.ToString());
 			if (alertText != null) alertText.text = txt;
 		}
 	}
