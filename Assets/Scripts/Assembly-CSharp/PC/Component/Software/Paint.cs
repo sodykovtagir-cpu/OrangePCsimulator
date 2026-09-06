@@ -29,7 +29,7 @@ namespace PC.Component.Software
         private Texture2D texture;
         private Vector2 lastPoint;
         private bool first;
-        private bool isDrawing; // Флаг рисования
+        private bool isDrawing; // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         private Color drawColor = new Color(0, 0, 0, 1);
         private Image[] colorImages;
 
@@ -49,7 +49,7 @@ namespace PC.Component.Software
 
         private void Update()
         {
-            // Логика рисования мышью/тачем
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅ
             if (texture == null || canvasTransform == null || workspace == null || !workspace.activeSelf) return;
 
             if (Input.GetMouseButtonDown(0))
@@ -87,6 +87,23 @@ namespace PC.Component.Software
             {
                 if (w != null) w.text = "32";
                 if (h != null) h.text = "70";
+                return;
+            }
+
+            // HD РєРІР°РґСЂР°С‚ (1024Г—1024).
+            if (i == 2)
+            {
+                if (w != null) w.text = "1024";
+                if (h != null) h.text = "1024";
+                return;
+            }
+
+            // Р‘Р°РЅРЅРµСЂ HD вЂ” РІ 4 СЂР°Р·Р° Р±РѕР»СЊС€Рµ РѕР±С‹С‡РЅРѕРіРѕ Р±Р°РЅРЅРµСЂР° (128Г—280).
+            if (i == 3)
+            {
+                if (w != null) w.text = "128";
+                if (h != null) h.text = "280";
+                return;
             }
         }
 
@@ -137,7 +154,7 @@ namespace PC.Component.Software
             if (newDocument != null) newDocument.SetActive(false);
             if (workspace != null) workspace.SetActive(true);
 
-            // Создаем кнопки цветов (один раз при инициализации)
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
             if (allColors != null && (colorImages == null || colorImages.Length == 0))
             {
                 colorImages = new Image[allColors.Length];
@@ -184,18 +201,18 @@ namespace PC.Component.Software
             }
         }
 
-        // ПРОВЕРКА: Можно ли рисовать в этой точке?
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ?
         private bool IsOverCanvas()
         {
             if (canvasTransform == null) return false;
 
             Camera cam = GetCanvasCamera();
 
-            // Не попали в прямоугольник холста
+            // пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
             if (!RectTransformUtility.RectangleContainsScreenPoint(canvasTransform, Input.mousePosition, cam))
                 return false;
 
-            // Попали в другой UI элемент (кнопка, панель с инструментами)
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ UI пїЅпїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
             if (EventSystem.current != null)
             {
                 var ped = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
@@ -204,7 +221,7 @@ namespace PC.Component.Software
 
                 foreach (var r in results)
                 {
-                    // Если элемент является кнопкой, инпутом и т.д. — блокируем рисование
+                    // пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅ.пїЅ. пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                     if (r.gameObject.GetComponent<Selectable>() || r.gameObject.GetComponentInParent<Selectable>())
                         return false;
                 }
@@ -227,7 +244,7 @@ namespace PC.Component.Software
             var size = rect.size;
             if (size.x <= 0f || size.y <= 0f) return;
 
-            // Правильная конвертация независимо от Pivot
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ Pivot
             var pos = local - rect.min;
 
             float px = pos.x / size.x * canvasSize.x;
@@ -358,7 +375,7 @@ namespace PC.Component.Software
             var source = new Rect(0f, 0f, targetX, targetY);
             texture2D.ReadPixels(source, 0, 0);
             texture2D.Apply();
-            RenderTexture.active = null; // Очистка во избежание утечек памяти
+            RenderTexture.active = null; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
             rt.Release();
         }
 
@@ -374,7 +391,7 @@ namespace PC.Component.Software
             base.Close();
         }
 
-        // Вспомогательный метод для определения камеры Canvas
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ Canvas
         private Camera GetCanvasCamera()
         {
             var c = canvasTransform != null ? canvasTransform.GetComponentInParent<Canvas>() : null;
