@@ -31,6 +31,8 @@ public class ModForge : Website
     [SerializeField] private Transform previewStage;
     [Tooltip("Скорость авто-вращения крышки (градусов/сек).")]
     [SerializeField] private float previewSpinSpeed = 40f;
+    [Tooltip("Слой для превью (например, номер отдельного слоя). Крышка на превью и её дети кладутся на этот слой, а у previewCamera Culling Mask должен включать ТОЛЬКО его — тогда крышку видно только в превью, а не в комнате. -1 = не менять слой.")]
+    [SerializeField] private int previewLayer = -1;
 
     private File selectedFile;
     private int selectedProduct;
@@ -168,6 +170,9 @@ public class ModForge : Website
         previewInstance.transform.localRotation = Quaternion.identity;
         previewInstance.transform.localScale = Vector3.one;
 
+        if (previewLayer >= 0)
+            SetLayerRecursively(previewInstance, previewLayer);
+
         var cp = previewInstance.GetComponent<CustomPaint>();
         if (cp != null)
         {
@@ -179,6 +184,15 @@ public class ModForge : Website
         previewActive = true;
 
         EnsureRenderTarget();
+    }
+
+
+    private static void SetLayerRecursively(GameObject go, int layer)
+    {
+        if (go == null) return;
+        go.layer = layer;
+        foreach (Transform t in go.transform)
+            SetLayerRecursively(t.gameObject, layer);
     }
 
     private void EnsureRenderTarget()
