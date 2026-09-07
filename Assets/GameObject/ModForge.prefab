@@ -1566,7 +1566,7 @@ MonoBehaviour:
   prices: 7800000064000000500000003c000000
   hdToggle: {fileID: 2523725324171538780}
   hdSurcharge: 500
-  previewImage: {fileID: 0}
+  previewImage: {fileID: 1514223044237218433}
   previewCamera: {fileID: 0}
   previewStage: {fileID: 0}
   previewSpinSpeed: 40
@@ -2805,8 +2805,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -91, y: -6}
-  m_SizeDelta: {x: 100, y: 100}
+  m_AnchoredPosition: {x: -185.80615, y: -6}
+  m_SizeDelta: {x: 289.6123, y: 289.6123}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8280233492380134015
 CanvasRenderer:
