@@ -592,6 +592,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 09f19f03e4b946a40b478bdf1447cd64, type: 2}
   - {fileID: 11400000, guid: 025dcd6191157414f99d1017bfaed67a, type: 2}
   - {fileID: 11400000, guid: be23377be54c8c24883828ab0c36ebfa, type: 2}
+  - {fileID: 11400000, guid: ed100d32b6e747dea4d83f4aca3c707c, type: 2}
+  - {fileID: 11400000, guid: 426c4b2dc75940409990869f98afcb82, type: 2}
   - {fileID: 11400000, guid: 125a93728c033cf46a0bd6388a3cd053, type: 2}
   - {fileID: 11400000, guid: 3e8522f668c4b7c49bf81e1fbc968676, type: 2}
   - {fileID: 11400000, guid: ee4fd9c6339363e4d9bf060c7f074540, type: 2}
@@ -621,6 +623,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d4b65c0c084494e4abe66b8803c6545a, type: 2}
   - {fileID: 11400000, guid: 445fd1cac384431fb0deeb2926dc2872, type: 2}
   - {fileID: 11400000, guid: e50ab8913fe4a174a9904a162d59eb71, type: 2}
+  - {fileID: 11400000, guid: 4cd847c7216d4b1fbf069aca01383016, type: 2}
+  - {fileID: 11400000, guid: 74d75922e7594305bf63b4339c255f00, type: 2}
   randomItems: []
   randomRate: 0.2
 --- !u!1 &1933139594592403
