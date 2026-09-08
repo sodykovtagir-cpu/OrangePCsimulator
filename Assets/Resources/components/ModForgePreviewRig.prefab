@@ -91,7 +91,7 @@ Transform:
   m_GameObject: {fileID: 500000}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -3}
+  m_LocalPosition: {x: 0, y: 0, z: -4.29}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -128,10 +128,10 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.05
+  near clip plane: 0.01
   far clip plane: 100
-  field of view: 40
-  orthographic: 1
+  field of view: 90
+  orthographic: 0
   orthographic size: 2.2
   m_Depth: -100
   m_CullingMask:
@@ -173,7 +173,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 900000}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.408218, y: -0.2345697, z: 0.1092516, w: 0.8754261}
+  m_LocalRotation: {x: 0.40822378, y: -0.23457302, z: 0.10925315, w: 0.8754385}
   m_LocalPosition: {x: 1, y: 1.5, z: -1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -205,7 +205,7 @@ Light:
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
-    m_CullingMatrix:
+    m_CullingMatrixOverride:
       e00: 1
       e01: 0
       e02: 0
@@ -240,6 +240,5 @@ Light:
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
-  m_ForceVisible: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0
