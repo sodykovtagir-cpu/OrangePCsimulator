@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a132b41b49b18a3078aa22fd0638b3e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: MonitorStand
+  spawnId: StandMonitor
   info: '{Monitor Stand}'
   match: 1
   slotOffset: {x: 0, y: 0, z: 0}
