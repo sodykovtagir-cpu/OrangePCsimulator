@@ -41,11 +41,15 @@ def generate_os_fixture():
         PersistIconPositions ParseIconPositions SaveIconPosition LoadIconPositions
         GetDesktopCanvas GetFullscreenDesktopSize GetScaledDesktopSize GetLegacyMonitorDesktopSize
         FindFreeSpawnPosition AutoArrangeIcons SortDesktopIcons RefreshDesktopIcon CollectDesktopFiles
-        AddFileIcon Update
+        AddFileIcon OpenDesktopFile IsIconSpawnOccupied Update LateUpdate
+        TransferRenamedIconPosition ReserveCanonicalIconCells UpdateDesktopIconView
+        RequestFileRefresh GetDesktopStorageFiles RefreshChangedFiles
     """.split())
     wanted_fields = set("""
         fileIconPrefab iconParent desktop folderSprite fileIcons iconPositions desktopFileKeys
         iconLayoutInitialized iconGridColumns SharedIconLayoutContext DefaultSortMode currentSortMode clockText
+        fullscreenIconPositions iconViewInitialized iconViewDirty lastIconViewFullscreen lastIconViewCanvas
+        lastIconViewportSize lastIconViewportPadding desktopFileSnapshot fileRefreshPending nextFileSystemScan FileSystemScanInterval
     """.split())
     members, found_methods, found_fields = [], set(), set()
     for node in nodes:
@@ -72,13 +76,34 @@ using PC.Component;
 using UnityEngine;
 using UnityEngine.UI;
 namespace PC.Component.Software.OS {
-public class OperatingSystem : MonoBehaviour {
-    public Motherboard Board;
-    public List<Storage> AllStorage;
+public class OperatingSystem : ComputerSystem {
     public bool Ready = true;
+    public int FileViewRefreshCount;
+    public int ErrorMessageCount;
+    public Action OnRefreshFileViews;
+    public void ShowMessageBox(string title, string message) { ErrorMessageCount++; }
+    private void RefreshRunningFileManagers() { FileViewRefreshCount++; if (OnRefreshFileViews != null) OnRefreshFileViews(); }
     private Sprite GetFileSprite(string path) { return null; }
     private void OpenFolder(File file) { }
     private void OpenFile(File file) { }
+""" + "\n\n".join(members) + "\n}\n}\n"
+
+
+def generate_storage_fixture():
+    wanted = {"Usage", "Write", "AddFile", "ContainsFile", "TryGetFile"}
+    members = []
+    for node in source_members(CS / "PC/Component/Storage.cs"):
+        if node.type == "method_declaration" and node.child_by_field_name("name").text.decode() in wanted:
+            members.append(node.text.decode())
+    assert len(members) == len(wanted)
+    return """
+using System.Collections.Generic;
+using System.Linq;
+using PC.Component.Software;
+namespace PC.Component {
+public class Storage {
+    public int Capacity = 100000000;
+    public List<File> files = new List<File>();
 """ + "\n\n".join(members) + "\n}\n}\n"
 
 
@@ -150,10 +175,14 @@ def main():
         folder = Path(folder)
         generated = folder / "OperatingSystemDesktop.cs"
         generated.write_text(fixture)
+        storage = folder / "StorageFiles.cs"
+        storage.write_text(generate_storage_fixture())
         exe = folder / "tests.exe"
         subprocess.run(["mcs", "-langversion:latest", "-out:" + str(exe),
                         str(CS / "DesktopIconGrid.cs"), str(CS / "DesktopIconDragger.cs"),
-                        str(generated), str(ROOT / "tools/tests/desktop_layout_stubs.cs"),
+                        str(CS / "DesktopFileSnapshot.cs"), str(CS / "PC/Component/Software/File.cs"),
+                        str(CS / "PC/Component/Software/OS/FileManager.cs"), str(CS / "PC/Component/Software/OS/SaveDialog.cs"),
+                        str(storage), str(generated), str(ROOT / "tools/tests/desktop_layout_stubs.cs"),
                         str(ROOT / "tools/tests/desktop_layout_tests.cs")], check=True)
         subprocess.run(["mono", str(exe)], check=True)
     print("C# desktop tests and prefab checks passed. Unity rendering/Play Mode was not run.")
