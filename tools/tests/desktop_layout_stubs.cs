@@ -2,10 +2,12 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using PC.Component.Software;
 
 namespace UnityEngine
 {
     public class SerializeField : Attribute { }
+    public class TextAreaAttribute : Attribute { public TextAreaAttribute(int min,int max) { } }
     public class HeaderAttribute : Attribute { public HeaderAttribute(string text) { } }
     public struct Vector2
     {
@@ -32,6 +34,16 @@ namespace UnityEngine
         public override int GetHashCode() => x*397 ^ y;
     }
     public struct Vector3 { public float x,y,z; public Vector3(float x,float y,float z=0) {this.x=x;this.y=y;this.z=z;} }
+    public struct Vector4
+    {
+        public float x,y,z,w;
+        public Vector4(float x,float y,float z,float w){this.x=x;this.y=y;this.z=z;this.w=w;}
+        public static Vector4 zero=>new Vector4();
+        public static bool operator ==(Vector4 a,Vector4 b)=>a.x==b.x&&a.y==b.y&&a.z==b.z&&a.w==b.w;
+        public static bool operator !=(Vector4 a,Vector4 b)=>!(a==b);
+        public override bool Equals(object b)=>b is Vector4&&this==(Vector4)b;
+        public override int GetHashCode()=>x.GetHashCode()^y.GetHashCode()^z.GetHashCode()^w.GetHashCode();
+    }
     public struct Rect { public float width,height; public Rect(float w,float h) {width=w;height=h;} public Vector2 size => new Vector2(width,height); }
     public static class Mathf
     {
@@ -39,6 +51,8 @@ namespace UnityEngine
         public static float Min(float a,float b)=>Math.Min(a,b); public static int Abs(int a)=>Math.Abs(a);
         public static int RoundToInt(float a)=>(int)Math.Round(a,MidpointRounding.ToEven);
         public static int FloorToInt(float a)=>(int)Math.Floor(a);
+        public static int CeilToInt(float a)=>(int)Math.Ceiling(a);
+        public static float Abs(float a)=>Math.Abs(a);
         public static float Pow(float a,float b)=>(float)Math.Pow(a,b); public static float Log(float a,float b)=>(float)Math.Log(a,b);
         public static float Lerp(float a,float b,float t)=>a+(b-a)*Math.Max(0,Math.Min(1,t));
     }
@@ -102,6 +116,7 @@ namespace UnityEngine
     public enum RenderMode {ScreenSpaceOverlay,ScreenSpaceCamera,WorldSpace}
     public class Canvas : MonoBehaviour {public RenderMode renderMode;public Camera worldCamera;}
     public class CanvasGroup : MonoBehaviour { }
+    public static class Time {public static float unscaledTime;}
     public static class Screen {public static int width=1920,height=1080; public static float dpi=96;}
     public static class Input {public static Vector3 mousePosition;public static bool held;public static bool GetMouseButton(int button)=>held;}
     public static class RectTransformUtility
@@ -126,6 +141,8 @@ namespace UnityEngine
 namespace UnityEngine.UI
 {
     public class Text : UnityEngine.MonoBehaviour {public string text;}
+    public class InputField : UnityEngine.MonoBehaviour {public string text;}
+    public class RectMask2D : UnityEngine.MonoBehaviour {public UnityEngine.Vector4 padding;}
     public class CanvasScaler : UnityEngine.MonoBehaviour
     {
         public enum ScaleMode {ConstantPixelSize,ScaleWithScreenSize,ConstantPhysicalSize}
@@ -149,17 +166,10 @@ public static class PointerInput
     public const float Slop=6;
     public static bool IsPrimary(UnityEngine.EventSystems.PointerEventData data)=>data.button==UnityEngine.EventSystems.PointerEventData.InputButton.Left;
 }
-public class File
-{
-    public string path;public bool hidden,isFolder;public int size;
-    public File(string path,int size=0){this.path=path;this.size=size;}
-    public static string Extension(string path){int i=path.LastIndexOf('.');return i<0?"":path.Substring(i);}
-}
 namespace PC.Component
 {
     public class Display {public int Id;public UnityEngine.Vector2 UnfocusedCanvasSize=new UnityEngine.Vector2(840,500);}
     public class Motherboard {public int Id;public Display monitor;}
-    public class Storage {public List<File> files=new List<File>();}
 }
 namespace PC.Component.Software
 {
@@ -170,5 +180,15 @@ namespace PC.Component.Software
         public void Init(File file,Action<File> callback){File=file;}
         public UnityEngine.Vector2 GetPosition()=>GetComponent<UnityEngine.RectTransform>().anchoredPosition;
         public void SetPosition(UnityEngine.Vector2 position){GetComponent<UnityEngine.RectTransform>().anchoredPosition=position;}
+    }
+}
+
+namespace PC.Component.Software.OS
+{
+    public class ComputerSystem : UnityEngine.MonoBehaviour
+    {
+        public PC.Component.Motherboard Board;
+        public List<PC.Component.Storage> AllStorage;
+        public FileManager FileManager;
     }
 }

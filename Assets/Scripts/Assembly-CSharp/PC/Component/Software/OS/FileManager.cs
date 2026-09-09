@@ -20,7 +20,9 @@ namespace PC.Component.Software.OS
 			var target = all[storage];
 			if (target == null) return null;
 
-			return target.Write(path, content);
+			var file = target.Write(path, content);
+			if (file != null) NotifyChanged();
+			return file;
 		}
 
 		public bool Create(int storage, File file)
@@ -34,7 +36,9 @@ namespace PC.Component.Software.OS
 			var target = all[storage];
 			if (target == null) return false;
 
-			return target.AddFile(file);
+			bool created = target.AddFile(file);
+			if (created) NotifyChanged();
+			return created;
 		}
 
 		public void Delete(int storage, string path)
@@ -57,9 +61,15 @@ namespace PC.Component.Software.OS
 				if (f != null && string.Equals(f.path, path))
 				{
 					files.RemoveAt(i);
+					NotifyChanged();
 					break;
 				}
 			}
+		}
+
+		private void NotifyChanged()
+		{
+			if (cs is OperatingSystem os) os.RequestFileRefresh();
 		}
 
 		public bool Exists(int storage, string path)

@@ -94,6 +94,19 @@ namespace PC.Component.Software.OS
         private Dictionary<string, FileIcon> fileIcons = new Dictionary<string, FileIcon>();
         private Dictionary<string, Vector2> iconPositions = new Dictionary<string, Vector2>();
         private readonly HashSet<string> desktopFileKeys = new HashSet<string>();
+        // A temporary fullscreen projection. Automatic fitting must never overwrite
+        // the shared/manual coordinates used by the physical monitor and saves.
+        private readonly Dictionary<string, Vector2> fullscreenIconPositions = new Dictionary<string, Vector2>();
+        private bool iconViewInitialized;
+        private bool iconViewDirty = true;
+        private bool lastIconViewFullscreen;
+        private Canvas lastIconViewCanvas;
+        private Vector2 lastIconViewportSize;
+        private Vector4 lastIconViewportPadding;
+        private readonly DesktopFileSnapshot desktopFileSnapshot = new DesktopFileSnapshot();
+        private bool fileRefreshPending;
+        private float nextFileSystemScan;
+        private const float FileSystemScanInterval = 0.25f;
         private bool iconLayoutInitialized;
         private int iconGridColumns = 9;
         private const string SharedIconLayoutContext = "shared_v2";
@@ -729,56 +742,50 @@ namespace PC.Component.Software.OS
 
         private void AddFileIcon(File file)
         {
-            if (file == null || fileIcons == null) return;
-
-            var key = file.path;
-            if (fileIcons.ContainsKey(key))
-                return;
-
-            var iconInstance = Instantiate(fileIconPrefab, iconParent);
-            if (iconInstance == null) return;
-
-            // Ensure DesktopIconDragger exists and is initialized
-            var dragger = iconInstance.GetComponent<DesktopIconDragger>();
-            if (dragger == null)
-                dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
-            dragger.Init();
-
-            iconInstance.Init(file, f =>
+            if (file == null || fileIcons == null || fileIconPrefab == null || iconParent == null) return;
+            string key = file.path;
+            bool created = !fileIcons.TryGetValue(key, out var iconInstance) || iconInstance == null;
+            if (created)
             {
-                if (f.isFolder)
-                {
-                    OpenFolder(f);
-                    return;
-                }
-
-                OpenFile(f);
-            });
-
-            if (file.isFolder)
-                iconInstance.Sprite = folderSprite;
-            else
-                iconInstance.Sprite = GetFileSprite(file.path);
-
-            // Saved cells are reserved separately, including icons not instantiated yet.
-            fileIcons.Add(key, iconInstance);
-            
-            // Restore saved position or find free spawn position
-            Vector2 finalPos;
-            if (iconPositions != null && iconPositions.ContainsKey(key))
-            {
-                finalPos = iconPositions[key];
-                Debug.Log($"[AddFileIcon] '{key}' => RESTORED position: {finalPos}");
-            }
-            else
-            {
-                finalPos = FindFreeSpawnPosition(key);
-                Debug.Log($"[AddFileIcon] '{key}' => NEW position: {finalPos}");
+                iconInstance = Instantiate(fileIconPrefab, iconParent);
+                if (iconInstance == null) return;
+                var dragger = iconInstance.GetComponent<DesktopIconDragger>();
+                if (dragger == null) dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
+                dragger.Init();
+                fileIcons[key] = iconInstance;
             }
 
-            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
-            iconPositions[key] = finalPos;
-            iconInstance.SetPosition(finalPos);
+            // Rebind even when the path is unchanged: disk cloning/overwriting can
+            // replace the File instance, and an existing icon must not open the old one.
+            iconInstance.Init(file, OpenDesktopFile);
+            iconInstance.Sprite = file.isFolder ? folderSprite : GetFileSprite(file.path);
+            if (!created) return;
+
+            Vector2 position;
+            if (!iconPositions.TryGetValue(key, out position) || IsIconSpawnOccupied(key, position))
+                position = FindFreeSpawnPosition(key);
+            iconPositions[key] = position;
+            iconInstance.SetPosition(position);
+        }
+
+        private void OpenDesktopFile(File file)
+        {
+            if (file == null) return;
+            if (file.isFolder) OpenFolder(file);
+            else OpenFile(file);
+        }
+
+        private bool IsIconSpawnOccupied(string key, Vector2 position)
+        {
+            var grid = GetDesktopIconGrid();
+            foreach (var pair in fileIcons)
+            {
+                if (pair.Key == key || pair.Value == null) continue;
+                if (iconPositions.TryGetValue(pair.Key, out var saved) && grid.Overlaps(position, saved)) return true;
+            }
+            foreach (var pair in fullscreenIconPositions)
+                if (pair.Key != key && desktopFileKeys.Contains(pair.Key) && grid.Overlaps(position, pair.Value)) return true;
+            return false;
         }
 
         public Sprite GetFileSprite(string fileName)
@@ -1220,8 +1227,33 @@ namespace PC.Component.Software.OS
             if (string.IsNullOrEmpty(key)) return;
             EnsureIconLayoutLoaded();
             if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
+            // A file can be renamed by another app while its icon is being dragged.
+            foreach (var pair in fileIcons)
+                if (pair.Value != null && pair.Value.File != null && pair.Value.File.path == key)
+                    TransferRenamedIconPosition(pair.Key, key);
             iconPositions[key] = position;
+            var canvas = GetDesktopCanvas();
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                fullscreenIconPositions[key] = position;
+            else
+                fullscreenIconPositions.Clear(); // a manual monitor edit takes precedence
+            iconViewDirty = true;
             PersistIconPositions();
+        }
+
+        private void TransferRenamedIconPosition(string previous, string current)
+        {
+            if (previous == current || string.IsNullOrEmpty(current)) return;
+            if (iconPositions.TryGetValue(previous, out var saved))
+            {
+                iconPositions.Remove(previous);
+                iconPositions[current] = saved;
+            }
+            if (fullscreenIconPositions.TryGetValue(previous, out var visible))
+            {
+                fullscreenIconPositions.Remove(previous);
+                fullscreenIconPositions[current] = visible;
+            }
         }
 
         private void LoadIconPositions()
@@ -1357,9 +1389,88 @@ namespace PC.Component.Software.OS
             foreach (var kvp in iconPositions)
             {
                 if (kvp.Key == fileName || !desktopFileKeys.Contains(kvp.Key)) continue;
-                occupied.Add(grid.GetCell(kvp.Value));
+                grid.ReserveCells(kvp.Value, occupied);
             }
+            // Do not spawn a new icon on top of an automatically fitted fullscreen icon.
+            foreach (var pair in fullscreenIconPositions)
+                if (pair.Key != fileName && desktopFileKeys.Contains(pair.Key)) grid.ReserveCells(pair.Value, occupied);
             return grid.FirstFreePosition(iconGridColumns, occupied);
+        }
+
+        internal void ReserveCanonicalIconCells(string exceptKey, HashSet<Vector2Int> occupied)
+        {
+            var grid = GetDesktopIconGrid();
+            foreach (var pair in iconPositions)
+                if (pair.Key != exceptKey && desktopFileKeys.Contains(pair.Key)) grid.ReserveCells(pair.Value, occupied);
+        }
+
+        private void UpdateDesktopIconView(bool force = false)
+        {
+            if (!iconLayoutInitialized || iconParent == null || DesktopIconDragger.IsDragging) return;
+            var rect = iconParent as RectTransform;
+            if (rect == null) return;
+            var canvas = GetDesktopCanvas();
+            bool fullscreen = canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay;
+            var mask = iconParent.GetComponent<RectMask2D>();
+            Vector4 padding = mask != null ? mask.padding : Vector4.zero;
+            Vector2 size = rect.rect.size;
+            if (!force && !iconViewDirty && iconViewInitialized && lastIconViewCanvas == canvas &&
+                lastIconViewFullscreen == fullscreen && lastIconViewportSize == size && lastIconViewportPadding == padding)
+                return;
+
+            if (fullscreen)
+            {
+                foreach (var pair in fileIcons)
+                    if (!fullscreenIconPositions.ContainsKey(pair.Key) && iconPositions.TryGetValue(pair.Key, out var position))
+                        fullscreenIconPositions[pair.Key] = position;
+                // Keep current in-bounds positions on resize; only overflowing icons move.
+                GetDesktopIconGrid().FitOverflow(fullscreenIconPositions, size, padding);
+            }
+
+            var visiblePositions = fullscreen ? fullscreenIconPositions : iconPositions;
+            foreach (var pair in fileIcons)
+                if (pair.Value != null && visiblePositions.TryGetValue(pair.Key, out var position))
+                    pair.Value.SetPosition(position);
+
+            // No persistence here: world-space / render-texture monitors always use
+            // the original shared coordinates, independent of fullscreen fitting.
+            iconViewInitialized = true;
+            iconViewDirty = false;
+            lastIconViewCanvas = canvas;
+            lastIconViewFullscreen = fullscreen;
+            lastIconViewportSize = size;
+            lastIconViewportPadding = padding;
+        }
+
+        internal void RequestFileRefresh()
+        {
+            // Batch multiple writes/copies into one refresh after the operation finishes.
+            fileRefreshPending = true;
+        }
+
+        private List<File> GetDesktopStorageFiles()
+        {
+            return AllStorage != null && AllStorage.Count > 0 && AllStorage[0] != null ? AllStorage[0].files : null;
+        }
+
+        private void RefreshChangedFiles()
+        {
+            if (!Ready || DesktopIconDragger.IsDragging) return;
+            if (!fileRefreshPending && Time.unscaledTime < nextFileSystemScan) return;
+            nextFileSystemScan = Time.unscaledTime + FileSystemScanInterval;
+            if (!fileRefreshPending && !desktopFileSnapshot.HasChanged(GetDesktopStorageFiles())) return;
+            RefreshDesktopIcon();
+            RefreshRunningFileManagers();
+            // Explorer may create missing folder entries while refreshing. Do not
+            // swallow that mutation by marking it captured before icons see it.
+            if (desktopFileSnapshot.HasChanged(GetDesktopStorageFiles())) RequestFileRefresh();
+        }
+
+        private void LateUpdate()
+        {
+            RefreshChangedFiles();
+            // CanvasScaler updates first, so this sees the actual resized viewport.
+            UpdateDesktopIconView();
         }
 
         /// <summary>
@@ -1369,6 +1480,8 @@ namespace PC.Component.Software.OS
         public void AutoArrangeIcons()
         {
             EnsureIconLayoutLoaded();
+            fullscreenIconPositions.Clear();
+            iconViewDirty = true;
             if (iconPositions != null)
                 iconPositions.Clear();
             
@@ -1389,6 +1502,8 @@ namespace PC.Component.Software.OS
         public void SortDesktopIcons(string mode)
         {
             EnsureIconLayoutLoaded();
+            fullscreenIconPositions.Clear();
+            iconViewDirty = true;
             if (iconPositions != null)
                 iconPositions.Clear();
             
@@ -1732,6 +1847,11 @@ namespace PC.Component.Software.OS
 
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
         {
+            if (preserveCurrentPositions && DesktopIconDragger.IsDragging)
+            {
+                RequestFileRefresh();
+                return;
+            }
             EnsureIconLayoutLoaded();
             if (fileIcons == null) fileIcons = new Dictionary<string, FileIcon>();
             var desktopFiles = CollectDesktopFiles();
@@ -1744,9 +1864,10 @@ namespace PC.Component.Software.OS
                 foreach (var kvp in fileIcons)
                 {
                     if (kvp.Value == null) continue;
-                    // Also preserve the position when the underlying File was renamed.
+                    // Never copy a fitted fullscreen coordinate into the monitor save.
+                    // Manual moves already call SaveIconPosition; renames carry both maps.
                     string key = kvp.Value.File != null ? kvp.Value.File.path : kvp.Key;
-                    if (desktopFileKeys.Contains(key)) iconPositions[key] = kvp.Value.GetPosition();
+                    if (desktopFileKeys.Contains(key)) TransferRenamedIconPosition(kvp.Key, key);
                 }
             }
 
@@ -1758,7 +1879,11 @@ namespace PC.Component.Software.OS
                     for (int i = iconParent.childCount - 1; i >= 0; i--)
                     {
                         var child = iconParent.GetChild(i);
-                        if (child != null) Destroy(child.gameObject);
+                        if (child != null)
+                        {
+                            child.gameObject.SetActive(false);
+                            Destroy(child.gameObject);
+                        }
                     }
                 }
             }
@@ -1770,15 +1895,27 @@ namespace PC.Component.Software.OS
 
                 foreach (var key in stale)
                 {
-                    if (fileIcons.TryGetValue(key, out var icon) && icon != null) Destroy(icon.gameObject);
+                    if (fileIcons.TryGetValue(key, out var icon) && icon != null)
+                    {
+                        icon.gameObject.SetActive(false);
+                        Destroy(icon.gameObject);
+                    }
                     fileIcons.Remove(key);
                 }
             }
 
+            var staleViewKeys = new List<string>();
+            foreach (var key in fullscreenIconPositions.Keys)
+                if (!desktopFileKeys.Contains(key)) staleViewKeys.Add(key);
+            foreach (var key in staleViewKeys) fullscreenIconPositions.Remove(key);
+
             foreach (var file in desktopFiles) AddFileIcon(file);
-            // No Fit/Clamp/LayoutRebuild pass: saved positions, including offscreen
-            // ones, are authoritative. Refreshing files must not move existing icons.
             PersistIconPositions();
+            iconViewDirty = true;
+            UpdateDesktopIconView(true);
+            desktopFileSnapshot.Capture(GetDesktopStorageFiles());
+            fileRefreshPending = false;
+            nextFileSystemScan = Time.unscaledTime + FileSystemScanInterval;
         }
 
         private List<File> CollectDesktopFiles()

@@ -151,11 +151,18 @@ namespace PC.Component.Software
             for (int i = 0; i < parent.childCount; i++)
             {
                 var child = parent.GetChild(i);
-                if (child == null || child.gameObject == gameObject) continue;
+                if (child == null || child.gameObject == gameObject || !child.gameObject.activeSelf) continue;
                 // Include clipped icons: being outside a monitor must not free their cells.
                 if (child.GetComponent<DesktopIconDragger>() == null) continue;
                 var rect = child.GetComponent<RectTransform>();
-                if (rect != null) occupied.Add(grid.GetCell(rect.anchoredPosition));
+                if (rect != null) grid.ReserveCells(rect.anchoredPosition, occupied);
+            }
+            // A temporary fullscreen fit may visually vacate another icon's saved
+            // cell. Do not let a manual drag create a collision on the physical monitor.
+            if (parentCanvas != null && parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                var os = GetComponentInParent<OS.OperatingSystem>();
+                if (os != null) os.ReserveCanonicalIconCells(GetIconKey(), occupied);
             }
             return occupied;
         }
