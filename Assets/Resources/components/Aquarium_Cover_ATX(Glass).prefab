@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 114479874087252823}
   - component: {fileID: 8441671780346609144}
   m_Layer: 0
-  m_Name: Aquarium_Cover_ATX(Glass)1
+  m_Name: Aquarium_Cover_ATX(Glass)
   m_TagString: Cover
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
