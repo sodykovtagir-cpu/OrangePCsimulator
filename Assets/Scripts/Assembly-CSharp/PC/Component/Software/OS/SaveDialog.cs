@@ -58,7 +58,11 @@ namespace PC.Component.Software.OS
 			var fm = sys != null ? sys.FileManager : null;
 			if (fm != null)
 			{
-				fm.Create(0, file);
+				if (!fm.Create(0, file))
+				{
+					sys.ShowMessageBox("Сохранение", "Не удалось сохранить файл. Проверьте свободное место на диске.");
+					return;
+				}
 				var go = gameObject;
 				if (go != null) go.SetActive(false);
 			}
