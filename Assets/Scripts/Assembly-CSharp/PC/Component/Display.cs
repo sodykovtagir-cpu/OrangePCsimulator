@@ -31,6 +31,9 @@ namespace PC.Component
 
 		private Vector2 defaultDelta;
 
+		// Used only to migrate old monitor-relative desktop icon coordinates.
+		internal Vector2 UnfocusedCanvasSize => defaultDelta;
+
 		private bool isZoom;
 
 		private Coroutine coroutine;

@@ -15,11 +15,6 @@ namespace PC.Component.Software.OS
 
         void Start()
         {
-            currentLayoutContext = ResolveIconLayoutContext();
-            LoadIconPositions();
-            LoadCurrentSortMode();
-            TrackIconParentSize(true);
-
             // Disable ReorderableList layout on iconParent for free icon positioning
             if (iconParent != null)
             {
@@ -98,20 +93,11 @@ namespace PC.Component.Software.OS
         private List<string> installedApps = new List<string>();
         private Dictionary<string, FileIcon> fileIcons = new Dictionary<string, FileIcon>();
         private Dictionary<string, Vector2> iconPositions = new Dictionary<string, Vector2>();
-        private Canvas desktopCanvas;
-        private string currentLayoutContext;
-        private Vector2 lastKnownIconParentSize;
-        private bool iconParentSizeInitialized;
-        private bool layoutSwitchPending;
-        private const string DefaultIconLayoutContext = "system";
-        private const string MonitorIconLayoutContext = "monitor";
+        private readonly HashSet<string> desktopFileKeys = new HashSet<string>();
+        private bool iconLayoutInitialized;
+        private int iconGridColumns = 9;
+        private const string SharedIconLayoutContext = "shared_v2";
         private const string DefaultSortMode = "Name";
-        private const float IconGridPadding = 20f;
-        private const float IconGridCellWidth = 70f;
-        private const float IconGridCellHeight = 70f;
-        private const float IconGridSpacingX = 20f;
-        private const float IconGridSpacingY = 20f;
-        private const float IconGridBottomPadding = 60f;
         private const string userFilePath = "System/user";
         private User userData;
 
@@ -180,6 +166,7 @@ namespace PC.Component.Software.OS
                 }
             }
 
+            EnsureIconLayoutLoaded();
             LoadFilesFromDisk();
 
             storageScore = 0;
@@ -755,8 +742,7 @@ namespace PC.Component.Software.OS
             var dragger = iconInstance.GetComponent<DesktopIconDragger>();
             if (dragger == null)
                 dragger = iconInstance.gameObject.AddComponent<DesktopIconDragger>();
-            // Reinit after a frame to ensure everything is ready
-            StartCoroutine(ReinitDragger(dragger));
+            dragger.Init();
 
             iconInstance.Init(file, f =>
             {
@@ -774,7 +760,7 @@ namespace PC.Component.Software.OS
             else
                 iconInstance.Sprite = GetFileSprite(file.path);
 
-            // Add to fileIcons first so FindFreeSpawnPosition can see it
+            // Saved cells are reserved separately, including icons not instantiated yet.
             fileIcons.Add(key, iconInstance);
             
             // Restore saved position or find free spawn position
@@ -1140,106 +1126,69 @@ namespace PC.Component.Software.OS
         }
 
 
-        private struct IconGridMetrics
+        private string GetIconPositionsKey()
         {
-            public float originX;
-            public float originY;
-            public float maxX;
-            public float maxY;
-            public float stepX;
-            public float stepY;
-            public int maxCols;
-            public int maxRows;
+            return "icon_positions_" + SystemId.ToString("X8") + "_" + SharedIconLayoutContext;
         }
 
-        private string NormalizeLayoutContext(string layoutContext)
+        private string GetIconSortModeKey()
         {
-            return string.IsNullOrEmpty(layoutContext) ? DefaultIconLayoutContext : layoutContext;
+            return "icon_sort_mode_" + SystemId.ToString("X8") + "_" + SharedIconLayoutContext;
         }
 
-        private Canvas GetDesktopCanvas()
+        private string GetIconGridColumnsKey()
         {
-            if (desktopCanvas != null) return desktopCanvas;
-            if (iconParent != null) desktopCanvas = iconParent.GetComponentInParent<Canvas>();
-            if (desktopCanvas == null && desktop != null) desktopCanvas = desktop.GetComponentInParent<Canvas>();
-            return desktopCanvas;
+            return "icon_grid_columns_" + SystemId.ToString("X8") + "_" + SharedIconLayoutContext;
         }
 
-        private string ResolveIconLayoutContext()
+        private DesktopIconGrid GetDesktopIconGrid()
         {
-            var canvas = GetDesktopCanvas();
-            if (canvas == null) return DefaultIconLayoutContext;
-            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay) return DefaultIconLayoutContext;
-
-            var board = Board;
-            var monitor = board != null ? board.monitor : null;
-            if (monitor != null && monitor.Id != 0)
-                return MonitorIconLayoutContext + "_" + monitor.Id.ToString("X8");
-
-            return MonitorIconLayoutContext;
+            var dragger = fileIconPrefab != null ? fileIconPrefab.GetComponent<DesktopIconDragger>() : null;
+            return dragger != null ? dragger.Grid : DesktopIconGrid.Default;
         }
 
-        private bool IsMonitorLayoutContext(string layoutContext)
+        private void EnsureIconLayoutLoaded()
         {
-            return NormalizeLayoutContext(layoutContext).StartsWith(MonitorIconLayoutContext, StringComparison.Ordinal);
+            if (iconLayoutInitialized || Board == null) return;
+            LoadIconPositions();
+            LoadCurrentSortMode();
+            iconGridColumns = PlayerPrefs.GetInt(GetIconGridColumnsKey(), 0);
+            if (iconGridColumns <= 0)
+                ResetIconGridColumns();
+            iconLayoutInitialized = true;
         }
 
-        private string GetLegacyIconPositionsKey()
+        private void ResetIconGridColumns()
         {
-            return "icon_positions_" + SystemId.ToString("X8");
-        }
-
-        private string GetLegacyMonitorIconPositionsKey()
-        {
-            return "icon_positions_" + SystemId.ToString("X8") + "_" + MonitorIconLayoutContext;
-        }
-
-        private string GetIconPositionsKey(string layoutContext = null)
-        {
-            return "icon_positions_" + SystemId.ToString("X8") + "_" + NormalizeLayoutContext(layoutContext ?? currentLayoutContext);
-        }
-
-        private string GetLegacyMonitorSortModeKey()
-        {
-            return "icon_sort_mode_" + SystemId.ToString("X8") + "_" + MonitorIconLayoutContext;
-        }
-
-        private string GetIconSortModeKey(string layoutContext = null)
-        {
-            return "icon_sort_mode_" + SystemId.ToString("X8") + "_" + NormalizeLayoutContext(layoutContext ?? currentLayoutContext);
+            // Use the fullscreen desktop, NOT the smaller physical monitor. Recalculate
+            // only for a new desktop or an explicit Arrange/Sort command, never on zoom.
+            iconGridColumns = GetDesktopIconGrid().ColumnsForWidth(GetFullscreenDesktopSize().x);
+            PlayerPrefs.SetInt(GetIconGridColumnsKey(), iconGridColumns);
         }
 
         private void LoadCurrentSortMode()
         {
-            var layoutContext = NormalizeLayoutContext(currentLayoutContext ?? ResolveIconLayoutContext());
-            currentSortMode = PlayerPrefs.GetString(GetIconSortModeKey(layoutContext), "");
-
-            if (string.IsNullOrEmpty(currentSortMode) && IsMonitorLayoutContext(layoutContext))
-                currentSortMode = PlayerPrefs.GetString(GetLegacyMonitorSortModeKey(), "");
-
-            if (string.IsNullOrEmpty(currentSortMode))
-                currentSortMode = DefaultSortMode;
+            currentSortMode = PlayerPrefs.GetString(GetIconSortModeKey(), DefaultSortMode);
+            if (string.IsNullOrEmpty(currentSortMode)) currentSortMode = DefaultSortMode;
         }
 
         private void SaveCurrentSortMode()
         {
-            if (string.IsNullOrEmpty(currentSortMode))
-                currentSortMode = DefaultSortMode;
+            if (string.IsNullOrEmpty(currentSortMode)) currentSortMode = DefaultSortMode;
             PlayerPrefs.SetString(GetIconSortModeKey(), currentSortMode);
         }
 
         private void PersistIconPositions()
         {
-            if (iconPositions == null)
-                iconPositions = new Dictionary<string, Vector2>();
-
+            if (Board == null) return;
+            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
             var sb = new System.Text.StringBuilder();
             foreach (var kvp in iconPositions)
             {
                 if (sb.Length > 0) sb.Append(";");
                 sb.Append(kvp.Key).Append(",")
-                  .Append(kvp.Value.x.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(",")
-                  .Append(kvp.Value.y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                  .Append(kvp.Value.x.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(",")
+                  .Append(kvp.Value.y.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
             }
             PlayerPrefs.SetString(GetIconPositionsKey(), sb.ToString());
         }
@@ -1247,19 +1196,21 @@ namespace PC.Component.Software.OS
         private void ParseIconPositions(string data, Dictionary<string, Vector2> target)
         {
             if (target == null || string.IsNullOrEmpty(data)) return;
-
-            var entries = data.Split(';');
-            foreach (var entry in entries)
+            foreach (var entry in data.Split(';'))
             {
                 if (string.IsNullOrEmpty(entry)) continue;
-                var parts = entry.Split(',');
-                if (parts.Length != 3) continue;
-
+                // The last two commas delimit coordinates; file names can contain commas.
+                int last = entry.LastIndexOf(',');
+                int previous = last > 0 ? entry.LastIndexOf(',', last - 1) : -1;
+                if (previous <= 0 || last <= previous) continue;
                 float x, y;
-                if (float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x) &&
-                    float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y))
+                if (float.TryParse(entry.Substring(previous + 1, last - previous - 1), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out x) &&
+                    float.TryParse(entry.Substring(last + 1), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out y) &&
+                    !float.IsNaN(x) && !float.IsInfinity(x) && !float.IsNaN(y) && !float.IsInfinity(y))
                 {
-                    target[parts[0]] = new Vector2(x, y);
+                    target[entry.Substring(0, previous)] = new Vector2(x, y);
                 }
             }
         }
@@ -1267,6 +1218,7 @@ namespace PC.Component.Software.OS
         public void SaveIconPosition(string key, Vector2 position)
         {
             if (string.IsNullOrEmpty(key)) return;
+            EnsureIconLayoutLoaded();
             if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
             iconPositions[key] = position;
             PersistIconPositions();
@@ -1277,252 +1229,117 @@ namespace PC.Component.Software.OS
             if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
             else iconPositions.Clear();
 
-            currentLayoutContext = NormalizeLayoutContext(currentLayoutContext ?? ResolveIconLayoutContext());
-
-            var data = PlayerPrefs.GetString(GetIconPositionsKey(), "");
-            bool migratedLegacy = false;
-            if (string.IsNullOrEmpty(data) && IsMonitorLayoutContext(currentLayoutContext))
+            // Empty is also a valid shared layout. Do not resurrect a legacy layout
+            // after the user has explicitly cleared/arranged the desktop.
+            if (PlayerPrefs.HasKey(GetIconPositionsKey()))
             {
-                data = PlayerPrefs.GetString(GetLegacyMonitorIconPositionsKey(), "");
-                migratedLegacy = !string.IsNullOrEmpty(data);
-            }
-            if (string.IsNullOrEmpty(data))
-            {
-                data = PlayerPrefs.GetString(GetLegacyIconPositionsKey(), "");
-                migratedLegacy = !string.IsNullOrEmpty(data);
+                ParseIconPositions(PlayerPrefs.GetString(GetIconPositionsKey(), ""), iconPositions);
+                return;
             }
 
-            ParseIconPositions(data, iconPositions);
+            // Prefer the existing fullscreen layout: the physical monitor is a clipped
+            // view of it, not a second desktop. Keep every legacy key as a backup.
+            var legacyContexts = new List<string> { "system" };
+            var monitor = Board != null ? Board.monitor : null;
+            if (monitor != null && monitor.Id != 0)
+                legacyContexts.Add("monitor_" + monitor.Id.ToString("X8"));
+            legacyContexts.Add("monitor");
+            legacyContexts.Add("");
 
-            if (migratedLegacy && iconPositions.Count > 0)
-                PersistIconPositions();
-        }
-
-        private Dictionary<string, Vector2> CaptureVisibleIconPositions()
-        {
-            var result = new Dictionary<string, Vector2>();
-            if (fileIcons == null) return result;
-
-            foreach (var kvp in fileIcons)
+            foreach (var context in legacyContexts)
             {
-                if (kvp.Value != null)
-                    result[kvp.Key] = kvp.Value.GetPosition();
+                string suffix = string.IsNullOrEmpty(context) ? "" : "_" + context;
+                string legacyKey = "icon_positions_" + SystemId.ToString("X8") + suffix;
+                ParseIconPositions(PlayerPrefs.GetString(legacyKey, ""), iconPositions);
+                if (iconPositions.Count == 0) continue;
+
+                var sourceSize = context.StartsWith("monitor", StringComparison.Ordinal)
+                    ? GetLegacyMonitorDesktopSize() : GetFullscreenDesktopSize();
+                var keys = new List<string>(iconPositions.Keys);
+                foreach (var key in keys)
+                    iconPositions[key] = DesktopIconGrid.FromLegacyCentre(iconPositions[key], sourceSize);
+
+                if (!PlayerPrefs.HasKey(GetIconSortModeKey()))
+                {
+                    string legacySort = "icon_sort_mode_" + SystemId.ToString("X8") + suffix;
+                    currentSortMode = PlayerPrefs.GetString(legacySort, "");
+                    if (string.IsNullOrEmpty(currentSortMode) && context.StartsWith("monitor", StringComparison.Ordinal))
+                        currentSortMode = PlayerPrefs.GetString("icon_sort_mode_" + SystemId.ToString("X8") + "_monitor", "");
+                    SaveCurrentSortMode();
+                }
+                break;
             }
-
-            return result;
-        }
-
-        private void SaveCapturedPositionsToCurrentLayout(Dictionary<string, Vector2> capturedPositions)
-        {
-            if (capturedPositions == null) return;
-            if (iconPositions == null) iconPositions = new Dictionary<string, Vector2>();
-
-            foreach (var kvp in capturedPositions)
-                iconPositions[kvp.Key] = kvp.Value;
-
             PersistIconPositions();
         }
 
-        private Vector2 GetIconParentSize()
+        private Canvas GetDesktopCanvas()
         {
-            if (iconParent != null)
+            // Do not cache a canvas belonging to a monitor that has been disconnected.
+            return iconParent != null ? iconParent.GetComponentInParent<Canvas>() : null;
+        }
+
+        private Vector2 GetFullscreenDesktopSize()
+        {
+            return GetScaledDesktopSize(new Vector2(Mathf.Max(1, Screen.width), Mathf.Max(1, Screen.height)));
+        }
+
+        private Vector2 GetScaledDesktopSize(Vector2 pixels)
+        {
+            var canvas = GetDesktopCanvas();
+            var scaler = canvas != null ? canvas.GetComponent<CanvasScaler>() : null;
+            // The display prefabs use an 800x500 reference with Expand scaling.
+            if (scaler == null)
+                return pixels / Mathf.Max(0.0001f, Mathf.Min(pixels.x / 800f, pixels.y / 500f));
+
+            float scale = scaler.scaleFactor;
+            if (scaler.uiScaleMode == CanvasScaler.ScaleMode.ScaleWithScreenSize)
             {
-                var parentRT = iconParent.GetComponent<RectTransform>();
-                if (parentRT != null && parentRT.rect.width >= 100f && parentRT.rect.height >= 100f)
-                    return parentRT.rect.size;
-            }
-
-            return new Vector2(Screen.width, Screen.height);
-        }
-
-        private void TrackIconParentSize(bool force = false)
-        {
-            var size = GetIconParentSize();
-            if (size.x <= 0f || size.y <= 0f) return;
-
-            if (force || !iconParentSizeInitialized || size != lastKnownIconParentSize)
-            {
-                lastKnownIconParentSize = size;
-                iconParentSizeInitialized = true;
-            }
-        }
-
-        private IconGridMetrics BuildIconGridMetrics(Vector2 size)
-        {
-            float pw = size.x;
-            float ph = size.y;
-
-            if (pw < 100f || ph < 100f)
-            {
-                pw = Screen.width;
-                ph = Screen.height;
-            }
-
-            var metrics = new IconGridMetrics();
-            metrics.stepX = IconGridCellWidth + IconGridSpacingX;
-            metrics.stepY = IconGridCellHeight + IconGridSpacingY;
-            metrics.originX = -pw / 2f + IconGridPadding + IconGridCellWidth / 2f;
-            metrics.originY = ph / 2f - IconGridPadding - IconGridCellHeight / 2f;
-            metrics.maxX = pw / 2f - IconGridPadding - IconGridCellWidth / 2f;
-            metrics.maxY = -ph / 2f + IconGridBottomPadding + IconGridCellHeight / 2f;
-            metrics.maxCols = Mathf.Max(1, Mathf.FloorToInt((metrics.maxX - metrics.originX) / metrics.stepX) + 1);
-            metrics.maxRows = Mathf.Max(1, Mathf.FloorToInt((metrics.originY - metrics.maxY) / metrics.stepY) + 1);
-            return metrics;
-        }
-
-        private Vector2Int ClampGridCell(Vector2Int cell, IconGridMetrics metrics)
-        {
-            return new Vector2Int(
-                Mathf.Clamp(cell.x, 0, metrics.maxCols - 1),
-                Mathf.Clamp(cell.y, 0, metrics.maxRows - 1));
-        }
-
-        private Vector2Int GetGridCellFromPosition(Vector2 position, IconGridMetrics metrics)
-        {
-            int col = Mathf.RoundToInt((position.x - metrics.originX) / metrics.stepX);
-            int row = Mathf.RoundToInt((metrics.originY - position.y) / metrics.stepY);
-            return ClampGridCell(new Vector2Int(col, row), metrics);
-        }
-
-        private Vector2 GetPositionFromGridCell(Vector2Int cell, IconGridMetrics metrics)
-        {
-            var clampedCell = ClampGridCell(cell, metrics);
-            float x = metrics.originX + clampedCell.x * metrics.stepX;
-            float y = metrics.originY - clampedCell.y * metrics.stepY;
-            return new Vector2(x, y);
-        }
-
-        private Vector2 FindFreeCellPosition(Vector2Int desiredCell, IconGridMetrics metrics, HashSet<Vector2Int> occupied)
-        {
-            var clampedDesired = ClampGridCell(desiredCell, metrics);
-            if (occupied == null) occupied = new HashSet<Vector2Int>();
-
-            if (!occupied.Contains(clampedDesired))
-            {
-                occupied.Add(clampedDesired);
-                return GetPositionFromGridCell(clampedDesired, metrics);
-            }
-
-            int maxSearch = Mathf.Max(metrics.maxCols, metrics.maxRows) + 8;
-            for (int radius = 1; radius <= maxSearch; radius++)
-            {
-                for (int dy = -radius; dy <= radius; dy++)
+                float widthScale = pixels.x / Mathf.Max(1f, scaler.referenceResolution.x);
+                float heightScale = pixels.y / Mathf.Max(1f, scaler.referenceResolution.y);
+                switch (scaler.screenMatchMode)
                 {
-                    for (int dx = -radius; dx <= radius; dx++)
-                    {
-                        if (Mathf.Abs(dx) != radius && Mathf.Abs(dy) != radius)
-                            continue;
-
-                        var cell = ClampGridCell(new Vector2Int(clampedDesired.x + dx, clampedDesired.y + dy), metrics);
-                        if (occupied.Contains(cell))
-                            continue;
-
-                        occupied.Add(cell);
-                        return GetPositionFromGridCell(cell, metrics);
-                    }
+                    case CanvasScaler.ScreenMatchMode.Expand:
+                        scale = Mathf.Min(widthScale, heightScale);
+                        break;
+                    case CanvasScaler.ScreenMatchMode.Shrink:
+                        scale = Mathf.Max(widthScale, heightScale);
+                        break;
+                    default:
+                        scale = Mathf.Pow(2f, Mathf.Lerp(Mathf.Log(widthScale, 2f), Mathf.Log(heightScale, 2f), scaler.matchWidthOrHeight));
+                        break;
                 }
             }
-
-            return GetPositionFromGridCell(clampedDesired, metrics);
-        }
-
-        private Vector2 AdaptPositionToCurrentLayout(Vector2 sourcePosition, Vector2 sourceSize, HashSet<Vector2Int> occupied)
-        {
-            var sourceMetrics = BuildIconGridMetrics(sourceSize);
-            var targetMetrics = BuildIconGridMetrics(GetIconParentSize());
-            var desiredCell = GetGridCellFromPosition(sourcePosition, sourceMetrics);
-            return FindFreeCellPosition(desiredCell, targetMetrics, occupied);
-        }
-
-        private Vector2 FitPositionToCurrentLayout(Vector2 position, HashSet<Vector2Int> occupied)
-        {
-            var targetMetrics = BuildIconGridMetrics(GetIconParentSize());
-            var desiredCell = GetGridCellFromPosition(position, targetMetrics);
-            return FindFreeCellPosition(desiredCell, targetMetrics, occupied);
-        }
-
-        private IEnumerator ApplyLayoutContextChange(string newLayoutContext, Vector2 sourceSize, Dictionary<string, Vector2> sourcePositions)
-        {
-            yield return null;
-            yield return new WaitForEndOfFrame();
-            yield return new WaitForEndOfFrame();
-
-            currentLayoutContext = NormalizeLayoutContext(newLayoutContext);
-            LoadIconPositions();
-            LoadCurrentSortMode();
-
-            if (fileIcons != null && fileIcons.Count > 0)
+            else if (scaler.uiScaleMode == CanvasScaler.ScaleMode.ConstantPhysicalSize)
             {
-                var orderedKeys = new List<string>(fileIcons.Keys);
-                orderedKeys.Sort(StringComparer.OrdinalIgnoreCase);
-
-                var occupied = new HashSet<Vector2Int>();
-                bool changed = false;
-
-                for (int i = 0; i < orderedKeys.Count; i++)
+                float unitsPerInch = 1f;
+                switch (scaler.physicalUnit)
                 {
-                    var key = orderedKeys[i];
-                    if (!fileIcons.TryGetValue(key, out var icon) || icon == null)
-                        continue;
-
-                    Vector2 nextPos;
-                    if (iconPositions.TryGetValue(key, out var savedPos))
-                    {
-                        nextPos = FitPositionToCurrentLayout(savedPos, occupied);
-                        if (savedPos != nextPos)
-                        {
-                            iconPositions[key] = nextPos;
-                            changed = true;
-                        }
-                    }
-                    else if (sourcePositions != null && sourcePositions.TryGetValue(key, out var previousPos))
-                    {
-                        nextPos = AdaptPositionToCurrentLayout(previousPos, sourceSize, occupied);
-                        iconPositions[key] = nextPos;
-                        changed = true;
-                    }
-                    else
-                    {
-                        nextPos = FindFreeCellPosition(new Vector2Int(0, 0), BuildIconGridMetrics(GetIconParentSize()), occupied);
-                        iconPositions[key] = nextPos;
-                        changed = true;
-                    }
-
-                    icon.SetPosition(nextPos);
+                    case CanvasScaler.Unit.Centimeters: unitsPerInch = 2.54f; break;
+                    case CanvasScaler.Unit.Millimeters: unitsPerInch = 25.4f; break;
+                    case CanvasScaler.Unit.Points: unitsPerInch = 72f; break;
+                    case CanvasScaler.Unit.Picas: unitsPerInch = 6f; break;
                 }
-
-                if (changed)
-                    PersistIconPositions();
+                scale = (Screen.dpi > 0f ? Screen.dpi : scaler.fallbackScreenDPI) / unitsPerInch;
             }
-
-            TrackIconParentSize(true);
-            layoutSwitchPending = false;
+            return pixels / Mathf.Max(0.0001f, scale);
         }
 
-        private void CheckForLayoutContextChange()
+        private Vector2 GetLegacyMonitorDesktopSize()
         {
-            if (!Ready || layoutSwitchPending)
-                return;
+            var canvas = GetDesktopCanvas();
+            var desktopRect = desktop != null ? desktop.GetComponent<RectTransform>() : null;
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay && desktopRect != null &&
+                desktopRect.rect.width >= 100f && desktopRect.rect.height >= 100f)
+                return desktopRect.rect.size;
 
-            var layoutContext = ResolveIconLayoutContext();
-            if (string.IsNullOrEmpty(currentLayoutContext))
-            {
-                currentLayoutContext = NormalizeLayoutContext(layoutContext);
-                LoadIconPositions();
-                LoadCurrentSortMode();
-                return;
-            }
+            var monitor = Board != null ? Board.monitor : null;
+            if (monitor != null && monitor.UnfocusedCanvasSize.x >= 100f && monitor.UnfocusedCanvasSize.y >= 100f)
+                return monitor.UnfocusedCanvasSize;
 
-            if (layoutContext == currentLayoutContext)
-                return;
-
-            var sourceSize = iconParentSizeInitialized ? lastKnownIconParentSize : GetIconParentSize();
-            var sourcePositions = CaptureVisibleIconPositions();
-            SaveCapturedPositionsToCurrentLayout(sourcePositions);
-            SaveCurrentSortMode();
-
-            layoutSwitchPending = true;
-            StartCoroutine(ApplyLayoutContextChange(layoutContext, sourceSize, sourcePositions));
+            var camera = canvas != null ? canvas.worldCamera : null;
+            if (camera != null && camera.targetTexture != null)
+                return GetScaledDesktopSize(new Vector2(camera.targetTexture.width, camera.targetTexture.height));
+            return new Vector2(840f, 500f);
         }
 
         private IEnumerator WaitRefresh()
@@ -1533,42 +1350,16 @@ namespace PC.Component.Software.OS
 
 
 
-        private System.Collections.IEnumerator ReinitDragger(DesktopIconDragger dragger)
-        {
-            yield return null; // Wait one frame
-            if (dragger != null)
-                dragger.Init();
-        }
-
         private Vector2 FindFreeSpawnPosition(string fileName = null)
         {
-            if (iconParent == null) return Vector2.zero;
-
-            var metrics = BuildIconGridMetrics(GetIconParentSize());
+            var grid = GetDesktopIconGrid();
             var occupied = new HashSet<Vector2Int>();
-            foreach (var kvp in fileIcons)
+            foreach (var kvp in iconPositions)
             {
-                if (kvp.Value == null) continue;
-                var rt = kvp.Value.GetComponent<RectTransform>();
-                if (rt == null) continue;
-                occupied.Add(GetGridCellFromPosition(rt.anchoredPosition, metrics));
+                if (kvp.Key == fileName || !desktopFileKeys.Contains(kvp.Key)) continue;
+                occupied.Add(grid.GetCell(kvp.Value));
             }
-
-            Debug.Log($"[FindFreeSpawn] Grid: {metrics.maxCols} cols x {metrics.maxRows} rows, occupied: {occupied.Count} cells");
-
-            for (int row = 0; row < metrics.maxRows; row++)
-            {
-                for (int col = 0; col < metrics.maxCols; col++)
-                {
-                    var cell = new Vector2Int(col, row);
-                    if (occupied.Contains(cell))
-                        continue;
-
-                    return GetPositionFromGridCell(cell, metrics);
-                }
-            }
-
-            return GetPositionFromGridCell(new Vector2Int(0, 0), metrics);
+            return grid.FirstFreePosition(iconGridColumns, occupied);
         }
 
         /// <summary>
@@ -1577,14 +1368,16 @@ namespace PC.Component.Software.OS
         /// </summary>
         public void AutoArrangeIcons()
         {
+            EnsureIconLayoutLoaded();
             if (iconPositions != null)
                 iconPositions.Clear();
             
-            PlayerPrefs.DeleteKey(GetIconPositionsKey());
+            PersistIconPositions();
+            ResetIconGridColumns();
             currentSortMode = DefaultSortMode;
             SaveCurrentSortMode();
             
-            Debug.Log("[AutoArrangeIcons] Cleared current layout positions, re-arranging...");
+            Debug.Log("[AutoArrangeIcons] Cleared shared layout positions, re-arranging...");
             
             RefreshDesktopIcon(false);
         }
@@ -1595,14 +1388,16 @@ namespace PC.Component.Software.OS
         /// </summary>
         public void SortDesktopIcons(string mode)
         {
+            EnsureIconLayoutLoaded();
             if (iconPositions != null)
                 iconPositions.Clear();
             
-            PlayerPrefs.DeleteKey(GetIconPositionsKey());
+            PersistIconPositions();
+            ResetIconGridColumns();
             currentSortMode = string.IsNullOrEmpty(mode) ? DefaultSortMode : mode;
             SaveCurrentSortMode();
             
-            Debug.Log($"[SortDesktopIcons] Sorting current layout by {currentSortMode}...");
+            Debug.Log($"[SortDesktopIcons] Sorting shared layout by {currentSortMode}...");
             
             RefreshDesktopIcon(false);
         }
@@ -1937,19 +1732,23 @@ namespace PC.Component.Software.OS
 
         public void RefreshDesktopIcon(bool preserveCurrentPositions = true)
         {
-            if (fileIcons == null)
-                fileIcons = new Dictionary<string, FileIcon>();
+            EnsureIconLayoutLoaded();
+            if (fileIcons == null) fileIcons = new Dictionary<string, FileIcon>();
+            var desktopFiles = CollectDesktopFiles();
+            desktopFileKeys.Clear();
+            foreach (var file in desktopFiles)
+                if (file != null && !string.IsNullOrEmpty(file.path)) desktopFileKeys.Add(file.path);
 
             if (preserveCurrentPositions && iconPositions != null)
             {
                 foreach (var kvp in fileIcons)
                 {
-                    if (kvp.Value != null)
-                        iconPositions[kvp.Key] = kvp.Value.GetPosition();
+                    if (kvp.Value == null) continue;
+                    // Also preserve the position when the underlying File was renamed.
+                    string key = kvp.Value.File != null ? kvp.Value.File.path : kvp.Key;
+                    if (desktopFileKeys.Contains(key)) iconPositions[key] = kvp.Value.GetPosition();
                 }
             }
-
-            var desktopFiles = CollectDesktopFiles();
 
             if (!preserveCurrentPositions)
             {
@@ -1958,41 +1757,28 @@ namespace PC.Component.Software.OS
                 {
                     for (int i = iconParent.childCount - 1; i >= 0; i--)
                     {
-                        var c = iconParent.GetChild(i);
-                        if (c != null) Destroy(c.gameObject);
+                        var child = iconParent.GetChild(i);
+                        if (child != null) Destroy(child.gameObject);
                     }
                 }
             }
             else
             {
-                var wanted = new HashSet<string>();
-                for (int i = 0; i < desktopFiles.Count; i++)
-                {
-                    var file = desktopFiles[i];
-                    if (file != null && !string.IsNullOrEmpty(file.path))
-                        wanted.Add(file.path);
-                }
-
                 var stale = new List<string>();
                 foreach (var kvp in fileIcons)
-                {
-                    if (kvp.Value == null || !wanted.Contains(kvp.Key))
-                        stale.Add(kvp.Key);
-                }
+                    if (kvp.Value == null || !desktopFileKeys.Contains(kvp.Key)) stale.Add(kvp.Key);
 
-                for (int i = 0; i < stale.Count; i++)
+                foreach (var key in stale)
                 {
-                    FileIcon icon;
-                    if (fileIcons.TryGetValue(stale[i], out icon) && icon != null)
-                        Destroy(icon.gameObject);
-                    fileIcons.Remove(stale[i]);
+                    if (fileIcons.TryGetValue(key, out var icon) && icon != null) Destroy(icon.gameObject);
+                    fileIcons.Remove(key);
                 }
             }
 
-            for (int i = 0; i < desktopFiles.Count; i++)
-                AddFileIcon(desktopFiles[i]);
-
-            StartCoroutine(DelayedLayoutRebuild());
+            foreach (var file in desktopFiles) AddFileIcon(file);
+            // No Fit/Clamp/LayoutRebuild pass: saved positions, including offscreen
+            // ones, are authoritative. Refreshing files must not move existing icons.
+            PersistIconPositions();
         }
 
         private List<File> CollectDesktopFiles()
@@ -2048,40 +1834,6 @@ namespace PC.Component.Software.OS
             }
 
             return desktopFiles;
-        }
-
-        private System.Collections.IEnumerator DelayedLayoutRebuild()
-        {
-            yield return new WaitForEndOfFrame();
-            yield return new WaitForEndOfFrame();
-            
-            if (iconParent != null)
-            {
-                var rt = iconParent.GetComponent<RectTransform>();
-                if (rt != null)
-                    UnityEngine.UI.LayoutRebuilder.MarkLayoutForRebuild(rt);
-            }
-            
-            // Re-apply positions after layout is ready
-            ReapplyIconPositions();
-        }
-
-        private void ReapplyIconPositions()
-        {
-            if (fileIcons == null || iconPositions == null) return;
-            
-            var occupied = new HashSet<Vector2Int>();
-            foreach (var kvp in fileIcons)
-            {
-                if (kvp.Value == null || !iconPositions.ContainsKey(kvp.Key))
-                    continue;
-
-                var fitted = FitPositionToCurrentLayout(iconPositions[kvp.Key], occupied);
-                iconPositions[kvp.Key] = fitted;
-                kvp.Value.SetPosition(fitted);
-            }
-
-            PersistIconPositions();
         }
 
         public List<DeviceDetail> ListInstalledDevices()
@@ -2211,9 +1963,6 @@ namespace PC.Component.Software.OS
 
         private void Update()
         {
-            CheckForLayoutContextChange();
-            TrackIconParentSize();
-
             if (!Ready) return;
 
             if (clockText != null)
