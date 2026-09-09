@@ -625,6 +625,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e50ab8913fe4a174a9904a162d59eb71, type: 2}
   - {fileID: 11400000, guid: 4cd847c7216d4b1fbf069aca01383016, type: 2}
   - {fileID: 11400000, guid: 74d75922e7594305bf63b4339c255f00, type: 2}
+  - {fileID: 11400000, guid: f49755a827a24126969cae910fff77c2, type: 2}
+  - {fileID: 11400000, guid: 338771690b44421b9a8e5a2d99362f84, type: 2}
   randomItems: []
   randomRate: 0.2
 --- !u!1 &1933139594592403
