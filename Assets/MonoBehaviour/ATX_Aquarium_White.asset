@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: Cover_ATX_Aquarium_Glass
+  m_Name: ATX_Aquarium_White
   m_EditorClassIdentifier: 
-  itemName: '{Glass} Aquarium (ATX)'
+  itemName: Aquarium (ATX)
   price: 60
-  bitcoin: 0
-  sprite: {fileID: 21300000, guid: 9120fa10d2182ef479bea4aa09d8b70a, type: 2}
-  spawn: {fileID: 1317529137250169, guid: 8c83b9445f07b934ba94d8d7d87b2f96, type: 3}
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: 57366effb45f43c4e94535733298b9ff, type: 3}
+  spawn: {fileID: 1317529137250169, guid: ea267ca902f1ae84ebdebdeb86207e27, type: 3}
   large: 1
   translateDescription: 1
   description: 
