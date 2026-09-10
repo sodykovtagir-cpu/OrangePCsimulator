@@ -110,6 +110,20 @@ public static class AccountInputTests
                     Check(!ServerAccounts.LoggedIn&&ServerAccounts.Name==""&&f.chip.text=="Not loggined","late response restored profile");
                 }
             });
+            Run("admin badge comes from the server flag, never from a chosen nickname",()=>{
+                Reset();ServerAccounts.SetSession("admin-test","Goose","g@example.test");
+                var go=new GameObject();var text=go.AddComponent<Text>();text.color=new Color(1,0.6f,0,1);var label=go.AddComponent<AccountProfileLabel>();Call(label,"Awake");Call(label,"OnEnable");
+                Check(!ServerAccounts.IsAdmin && text.color.g==0.6f,"name alone granted badge");
+                ServerAccounts.TryApplyProfile("admin-test",new AccountMeResponse{ok=true,name="Goose",is_admin=true});
+                Check(ServerAccounts.IsAdmin && text.color.g==AccountProfileLabel.AdminColor.g,"server role not shown");
+                ServerAccounts.TryApplyProfile("admin-test",new AccountMeResponse{ok=true,name="Goose",is_admin=false});
+                Check(!ServerAccounts.IsAdmin && text.color.g==0.6f,"revoked badge stayed red");Call(label,"OnDisable");
+            });
+            Run("cached admin role survives display initialization but not logout/account switch",()=>{
+                Reset();ServerAccounts.SetSession("a","Semyalol","s@example.test",true);Check(ServerAccounts.IsAdmin,"auth role not cached");
+                ServerAccounts.SetSession("b","Player","p@example.test");Check(!ServerAccounts.IsAdmin,"old admin role leaked");
+                ServerAccounts.SetSession("a","Semyalol","s@example.test",true);ServerAccounts.Clear();Check(!ServerAccounts.IsAdmin,"logout kept admin");
+            });
             Run("touch lookup follows the original finger rather than touch zero",()=>{
                 Reset();Input.touches=new[]{new Touch{fingerId=1,position=new Vector2(999,999),phase=TouchPhase.Moved},new Touch{fingerId=7,position=new Vector2(50,50),phase=TouchPhase.Stationary}};
                 Vector2 p;Check(PointerInput.TryGetHeldPosition(7,out p)&&p.x==50,"wrong finger");Check(!PointerInput.TryGetHeldPosition(9,out p),"missing finger treated as held");

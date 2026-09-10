@@ -399,7 +399,16 @@ public class WorkshopMenu : MonoBehaviour
 
 	private void WireRow(Transform t, WorkshopItem it)
 	{
-		SetChildText(t, "Name", it.title + " — " + it.author);
+		var authorNode = t.Find("Author");
+		var authorText = authorNode != null ? authorNode.GetComponent<Text>() : null;
+		if (authorText != null)
+		{
+			SetChildText(t, "Name", it.title);
+			authorText.supportRichText = false;
+			authorText.text = it.author ?? "";
+			authorText.color = it.author_is_admin ? AccountProfileLabel.AdminColor : new Color(0.8f, 0.8f, 0.8f, 1f);
+		}
+		else SetChildText(t, "Name", it.title + " — " + it.author);
 		SetChildText(t, "Downloads", it.downloads.ToString());
 		SetChildText(t, "Likes", it.likes.ToString());
 		SetChildText(t, "Description", it.description ?? "");

@@ -585,7 +585,7 @@ public class AccountPage : MonoBehaviour
 		{
 			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Login failed.")); return; }
-			ServerAccounts.SetSession(r.token, r.name, r.email);
+			ServerAccounts.SetSession(r.token, r.name, r.email, r.is_admin);
 			LoadMe();
 			SetMode(Mode.Home);
 			SetStatus(Tr("Welcome, {0}", r.name));
@@ -630,7 +630,7 @@ public class AccountPage : MonoBehaviour
 		{
 			if (err != null) { SetStatus(Tr("Network error: {0}", err)); return; }
 			if (r == null || !r.ok) { SetStatus(r != null ? Err(r.error) : Tr("Wrong code.")); return; }
-			ServerAccounts.SetSession(r.token, r.name, r.email);
+			ServerAccounts.SetSession(r.token, r.name, r.email, r.is_admin);
 			recallEmail = "";
 			SetStatus(Tr("Verified! Welcome, {0}", r.name));
 			SetMode(Mode.Home);

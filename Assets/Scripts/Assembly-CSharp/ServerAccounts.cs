@@ -11,6 +11,7 @@ public static class ServerAccounts
     private const string NameKey = "SrvAcct_Name";
     private const string EmailKey = "SrvAcct_Email";
     private const string BonusKey = "SrvAcct_Bonus";
+    private const string AdminKey = "SrvAcct_Admin";
 
     public static event System.Action StateChanged;
     private static readonly List<AccountSaveItem> saves = new List<AccountSaveItem>();
@@ -20,6 +21,8 @@ public static class ServerAccounts
     public static string Email { get { return PlayerPrefs.GetString(EmailKey, ""); } }
     public static bool LoggedIn { get { return !string.IsNullOrEmpty(Token) && !string.IsNullOrEmpty(Name); } }
     public static bool BonusClaimed { get { return PlayerPrefs.GetInt(BonusKey, 0) == 1; } }
+    // Cached role for UI/game features. Privileged server actions must validate the token server-side.
+    public static bool IsAdmin { get { return LoggedIn && PlayerPrefs.GetInt(AdminKey, 0) == 1; } }
     public static bool SavesLoaded { get; private set; }
     public static IReadOnlyList<AccountSaveItem> MySaves { get { return saves; } }
 
@@ -43,7 +46,7 @@ public static class ServerAccounts
         return save != null ? (save.owner_key ?? "") : "";
     }
 
-    public static void SetSession(string token, string name, string email)
+    public static void SetSession(string token, string name, string email, bool isAdmin = false)
     {
         token = token ?? "";
         if (!string.Equals(Token, token, System.StringComparison.Ordinal))
@@ -59,6 +62,7 @@ public static class ServerAccounts
         else PlayerPrefs.SetString(TokenKey, token);
         if (!string.IsNullOrEmpty(name)) PlayerPrefs.SetString(NameKey, name);
         if (!string.IsNullOrEmpty(email)) PlayerPrefs.SetString(EmailKey, email);
+        PlayerPrefs.SetInt(AdminKey, !string.IsNullOrEmpty(token) && isAdmin ? 1 : 0);
         PlayerPrefs.Save();
         StateChanged?.Invoke();
     }
@@ -70,6 +74,7 @@ public static class ServerAccounts
         if (!string.IsNullOrEmpty(profile.name)) PlayerPrefs.SetString(NameKey, profile.name);
         if (!string.IsNullOrEmpty(profile.email)) PlayerPrefs.SetString(EmailKey, profile.email);
         PlayerPrefs.SetInt(BonusKey, profile.tg_bonus ? 1 : 0);
+        PlayerPrefs.SetInt(AdminKey, profile.is_admin ? 1 : 0);
         saves.Clear();
         if (profile.saves != null)
             foreach (var save in profile.saves)
@@ -103,6 +108,7 @@ public static class ServerAccounts
         PlayerPrefs.DeleteKey(NameKey);
         PlayerPrefs.DeleteKey(EmailKey);
         PlayerPrefs.DeleteKey(BonusKey);
+        PlayerPrefs.DeleteKey(AdminKey);
         saves.Clear();
         SavesLoaded = false;
         PlayerPrefs.Save();

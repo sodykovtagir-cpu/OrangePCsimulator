@@ -55,6 +55,11 @@ namespace UnityEngine
     }
     public class RectTransform:Transform{public Vector2 anchoredPosition;}
     public class Sprite:Object{}
+    public struct Color
+    {
+        public float r,g,b,a;public Color(float r,float g,float b,float a=1){this.r=r;this.g=g;this.b=b;this.a=a;}
+        public static Color white {get{return new Color(1,1,1,1);}}
+    }
     public struct Vector2
     {
         public float x,y;public Vector2(float x,float y){this.x=x;this.y=y;}
@@ -98,7 +103,7 @@ namespace UnityEngine.UI
 {
     public class Selectable:UnityEngine.MonoBehaviour{}
     public class Button:Selectable{}
-    public class Text:UnityEngine.MonoBehaviour{public string text;}
+    public class Text:UnityEngine.MonoBehaviour{public string text;public UnityEngine.Color color=UnityEngine.Color.white;}
     public class InputField:Selectable{public string text;}
     public class Image:UnityEngine.MonoBehaviour{public UnityEngine.Sprite sprite;}
 }

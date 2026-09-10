@@ -1,0 +1,15 @@
+<IfModule mod_php.c>
+php_value upload_max_filesize 12M
+php_value post_max_size 14M
+</IfModule>
+
+# Server-side account/role state is not a public download.
+<FilesMatch "^(users|admin_config|game_admins)\.json(\..*)?$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
