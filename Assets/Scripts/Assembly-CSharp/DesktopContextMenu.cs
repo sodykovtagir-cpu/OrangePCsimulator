@@ -45,6 +45,8 @@ namespace PC.Component.Software
         private float pointerDownTime;
         private Vector2 pointerDownPos;
         private bool isPointerDown;
+        private int activePointerId;
+        private RenderMode pointerDownRenderMode;
 
         private const float longPressDuration = PointerInput.LongPress;
         private const float pointerMoveThreshold = PointerInput.Slop;
@@ -77,6 +79,7 @@ namespace PC.Component.Software
 
         private void OnDisable()
         {
+            isPointerDown = false;
             CloseMenu();
         }
 
@@ -150,9 +153,16 @@ namespace PC.Component.Software
             return os != null && os != operatingSystem;
         }
 
+        public bool CanReceivePointer(Vector2 screenPos)
+        {
+            EnsureRefs();
+            return PointerHitsThisOs(screenPos);
+        }
+
         private bool PointerHitsThisOs(Vector2 screenPos)
         {
             var results = RaycastAt(screenPos);
+            if (PointerInput.HasBlockingGameControls(results)) return false;
             for (int i = 0; i < results.Count; i++)
             {
                 var go = results[i].gameObject;
@@ -184,7 +194,7 @@ namespace PC.Component.Software
         private bool CanOpenMenuAt(Vector2 screenPos)
         {
             var results = RaycastAt(screenPos);
-            if (results.Count == 0)
+            if (results.Count == 0 || PointerInput.HasBlockingGameControls(results))
                 return false;
 
             for (int i = 0; i < results.Count; i++)
@@ -194,7 +204,7 @@ namespace PC.Component.Software
                     continue;
 
                 if (IsForeignOs(go))
-                    continue;
+                    return false;
 
                 if (IsMenuElement(go))
                     return false;
@@ -226,7 +236,7 @@ namespace PC.Component.Software
 
         private void OpenContextAt(Vector2 screenPos)
         {
-            if (IsPointerOverMenu(screenPos))
+            if (!PointerHitsThisOs(screenPos) || IsPointerOverMenu(screenPos))
                 return;
 
             var icon = FindFileIconAt(screenPos);
@@ -282,14 +292,20 @@ namespace PC.Component.Software
                 return;
             }
 
-            if (isPointerDown && Time.unscaledTime - pointerDownTime > longPressDuration)
+            if (!isPointerDown) return;
+            Vector2 current;
+            if (DesktopIconDragger.IsDragging || canvas == null || canvas.renderMode != pointerDownRenderMode ||
+                !PointerInput.TryGetHeldPosition(activePointerId, out current) ||
+                Vector2.Distance(current, pointerDownPos) >= pointerMoveThreshold || !PointerHitsThisOs(current))
             {
-                if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
-                {
-                    isPointerDown = false;
-                    PointerInput.ConsumedClick = true;
-                    ShowDesktopMenu(pointerDownPos, true);
-                }
+                isPointerDown = false;
+                return;
+            }
+            if (Time.unscaledTime - pointerDownTime > longPressDuration)
+            {
+                isPointerDown = false;
+                PointerInput.ConsumedClick = true;
+                ShowDesktopMenu(current, true);
             }
         }
 
@@ -298,14 +314,18 @@ namespace PC.Component.Software
             if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            EnsureRefs();
+            if (canvas == null || !PointerHitsThisOs(eventData.position) || !CanOpenMenuAt(eventData.position)) return;
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = PointerInput.ScreenPosition();
+            pointerDownPos = eventData.position;
+            activePointerId = eventData.pointerId;
+            pointerDownRenderMode = canvas.renderMode;
             isPointerDown = true;
         }
 
         public void OnPointerUp(PointerEventData eventData)
         {
-            isPointerDown = false;
+            if (eventData == null || eventData.pointerId == activePointerId) isPointerDown = false;
         }
 
         public void ShowDesktopMenu(Vector2 screenPos)
@@ -413,7 +433,7 @@ namespace PC.Component.Software
         private bool PrepareMenu(Vector2 screenPos, bool skipDesktopCheck)
         {
             EnsureRefs();
-            if (canvas == null || operatingSystem == null)
+            if (canvas == null || operatingSystem == null || !PointerHitsThisOs(screenPos))
                 return false;
 
             if (!skipDesktopCheck && !CanOpenMenuAt(screenPos))

@@ -18,6 +18,7 @@ namespace PC.Component.Software
         private float pointerDownTime;
         private Vector2 pointerDownPos;
         private bool isPointerDown;
+        private int activePointerId;
         private bool openedMenu;
 
         private const float longPressDuration = PointerInput.LongPress;
@@ -80,15 +81,21 @@ namespace PC.Component.Software
                 return;
             }
 
-            if (Time.unscaledTime - pointerDownTime > longPressDuration
-                && Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) < pointerMoveThreshold)
+            Vector2 current;
+            if (!PointerInput.TryGetHeldPosition(activePointerId, out current) ||
+                Vector2.Distance(current, pointerDownPos) >= pointerMoveThreshold)
+            {
+                isPointerDown = false;
+                return;
+            }
+            if (Time.unscaledTime - pointerDownTime > longPressDuration)
             {
                 openedMenu = true;
                 isPointerDown = false;
                 PointerInput.ConsumedClick = true;
                 var menu = DesktopContextMenu.For(this);
                 if (menu != null && File != null)
-                    menu.ShowFileMenu(File, PointerInput.ScreenPosition());
+                    menu.ShowFileMenu(File, current);
             }
         }
 
@@ -97,6 +104,9 @@ namespace PC.Component.Software
             if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null && !menu.CanReceivePointer(eventData.position)) return;
+            activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             pointerDownTime = Time.unscaledTime;
             pointerDownPos = eventData.position;
@@ -106,7 +116,13 @@ namespace PC.Component.Software
 
         public void OnPointerUp(PointerEventData eventData)
         {
+            if (eventData == null || eventData.pointerId == activePointerId) isPointerDown = false;
+        }
+
+        private void OnDisable()
+        {
             isPointerDown = false;
+            openedMenu = false;
         }
 
         public void OnPointerClick(PointerEventData eventData)
