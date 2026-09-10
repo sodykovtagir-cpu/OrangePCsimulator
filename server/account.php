@@ -18,6 +18,8 @@ header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+require_once __DIR__ . '/game_roles.php';
+
 $cfgPath = __DIR__ . '/config.php';
 if (is_file($cfgPath)) require $cfgPath;
 
@@ -275,7 +277,7 @@ if ($action === 'verify' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($client !== '') $u['client'] = $client;
     save_users($users);
 
-    json_out(['ok' => true, 'token' => $u['token'], 'name' => $u['name'], 'email' => $u['email'], 'tg_bonus' => !empty($u['tg_bonus'])]);
+    json_out(['ok' => true, 'token' => $u['token'], 'name' => $u['name'], 'email' => $u['email'], 'tg_bonus' => !empty($u['tg_bonus']), 'is_admin' => game_is_admin_user($u)]);
 }
 
 // ================= LOGIN =================
@@ -295,7 +297,7 @@ if ($action === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($client !== '') $u['client'] = $client;
     save_users($users);
 
-    json_out(['ok' => true, 'token' => $u['token'], 'name' => $u['name'], 'email' => $u['email'], 'tg_bonus' => !empty($u['tg_bonus'])]);
+    json_out(['ok' => true, 'token' => $u['token'], 'name' => $u['name'], 'email' => $u['email'], 'tg_bonus' => !empty($u['tg_bonus']), 'is_admin' => game_is_admin_user($u)]);
 }
 
 // ================= RESEND =================
@@ -352,6 +354,7 @@ if ($action === 'me' && ($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUE
         'tg' => $u['tg_username'],
         'tg_bonus' => !empty($u['tg_bonus']),
         'verified' => !empty($u['verified']),
+        'is_admin' => game_is_admin_user($u),
         'saves' => $mine,
     ]);
 }

@@ -24,7 +24,7 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Button purchaseButton;
 
-		[Tooltip("Галочка «HD»: баннер 128×280 за доплату 500$ (обычный 32×70 за 200$).")]
+		[Tooltip("Галочка «HD»: баннер 1024×2240 за доплату 500$ (обычный 32×70 за 200$).")]
 		[SerializeField]
 		private Toggle hdToggle;
 
@@ -59,11 +59,11 @@ namespace PC.Component.Software
 		private const int bannerPrice = 200;
 		private const int hdSurcharge = 500;
 
-		// Обычный баннер 32×70, HD — в 4 раза больше (128×280).
+		// Обычный баннер 32×70, HD — в 32 раза больше (1024×2240).
 		private const int bannerW = 32;
 		private const int bannerH = 70;
-		private const int bannerHdW = 128;
-		private const int bannerHdH = 280;
+		private const int bannerHdW = 1024;
+		private const int bannerHdH = 2240;
 
 		private bool Hd => hdToggle != null && hdToggle.isOn;
 		private int CurrentPrice => bannerPrice + (Hd ? hdSurcharge : 0);
