@@ -1559,14 +1559,14 @@ MonoBehaviour:
   - {fileID: 5153882632747095219}
   - {fileID: 4243483032158242128}
   - {fileID: 4181002873266272933}
+  - {fileID: 3202623659170792719}
   coverPrefabs:
   - {fileID: 114587765826080250, guid: 63af6dedbd48085478325b11f73c9599, type: 3}
   - {fileID: 5876943280706620454, guid: c3d7ff3a6ade71e449764205a096c397, type: 3}
   - {fileID: 114243736805655561, guid: 0b37984ec900a4c4090ac559fc2d1fee, type: 3}
   - {fileID: 114243736805655561, guid: 0b3d38ef5e0c6564f8d6915b6dc929cf, type: 3}
-  - {fileID: 114243736805655561, guid: 0b3d38ef5e0c6564f8d6915b6dc929cf, type: 3}
   - {fileID: 7478285624938629712, guid: 70b17a2c496781b41b4f72d1f326cdbd, type: 3}
-  prices: 7800000064000000500000003c000000
+  prices: 7800000064000000500000003c00000078000000
   hdToggle: {fileID: 2523725324171538780}
   hdSurcharge: 500
   previewImage: {fileID: 1514223044237218433}
@@ -2645,7 +2645,7 @@ MonoBehaviour:
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 3
+          m_IntArgument: 4
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0

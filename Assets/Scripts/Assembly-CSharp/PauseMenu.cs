@@ -46,9 +46,9 @@ public class PauseMenu : MonoBehaviour
 
             if (cam != null)
             {
-                float fov = PlayerPrefs.GetFloat("FOV", cam.fieldOfView);
+                float fov = FieldOfViewSettings.ReadSaved(cam.fieldOfView);
                 cam.fieldOfView = fov;
-                fovSlider.value = fov;
+                fovSlider.SetValueWithoutNotify(fov);
             }
         }
 
@@ -113,6 +113,7 @@ public class PauseMenu : MonoBehaviour
     public void OnFOVChanged(float value)
     {
         Camera cam = Camera.main;
+        value = FieldOfViewSettings.Sanitize(value, cam != null ? cam.fieldOfView : FieldOfViewSettings.Default);
 
         if (cam != null)
             cam.fieldOfView = value;
@@ -121,7 +122,7 @@ public class PauseMenu : MonoBehaviour
         PlayerPrefs.Save();
 
         var t = Localization.GetText("FOV");
-        fovText.text = t + ": " + value.ToString("0");
+        if (fovText != null) fovText.text = t + ": " + value.ToString("0");
     }
 
     public void Restart()
@@ -133,6 +134,6 @@ public class PauseMenu : MonoBehaviour
 	{
 		if (volumeSlider != null) PlayerPrefs.SetFloat("Volume", volumeSlider.value);
 		if (sensitivitySlider != null) PlayerPrefs.SetFloat("Sensitivity", sensitivitySlider.value);
-        if (fovSlider != null) PlayerPrefs.SetFloat("FOV", fovSlider.value);
+        // FOV is saved on change; an unopened menu must not overwrite it on destroy.
     }
 }
