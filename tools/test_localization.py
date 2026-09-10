@@ -93,6 +93,11 @@ def main():
         assert item["m_Name"] == name and item["bitcoin"] == 5
         assert item["translateDescription"] == 1 and item["description"] in table
         assert item["itemName"].startswith("{") and item["itemName"][1:-1] in table
+    rotating = docs(ASSETS / "MonoBehaviour/RotatingDisplayStand.asset")[11400000][1]
+    assert rotating["m_Name"] == "RotatingDisplayStand" and rotating["price"] == 150 and rotating["bitcoin"] == 0
+    assert rotating["itemName"] == "{Rotating Display Stand}" and rotating["translateDescription"] == 1
+    assert rotating["description"] in table
+    assert table["Rotating Display Stand"][languages.index("RU")] == "Вращающийся стенд"
     assert "128x720" not in (ASSETS / "Resources/apps/Paint.prefab").read_text()
     assert "up to 1024x1024" not in (ASSETS / "GameObject/PrintExpert.prefab").read_text()
     assert "up to 1024x1024" not in (ASSETS / "GameObject/ModForge.prefab").read_text()
