@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: ATX_Aquarium_black
   m_EditorClassIdentifier: 
-  itemName: Aquarium (ATX)
+  itemName: '{Aquarium (ATX)}'
   price: 60
   bitcoin: 5
   sprite: {fileID: 21300000, guid: c6bad9cdeaf782f40ad4ea3abba03ae9, type: 3}

@@ -131,7 +131,7 @@ namespace PC.Component.Software
 			if (tex.width != needW || tex.height != needH)
 			{
 				if (alertText != null)
-					alertText.text = string.Format("Only supports {0}x{1} resolution", needW, needH);
+					alertText.text = string.Format(Localization.GetText("Only supports {0}x{1} resolution"), needW, needH);
 				Destroy(tex);
 				return;
 			}
@@ -146,7 +146,7 @@ namespace PC.Component.Software
 			int price = CurrentPrice;
 			if (m.Money < price)
 			{
-				m.FadeText("<color=red>" + "Not enough cash" + "</color>");
+				m.FadeText("<color=red>" + Localization.GetText("Not enough cash") + "</color>");
 				Destroy(tex);
 				return;
 			}
@@ -186,7 +186,7 @@ namespace PC.Component.Software
 			}
 			catch (System.FormatException)
 			{
-				if (alertText != null) alertText.text = "Invalid picture";
+				if (alertText != null) alertText.text = Localization.GetText("Invalid picture");
 				return null;
 			}
 		}

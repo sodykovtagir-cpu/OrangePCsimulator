@@ -26,7 +26,7 @@ namespace PC.Component.Software
         [SerializeField]
         private InputField passwordInput;
 
-        private readonly string[] fitLabels = { "Заполнить", "Вписать", "Растянуть", "Центр", "Плитка" };
+        private readonly string[] fitLabels = { "Wallpaper Fill", "Wallpaper Fit", "Wallpaper Stretch", "Wallpaper Center", "Wallpaper Tile" };
 
         [Header("Назначьте в инспекторе")]
         [Tooltip("Выпадающий список режима заполнения обоев (Fill/Fit/Stretch/Center/Tile).")]
@@ -36,6 +36,7 @@ namespace PC.Component.Software
         protected override void Start()
         {
             base.Start();
+            Localization.LanguageChanged += RefreshLocalizedLabels;
             RefreshPicture();
 
             var os = system as GameOS;
@@ -124,7 +125,9 @@ namespace PC.Component.Software
             if (fitDropdown == null) return;
 
             fitDropdown.ClearOptions();
-            fitDropdown.AddOptions(new List<string>(fitLabels));
+            var labels = new List<string>();
+            foreach (var key in fitLabels) labels.Add(Localization.GetText(key));
+            fitDropdown.AddOptions(labels);
 
             var os = system as GameOS;
             int current = os != null ? Mathf.Clamp(os.WallpaperMode, 0, fitLabels.Length - 1) : 0;
@@ -132,6 +135,17 @@ namespace PC.Component.Software
 
             fitDropdown.onValueChanged.RemoveAllListeners();
             fitDropdown.onValueChanged.AddListener(OnFitDropdownChanged);
+        }
+
+        private void RefreshLocalizedLabels()
+        {
+            RefreshPicture();
+            InitWallpaperFitDropdown();
+        }
+
+        private void OnDestroy()
+        {
+            Localization.LanguageChanged -= RefreshLocalizedLabels;
         }
 
         private void OnFitDropdownChanged(int index)
@@ -252,7 +266,7 @@ namespace PC.Component.Software
 
                 os.ImportWallpaperFromDevice(bytes);
 
-            }, "Выберите изображение", "image/*");
+            }, Localization.GetText("Select image"), "image/*");
         }
 
         private IEnumerator DisableInput(InputField input)

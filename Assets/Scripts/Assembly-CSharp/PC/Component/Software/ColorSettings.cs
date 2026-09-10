@@ -94,10 +94,8 @@ namespace PC.Component.Software
 				}
 			}
 
-			var timeLabel = Localization.GetText("Time");
-			var typeLabel = Localization.GetText("Type");
-			if (timePreview != null) timePreview.text = timeLabel + ": " + animationPreview.time.ToString("0.#") + "s";
-			if (typePreview != null) typePreview.text = typeLabel + ": " + ((Led.LedAnimation.FadeType)animationPreview.type).ToString();
+			if (timePreview != null) timePreview.text = string.Format(Localization.GetText("Time: {0}s"), animationPreview.time.ToString("0.#"));
+			if (typePreview != null) typePreview.text = string.Format(Localization.GetText("Type: {0}"), Localization.GetText(((Led.LedAnimation.FadeType)animationPreview.type).ToString()));
 
 			if (example != null) example.SetActive(true);
 			if (advanced != null) advanced.SetActive(false);
@@ -197,8 +195,7 @@ namespace PC.Component.Software
 			if (t != null)
 			{
 				var v = value.ToString("0.#");
-				var label = Localization.GetText("Time");
-				t.text = label + ": " + v + "s";
+				t.text = string.Format(Localization.GetText("Time: {0}s"), v);
 			}
 		}
 
@@ -206,8 +203,7 @@ namespace PC.Component.Software
 		{
 			var val = (Led.LedAnimation.FadeType)System.Enum.Parse(typeof(Led.LedAnimation.FadeType), type);
 			animationPreview.type = val;
-			var label = Localization.GetText("Type");
-			if (typePreview != null) typePreview.text = label + ": " + type;
+			if (typePreview != null) typePreview.text = string.Format(Localization.GetText("Type: {0}"), Localization.GetText(type));
 		}
 
 		public void OtherLed(int value)

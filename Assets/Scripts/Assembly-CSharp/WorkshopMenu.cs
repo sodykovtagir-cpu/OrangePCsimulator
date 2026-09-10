@@ -182,7 +182,7 @@ public class WorkshopMenu : MonoBehaviour
 	private void RefreshSortLabels()
 	{
 		if (sortLabel != null) sortLabel.text = SortName();
-		if (orderLabel != null) orderLabel.text = ascending ? "↑ asc" : "↓ desc";
+		if (orderLabel != null) orderLabel.text = ascending ? "↑ " + Tr("Ascending") : "↓ " + Tr("Descending");
 	}
 
 	private string SortName()

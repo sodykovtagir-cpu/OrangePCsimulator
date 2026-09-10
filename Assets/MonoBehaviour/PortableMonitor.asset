@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: PortableMonitor
   m_EditorClassIdentifier:
-  itemName: Portable Monitor
+  itemName: '{Portable Monitor}'
   price: 250
   bitcoin: 5
   sprite: {fileID: 21300000, guid: a5c2dfe27db984449bb1cd2930227992, type: 3}
   spawn: {fileID: 1526699019895958, guid: e1a2497781be7734cb396c570b2e28b6, type: 3}
   large: 1
-  translateDescription: 0
+  translateDescription: 1
   description: Compact portable monitor.

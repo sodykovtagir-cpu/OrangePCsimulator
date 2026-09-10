@@ -321,17 +321,17 @@ namespace PC.Component.Software
             if (!PrepareMenu(screenPos, skipDesktopCheck))
                 return;
 
-            AddMenuItem(menuPanel, "Автоупорядочить", AutoArrangeIcons);
-            AddMenuItemWithSubmenu(menuPanel, "Упорядочить по", new (string, System.Action)[] {
-                ("По названию", () => SortIcons(SortMode.Name)),
-                ("По размеру", () => SortIcons(SortMode.Size)),
-                ("По типу", () => SortIcons(SortMode.Type))
+            AddMenuItem(menuPanel, Localization.GetText("Auto arrange"), AutoArrangeIcons);
+            AddMenuItemWithSubmenu(menuPanel, Localization.GetText("Sort by"), new (string, System.Action)[] {
+                (Localization.GetText("By name"), () => SortIcons(SortMode.Name)),
+                (Localization.GetText("By size"), () => SortIcons(SortMode.Size)),
+                (Localization.GetText("By type"), () => SortIcons(SortMode.Type))
             });
             AddCreateSubmenu(menuPanel, "");
             if (operatingSystem != null && operatingSystem.HasClipboard)
-                AddMenuItem(menuPanel, "Вставить", () => operatingSystem.PasteClipboard(""));
-            AddMenuItem(menuPanel, "Обновить", RefreshDesktop);
-            AddMenuItem(menuPanel, "Персонализация", OpenPersonalization);
+                AddMenuItem(menuPanel, Localization.GetText("Paste"), () => operatingSystem.PasteClipboard(""));
+            AddMenuItem(menuPanel, Localization.GetText("Refresh"), RefreshDesktop);
+            AddMenuItem(menuPanel, Localization.GetText("Personalization"), OpenPersonalization);
 
             PositionMenu(menuRect, screenPos);
         }
@@ -345,7 +345,7 @@ namespace PC.Component.Software
             if (!PrepareMenu(screenPos, true))
                 return;
 
-            AddMenuItem(menuPanel, "Открыть", () =>
+            AddMenuItem(menuPanel, Localization.GetText("Open"), () =>
             {
                 if (operatingSystem == null) return;
                 operatingSystem.OpenFile(file);
@@ -361,24 +361,24 @@ namespace PC.Component.Software
                     {
                         var app = apps[i];
                         if (app == null) continue;
-                        items.Add((app.AppName, () => operatingSystem.OpenFileWith(file, app)));
+                        items.Add((Localization.GetText(app.AppName), () => operatingSystem.OpenFileWith(file, app)));
                     }
 
                     if (items.Count > 0)
-                        AddMenuItemWithSubmenu(menuPanel, "Открыть с помощью", items.ToArray());
+                        AddMenuItemWithSubmenu(menuPanel, Localization.GetText("Open with"), items.ToArray());
                 }
             }
 
             if (operatingSystem.CanCopyFile(file))
-                AddMenuItem(menuPanel, "Скопировать", () => operatingSystem.CopyToClipboard(file));
+                AddMenuItem(menuPanel, Localization.GetText("Copy"), () => operatingSystem.CopyToClipboard(file));
 
             bool protect = operatingSystem.IsProtectedFile(file);
             if (!protect)
             {
-                AddMenuItem(menuPanel, "Вырезать", () => operatingSystem.CutToClipboard(file));
-                AddMenuItem(menuPanel, "Переименовать", () => ShowRenameDialog(file, screenPos), false);
-                AddMenuItem(menuPanel, "Скрыть", () => operatingSystem.HideUserFile(file));
-                AddMenuItem(menuPanel, "Удалить", () => operatingSystem.DeleteUserFile(file));
+                AddMenuItem(menuPanel, Localization.GetText("Cut"), () => operatingSystem.CutToClipboard(file));
+                AddMenuItem(menuPanel, Localization.GetText("Rename"), () => ShowRenameDialog(file, screenPos), false);
+                AddMenuItem(menuPanel, Localization.GetText("Hide"), () => operatingSystem.HideUserFile(file));
+                AddMenuItem(menuPanel, Localization.GetText("Delete"), () => operatingSystem.DeleteUserFile(file));
             }
 
             PositionMenu(menuRect, screenPos);
@@ -395,18 +395,18 @@ namespace PC.Component.Software
             string folder = explorer.CurrentFolder ?? "";
             AddCreateSubmenu(menuPanel, folder);
             if (operatingSystem != null && operatingSystem.HasClipboard)
-                AddMenuItem(menuPanel, "Вставить", () => operatingSystem.PasteClipboard(folder));
-            AddMenuItem(menuPanel, "Обновить", () => explorer.RefreshView());
+                AddMenuItem(menuPanel, Localization.GetText("Paste"), () => operatingSystem.PasteClipboard(folder));
+            AddMenuItem(menuPanel, Localization.GetText("Refresh"), () => explorer.RefreshView());
 
             PositionMenu(menuRect, screenPos);
         }
 
         private void AddCreateSubmenu(GameObject parent, string folder)
         {
-            AddMenuItemWithSubmenu(parent, "Создать", new (string, System.Action)[] {
-                ("Текстовый документ", () => operatingSystem.CreateFileAt(folder, "Новый документ.txt", "")),
-                ("Папку", () => operatingSystem.CreateFolderAt(folder, "Новая папка")),
-                ("Lua-файл", () => operatingSystem.CreateFileAt(folder, "script.lua", "-- Lua script\n"))
+            AddMenuItemWithSubmenu(parent, Localization.GetText("Create"), new (string, System.Action)[] {
+                (Localization.GetText("Text document"), () => operatingSystem.CreateFileAt(folder, Localization.GetText("New document") + ".txt", "")),
+                (Localization.GetText("Folder"), () => operatingSystem.CreateFolderAt(folder, Localization.GetText("New Folder"))),
+                (Localization.GetText("Lua file"), () => operatingSystem.CreateFileAt(folder, "script.lua", "-- Lua script\n"))
             });
         }
 
@@ -659,7 +659,7 @@ namespace PC.Component.Software
             titleRt.sizeDelta = new Vector2(-16f, 22f);
             titleRt.anchoredPosition = new Vector2(0f, -6f);
             var title = titleGo.AddComponent<Text>();
-            title.text = "Переименовать";
+            title.text = Localization.GetText("Rename");
             title.font = MenuFont();
             title.fontSize = 14;
             title.color = Color.black;

@@ -98,7 +98,7 @@ public class ModForge : Website
         // принимаются только с галочкой HD.
         if (!Hd && (tex.width > 512 || tex.height > 512))
         {
-            if (priceText != null) priceText.text = "HD required";
+            if (priceText != null) priceText.text = Localization.GetText("HD required");
             tex.Apply(false, true);
             return;
         }
