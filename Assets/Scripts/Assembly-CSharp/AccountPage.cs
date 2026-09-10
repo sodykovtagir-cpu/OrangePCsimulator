@@ -62,6 +62,8 @@ public class AccountPage : MonoBehaviour
 	[SerializeField] private Text emailText;
 	[Tooltip("Заголовок над списком сейвов (опционально).")]
 	[SerializeField] private Text savesTitle;
+	[Tooltip("Authored label inside the saves viewport, outside the scrollable content.")]
+	[SerializeField] private Text savesStateText;
 	[Tooltip("Контейнер, куда спавнятся карточки ваших сейвов.")]
 	[SerializeField] private Transform savesList;
 	[Tooltip("Своя карточка сейва. Дети: Name/Title, Downloads, Likes, Description, Cover (RawImage), Delete (Button). Шаблон-ребёнок Template не удаляется.")]
@@ -87,6 +89,9 @@ public class AccountPage : MonoBehaviour
 	private bool wired;
 	private bool subscribed;
 	private bool opened;
+	private bool profileLoading;
+	private bool profileLoadFailed;
+	private string profileRequestToken;
 
 	private static AccountPage instance;
 	public static AccountPage Instance { get { return instance; } }
@@ -371,15 +376,15 @@ public class AccountPage : MonoBehaviour
 		if (chipText == null && chipButton != null)
 			chipText = chipButton.GetComponentInChildren<Text>();
 		if (chipText == null) return;
-		string label = ServerAccounts.LoggedIn ? ServerAccounts.Name : Tr(NotLoggedChip);
-		if (string.IsNullOrEmpty(label)) label = Tr(NotLoggedChip);
+		string label = AccountProfileLabel.DisplayName();
 		chipText.text = label;
 		var loc = chipText.GetComponent<LocalizationText>();
 		if (loc != null) loc.enabled = false;
 		var anim = chipText.GetComponent<TextAnimation>();
 		if (anim != null)
 		{
-			anim.ResetText();
+			// Disabling a MonoBehaviour does not stop an already-running coroutine.
+			anim.StopAllCoroutines();
 			anim.enabled = false;
 		}
 	}
@@ -391,9 +396,11 @@ public class AccountPage : MonoBehaviour
 		var loc = target.GetComponent<LocalizationText>();
 		if (loc != null) loc.enabled = false;
 		var anim = target.GetComponent<TextAnimation>();
-		if (anim != null) anim.enabled = false;
-		if (target.GetComponent<AccountChipKeep>() == null)
-			target.AddComponent<AccountChipKeep>();
+		if (anim != null)
+		{
+			anim.StopAllCoroutines();
+			anim.enabled = false;
+		}
 	}
 
 	private void Refresh()
@@ -407,15 +414,17 @@ public class AccountPage : MonoBehaviour
 		if (verifyGroup != null)   verifyGroup.SetActive(!logged && mode == Mode.Verify);
 		if (homeGroup != null)     homeGroup.SetActive(logged && mode == Mode.Home);
 
+		if (savesTitle != null) savesTitle.text = Tr("Saves");
 		if (!logged)
 		{
+			if (savesStateText != null) savesStateText.gameObject.SetActive(false);
 			SetStatus(mode == Mode.Register ? Tr("Create your account with email.") :
 			          mode == Mode.Verify ? Tr("Code sent to your email.") : Tr("Sign in to sync your profile."));
 			return;
 		}
 
 		if (nameText != null)  nameText.text = ServerAccounts.Name;
-		if (emailText != null) emailText.text = ServerAccounts.Email;
+		if (emailText != null) emailText.text = AccountProfileLabel.MaskEmail(ServerAccounts.Email);
 		if (bonusText != null)
 			bonusText.text = ServerAccounts.BonusClaimed
 				? Tr("Telegram bonus already claimed.")
@@ -430,16 +439,18 @@ public class AccountPage : MonoBehaviour
 		{
 			var ch = savesList.GetChild(i);
 			if (IsSaveTemplate(ch.gameObject)) continue;
+			ch.gameObject.SetActive(false);
 			Destroy(ch.gameObject);
 		}
 
 		var my = ServerAccounts.MySaves;
 		if (my == null || my.Count == 0)
 		{
-			ShowEmptySaves();
+			ShowSavesState();
 			return;
 		}
 
+		if (savesStateText != null) savesStateText.gameObject.SetActive(false);
 		foreach (var s in my)
 			SpawnSaveCard(s);
 	}
@@ -451,45 +462,13 @@ public class AccountPage : MonoBehaviour
 		return n == "Template" || n == "SaveCard" || n == "Card" || n.EndsWith("(Template)");
 	}
 
-	private void EnsureSavesLayout()
+	private void ShowSavesState()
 	{
-		var v = savesList.GetComponent<VerticalLayoutGroup>();
-		if (v == null)
-		{
-			v = savesList.gameObject.AddComponent<VerticalLayoutGroup>();
-			v.spacing = 8f;
-			v.padding = new RectOffset(8, 8, 8, 8);
-			v.childAlignment = TextAnchor.UpperLeft;
-			v.childControlWidth = true;
-			v.childControlHeight = false;
-			v.childForceExpandWidth = true;
-			v.childForceExpandHeight = false;
-		}
-		var fitter = savesList.GetComponent<ContentSizeFitter>();
-		if (fitter == null)
-		{
-			fitter = savesList.gameObject.AddComponent<ContentSizeFitter>();
-			fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-			fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-		}
-	}
-
-	private void ShowEmptySaves()
-	{
-		var empty = MakeText(savesList, "Empty", Tr("You haven't published any saves yet."), TextAnchor.MiddleLeft, 18, new Color(0.75f, 0.75f, 0.75f));
-		empty.horizontalOverflow = HorizontalWrapMode.Wrap;
-		empty.verticalOverflow = VerticalWrapMode.Overflow;
-		empty.resizeTextForBestFit = false;
-		var rt = empty.rectTransform;
-		rt.anchorMin = new Vector2(0f, 1f);
-		rt.anchorMax = new Vector2(1f, 1f);
-		rt.pivot = new Vector2(0.5f, 1f);
-		rt.offsetMin = new Vector2(8f, -80f);
-		rt.offsetMax = new Vector2(-8f, -8f);
-		var le = empty.gameObject.AddComponent<LayoutElement>();
-		le.minHeight = 48f;
-		le.preferredHeight = 48f;
-		le.flexibleWidth = 1f;
+		if (savesStateText == null) return;
+		savesStateText.text = profileLoadFailed ? Tr("Could not load saves. Try again.")
+			: !ServerAccounts.SavesLoaded ? Tr("Loading...")
+			: Tr("You haven't published any saves yet.");
+		savesStateText.gameObject.SetActive(true);
 	}
 
 	private void SpawnSaveCard(AccountSaveItem s)
@@ -507,19 +486,9 @@ public class AccountPage : MonoBehaviour
 			}
 		}
 
-		if (row == null)
-		{
-			row = new GameObject("row_" + s.id, typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(Image), typeof(LayoutElement));
-			row.transform.SetParent(savesList, false);
-			row.GetComponent<Image>().color = new Color(0.14f, 0.14f, 0.14f, 1f);
-			var h = row.GetComponent<HorizontalLayoutGroup>();
-			h.spacing = 6; h.padding = new RectOffset(8, 8, 4, 4); h.childForceExpandWidth = true;
-			row.GetComponent<LayoutElement>().minHeight = 40f;
-			var title = MakeText(row.transform, "Name", "", TextAnchor.MiddleLeft, 16, Color.white);
-			title.horizontalOverflow = HorizontalWrapMode.Wrap;
-			title.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-			MakeRowButton(row.transform, "Delete", () => { }, 80f);
-		}
+		// UI is authored in the prefab/inspector; never build a fallback row in code.
+		if (row == null) return;
+		row.SetActive(true);
 
 		row.name = "row_" + s.id;
 		WireSaveCard(row.transform, s);
@@ -541,7 +510,7 @@ public class AccountPage : MonoBehaviour
 
 	private void WireSaveCard(Transform t, AccountSaveItem s)
 	{
-		string title = string.IsNullOrEmpty(s.title) ? ("Save #" + s.id) : s.title;
+		string title = string.IsNullOrEmpty(s.title) ? Tr("Save #{0}", s.id) : s.title;
 		SetChildText(t, "Name", title);
 		SetChildText(t, "Title", title);
 		SetChildText(t, "Downloads", s.downloads.ToString());
@@ -583,22 +552,6 @@ public class AccountPage : MonoBehaviour
 		if (c == null) return;
 		var tx = c.GetComponent<Text>();
 		if (tx != null) tx.text = value;
-	}
-
-	private void MakeRowButton(Transform parent, string label, UnityEngine.Events.UnityAction click, float width)
-	{
-		var go = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
-		go.transform.SetParent(parent, false);
-		go.GetComponent<Image>().color = new Color(0.8f, 0.2f, 0.2f, 1f);
-		var le = go.AddComponent<LayoutElement>();
-		le.preferredWidth = width; le.preferredHeight = 30f;
-		var tx = MakeText(go.transform, "Label", label, TextAnchor.MiddleCenter, 13, Color.white);
-		var trt = tx.rectTransform;
-		trt.anchorMin = Vector2.zero;
-		trt.anchorMax = Vector2.one;
-		trt.offsetMin = Vector2.zero;
-		trt.offsetMax = Vector2.zero;
-		go.GetComponent<Button>().onClick.AddListener(click);
 	}
 
 	// ================= Actions =================
@@ -702,17 +655,38 @@ public class AccountPage : MonoBehaviour
 
 	private void LoadMe()
 	{
+		string requestedToken = ServerAccounts.Token;
+		if (string.IsNullOrEmpty(requestedToken)) return;
+		if (profileLoading && profileRequestToken == requestedToken) return;
 		var wc = Net();
-		if (wc == null) return;
-		wc.AccountMe(ServerAccounts.Token, (r, err) =>
+		if (wc == null)
 		{
-			if (r == null || !r.ok) return;
-			ServerAccounts.SetSession(ServerAccounts.Token, r.name, r.email);
-			if (r.tg_bonus) ServerAccounts.SetBonusClaimed();
-			var list = r.saves != null ? new System.Collections.Generic.List<AccountSaveItem>(r.saves) : new System.Collections.Generic.List<AccountSaveItem>();
-			ServerAccounts.SetSaves(list);
-			if (opened || (page != null && page.activeSelf)) Refresh();
-			else RefreshChip();
+			profileLoadFailed = true;
+			if (opened) RebuildSaves();
+			return;
+		}
+		profileLoading = true;
+		profileLoadFailed = false;
+		profileRequestToken = requestedToken;
+		if (opened) RebuildSaves();
+		wc.AccountMe(requestedToken, (r, err) =>
+		{
+			// Do not restore another account after logout or an account switch.
+			if (this == null || !ServerAccounts.IsCurrentSession(requestedToken) || profileRequestToken != requestedToken) return;
+			profileLoading = false;
+			profileRequestToken = null;
+			if (r != null && !r.ok && r.error == "no session")
+			{
+				ServerAccounts.Clear();
+				SetMode(Mode.Login);
+				SetStatus(Tr("Session expired. Sign in again."));
+				return;
+			}
+			if (err != null || !ServerAccounts.TryApplyProfile(requestedToken, r))
+			{
+				profileLoadFailed = true;
+				if (opened || (page != null && page.activeSelf)) Refresh();
+			}
 		});
 	}
 
@@ -760,7 +734,11 @@ public class AccountPage : MonoBehaviour
 
 	private void DoLogout()
 	{
-		WorkshopClient.Instance.AccountLogout(ServerAccounts.Token, (err) => { });
+		var client = WorkshopClient.Instance;
+		if (client != null) client.AccountLogout(ServerAccounts.Token, (err) => { });
+		profileLoading = false;
+		profileLoadFailed = false;
+		profileRequestToken = null;
 		ServerAccounts.Clear();
 		SetMode(Mode.Login);
 		RefreshChip();
@@ -791,34 +769,4 @@ public class AccountPage : MonoBehaviour
 		Debug.Log("[Account] " + s);
 	}
 
-	// ================= UI widgets =================
-
-	private static Text MakeText(Transform parent, string name, string content, TextAnchor anchor, int fontSize, Color color)
-	{
-		var go = new GameObject(name, typeof(RectTransform), typeof(Text));
-		go.transform.SetParent(parent, false);
-		var tx = go.GetComponent<Text>();
-		tx.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-		tx.fontSize = fontSize;
-		tx.color = color;
-		tx.alignment = anchor;
-		tx.text = content;
-		tx.raycastTarget = false;
-		var rt = go.GetComponent<RectTransform>();
-		rt.sizeDelta = new Vector2(380f, 26f);
-		return tx;
-	}
-}
-
-/// <summary>
-/// Чип лежит в Main: при уходе в настройки TextAnimation/локализация возвращают
-/// сценовую заглушку "User". OnEnable снова пишет имя аккаунта.
-/// </summary>
-public class AccountChipKeep : MonoBehaviour
-{
-	private void OnEnable()
-	{
-		var page = AccountPage.Instance;
-		if (page != null) page.RefreshChip();
-	}
 }

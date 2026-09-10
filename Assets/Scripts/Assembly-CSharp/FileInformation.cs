@@ -186,16 +186,11 @@ public class FileInformation : MonoBehaviour
 			if (next != null) next();
 			return;
 		}
-		WorkshopClient.Instance.AccountMe(ServerAccounts.Token, (r, err) =>
+		string requestedToken = ServerAccounts.Token;
+		WorkshopClient.Instance.AccountMe(requestedToken, (r, err) =>
 		{
-			if (r != null && r.ok)
-			{
-				ServerAccounts.SetSession(ServerAccounts.Token, r.name, r.email);
-				var list = r.saves != null
-					? new List<AccountSaveItem>(r.saves)
-					: new List<AccountSaveItem>();
-				ServerAccounts.SetSaves(list);
-			}
+			if (this == null || !ServerAccounts.IsCurrentSession(requestedToken)) return;
+			if (err == null) ServerAccounts.TryApplyProfile(requestedToken, r);
 			if (next != null) next();
 		});
 	}
