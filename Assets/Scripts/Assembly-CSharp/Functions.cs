@@ -117,7 +117,7 @@ public class Functions : MonoBehaviour
         }
         else
         {
-            float savedFov = PlayerPrefs.GetFloat("FOV", 60f);
+            float savedFov = FieldOfViewSettings.ReadSaved();
             cam.fieldOfView = savedFov;
 
             if (zoomImage != null)

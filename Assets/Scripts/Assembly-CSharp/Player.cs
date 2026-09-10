@@ -78,6 +78,11 @@ public class Player : MonoBehaviour
         if (cam != null)
         {
             cameraOld = cam.localPosition;
+            // PauseMenu may stay inactive for the entire session. Apply the saved
+            // FOV to the player camera before the first rendered frame instead.
+            var viewCamera = cam.GetComponent<Camera>();
+            if (viewCamera == null) viewCamera = cam.GetComponentInChildren<Camera>(true);
+            FieldOfViewSettings.ApplySaved(viewCamera);
         }
     }
 

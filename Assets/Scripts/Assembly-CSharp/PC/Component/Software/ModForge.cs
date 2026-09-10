@@ -85,7 +85,7 @@ public class ModForge : Website
 
     public void Purchase()
     {
-        if (selectedFile == null) return;
+        if (selectedFile == null || !HasProduct(selectedProduct)) return;
 
         int price = CurrentPrice();
         var m = Main.Instance;
@@ -129,8 +129,15 @@ public class ModForge : Website
         if (item != null) item.SetTexture(texture, bytes);
     }
 
+    private bool HasProduct(int index)
+    {
+        return coverPrefabs != null && prices != null && index >= 0 &&
+            index < coverPrefabs.Length && index < prices.Length && coverPrefabs[index] != null;
+    }
+
     public void SelectProduct(int index)
     {
+        if (!HasProduct(index)) return;
         selectedProduct = index;
         if (priceText != null) priceText.text = CurrentPrice().ToString() + "$";
         home.SetActive(false);

@@ -1565,9 +1565,8 @@ MonoBehaviour:
   - {fileID: 5876943280706620454, guid: c3d7ff3a6ade71e449764205a096c397, type: 3}
   - {fileID: 114243736805655561, guid: 0b37984ec900a4c4090ac559fc2d1fee, type: 3}
   - {fileID: 114243736805655561, guid: 0b3d38ef5e0c6564f8d6915b6dc929cf, type: 3}
-  - {fileID: 114243736805655561, guid: 0b3d38ef5e0c6564f8d6915b6dc929cf, type: 3}
   - {fileID: 7478285624938629712, guid: 70b17a2c496781b41b4f72d1f326cdbd, type: 3}
-  prices: 7800000064000000500000003c0000008c000000
+  prices: 7800000064000000500000003c00000078000000
   hdToggle: {fileID: 2523725324171538780}
   hdSurcharge: 500
   previewImage: {fileID: 1514223044237218433}
@@ -1795,6 +1794,7 @@ GameObject:
   - component: {fileID: 224693062532245359}
   - component: {fileID: 222630643969539439}
   - component: {fileID: 1326462314666388317}
+  - component: {fileID: 114574304967836189}
   m_Layer: 5
   m_Name: Name
   m_TagString: Untagged
@@ -3192,3 +3192,15 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &114574304967836189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1977153420339851}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b0e8336b8806994409313390467085e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
