@@ -152,7 +152,8 @@ namespace PC.Component.Software
 			if (panel != null) panel.SetActive(true);
 			var hint = Live(docsLanguageHint);
 			if (hint != null)
-				hint.text = Localization.GetLanguage() ?? "EN";
+				hint.text = string.Format(Localization.GetText("Documentation language: {0}"),
+                    string.Equals(Localization.GetLanguage(), "RU", StringComparison.OrdinalIgnoreCase) ? "RU" : "EN");
 		}
 
 		public void Run()
@@ -232,7 +233,7 @@ namespace PC.Component.Software
 			var picker = Live(iconPickerPanel);
 			if (picker == null)
 			{
-				AppendOut("Assign Icon Picker Panel: child of this window, not a Project prefab.");
+				AppendOut(Localization.GetText("Assign the icon picker panel in the inspector."));
 				return;
 			}
 			FillIconGrid();
@@ -263,9 +264,9 @@ namespace PC.Component.Software
 				}
 				catch (Exception ex)
 				{
-					AppendOut("icon: " + ex.Message);
+					AppendOut(string.Format(Localization.GetText("Could not load icon: {0}"), ex.Message));
 				}
-			}, "Icon", "image/*");
+			}, Localization.GetText("Select Icon"), "image/*");
 		}
 
 		void WriteCompiledExe()
@@ -291,7 +292,7 @@ namespace PC.Component.Software
 			system.FileManager.Write(0, path, json);
 			system.RefreshDesktopIcon();
 			filePath = path;
-			AppendOut("compiled " + path);
+			AppendOut(string.Format(Localization.GetText("Compiled: {0}"), path));
 			if (system != null) system.ShowMessageBox("Lua", path);
 		}
 

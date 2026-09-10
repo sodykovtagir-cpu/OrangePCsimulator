@@ -60,7 +60,7 @@ namespace PC.Component.Software.OS
 			{
 				if (!fm.Create(0, file))
 				{
-					sys.ShowMessageBox("Сохранение", "Не удалось сохранить файл. Проверьте свободное место на диске.");
+					sys.ShowMessageBox(Localization.GetText("Save failed"), Localization.GetText("Could not save the file. Check free disk space."));
 					return;
 				}
 				var go = gameObject;

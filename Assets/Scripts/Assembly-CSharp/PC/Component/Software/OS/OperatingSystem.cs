@@ -895,7 +895,7 @@ namespace PC.Component.Software.OS
                     return true;
                 }
 
-                ShowRequires(string.IsNullOrEmpty(name) ? "приложение" : name);
+                ShowRequires(string.IsNullOrEmpty(name) ? Localization.GetText("Application") : name);
                 return false;
             }
 
@@ -907,7 +907,7 @@ namespace PC.Component.Software.OS
             }
 
             var needed = FindAppForExtension(ext);
-            ShowRequires(needed != null ? needed.AppName : "приложение");
+            ShowRequires(needed != null ? needed.AppName : Localization.GetText("Application"));
             return false;
         }
 
@@ -930,8 +930,8 @@ namespace PC.Component.Software.OS
         public void ShowRequires(string appName)
         {
             if (string.IsNullOrEmpty(appName))
-                appName = "приложение";
-            ShowMessageBox("Ошибка", "Требует " + appName);
+                appName = Localization.GetText("Application");
+            ShowMessageBox(Localization.GetText("Error"), string.Format(Localization.GetText("Requires {0}"), Localization.GetText(appName)));
         }
 
         private bool OpenFolder(File folder)
@@ -1682,7 +1682,7 @@ namespace PC.Component.Software.OS
             var created = FileManager.Write(0, path, body);
             if (created == null)
             {
-                ShowMessageBox(name, "Не удалось создать файл.");
+                ShowMessageBox(name, Localization.GetText("Could not create the file."));
                 return;
             }
 
@@ -1699,7 +1699,7 @@ namespace PC.Component.Software.OS
             string path = UniquePath(CombinePath(folder, name));
             if (!FileManager.Create(0, File.MakeFolder(path)))
             {
-                ShowMessageBox(name, "Не удалось создать папку.");
+                ShowMessageBox(name, Localization.GetText("Could not create the folder."));
                 return;
             }
 
@@ -2163,7 +2163,7 @@ namespace PC.Component.Software.OS
 
                 var txt = btn.transform.GetChild(1).GetComponent<Text>();
                 if (txt != null)
-                    txt.text = appName;
+                    txt.text = Localization.GetText(appName);
 
                 btn.onClick.AddListener(() =>
                 {

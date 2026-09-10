@@ -153,7 +153,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   spawnId: StandMonitor
-  info: '{Monitor Stand}'
+  info: '{Stand Monitor}'
   match: 1
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0

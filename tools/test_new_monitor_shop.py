@@ -61,7 +61,7 @@ def main():
         assert item["m_Name"] == name
         keys.append(item["m_Name"])
         assert item["price"] == price and item["bitcoin"] == 5
-        assert item["large"] == 1 and item["translateDescription"] == 0
+        assert item["large"] == 1 and item["translateDescription"] == 1
         assert sum(ref["guid"] == item_guid for ref in monitor_page["item"]) == 1
         assert sum(ref["guid"] == item_guid for ref in market["items"]) == 1
         assert not any(ref["guid"] == item_guid for ref in (market["randomItems"] or []))

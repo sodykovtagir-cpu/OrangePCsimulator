@@ -24,6 +24,23 @@ namespace PC.Shop
 
         private Action<ShopItem> onBuy;
 
+        private void Awake()
+        {
+            Localization.LanguageChanged += RefreshLocalizedLabels;
+        }
+
+        private void OnDestroy()
+        {
+            Localization.LanguageChanged -= RefreshLocalizedLabels;
+        }
+
+        private void RefreshLocalizedLabels()
+        {
+            if (item == null) return;
+            if (nameText != null) nameText.text = Item.TranslateBracket(item.itemName);
+            UpdateButton();
+        }
+
         public void Init(ShopItem item)
         {
             this.item = item;

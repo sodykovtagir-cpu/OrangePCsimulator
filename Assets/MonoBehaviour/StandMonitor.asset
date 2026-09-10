@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: StandMonitor
   m_EditorClassIdentifier:
-  itemName: Stand Monitor
+  itemName: '{Stand Monitor}'
   price: 400
   bitcoin: 5
   sprite: {fileID: 21300000, guid: a0a0b23350403a54d9ff67391ccefd8f, type: 3}
   spawn: {fileID: 1526699019895958, guid: e0bed89c91e84b72b6d642b26724d453, type: 3}
   large: 1
-  translateDescription: 0
+  translateDescription: 1
   description: Floor-standing portrait monitor.

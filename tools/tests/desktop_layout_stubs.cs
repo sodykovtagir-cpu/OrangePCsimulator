@@ -192,3 +192,8 @@ namespace PC.Component.Software.OS
         public FileManager FileManager;
     }
 }
+
+public static class Localization
+{
+    public static string GetText(string key) { return key; }
+}
