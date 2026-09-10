@@ -2,80 +2,110 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Серверные аккаунты (двухэтапка: регистрация с email -> код -> вход).
-/// Сессия хранится токеном в PlayerPrefs -> автовход между запусками.
-/// Состояние доступно всем; сеть идёт через WorkshopClient.
+/// Persisted session/display identity, with server-owned saves kept in memory only.
+/// AccountMe validates the token; cached display data is not an authorization grant.
 /// </summary>
 public static class ServerAccounts
 {
-	private const string TokenKey = "SrvAcct_Token";
-	private const string NameKey  = "SrvAcct_Name";
-	private const string EmailKey = "SrvAcct_Email";
-	private const string BonusKey = "SrvAcct_Bonus";
+    private const string TokenKey = "SrvAcct_Token";
+    private const string NameKey = "SrvAcct_Name";
+    private const string EmailKey = "SrvAcct_Email";
+    private const string BonusKey = "SrvAcct_Bonus";
 
-	/// <summary>Вызывается при входе/выходе/обновлении профиля.</summary>
-	public static event System.Action StateChanged;
+    public static event System.Action StateChanged;
+    private static readonly List<AccountSaveItem> saves = new List<AccountSaveItem>();
 
-	private static readonly List<AccountSaveItem> saves = new List<AccountSaveItem>();
+    public static string Token { get { return PlayerPrefs.GetString(TokenKey, ""); } }
+    public static string Name { get { return PlayerPrefs.GetString(NameKey, ""); } }
+    public static string Email { get { return PlayerPrefs.GetString(EmailKey, ""); } }
+    public static bool LoggedIn { get { return !string.IsNullOrEmpty(Token) && !string.IsNullOrEmpty(Name); } }
+    public static bool BonusClaimed { get { return PlayerPrefs.GetInt(BonusKey, 0) == 1; } }
+    public static bool SavesLoaded { get; private set; }
+    public static IReadOnlyList<AccountSaveItem> MySaves { get { return saves; } }
 
-	public static string Token { get { return PlayerPrefs.GetString(TokenKey, ""); } }
-	public static string Name   { get { return PlayerPrefs.GetString(NameKey, ""); } }
-	public static string Email  { get { return PlayerPrefs.GetString(EmailKey, ""); } }
-	public static bool LoggedIn { get { return !string.IsNullOrEmpty(Token) && !string.IsNullOrEmpty(Name); } }
-	public static bool BonusClaimed { get { return PlayerPrefs.GetInt(BonusKey, 0) == 1; } }
+    public static bool IsCurrentSession(string token)
+    {
+        return !string.IsNullOrEmpty(token) && string.Equals(Token, token, System.StringComparison.Ordinal);
+    }
 
-	public static IReadOnlyList<AccountSaveItem> MySaves { get { return saves; } }
+    public static AccountSaveItem FindSave(int id)
+    {
+        if (id <= 0) return null;
+        for (int i = 0; i < saves.Count; i++)
+            if (saves[i] != null && saves[i].id == id) return saves[i];
+        return null;
+    }
 
-	public static AccountSaveItem FindSave(int id)
-	{
-		if (id <= 0) return null;
-		for (int i = 0; i < saves.Count; i++)
-			if (saves[i] != null && saves[i].id == id) return saves[i];
-		return null;
-	}
+    public static bool OwnsListing(int id) { return FindSave(id) != null; }
+    public static string OwnerKeyFor(int id)
+    {
+        var save = FindSave(id);
+        return save != null ? (save.owner_key ?? "") : "";
+    }
 
-	public static bool OwnsListing(int id)
-	{
-		return FindSave(id) != null;
-	}
+    public static void SetSession(string token, string name, string email)
+    {
+        token = token ?? "";
+        if (!string.Equals(Token, token, System.StringComparison.Ordinal))
+        {
+            // Never carry another account's saves, bonus or email into a new login.
+            saves.Clear();
+            SavesLoaded = false;
+            PlayerPrefs.DeleteKey(NameKey);
+            PlayerPrefs.DeleteKey(EmailKey);
+            PlayerPrefs.DeleteKey(BonusKey);
+        }
+        if (string.IsNullOrEmpty(token)) PlayerPrefs.DeleteKey(TokenKey);
+        else PlayerPrefs.SetString(TokenKey, token);
+        if (!string.IsNullOrEmpty(name)) PlayerPrefs.SetString(NameKey, name);
+        if (!string.IsNullOrEmpty(email)) PlayerPrefs.SetString(EmailKey, email);
+        PlayerPrefs.Save();
+        StateChanged?.Invoke();
+    }
 
-	public static string OwnerKeyFor(int id)
-	{
-		var s = FindSave(id);
-		return s != null ? (s.owner_key ?? "") : "";
-	}
+    // Apply one response atomically and ignore responses from a previous login.
+    public static bool TryApplyProfile(string requestedToken, AccountMeResponse profile)
+    {
+        if (!IsCurrentSession(requestedToken) || profile == null || !profile.ok) return false;
+        if (!string.IsNullOrEmpty(profile.name)) PlayerPrefs.SetString(NameKey, profile.name);
+        if (!string.IsNullOrEmpty(profile.email)) PlayerPrefs.SetString(EmailKey, profile.email);
+        PlayerPrefs.SetInt(BonusKey, profile.tg_bonus ? 1 : 0);
+        saves.Clear();
+        if (profile.saves != null)
+            foreach (var save in profile.saves)
+                if (save != null) saves.Add(save);
+        SavesLoaded = true;
+        PlayerPrefs.Save();
+        StateChanged?.Invoke();
+        return true;
+    }
 
-	public static void SetSession(string token, string name, string email)
-	{
-		if (!string.IsNullOrEmpty(token)) PlayerPrefs.SetString(TokenKey, token);
-		if (!string.IsNullOrEmpty(name))  PlayerPrefs.SetString(NameKey, name);
-		if (!string.IsNullOrEmpty(email)) PlayerPrefs.SetString(EmailKey, email);
-		PlayerPrefs.Save();
-		StateChanged?.Invoke();
-	}
+    public static void SetBonusClaimed()
+    {
+        PlayerPrefs.SetInt(BonusKey, 1);
+        PlayerPrefs.Save();
+        StateChanged?.Invoke();
+    }
 
-	public static void SetBonusClaimed()
-	{
-		PlayerPrefs.SetInt(BonusKey, 1);
-		PlayerPrefs.Save();
-		StateChanged?.Invoke();
-	}
+    public static void SetSaves(List<AccountSaveItem> list)
+    {
+        saves.Clear();
+        if (list != null)
+            foreach (var save in list)
+                if (save != null) saves.Add(save);
+        SavesLoaded = true;
+        StateChanged?.Invoke();
+    }
 
-	public static void SetSaves(List<AccountSaveItem> list)
-	{
-		saves.Clear();
-		if (list != null) saves.AddRange(list);
-		StateChanged?.Invoke();
-	}
-
-	public static void Clear()
-	{
-		PlayerPrefs.DeleteKey(TokenKey);
-		PlayerPrefs.DeleteKey(NameKey);
-		PlayerPrefs.DeleteKey(EmailKey);
-		PlayerPrefs.DeleteKey(BonusKey);
-		saves.Clear();
-		PlayerPrefs.Save();
-		StateChanged?.Invoke();
-	}
+    public static void Clear()
+    {
+        PlayerPrefs.DeleteKey(TokenKey);
+        PlayerPrefs.DeleteKey(NameKey);
+        PlayerPrefs.DeleteKey(EmailKey);
+        PlayerPrefs.DeleteKey(BonusKey);
+        saves.Clear();
+        SavesLoaded = false;
+        PlayerPrefs.Save();
+        StateChanged?.Invoke();
+    }
 }

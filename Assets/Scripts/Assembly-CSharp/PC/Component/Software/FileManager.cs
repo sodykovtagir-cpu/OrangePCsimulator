@@ -604,6 +604,7 @@ namespace PC.Component.Software
         private float pointerDownTime;
         private Vector2 pointerDownPos;
         private bool isPointerDown;
+        private int activePointerId;
 
         public void Init(FileManager fileManager)
         {
@@ -615,13 +616,21 @@ namespace PC.Component.Software
             if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            var context = DesktopContextMenu.For(this);
+            if (context != null && !context.CanReceivePointer(eventData.position)) return;
+            activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             isPointerDown = true;
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = PointerInput.ScreenPosition();
+            pointerDownPos = eventData.position;
         }
 
         public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.pointerId == activePointerId) isPointerDown = false;
+        }
+
+        private void OnDisable()
         {
             isPointerDown = false;
         }
@@ -631,10 +640,13 @@ namespace PC.Component.Software
             if (!isPointerDown || explorer == null)
                 return;
 
-            if (Time.unscaledTime - pointerDownTime <= PointerInput.LongPress)
+            Vector2 current;
+            if (!PointerInput.TryGetHeldPosition(activePointerId, out current) || Vector2.Distance(current, pointerDownPos) >= PointerInput.Slop)
+            {
+                isPointerDown = false;
                 return;
-            if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) >= PointerInput.Slop)
-                return;
+            }
+            if (Time.unscaledTime - pointerDownTime <= PointerInput.LongPress) return;
 
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
@@ -650,6 +662,7 @@ namespace PC.Component.Software
         private float pointerDownTime;
         private Vector2 pointerDownPos;
         private bool isPointerDown;
+        private int activePointerId;
         private bool openedMenu;
 
         public File File => file;
@@ -665,14 +678,22 @@ namespace PC.Component.Software
             if (!PointerInput.IsPrimary(eventData))
                 return;
 
+            var context = DesktopContextMenu.For(this);
+            if (context != null && !context.CanReceivePointer(eventData.position)) return;
+            activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             isPointerDown = true;
             openedMenu = false;
             pointerDownTime = Time.unscaledTime;
-            pointerDownPos = PointerInput.ScreenPosition();
+            pointerDownPos = eventData.position;
         }
 
         public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData == null || eventData.pointerId == activePointerId) isPointerDown = false;
+        }
+
+        private void OnDisable()
         {
             isPointerDown = false;
         }
@@ -690,8 +711,13 @@ namespace PC.Component.Software
         private void Update()
         {
             if (!isPointerDown || openedMenu || file == null) return;
+            Vector2 current;
+            if (!PointerInput.TryGetHeldPosition(activePointerId, out current) || Vector2.Distance(current, pointerDownPos) >= PointerInput.Slop)
+            {
+                isPointerDown = false;
+                return;
+            }
             if (Time.unscaledTime - pointerDownTime <= PointerInput.LongPress) return;
-            if (Vector2.Distance(PointerInput.ScreenPosition(), pointerDownPos) >= PointerInput.Slop) return;
 
             openedMenu = true;
             isPointerDown = false;
