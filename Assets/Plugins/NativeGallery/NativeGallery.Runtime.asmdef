@@ -1,3 +1,6 @@
 {
-	"name": "NativeGallery.Runtime"
+  "name": "NativeGallery.Runtime",
+  "references": [
+    "OrangePC.NativeDialogs"
+  ]
 }
