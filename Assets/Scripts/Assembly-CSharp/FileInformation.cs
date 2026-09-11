@@ -759,12 +759,42 @@ public class FileInformation : MonoBehaviour
 	public void Export()
 	{
 		if (load == null || load.loader == null) return;
+		string sourcePath = load.loader.Path;
+		string extension = Path.GetExtension(sourcePath).ToLowerInvariant();
+		if (extension != ".pc" && extension != ".opc")
+		{
+			messageBox?.Show("Unsupported file format.");
+			return;
+		}
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX
+		// Export preserves the actual on-disk format; renaming an OPC to PC is not a conversion.
 #if UNITY_EDITOR
-		string savePath = EditorUtility.SaveFilePanel("Export Save File", "", Path.GetFileName(load.loader.Path), "sav");
-		if (!string.IsNullOrEmpty(savePath))
-			File.Copy(load.loader.Path, savePath, true);
+		string savePath = EditorUtility.SaveFilePanel("Export Save File", "", Path.GetFileName(sourcePath), extension.Substring(1));
 #else
-		NativeFilePicker.ExportFile(load.loader.Path, (success) =>
+		string savePath = OrangePC.NativeDialogs.DesktopFilePicker.SaveFile("Export Save File", Path.GetFileName(sourcePath), new[] { extension });
+#endif
+		if (string.IsNullOrEmpty(savePath)) return;
+		if (!string.Equals(Path.GetExtension(savePath), extension, System.StringComparison.OrdinalIgnoreCase))
+		{
+			messageBox?.Show("Unsupported file format.");
+			return;
+		}
+		try
+		{
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+			var comparison = System.StringComparison.OrdinalIgnoreCase;
+#else
+			var comparison = System.StringComparison.Ordinal;
+#endif
+			if (!string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(savePath), comparison)) File.Copy(sourcePath, savePath, true);
+		}
+		catch (System.Exception e)
+		{
+			Debug.LogWarning("[Export] " + e.Message);
+			messageBox?.Show("No permission to export the file.");
+		}
+#else
+		NativeFilePicker.ExportFile(sourcePath, (success) =>
 		{
 			if (!success) messageBox?.Show("No permission to export the file.");
 		});

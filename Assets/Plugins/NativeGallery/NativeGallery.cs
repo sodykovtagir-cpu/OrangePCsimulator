@@ -559,30 +559,11 @@ public static class NativeGallery
 			}
 
 #if UNITY_EDITOR
-			System.Collections.Generic.List<string> editorFilters = new System.Collections.Generic.List<string>( 4 );
-
-			if( ( mediaType & MediaType.Image ) == MediaType.Image )
-			{
-				editorFilters.Add( "Image files" );
-				editorFilters.Add( "png,jpg,jpeg" );
-			}
-
-			if( ( mediaType & MediaType.Video ) == MediaType.Video )
-			{
-				editorFilters.Add( "Video files" );
-				editorFilters.Add( "mp4,mov,webm,avi" );
-			}
-
-			if( ( mediaType & MediaType.Audio ) == MediaType.Audio )
-			{
-				editorFilters.Add( "Audio files" );
-				editorFilters.Add( "mp3,wav,aac,flac" );
-			}
-
-			editorFilters.Add( "All files" );
-			editorFilters.Add( "*" );
-
-			string pickedFile = UnityEditor.EditorUtility.OpenFilePanelWithFilters( "Select file", "", editorFilters.ToArray() );
+            var fileTypes = DesktopMediaTypes(mediaType, mime);
+            string pickedFile = UnityEditor.EditorUtility.OpenFilePanelWithFilters("Select file", "",
+                OrangePC.NativeDialogs.DesktopFilePicker.EditorFilters(fileTypes));
+            if (!OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath(pickedFile,
+                OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(fileTypes))) pickedFile = "";
 
 			if( callback != null )
 				callback( pickedFile != "" ? pickedFile : null );

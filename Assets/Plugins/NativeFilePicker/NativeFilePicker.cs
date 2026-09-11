@@ -209,49 +209,10 @@ public static class NativeFilePicker
 			}
 
 #if UNITY_EDITOR
-			// Accept Android and iOS UTIs when possible, for user's convenience
-			string[] editorFilters = new string[allowedFileTypes.Length * 2];
-			for( int i = 0; i < allowedFileTypes.Length; i++ )
-			{
-				if( allowedFileTypes[i].IndexOf( '*' ) >= 0 )
-				{
-					if( allowedFileTypes[i] == "image/*" )
-					{
-						editorFilters[i * 2] = "Image files";
-						editorFilters[i * 2 + 1] = "png,jpg,jpeg";
-					}
-					else if( allowedFileTypes[i] == "video/*" )
-					{
-						editorFilters[i * 2] = "Video files";
-						editorFilters[i * 2 + 1] = "mp4,mov,webm,avi";
-					}
-					else if( allowedFileTypes[i] == "audio/*" )
-					{
-						editorFilters[i * 2] = "Audio files";
-						editorFilters[i * 2 + 1] = "mp3,wav,aac,flac";
-					}
-					else
-					{
-						editorFilters[i * 2] = "All files";
-						editorFilters[i * 2 + 1] = "*";
-					}
-				}
-				else
-				{
-					editorFilters[i * 2] = allowedFileTypes[i];
-
-					if( allowedFileTypes[i].IndexOf( '/' ) >= 0 ) // Android UTIs like 'image/png'
-						editorFilters[i * 2 + 1] = allowedFileTypes[i].Substring( allowedFileTypes[i].IndexOf( '/' ) + 1 );
-					else if( allowedFileTypes[i].StartsWith( "public." ) ) // iOS UTIs like 'public.png'
-						editorFilters[i * 2 + 1] = allowedFileTypes[i].Substring( 7 );
-					else if( allowedFileTypes[i].IndexOf( '.' ) == 0 ) // Extensions starting with period like '.png'
-						editorFilters[i * 2 + 1] = allowedFileTypes[i].Substring( 1 );
-					else
-						editorFilters[i * 2 + 1] = allowedFileTypes[i];
-				}
-			}
-
-			string pickedFile = UnityEditor.EditorUtility.OpenFilePanelWithFilters( "Select file", "", editorFilters );
+            string[] editorFilters = OrangePC.NativeDialogs.DesktopFilePicker.EditorFilters(allowedFileTypes);
+            string pickedFile = UnityEditor.EditorUtility.OpenFilePanelWithFilters("Select file", "", editorFilters);
+            if (!OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath(pickedFile,
+                OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(allowedFileTypes))) pickedFile = "";
 
 			if( callback != null )
 				callback( pickedFile != "" ? pickedFile : null );
