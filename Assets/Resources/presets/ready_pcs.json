@@ -1,0 +1,155 @@
+[
+  {
+    "name": "Gaming PC",
+    "description": "High-performance gaming computer",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASUS ROG Strix Z790-E", "price": 330},
+      {"type": "CPU", "name": "Intel Core i9-14900K", "price": 660},
+      {"type": "GPU", "name": "NVIDIA RTX 4090", "price": 1980},
+      {"type": "RAM", "name": "64GB DDR5-6000", "price": 180},
+      {"type": "Storage", "name": "2TB NVMe SSD", "price": 165},
+      {"type": "PSU", "name": "1200W Platinum", "price": 260},
+      {"type": "Cooler", "name": "Liquid Cooler 360mm", "price": 180},
+      {"type": "Case", "name": "Gaming Case", "price": 165}
+    ],
+    "totalPrice": 3920,
+    "performance": "Ultra"
+  },
+  {
+    "name": "Streaming PC",
+    "description": "Powerful PC for streaming and content creation",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "MSI MAG B650 Tomahawk", "price": 220},
+      {"type": "CPU", "name": "AMD Ryzen 9 7950X", "price": 770},
+      {"type": "GPU", "name": "NVIDIA RTX 4080", "price": 1430},
+      {"type": "RAM", "name": "32GB DDR5-5600", "price": 121},
+      {"type": "Storage", "name": "1TB NVMe SSD + 4TB HDD", "price": 143},
+      {"type": "PSU", "name": "850W Gold", "price": 143},
+      {"type": "Cooler", "name": "Air Cooler", "price": 110},
+      {"type": "Case", "name": "Streaming Case", "price": 121}
+    ],
+    "totalPrice": 3058,
+    "performance": "High"
+  },
+  {
+    "name": "Office PC",
+    "description": "Basic office computer for work",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASUS Prime B660", "price": 132},
+      {"type": "CPU", "name": "Intel Core i5-12400F", "price": 220},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "16GB DDR4-3200", "price": 77},
+      {"type": "Storage", "name": "512GB SATA SSD", "price": 66},
+      {"type": "PSU", "name": "500W 80+", "price": 88},
+      {"type": "Cooler", "name": "Stock Cooler", "price": 22},
+      {"type": "Case", "name": "Office Case", "price": 77}
+    ],
+    "totalPrice": 682,
+    "performance": "Medium"
+  },
+  {
+    "name": "Budget PC",
+    "description": "Affordable basic computer",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "Gigabyte B560M", "price": 110},
+      {"type": "CPU", "name": "Intel Core i3-12100F", "price": 132},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "8GB DDR4-3200", "price": 44},
+      {"type": "Storage", "name": "256GB SATA SSD", "price": 44},
+      {"type": "PSU", "name": "400W 80+", "price": 55},
+      {"type": "Cooler", "name": "Stock Cooler", "price": 11},
+      {"type": "Case", "name": "Budget Case", "price": 44}
+    ],
+    "totalPrice": 440,
+    "performance": "Low"
+  },
+  {
+    "name": "Workstation PC",
+    "description": "Professional workstation for rendering",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASUS Pro WS X570-ACE", "price": 330},
+      {"type": "CPU", "name": "AMD Ryzen 9 5950X", "price": 880},
+      {"type": "GPU", "name": "NVIDIA RTX A5000", "price": 2420},
+      {"type": "RAM", "name": "128GB DDR4-3200 ECC", "price": 440},
+      {"type": "Storage", "name": "2TB NVMe SSD + 8TB HDD", "price": 275},
+      {"type": "PSU", "name": "1000W Platinum", "price": 264},
+      {"type": "Cooler", "name": "Liquid Cooler 280mm", "price": 143},
+      {"type": "Case", "name": "Workstation Case", "price": 220}
+    ],
+    "totalPrice": 4972,
+    "performance": "Ultra"
+  },
+  {
+    "name": "Home PC",
+    "description": "Balanced PC for home use",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "MSI B550-A PRO", "price": 143},
+      {"type": "CPU", "name": "AMD Ryzen 7 5700X", "price": 385},
+      {"type": "GPU", "name": "NVIDIA RTX 3060 Ti", "price": 550},
+      {"type": "RAM", "name": "16GB DDR4-3600", "price": 88},
+      {"type": "Storage", "name": "1TB NVMe SSD", "price": 121},
+      {"type": "PSU", "name": "650W Gold", "price": 110},
+      {"type": "Cooler", "name": "Air Cooler", "price": 44},
+      {"type": "Case", "name": "Home Case", "price": 88}
+    ],
+    "totalPrice": 1529,
+    "performance": "High"
+  },
+  {
+    "name": "Student PC",
+    "description": "Affordable PC for students",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASRock B460M", "price": 99},
+      {"type": "CPU", "name": "Intel Core i3-10100F", "price": 121},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "8GB DDR4-2933", "price": 55},
+      {"type": "Storage", "name": "256GB SATA SSD", "price": 44},
+      {"type": "PSU", "name": "450W 80+", "price": 66},
+      {"type": "Cooler", "name": "Stock Cooler", "price": 11},
+      {"type": "Case", "name": "Student Case", "price": 55}
+    ],
+    "totalPrice": 451,
+    "performance": "Low"
+  },
+  {
+    "name": "Server PC",
+    "description": "Reliable server computer",
+    "caseColors": ["Black"],
+    "components": [
+      {"type": "Motherboard", "name": "Supermicro X11SSH-F", "price": 275},
+      {"type": "CPU", "name": "Intel Xeon E-2236", "price": 385},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "64GB DDR4-2666 ECC", "price": 330},
+      {"type": "Storage", "name": "4x 2TB SATA SSD", "price": 440},
+      {"type": "PSU", "name": "600W Redundant", "price": 220},
+      {"type": "Cooler", "name": "Server Cooler", "price": 88},
+      {"type": "Case", "name": "Server Rack Case", "price": 275}
+    ],
+    "totalPrice": 2013,
+    "performance": "Medium"
+  },
+  {
+    "name": "VR PC",
+    "description": "Virtual reality ready computer",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "Gigabyte Z690 AORUS Elite", "price": 275},
+      {"type": "CPU", "name": "Intel Core i7-13700K", "price": 495},
+      {"type": "GPU", "name": "NVIDIA RTX 4080 Super", "price": 1540},
+      {"type": "RAM", "name": "32GB DDR5-6000", "price": 143},
+      {"type": "Storage", "name": "1TB NVMe SSD", "price": 121},
+      {"type": "PSU", "name": "850W Platinum", "price": 209},
+      {"type": "Cooler", "name": "Liquid Cooler 240mm", "price": 132},
+      {"type": "Case", "name": "VR Ready Case", "price": 165}
+    ],
+    "totalPrice": 3080,
+    "performance": "High"
+  }
+]
