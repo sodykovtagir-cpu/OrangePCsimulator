@@ -261,7 +261,13 @@ public class FileMenu : MonoBehaviour
 
 public void Import()
 {
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX
+        string[] exts = new string[] { ".pc", ".opc" };
+#else
+        // Mobile providers have no registered MIME type for .pc/.opc.
+        // The callback below still validates these two extensions before importing.
         string[] exts = new string[] { "*/*" };
+#endif
 
         bool CanReadFile(string path)
 	{

@@ -30,6 +30,17 @@ namespace OrangePC.NativeDialogs
 
         public static string[] PickFiles(string title, string[] fileTypes, bool multiple)
         {
+            return SelectFiles(title, fileTypes, multiple, false, null);
+        }
+
+        public static string SaveFile(string title, string suggestedName, string[] fileTypes)
+        {
+            var paths = SelectFiles(title, fileTypes, false, true, Path.GetFileName(suggestedName));
+            return paths != null && paths.Length > 0 ? paths[0] : null;
+        }
+
+        private static string[] SelectFiles(string title, string[] fileTypes, bool multiple, bool save, string suggestedName)
+        {
             if (busy || !IsSupported) return null;
             busy = true;
             var previousLock = UnityEngine.Cursor.lockState;
@@ -39,21 +50,26 @@ namespace OrangePC.NativeDialogs
             try
             {
                 var patterns = NormalizePatterns(fileTypes);
-                if (string.IsNullOrEmpty(title)) title = "Select file";
+                if (patterns.Length == 0) return null;
+                if (string.IsNullOrEmpty(title)) title = save ? "Save file" : "Select file";
                 string[] selected;
 #if !UNITY_EDITOR && UNITY_STANDALONE_WIN
-                selected = PickWindows(title, patterns, multiple);
+                selected = PickWindows(title, patterns, multiple, save, suggestedName);
 #elif !UNITY_EDITOR && UNITY_STANDALONE_OSX
-                selected = PickMac(title, multiple);
+                selected = PickMac(title, patterns, multiple, save, suggestedName);
 #elif !UNITY_EDITOR && UNITY_STANDALONE_LINUX
-                selected = PickLinux(title, patterns, multiple);
+                selected = PickLinux(title, patterns, multiple, save, suggestedName);
 #else
                 selected = null;
 #endif
                 if (selected == null || selected.Length == 0) return null;
                 var valid = new List<string>();
                 foreach (var path in selected)
-                    if (!string.IsNullOrEmpty(path) && File.Exists(path)) valid.Add(path);
+                {
+                    // Typed filenames can bypass the dialog's visible filter.
+                    if (!IsAllowedPath(path, patterns)) continue;
+                    if (save ? Directory.Exists(Path.GetDirectoryName(Path.GetFullPath(path))) : File.Exists(path)) valid.Add(path);
+                }
                 if (valid.Count == 0) return null;
                 lastDirectory = Path.GetDirectoryName(valid[0]);
                 return valid.ToArray();
@@ -109,9 +125,9 @@ namespace OrangePC.NativeDialogs
                                     bool safe = true;
                                     foreach (char c in value) if (!char.IsLetterOrDigit(c) && c != '_' && c != '-') { safe = false; break; }
                                     if (safe) extensions = value;
-                                    else all = true;
+
                                 }
-                                else all = true;
+
                                 break;
                         }
                         if (extensions == null) continue;
@@ -123,15 +139,40 @@ namespace OrangePC.NativeDialogs
                     }
                 }
             }
-            if (all || result.Count == 0) return new[] { "*.*" };
-            return result.ToArray();
+            // Explicit extensions take priority over a broad MIME fallback.
+            if (result.Count > 0) return result.ToArray();
+            return all ? new[] { "*.*" } : new string[0];
+        }
+
+        public static bool IsAllowedPath(string path, string[] patterns)
+        {
+            if (string.IsNullOrWhiteSpace(path) || patterns == null || patterns.Length == 0) return false;
+            string extension;
+            try { extension = Path.GetExtension(path); }
+            catch (ArgumentException) { return false; }
+            foreach (var pattern in patterns)
+            {
+                if (pattern == "*.*" || pattern == "*") return true;
+                if (pattern.StartsWith("*.", StringComparison.Ordinal) &&
+                    string.Equals(extension, pattern.Substring(1), StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        public static string[] EditorFilters(string[] fileTypes)
+        {
+            var patterns = NormalizePatterns(fileTypes);
+            if (patterns.Length == 1 && patterns[0] == "*.*") return new[] { "All files", "*" };
+            var extensions = new List<string>();
+            foreach (var pattern in patterns) extensions.Add(pattern.Substring(2));
+            return new[] { "Supported files", string.Join(",", extensions.ToArray()) };
         }
 
         public static string WindowsFilter(string[] patterns)
         {
             string pattern = string.Join(";", patterns);
             if (pattern == "*.*") return "All files\0*.*\0\0";
-            return "Supported files (" + pattern + ")\0" + pattern + "\0All files\0*.*\0\0";
+            return "Supported files (" + pattern + ")\0" + pattern + "\0\0";
         }
 
         public static string[] ParseWindowsSelection(string buffer)
@@ -170,28 +211,39 @@ namespace OrangePC.NativeDialogs
         [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetOpenFileNameW(ref OpenFileName dialog);
+        [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetSaveFileNameW(ref OpenFileName dialog);
         [DllImport("comdlg32.dll", ExactSpelling = true)]
         private static extern int CommDlgExtendedError();
         [DllImport("user32.dll", ExactSpelling = true)]
         private static extern IntPtr GetActiveWindow();
 
-        private static string[] PickWindows(string title, string[] patterns, bool multiple)
+        private static string[] PickWindows(string title, string[] patterns, bool multiple, bool save, string suggestedName)
         {
             const int capacity = 32768;
             IntPtr buffer = Marshal.AllocHGlobal(capacity * 2);
             try
             {
                 Marshal.Copy(new char[capacity], 0, buffer, capacity);
+                if (save && !string.IsNullOrEmpty(suggestedName))
+                {
+                    if (suggestedName.Length >= capacity) return null;
+                    Marshal.Copy(suggestedName.ToCharArray(), 0, buffer, suggestedName.Length);
+                }
                 var dialog = new OpenFileName
                 {
                     size = Marshal.SizeOf(typeof(OpenFileName)), owner = GetActiveWindow(),
                     filter = WindowsFilter(patterns), filterIndex = 1,
                     file = buffer, maxFile = capacity, initialDirectory = lastDirectory,
                     title = title,
-                    // Explorer, file/path must exist, no cwd changes, no Recent Documents.
-                    flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008 | 0x02000000 | (multiple ? 0x00000200 : 0)
+                    defaultExtension = save && patterns.Length == 1 && patterns[0] != "*.*" ? patterns[0].Substring(2) : null,
+                    // Save asks before overwriting; open requires an existing file.
+                    flags = 0x00080000 | 0x00000800 | 0x00000008 | 0x02000000 |
+                        (save ? 0x00000002 : 0x00001000) | (!save && multiple ? 0x00000200 : 0)
                 };
-                if (!GetOpenFileNameW(ref dialog))
+                bool accepted = save ? GetSaveFileNameW(ref dialog) : GetOpenFileNameW(ref dialog);
+                if (!accepted)
                 {
                     int error = CommDlgExtendedError();
                     if (error != 0) throw new IOException("Windows file dialog error 0x" + error.ToString("X"));
@@ -226,34 +278,55 @@ namespace OrangePC.NativeDialogs
 #endif
 
 #if !UNITY_EDITOR && UNITY_STANDALONE_OSX
-        private static string[] PickMac(string title, bool multiple)
+        private static string JsString(string value)
         {
-            string prompt = title.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            string script = multiple
-                ? "set pickedFiles to choose file with prompt \"" + prompt + "\" with multiple selections allowed\nset output to \"\"\nrepeat with itemPath in pickedFiles\nset output to output & POSIX path of itemPath & linefeed\nend repeat\nreturn output"
-                : "POSIX path of (choose file with prompt \"" + prompt + "\")";
-            string selected = RunDialog("/usr/bin/osascript", "-e " + QuoteArgument(script));
+            return "\"" + (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"")
+                .Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
+        }
+
+        private static string[] PickMac(string title, string[] patterns, bool multiple, bool save, string suggestedName)
+        {
+            // NSOpenPanel/NSSavePanel accepts custom extensions such as pc/opc,
+            // unlike a generic AppleScript 'choose file' with no type restriction.
+            bool all = patterns.Length == 1 && patterns[0] == "*.*";
+            var types = new List<string>();
+            if (!all) foreach (var pattern in patterns) types.Add(JsString(pattern.Substring(2)));
+            string script = "ObjC.import('AppKit'); var p = $." + (save ? "NSSavePanel.savePanel" : "NSOpenPanel.openPanel")
+                + "; p.title = $(" + JsString(title) + "); p.canCreateDirectories = true;"
+                + (!all ? "p.allowedFileTypes = $([" + string.Join(",", types.ToArray()) + "]); p.allowsOtherFileTypes = false;" : "")
+                + (save ? "p.nameFieldStringValue = $(" + JsString(suggestedName) + ");"
+                    : "p.canChooseFiles = true; p.canChooseDirectories = false; p.allowsMultipleSelection = " + (multiple ? "true;" : "false;"))
+                + "var result = ''; if (p.runModal == 1) {"
+                + (save ? "result = ObjC.unwrap(p.URL.path);"
+                    : "var paths = []; for (var i=0; i<p.URLs.count; i++) paths.push(ObjC.unwrap(p.URLs.objectAtIndex(i).path)); result = paths.join('\\n');")
+                + "} result;";
+            string selected = RunDialog("/usr/bin/osascript", "-l JavaScript -e " + QuoteArgument(script));
             return string.IsNullOrEmpty(selected) ? null : selected.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
         }
 #endif
 
 #if !UNITY_EDITOR && UNITY_STANDALONE_LINUX
-        private static string[] PickLinux(string title, string[] patterns, bool multiple)
+        private static string[] PickLinux(string title, string[] patterns, bool multiple, bool save, string suggestedName)
         {
             string selected;
             try
             {
-                string filter = string.Join(" ", patterns);
+                string filter = string.Join(" ", patterns).Replace("*.*", "*");
                 selected = RunDialog("zenity", "--file-selection --title=" + QuoteArgument(title)
                     + " --file-filter=" + QuoteArgument("Supported files | " + filter)
-                    + " --file-filter=" + QuoteArgument("All files | *")
-                    + (multiple ? " --multiple --separator=" + QuoteArgument("\n") : ""));
+                    + (save ? " --save --confirm-overwrite --filename=" + QuoteArgument(Path.Combine(lastDirectory ?? ".", suggestedName ?? "")) : "")
+                    + (!save && multiple ? " --multiple --separator=" + QuoteArgument("\n") : ""));
             }
             catch (System.ComponentModel.Win32Exception)
             {
-                selected = RunDialog("kdialog", "--getopenfilename " + QuoteArgument(lastDirectory ?? ".")
-                    + " " + QuoteArgument(string.Join(" ", patterns)) + " --title " + QuoteArgument(title)
-                    + (multiple ? " --multiple --separate-output" : ""));
+                string initial = save ? Path.Combine(lastDirectory ?? ".", suggestedName ?? "") : (lastDirectory ?? ".");
+                selected = RunDialog("kdialog", (save ? "--getsavefilename " : "--getopenfilename ") + QuoteArgument(initial)
+                    + " " + QuoteArgument(string.Join(" ", patterns).Replace("*.*", "*")) + " --title " + QuoteArgument(title)
+                    + (!save && multiple ? " --multiple --separate-output" : ""));
+                // KDE's save picker can return an existing path without confirming.
+                if (save && !string.IsNullOrEmpty(selected) && File.Exists(selected) &&
+                    RunDialog("kdialog", "--yesno " + QuoteArgument("The file already exists. Replace it?")
+                        + " --title " + QuoteArgument(title)) == null) selected = null;
             }
             return string.IsNullOrEmpty(selected) ? null : selected.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
         }

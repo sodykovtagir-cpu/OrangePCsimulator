@@ -39,8 +39,18 @@ class Test {
   p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"public.image","public.jpeg"});Check(p.Length==3,"iOS image UTI");
   p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"video/*","audio/*"});Check(Array.IndexOf(p,"*.mp4")>=0&&Array.IndexOf(p,"*.wav")>=0,"media filters");
   p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"public.item","public.content"});Check(p[0]=="*.*","default mobile types");
-  p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"weird/path;$(bad)"});Check(p[0]=="*.*","unsafe filter input");
+  p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"weird/path;$(bad)"});Check(p.Length==0,"unsafe filter input");
   string f=OrangePC.NativeDialogs.DesktopFilePicker.WindowsFilter(new[]{"*.pc","*.opc"});Check(f.EndsWith("\\0\\0")&&f.Contains("*.pc;*.opc\\0"),"Win32 filter termination");
+  Check(!f.Contains("All files")&&!f.Contains("*.*"),"restricted filter still exposes All files");
+  var editor=OrangePC.NativeDialogs.DesktopFilePicker.EditorFilters(new[]{"image/*"});Check(editor.Length==2&&editor[1]=="png,jpg,jpeg","editor image filter");
+  editor=OrangePC.NativeDialogs.DesktopFilePicker.EditorFilters(new[]{".pc",".opc"});Check(editor[1]=="pc,opc","editor save filter");
+
+  p=OrangePC.NativeDialogs.DesktopFilePicker.NormalizePatterns(new[]{"*/*",".pc",".opc"});Check(p.Length==2,"wildcard widened explicit save formats");
+  Check(OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath("PHOTO.PNG",new[]{"*.png","*.jpg"}),"uppercase image extension");
+  Check(!OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath("video.mp4",new[]{"*.png","*.jpg"}),"video bypassed image filter");
+  Check(!OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath("image.png.exe",new[]{"*.png"}),"double extension bypass");
+  Check(!OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath("a.sav",new[]{"*.pc","*.opc"}),"unsupported save format");
+  Check(OrangePC.NativeDialogs.DesktopFilePicker.IsAllowedPath("мир.OPC",new[]{"*.pc","*.opc"}),"valid OPC format");
   string unicode="C:\\\\Игры\\\\Пример мира.opc";
   var result=OrangePC.NativeDialogs.DesktopFilePicker.ParseWindowsSelection(unicode+"\\0\\0");Check(result.Length==1&&result[0]==unicode,"Unicode path");
   result=OrangePC.NativeDialogs.DesktopFilePicker.ParseWindowsSelection("C:\\\\Save\\0one.pc\\0два.opc\\0\\0");Check(result.Length==2&&result[1]==Path.Combine("C:\\\\Save","два.opc"),"multi-select");
