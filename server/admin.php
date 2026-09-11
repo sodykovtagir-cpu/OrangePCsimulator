@@ -8,6 +8,7 @@
  */
 
 session_start();
+require_once __DIR__ . '/game_roles.php';
 
 define('DATA_DIR', __DIR__);
 define('INDEX_FILE', DATA_DIR . '/uploads/index.json');
@@ -73,7 +74,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     elseif (is_admin() && csrf_ok()) {
 
-        if ($act === 'delete') {
+        if ($act === 'game_admin_set') {
+            $id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
+            $enabled = isset($_POST['enabled']) && $_POST['enabled'] === '1';
+            if (game_set_admin($id, $enabled)) {
+                $msg = $enabled ? "Игровой администратор назначен: #$id" : "Статус игрового администратора снят: #$id";
+            } else {
+                $msg = 'Не удалось изменить роль. Проверьте ID, подтверждение аккаунта и права на файл ролей.';
+                $msgType = 'err';
+            }
+        }
+        elseif ($act === 'delete') {
             $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
             $items = load_json(INDEX_FILE);
             foreach ($items as $i => $it) {
@@ -162,7 +173,7 @@ $totalDl = 0; $totalLk = 0;
 foreach ($items as $it) { $totalDl += (int)($it['downloads'] ?? 0); $totalLk += (int)($it['likes'] ?? 0); }
 
 $tab = isset($_GET['tab']) ? preg_replace('/[^a-z]/', '', $_GET['tab']) : 'dashboard';
-$tab = in_array($tab, ['dashboard', 'saves', 'banned', 'quiz', 'pass'], true) ? $tab : 'dashboard';
+$tab = in_array($tab, ['dashboard', 'saves', 'accounts', 'banned', 'quiz', 'pass'], true) ? $tab : 'dashboard';
 
 function size_fmt($b) {
     if ($b >= 1048576) return round($b / 1048576, 1) . ' MB';
@@ -215,6 +226,7 @@ function size_fmt($b) {
   <div class="nav" style="margin-bottom:20px">
     <a class="<?php echo $tab==='dashboard'?'active':''; ?>" href="?tab=dashboard">Обзор</a>
     <a class="<?php echo $tab==='saves'?'active':''; ?>" href="?tab=saves">Сейвы (<?php echo count($items); ?>)</a>
+    <a class="<?php echo $tab==='accounts'?'active':''; ?>" href="?tab=accounts">Аккаунты / админы</a>
     <a class="<?php echo $tab==='banned'?'active':''; ?>" href="?tab=banned">Баны (<?php echo count($bans); ?>)</a>
     <a class="<?php echo $tab==='quiz'?'active':''; ?>" href="?tab=quiz">Квиз</a>
     <a class="<?php echo $tab==='pass'?'active':''; ?>" href="?tab=pass">Пароль</a>
@@ -353,6 +365,38 @@ function size_fmt($b) {
         </form>
       </div>
       <?php endif; ?>
+    </div>
+  <?php elseif ($tab === 'accounts'): ?>
+    <div class="panel">
+      <h2>Игровые аккаунты и администраторы</h2>
+      <p class="sub">Назначайте роль подтверждённым аккаунтам. Игра получает её с сервера при входе и обновлении профиля. Красный ник — пометка администратора; пароль веб-админки и игровые деньги не меняются.</p>
+      <table>
+        <thead><tr><th>ID</th><th>Ник</th><th>Подтверждён</th><th>Роль</th><th>Действие</th></tr></thead>
+        <tbody>
+        <?php foreach (game_role_users() as $account):
+            $uid = (int)($account['id'] ?? 0);
+            $isGameAdmin = game_is_admin_user($account);
+            $verifiedAccount = !empty($account['verified']); ?>
+          <tr>
+            <td><?php echo $uid; ?></td>
+            <td><strong<?php if ($isGameAdmin): ?> style="color:#ff5555"<?php endif; ?>><?php echo htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></strong></td>
+            <td><?php echo $verifiedAccount ? 'Да' : 'Нет'; ?></td>
+            <td><?php echo $isGameAdmin ? 'Администратор' : 'Игрок'; ?></td>
+            <td>
+              <?php if ($verifiedAccount): ?>
+              <form method="post">
+                <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
+                <input type="hidden" name="act" value="game_admin_set">
+                <input type="hidden" name="user_id" value="<?php echo $uid; ?>">
+                <input type="hidden" name="enabled" value="<?php echo $isGameAdmin ? '0' : '1'; ?>">
+                <button class="btn small<?php echo $isGameAdmin ? ' danger' : ''; ?>" type="submit"><?php echo $isGameAdmin ? 'Снять админа' : 'Назначить админом'; ?></button>
+              </form>
+              <?php else: ?><span class="sub">Сначала подтвердите почту</span><?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
     </div>
   <?php elseif ($tab === 'pass'): ?>
     <div class="panel" style="max-width:420px">

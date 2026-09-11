@@ -11,6 +11,9 @@ public sealed class AccountProfileLabel : MonoBehaviour
 {
     [SerializeField] private bool showEmail;
     private Text label;
+    private Color normalColor;
+    private bool colorCaptured;
+    public static Color AdminColor { get { return new Color(1f, 0.2f, 0.2f, 1f); } }
 
     private void Awake()
     {
@@ -35,7 +38,9 @@ public sealed class AccountProfileLabel : MonoBehaviour
     {
         if (label == null) label = GetComponent<Text>();
         if (label == null) return;
+        if (!colorCaptured) { normalColor = label.color; colorCaptured = true; }
         label.text = showEmail ? MaskEmail(ServerAccounts.Email) : DisplayName();
+        label.color = !showEmail && ServerAccounts.IsAdmin ? AdminColor : normalColor;
     }
 
     public static string DisplayName()

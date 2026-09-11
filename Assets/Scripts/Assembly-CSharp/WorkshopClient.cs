@@ -11,6 +11,7 @@ using UnityEngine.Networking;
 [Serializable]
 public class WorkshopItem
 {
+	public bool author_is_admin;
 	public int id;
 	public string title;
 	public string author;
@@ -62,6 +63,7 @@ public class WorkshopRedeemResponse
 [Serializable]
 public class AccountAuthResponse
 {
+	public bool is_admin;
 	public bool ok;
 	public string error;
 	public bool pending;
@@ -93,6 +95,7 @@ public class AccountSaveItem
 [Serializable]
 public class AccountMeResponse
 {
+	public bool is_admin;
 	public bool ok;
 	public string error;
 	public string name;

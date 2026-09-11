@@ -23,7 +23,7 @@ namespace PC.Component.Software
         [Header("Settings")]
         [SerializeField] private Color[] allColors;
         [SerializeField] private Vector2Int minCanvasSize = new Vector2Int(1, 1);
-        [SerializeField] private Vector2Int maxCanvasSize = new Vector2Int(1024, 1024);
+        [SerializeField] private Vector2Int maxCanvasSize = new Vector2Int(1024, 2240);
 
         private Vector2Int canvasSize;
         private Texture2D texture;
@@ -98,11 +98,11 @@ namespace PC.Component.Software
                 return;
             }
 
-            // Баннер HD — в 4 раза больше обычного баннера (128×280).
+            // Баннер HD — в 32 раза больше обычного баннера (1024×2240).
             if (i == 3)
             {
-                if (w != null) w.text = "128";
-                if (h != null) h.text = "280";
+                if (w != null) w.text = "1024";
+                if (h != null) h.text = "2240";
                 return;
             }
         }
@@ -132,6 +132,7 @@ namespace PC.Component.Software
             int w, h;
             if (!int.TryParse(canvasWidthInput.text, out w)) return;
             if (!int.TryParse(canvasHeightInput.text, out h)) return;
+            if (w < minCanvasSize.x || h < minCanvasSize.y || w > maxCanvasSize.x || h > maxCanvasSize.y) return;
 
             SetCanvasSize(w, h);
             NewCanvas();

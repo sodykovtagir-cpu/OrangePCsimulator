@@ -4,6 +4,8 @@ header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-Upload-Key, X-Auth-Token');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+require_once __DIR__ . '/game_roles.php';
+
 $cfgPath = __DIR__ . '/config.php';
 if (is_file($cfgPath)) require $cfgPath;
 if (!defined('MAX_BYTES')) define('MAX_BYTES', 10485760); // 10 MB
@@ -59,6 +61,8 @@ function clean($s, $max) {
     return substr($s, 0, $max);
 }
 function pub($it) {
+    // Only the verified owning account determines the badge, never submitted author text.
+    $it['author_is_admin'] = game_is_admin_id($it['owner_user_id'] ?? 0);
     unset($it['owner_key'], $it['liked'], $it['ip'], $it['owner_user_id']);
     if (empty($it['likes'])) $it['likes'] = 0;
     if (empty($it['downloads'])) $it['downloads'] = 0;

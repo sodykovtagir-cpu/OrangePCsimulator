@@ -1,0 +1,5 @@
+/config.php
+/users.json*
+/admin_config.json*
+/game_admins.json*
+/uploads/
