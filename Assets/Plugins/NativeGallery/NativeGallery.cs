@@ -282,6 +282,8 @@ public static class NativeGallery
 		return AJC.CallStatic<bool>( "CanSelectMultipleMedia" );
 #elif !UNITY_EDITOR && UNITY_IOS
 		return _NativeGallery_CanPickMultipleMedia() == 1;
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+		return true;
 #else
 		return false;
 #endif
@@ -294,6 +296,8 @@ public static class NativeGallery
 #elif UNITY_ANDROID
 		return AJC.CallStatic<bool>( "CanSelectMultipleMediaTypes" );
 #elif UNITY_IOS
+		return true;
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
 		return true;
 #else
 		return false;
@@ -344,6 +348,8 @@ public static class NativeGallery
 	{
 #if !UNITY_EDITOR && UNITY_IOS
 		return NGMediaReceiveCallbackiOS.IsBusy;
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+		return OrangePC.NativeDialogs.DesktopFilePicker.IsBusy;
 #else
 		return false;
 #endif
@@ -532,6 +538,16 @@ public static class NativeGallery
 #endif
 	}
 
+    private static string[] DesktopMediaTypes(MediaType mediaTypes, string mime)
+    {
+        if (!string.IsNullOrEmpty(mime) && mime != "*/*") return new[] { mime };
+        var types = new System.Collections.Generic.List<string>();
+        if ((mediaTypes & MediaType.Image) != 0) types.Add("image/*");
+        if ((mediaTypes & MediaType.Video) != 0) types.Add("video/*");
+        if ((mediaTypes & MediaType.Audio) != 0) types.Add("audio/*");
+        return types.ToArray();
+    }
+
 	private static void GetMediaFromGallery( MediaPickCallback callback, MediaType mediaType, string mime, string title )
 	{
 		RequestPermissionAsync( ( permission ) =>
@@ -585,6 +601,9 @@ public static class NativeGallery
 				NGMediaReceiveCallbackiOS.Initialize( callback, null );
 				_NativeGallery_PickMedia( SelectedMediaPath, (int) ( mediaType & ~MediaType.Audio ), PermissionFreeMode ? 1 : 0, 1 );
 			}
+#elif UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX
+            var paths = OrangePC.NativeDialogs.DesktopFilePicker.PickFiles(title, DesktopMediaTypes(mediaType, mime), false);
+            callback?.Invoke(paths != null && paths.Length > 0 ? paths[0] : null);
 #else
 			if( callback != null )
 				callback( null );
@@ -619,6 +638,8 @@ public static class NativeGallery
 					NGMediaReceiveCallbackiOS.Initialize( null, callback );
 					_NativeGallery_PickMedia( SelectedMediaPath, (int) ( mediaType & ~MediaType.Audio ), PermissionFreeMode ? 1 : 0, 0 );
 				}
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+                callback?.Invoke(OrangePC.NativeDialogs.DesktopFilePicker.PickFiles(title, DesktopMediaTypes(mediaType, mime), true));
 #else
 				if( callback != null )
 					callback( null );

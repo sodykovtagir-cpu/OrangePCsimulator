@@ -122,6 +122,8 @@ public static class NativeFilePicker
 		return AJC.CallStatic<bool>( "CanPickMultipleFiles" );
 #elif !UNITY_EDITOR && UNITY_IOS
 		return _NativeFilePicker_CanPickMultipleFiles() == 1;
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+		return true;
 #else
 		return false;
 #endif
@@ -157,6 +159,8 @@ public static class NativeFilePicker
 	{
 #if !UNITY_EDITOR && UNITY_IOS
 		return FPResultCallbackiOS.IsBusy;
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+		return OrangePC.NativeDialogs.DesktopFilePicker.IsBusy;
 #else
 		return false;
 #endif
@@ -256,6 +260,9 @@ public static class NativeFilePicker
 #elif UNITY_IOS
 			FPResultCallbackiOS.Initialize( callback, null, null );
 			_NativeFilePicker_PickFile( allowedFileTypes, allowedFileTypes.Length );
+#elif UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX
+            var paths = OrangePC.NativeDialogs.DesktopFilePicker.PickFiles("Select file", allowedFileTypes, false);
+            callback?.Invoke(paths != null && paths.Length > 0 ? paths[0] : null);
 #else
 			if( callback != null )
 				callback( null );
@@ -290,6 +297,8 @@ public static class NativeFilePicker
 #elif !UNITY_EDITOR && UNITY_IOS
 				FPResultCallbackiOS.Initialize( null, callback, null );
 				_NativeFilePicker_PickMultipleFiles( allowedFileTypes, allowedFileTypes.Length );
+#elif !UNITY_EDITOR && (UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX)
+                callback?.Invoke(OrangePC.NativeDialogs.DesktopFilePicker.PickFiles("Select files", allowedFileTypes, true));
 #endif
 			}
 			else if( callback != null )
