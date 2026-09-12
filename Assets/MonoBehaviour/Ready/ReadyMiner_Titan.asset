@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: ReadyPC_Gaming
+  m_Name: ReadyMiner_Titan
   m_EditorClassIdentifier: 
-  itemName: '{Gaming PC}'
-  price: 5245
+  itemName: '{Titan Miner}'
+  price: 29160
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 52e52e08ed834a945865945b8fecc204, type: 2}
-  spawn: {fileID: 1195362234439980005, guid: 45a47664d8c2b3d67792ef2cf48ee6b9, type: 3}
+  sprite: {fileID: 21300000, guid: a2a47c3e39a00494e9ebc5597be5e4e1, type: 2}
+  spawn: {fileID: 3897462054029552084, guid: 214e9e5611401efc687bffd4d357ad04, type: 3}
   large: 1
   translateDescription: 1
-  description: 'Gaming PC Description'
+  description: 'Titan Miner Description'

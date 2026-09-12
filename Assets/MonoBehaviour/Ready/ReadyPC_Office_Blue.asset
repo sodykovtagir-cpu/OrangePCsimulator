@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: ReadyPC_Home
+  m_Name: ReadyPC_Office_Blue
   m_EditorClassIdentifier: 
-  itemName: '{Home PC}'
-  price: 1485
+  itemName: '{Office PC} ({Blue})'
+  price: 660
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: db9283e2735c3204b829ed53ad0d3471, type: 2}
-  spawn: {fileID: 3564556672198386752, guid: 976bc4c7ade732f85144f75343961faa, type: 3}
+  sprite: {fileID: 21300000, guid: a3e4c187b96518044a7b0f62333a39db, type: 2}
+  spawn: {fileID: 6889958913413992652, guid: 8b408e841b0fa5f1493ed2973803b282, type: 3}
   large: 1
   translateDescription: 1
-  description: 'Home PC Description'
+  description: 'Office PC Description'

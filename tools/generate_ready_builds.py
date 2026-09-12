@@ -34,6 +34,7 @@ from unity_asset_tool import (  # noqa: E402
     ShopItemAsset,
     UnityDoc,
     make_guid,
+    prefab_spawn_ref,
     quat_to_euler,
     read_meta_guid,
     shop_add_page,
@@ -111,6 +112,18 @@ def load_price_table() -> Dict[str, int]:
         guid = read_meta_guid(prefab)
         if guid in by_spawn_guid and inner not in prices:
             prices[inner] = by_spawn_guid[guid]
+
+    # Аквариумные корпуса и их стекло названы в магазине иначе, чем префабы.
+    aliases = {
+        "Aquarium_ATX(Black)": "ATX_Aquarium_black",
+        "Aquarium_ATX(White)": "ATX_Aquarium_White",
+        "Aquarium_Cover_ATX(Glass)": "Cover_ATX_Aquarium_Glass",
+        "Cover_ATX(Glass) Custom": "Cover_ATX(Glass) Custom",
+        "Case_ATX 2(Black)": "Case_ATX 2(Black)",
+    }
+    for prefab_name, asset_name in aliases.items():
+        if prefab_name not in prices and asset_name in by_name:
+            prices[prefab_name] = by_name[asset_name]
     return prices
 
 
@@ -135,8 +148,34 @@ def p(path: str, target: str, host: Optional[str] = None, index: Optional[int] =
                    host=host, slot_index=index)
 
 
-def office_pc() -> List[PartRef]:
-    """Офисный: минимум для работы. Без дискретной видеокарты — дёшево."""
+# Крышка обязана совпасть со слотом Cover корпуса по match:
+#   ITX = 0, ATX/ATX 2 = 1, аквариум = 2 (своё стекло).
+COVER_BY_CASE = {
+    "Case_ITX(Black)": "Cover_ITX(Black)",
+    "Case_ITX(White)": "Cover_ITX(White)",
+    "Case_ITX(Blue)": "Cover_ITX(Glass)",
+    "Case_ITX(Red)": "Cover_ITX(Glass)",
+    "Case_ITX(Green)": "Cover_ITX(Glass)",
+    "Case_ITX(Yellow)": "Cover_ITX(Glass)",
+    "Case_ATX(Black)": "Cover_ATX(Black)",
+    "Case_ATX(White)": "Cover_ATX(White)",
+    "Case_ATX 2(Black)": "Cover_ATX(Glass)",
+    "Case_ATX 2(White)": "Cover_ATX(Glass)",
+    "Aquarium_ATX(Black)": "Aquarium_Cover_ATX(Glass)",
+    "Aquarium_ATX(White)": "Aquarium_Cover_ATX(Glass)",
+}
+
+
+def cover_for(case_prefab_name: str) -> str:
+    """Подобрать крышку под корпус (иначе Slot её просто не примет)."""
+    try:
+        return COVER_BY_CASE[case_prefab_name]
+    except KeyError:
+        raise SystemExit(f"Нет крышки для корпуса '{case_prefab_name}'")
+
+
+def office_pc(case: str) -> List[PartRef]:
+    """Офисный: минимум для работы. Дёшево и тихо."""
     return [
         p("Micro_ATX", "Motherboard"),
         p("CPU Celeron G3920", "CPU", host="Micro_ATX"),
@@ -147,10 +186,11 @@ def office_pc() -> List[PartRef]:
         p("PSU 300W", "Supply"),
         p("HDD 500GB", "Drive"),
         p("CaseFan", "Fan"),
+        p(cover_for(case), "Cover"),
     ]
 
 
-def home_pc() -> List[PartRef]:
+def home_pc(case: str) -> List[PartRef]:
     """Домашний: универсальный середняк для учёбы, кино и нетяжёлых игр."""
     return [
         p("ATX", "Motherboard"),
@@ -163,10 +203,11 @@ def home_pc() -> List[PartRef]:
         p("SSD 512GB", "Drive"),
         p("HDD 1TB", "Drive"),
         p("CaseFan", "Fan"),
+        p(cover_for(case), "Cover"),
     ]
 
 
-def gaming_pc() -> List[PartRef]:
+def gaming_pc(case: str) -> List[PartRef]:
     """Игровой: топовое железо, RGB и стеклянная крышка."""
     return [
         p("ATX", "Motherboard"),
@@ -179,7 +220,78 @@ def gaming_pc() -> List[PartRef]:
         p("SSD 2TB", "Drive"),
         p("SSD 1TB", "Drive"),
         p("CaseFan(RGB)", "Fan"),
+        p(cover_for(case), "Cover"),
     ]
+
+
+def workstation_pc(case: str) -> List[PartRef]:
+    """Рабочая станция на EXATX: 8 планок памяти и оба слота M.2.
+
+    EXATX — единственная плата, у которой есть и восемь слотов RAM, и два
+    собственных M.2. Забиваем всё: 8 x 64 ГБ = 512 ГБ памяти.
+    """
+    parts = [
+        p("EXATX", "Motherboard"),
+        p("CPU RMD Ryzen 9 7950X", "CPU", host="EXATX"),
+        p("WaterCooler", "Cooler", host="EXATX"),
+    ]
+    parts += [p("RAM 64GB(RGB)", "RAM", host="EXATX") for _ in range(8)]
+    parts += [
+        p("RTX4080Ti", "GPU", host="EXATX"),
+        p("Titan V", "GPU", host="EXATX"),
+        # Два слота M.2 живут на самой плате (matches=01).
+        p("SSD_M.2 1TB", "Drive", host="EXATX"),
+        p("SSD_M.2 1TB", "Drive", host="EXATX"),
+        p("PSU 2kW", "Supply"),
+        p("SSD 2TB", "Drive"),
+        p("CaseFan(RGB)", "Fan"),
+        p(cover_for(case), "Cover"),
+    ]
+    return parts
+
+
+def aquarium_pc(case: str) -> List[PartRef]:
+    """Аквариумный корпус: витринная сборка, всё напоказ.
+
+    У аквариума крышка со своим match=02, обычное стекло сюда не встанет.
+    """
+    return [
+        p("ATX", "Motherboard"),
+        p("CPU i7-14700K", "CPU", host="ATX"),
+        p("WaterCooler", "Cooler", host="ATX"),
+        p("RAM 32GB(RGB)", "RAM", host="ATX"),
+        p("RAM 32GB(RGB)", "RAM", host="ATX"),
+        p("RAM 32GB(RGB)", "RAM", host="ATX"),
+        p("RAM 32GB(RGB)", "RAM", host="ATX"),
+        p("RTX5090", "GPU", host="ATX"),
+        p("PSU 1.1kW", "Supply"),
+        p("SSD 2TB", "Drive"),
+        p("SSD 1TB", "Drive"),
+        p("CaseFan(RGB)", "Fan"),
+        p("Aquarium_Cover_ATX(Glass)", "Cover"),
+    ]
+
+
+def dream_pc(case: str) -> List[PartRef]:
+    """Полный фарш: EXATX, 512 ГБ RGB-памяти, RTX 5090 и Titan V."""
+    parts = [
+        p("EXATX", "Motherboard"),
+        p("CPU i9-7900X", "CPU", host="EXATX"),
+        p("WaterCooler", "Cooler", host="EXATX"),
+    ]
+    parts += [p("RAM 64GB(RGB)", "RAM", host="EXATX") for _ in range(8)]
+    parts += [
+        p("RTX5090", "GPU", host="EXATX"),
+        p("RTX4080Ti", "GPU", host="EXATX"),
+        p("SSD_M.2 1TB", "Drive", host="EXATX"),
+        p("SSD_M.2 1TB", "Drive", host="EXATX"),
+        p("PSU 2kW", "Supply"),
+        p("SSD 2TB", "Drive"),
+        p("SSD 2TB", "Drive"),
+        p("CaseFan(RGB)", "Fan"),
+        p("Aquarium_Cover_ATX(Glass)", "Cover"),
+    ]
+    return parts
 
 
 def miner_cheap() -> List[PartRef]:
@@ -230,62 +342,129 @@ def miner_ultra() -> List[PartRef]:
     return parts
 
 
-BUILDS: List[BuildSpec] = [
-    BuildSpec(
-        key="ReadyPC_Office",
-        title="{Office PC}",
-        case=COMP + "Case_ITX(Black).prefab",
-        parts=office_pc(),
-        page="Ready PC",
-        sprite_from="Case_ITX(Black)",
-        description="Office PC Description",
-    ),
-    BuildSpec(
-        key="ReadyPC_Home",
-        title="{Home PC}",
-        case=COMP + "Case_ATX(Black).prefab",
-        parts=home_pc(),
-        page="Ready PC",
-        sprite_from="Case_ATX(Black)",
-        description="Home PC Description",
-    ),
-    BuildSpec(
-        key="ReadyPC_Gaming",
-        title="{Gaming PC}",
-        case=COMP + "Case_ATX 2(Black).prefab",
-        parts=gaming_pc(),
-        page="Ready PC",
-        sprite_from="Case_ATX 2(Black)",
-        description="Gaming PC Description",
-    ),
-    BuildSpec(
-        key="ReadyMiner_Cheap",
-        title="{Cheap Miner}",
-        case=COMP + "Miner.prefab",
-        parts=miner_cheap(),
-        page="Ready Miner",
-        sprite_from="Miner",
-        description="Cheap Miner Description",
-    ),
-    BuildSpec(
-        key="ReadyMiner_Medium",
-        title="{Medium Miner}",
-        case=COMP + "Miner.prefab",
-        parts=miner_medium(),
-        page="Ready Miner",
-        sprite_from="Miner",
-        description="Medium Miner Description",
-    ),
-    BuildSpec(
-        key="ReadyMiner_Ultra",
-        title="{Ultra Miner}",
-        case=COMP + "BigMiner.prefab",
-        parts=miner_ultra(),
-        page="Ready Miner",
-        sprite_from="Big Miner",
-        description="Ultra Miner Description",
-    ),
+def miner_5090() -> List[PartRef]:
+    """Флагманская ферма: 24 x RTX 5090 — самое дорогое, что можно собрать."""
+    parts = [
+        p("Mini_ITX", "Motherboard"),
+        p("CPU RMD Ryzen 9 7950X", "CPU", host="Mini_ITX"),
+        p("WaterCooler", "Cooler", host="Mini_ITX"),
+        p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
+        p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
+    ]
+    parts += [p("PSU 2kW", "Supply") for _ in range(6)]
+    parts += [p("SSD_M.2 1TB", "Drive", index=i) for i in range(2)]
+    parts += [p("RTX5090", "GPU") for _ in range(24)]
+    return parts
+
+
+def miner_titan() -> List[PartRef]:
+    """Titan V — 8 карт на обычной раме, компактно и дорого."""
+    parts = [
+        p("Mini_ITX", "Motherboard"),
+        p("CPU i7-14700K", "CPU", host="Mini_ITX"),
+        p("TowerCooler(RGB)", "Cooler", host="Mini_ITX"),
+        p("RAM 32GB", "RAM", host="Mini_ITX"),
+        p("RAM 32GB", "RAM", host="Mini_ITX"),
+        p("PSU 2kW", "Supply"),
+        p("PSU 2kW", "Supply"),
+        p("SSD 1TB", "Drive"),
+    ]
+    parts += [p("Titan V", "GPU") for _ in range(8)]
+    return parts
+
+
+# Цветовые варианты: одна и та же начинка в разных корпусах.
+# Ключ локализации у них общий, а к названию дописывается цвет.
+PC_MODELS = [
+    # (ключ, заголовок, описание, функция начинки, [(суффикс, корпус, цвет)])
+    ("Office", "{Office PC}", "Office PC Description", office_pc, [
+        ("Black", "Case_ITX(Black)", "{Black}"),
+        ("White", "Case_ITX(White)", "{White}"),
+        ("Blue", "Case_ITX(Blue)", "{Blue}"),
+        ("Red", "Case_ITX(Red)", "{Red}"),
+    ]),
+    ("Home", "{Home PC}", "Home PC Description", home_pc, [
+        ("Black", "Case_ATX(Black)", "{Black}"),
+        ("White", "Case_ATX(White)", "{White}"),
+    ]),
+    ("Gaming", "{Gaming PC}", "Gaming PC Description", gaming_pc, [
+        ("Black", "Case_ATX 2(Black)", "{Black}"),
+        ("White", "Case_ATX 2(White)", "{White}"),
+    ]),
+    ("Workstation", "{Workstation PC}", "Workstation PC Description",
+     workstation_pc, [
+         ("Black", "Case_ATX 2(Black)", "{Black}"),
+         ("White", "Case_ATX 2(White)", "{White}"),
+     ]),
+    ("Aquarium", "{Aquarium PC}", "Aquarium PC Description", aquarium_pc, [
+        ("Black", "Aquarium_ATX(Black)", "{Black}"),
+        ("White", "Aquarium_ATX(White)", "{White}"),
+    ]),
+    ("Dream", "{Dream PC}", "Dream PC Description", dream_pc, [
+        ("Black", "Aquarium_ATX(Black)", "{Black}"),
+        ("White", "Aquarium_ATX(White)", "{White}"),
+    ]),
 ]
+
+MINER_MODELS = [
+    ("Cheap", "{Cheap Miner}", "Cheap Miner Description", miner_cheap,
+     "Miner", "Miner"),
+    ("Medium", "{Medium Miner}", "Medium Miner Description", miner_medium,
+     "Miner", "Miner"),
+    ("Titan", "{Titan Miner}", "Titan Miner Description", miner_titan,
+     "Miner", "Miner"),
+    ("Ultra", "{Ultra Miner}", "Ultra Miner Description", miner_ultra,
+     "BigMiner", "Big Miner"),
+    ("RTX5090", "{Flagship Miner}", "Flagship Miner Description", miner_5090,
+     "BigMiner", "Big Miner"),
+]
+
+
+def _make_builds() -> List[BuildSpec]:
+    builds: List[BuildSpec] = []
+    for key, title, desc, factory, variants in PC_MODELS:
+        for suffix, case, color in variants:
+            builds.append(
+                BuildSpec(
+                    key=f"ReadyPC_{key}_{suffix}",
+                    title=f"{title} ({color})",
+                    case=COMP + case + ".prefab",
+                    parts=factory(case),
+                    page="Ready PC",
+                    sprite_from=SPRITE_BY_CASE[case],
+                    description=desc,
+                )
+            )
+    for key, title, desc, factory, case, sprite in MINER_MODELS:
+        builds.append(
+            BuildSpec(
+                key=f"ReadyMiner_{key}",
+                title=title,
+                case=COMP + case + ".prefab",
+                parts=factory(),
+                page="Ready Miner",
+                sprite_from=sprite,
+                description=desc,
+            )
+        )
+    return builds
+
+
+# Иконка берётся у соответствующего корпуса из магазина.
+SPRITE_BY_CASE = {
+    "Case_ITX(Black)": "Case_ITX(Black)",
+    "Case_ITX(White)": "Case_ITX(White)",
+    "Case_ITX(Blue)": "Case_ITX(Blue)",
+    "Case_ITX(Red)": "Case_ITX(Red)",
+    "Case_ATX(Black)": "Case_ATX(Black)",
+    "Case_ATX(White)": "Case_ATX(White)",
+    "Case_ATX 2(Black)": "Case_ATX 2(Black)",
+    "Case_ATX 2(White)": "Case_ATX 2(White)",
+    "Aquarium_ATX(Black)": "ATX_Aquarium_black",
+    "Aquarium_ATX(White)": "ATX_Aquarium_White",
+}
+
+BUILDS: List[BuildSpec] = _make_builds()
 
 
 # ---------------------------------------------------------------------------
@@ -300,10 +479,7 @@ def sprite_of(asset_name: str) -> str:
 
 def base_ref(prefab_rel: str):
     """(guid, fileID корневого GameObject) базового префаба."""
-    full = os.path.join(REPO, prefab_rel)
-    doc = UnityDoc.load(full)
-    root = doc.root_game_object()
-    return read_meta_guid(full), root.file_id
+    return prefab_spawn_ref(os.path.join(REPO, prefab_rel), REPO)
 
 
 def main() -> int:

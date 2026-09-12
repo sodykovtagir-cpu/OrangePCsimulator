@@ -151,11 +151,24 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}
   - pageName: Ready PC
     item:
-    - {fileID: 11400000, guid: 0235d606c4c3b8585559382420b80f1e, type: 2}
-    - {fileID: 11400000, guid: 01bdbc3c4eec2dfe748abe0859cd0bbb, type: 2}
-    - {fileID: 11400000, guid: eed95391f826ed5f2c565f7bb599cdc7, type: 2}
+    - {fileID: 11400000, guid: 37369c251a2077cf14eda7b9cb979509, type: 2}
+    - {fileID: 11400000, guid: 141cc59db548bec45f9c140a5e000624, type: 2}
+    - {fileID: 11400000, guid: bcddaaf55820715ccdfe7eadc4820ede, type: 2}
+    - {fileID: 11400000, guid: d62cd921ab89ee8d7ea182759be01a22, type: 2}
+    - {fileID: 11400000, guid: a1eeb050a160e54345517b76862ce73b, type: 2}
+    - {fileID: 11400000, guid: 46b0c264791fb8e967a54426d0799f92, type: 2}
+    - {fileID: 11400000, guid: ba270e14ad1f91be3de79a0dd09d8572, type: 2}
+    - {fileID: 11400000, guid: 700207289beda8a0c27e0c7edc2267e5, type: 2}
+    - {fileID: 11400000, guid: 5fc178b8aad25cd0ef7981c88190995c, type: 2}
+    - {fileID: 11400000, guid: 811ab21ac9ab9c6ec5f1cfe241a7e5b3, type: 2}
+    - {fileID: 11400000, guid: 4bc24992f8b3141b568b9cba49744e12, type: 2}
+    - {fileID: 11400000, guid: 708846def91cc6711fc95af52294695a, type: 2}
+    - {fileID: 11400000, guid: 0bfbcc26540e69fe8dffd1c9e6071491, type: 2}
+    - {fileID: 11400000, guid: 44b86f5d76629301fab8deb33aac9adb, type: 2}
   - pageName: Ready Miner
     item:
     - {fileID: 11400000, guid: a686bb43c1f327094cb8f73291f47e3b, type: 2}
     - {fileID: 11400000, guid: a21b78346bae76ee8069f5dbf8daec01, type: 2}
+    - {fileID: 11400000, guid: d4b86b0f5d1f95e5f60aef6ad6228765, type: 2}
     - {fileID: 11400000, guid: a2e75cf4619ef1e6a58122e91eeffa2d, type: 2}
+    - {fileID: 11400000, guid: 231dc0a0a96d37f8dab4c8aa8eb28c44, type: 2}

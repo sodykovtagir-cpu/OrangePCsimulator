@@ -140,8 +140,13 @@ print("\nМагазин")
 pages = dict(shop_pages(str(ROOT / gen.SHOP)))
 check("Ready PC" in pages, "страница 'Ready PC' есть в Shop.asset")
 check("Ready Miner" in pages, "страница 'Ready Miner' есть в Shop.asset")
-check(len(pages.get("Ready PC", [])) == 3, "на странице 'Ready PC' три сборки")
-check(len(pages.get("Ready Miner", [])) == 3, "на странице 'Ready Miner' три майнера")
+
+expected_pc = sum(1 for b in gen.BUILDS if b.page == "Ready PC")
+expected_miner = sum(1 for b in gen.BUILDS if b.page == "Ready Miner")
+check(len(pages.get("Ready PC", [])) == expected_pc,
+      f"на странице 'Ready PC' {expected_pc} сборок")
+check(len(pages.get("Ready Miner", [])) == expected_miner,
+      f"на странице 'Ready Miner' {expected_miner} майнеров")
 
 for page, guids in pages.items():
     check(len(guids) == len(set(guids)), f"страница '{page}' без дублей")

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &4671239990028079720
+--- !u!1 &1806925585756163624
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,22 +8,22 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 828376817325055814}
-  - component: {fileID: 5246810285097348005}
+  - component: {fileID: 4268154997959851726}
+  - component: {fileID: 4778766678112066112}
   m_Layer: 0
-  m_Name: ReadyMiner_Ultra
+  m_Name: ReadyMiner_RTX5090
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &828376817325055814
+--- !u!4 &4268154997959851726
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4671239990028079720}
+  m_GameObject: {fileID: 1806925585756163624}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -32,13 +32,13 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &5246810285097348005
+--- !u!114 &4778766678112066112
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4671239990028079720}
+  m_GameObject: {fileID: 1806925585756163624}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01aba92678a70fdad133966614ce5f35, type: 3}
@@ -50,19 +50,19 @@ MonoBehaviour:
     localPosition: {x: -0.3, y: 3.8, z: -0.98}
     localEuler: {x: 270, y: 180, z: 0}
     order: 0
-  - prefab: {fileID: 1743462487490901, guid: 469a502fe839c3243bd60307436c9b5f, type: 3}
+  - prefab: {fileID: 1874669844494836, guid: e49aab5a509c3854b95249d4abaafd8b, type: 3}
     localPosition: {x: -0.31, y: 3.54, z: -0.907}
     localEuler: {x: 270, y: 180, z: 0}
     order: 1
-  - prefab: {fileID: 1231632343404861, guid: 79e52514a44a98f49a564b8ab4f6d2ba, type: 3}
+  - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
     localPosition: {x: -0.31, y: 3.54, z: -0.344}
     localEuler: {x: 270, y: 180, z: 0}
     order: 2
-  - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
+  - prefab: {fileID: 1399950458602353, guid: eb52917055a57ec43bd2363005b4e078, type: 3}
     localPosition: {x: 0.4496, y: 3.68758, z: -0.71}
     localEuler: {x: 0, y: 180, z: 90}
     order: 3
-  - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
+  - prefab: {fileID: 1399950458602353, guid: eb52917055a57ec43bd2363005b4e078, type: 3}
     localPosition: {x: 0.5504, y: 3.68758, z: -0.71}
     localEuler: {x: 0, y: 180, z: 90}
     order: 4
@@ -90,107 +90,107 @@ MonoBehaviour:
     localPosition: {x: 0.07, y: -0.4, z: -0.56}
     localEuler: {x: 0, y: 90, z: 90}
     order: 10
-  - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
+  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
     localPosition: {x: -0.878, y: 0.699, z: -0.86}
     localEuler: {x: 0, y: 270, z: 270}
     order: 11
-  - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
+  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
     localPosition: {x: -0.878, y: 0.699, z: -0.509}
     localEuler: {x: 0, y: 270, z: 270}
     order: 12
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -4.896, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 13
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -4.786, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 14
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -4.276, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 15
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -4.166, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 16
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -3.656, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 17
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -3.546, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 18
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -3.036, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 19
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -2.926, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 20
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -2.416, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 21
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -2.306, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 22
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -1.796, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 23
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -1.686, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 24
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -1.176, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 25
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -1.066, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 26
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: 0.074, y: -0.556, z: 0.483}
     localEuler: {x: 0, y: 180, z: 180}
     order: 27
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: -0.446, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 28
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 0.194, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 29
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 0.814, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 30
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 1.434, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 31
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 2.054, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 32
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 2.674, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 33
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 3.294, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 34
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 3.914, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 35
-  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.02791, y: 4.534, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 36
