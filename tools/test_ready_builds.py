@@ -311,11 +311,34 @@ check(_guid_exists("7c1f4b6ae2d84a1d9b3f5e08c7a26d41"),
 
 guard_src = guard_cs.read_text(encoding="utf-8")
 # Стеклянные крышки — Glass : Destruction. Этот компонент не помечает
-# деталь сломанной, а уничтожает её, поэтому кинематики мало: его надо
-# гасить явно, иначе аквариумные сборки бьются прямо при установке.
+# деталь сломанной, а уничтожает её, поэтому его надо гасить явно,
+# иначе аквариумные сборки бьются прямо при установке.
 check("Destruction" in guard_src, "ImpactGuard гасит Destruction (стекло)")
 check("Breakable" in guard_src, "ImpactGuard гасит Breakable")
-check("isKinematic" in guard_src, "ImpactGuard делает деталь кинематической")
+
+# Деталь НЕ должна становиться кинематической: кинематическое тело не даёт
+# нормальных контактов, слот его не подхватывает, а FixedJoint из
+# Slot.SetComponent к нему не применяется — деталь повисает в воздухе.
+guard_code = "\n".join(
+    line for line in guard_src.split("\n") if not line.strip().startswith("//"))
+check("isKinematic" not in guard_code,
+      "ImpactGuard не делает деталь кинематической (иначе слот её не примет)")
+check("Connector" in guard_src,
+      "ImpactGuard снимает защиту, как только слот принял деталь")
+
+# Корпус на время сборки замораживается ограничениями, а не кинематикой:
+# FixedJoint детали цепляется к Rigidbody корпуса и требует динамическое тело.
+check("RigidbodyConstraints.FreezeAll" in spawner_cs,
+      "спавнер морозит корпус ограничениями, а не isKinematic")
+check("rootBody.isKinematic = true" not in spawner_cs,
+      "спавнер не делает корпус кинематическим")
+
+# OnTriggerEnter срабатывает только на вход коллайдера в зону, поэтому
+# деталь, созданную сразу внутри триггера, нужно «внести» в слот заново.
+check("SetActive(false)" in spawner_cs and "SetActive(true)" in spawner_cs,
+      "спавнер перевходит деталь в триггер слота")
+check("не попала в слот" in spawner_cs,
+      "спавнер предупреждает в логе о неподключённой детали")
 
 # Защита обязана держаться до конца сборки: пока ставятся оставшиеся
 # детали, уже установленные тоже могут получить импульс.

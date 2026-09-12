@@ -79,11 +79,20 @@ namespace PC
 			yield return StartCoroutine(WaitUntilSettled(rootBody));
 
 			// Пока детали расставляются, корпус не должен уехать от толчков.
-			bool restoreKinematic = false;
-			if (rootBody != null && !rootBody.isKinematic)
+			// Кинематическим его делать НЕЛЬЗЯ: Slot.SetComponent вешает на
+			// деталь FixedJoint и цепляет его к Rigidbody корпуса, а joint,
+			// связанный с кинематическим телом, деталь не удержит. Вместо
+			// этого замораживаем корпус ограничениями — он остаётся
+			// динамическим и полноценно работает как якорь для joint'ов.
+			RigidbodyConstraints savedConstraints = RigidbodyConstraints.None;
+			bool restoreConstraints = false;
+			if (rootBody != null)
 			{
-				rootBody.isKinematic = true;
-				restoreKinematic = true;
+				savedConstraints = rootBody.constraints;
+				rootBody.velocity = Vector3.zero;
+				rootBody.angularVelocity = Vector3.zero;
+				rootBody.constraints = RigidbodyConstraints.FreezeAll;
+				restoreConstraints = true;
 			}
 
 			yield return new WaitForFixedUpdate();
@@ -115,6 +124,21 @@ namespace PC
 						body.angularVelocity = Vector3.zero;
 					}
 
+					// Slot ловит деталь в OnTriggerEnter, а он срабатывает
+					// только на ВХОД коллайдера в зону. Деталь, созданная
+					// сразу внутри триггера, событие может не породить —
+					// тогда она так и висит в корпусе неподключённой (именно
+					// это и происходило с БП, накопителем и видеокартой).
+					// Поэтому принудительно «вносим» её в слот: гасим объект
+					// на один шаг физики и включаем обратно, чтобы коллайдер
+					// зашёл в триггер заново и событие гарантированно возникло.
+					spawned.SetActive(false);
+					yield return new WaitForFixedUpdate();
+					spawned.SetActive(true);
+
+					// Защита вешается после перевхода: SetActive(false)
+					// прервал бы отсчёт, а MonoBehaviour на выключенном
+					// объекте не получает FixedUpdate.
 					// Пока деталь не поймана слотом, она не должна получать
 					// урон от касания корпуса и соседних деталей: Breakable и
 					// Storage ломают железо по импульсу, а Destruction/Glass
@@ -137,13 +161,26 @@ namespace PC
 						yield return new WaitForSeconds(stepDelay);
 					else
 						yield return new WaitForFixedUpdate();
+
+					// Слот вешает Connector на подключённую деталь. Нет его —
+					// деталь осталась висеть в корпусе неподключённой, и это
+					// нужно видеть в логе, а не искать глазами по сборке.
+					if (spawned != null && spawned.GetComponent<Connector>() == null)
+					{
+						Debug.LogWarning(
+							$"{name}: деталь '{part.prefab.name}' не попала в слот");
+					}
 				}
 			}
 
 			yield return new WaitForFixedUpdate();
 
-			if (restoreKinematic && rootBody != null)
-				rootBody.isKinematic = false;
+			if (restoreConstraints && rootBody != null)
+			{
+				rootBody.constraints = savedConstraints;
+				rootBody.velocity = Vector3.zero;
+				rootBody.angularVelocity = Vector3.zero;
+			}
 
 			if (destroyAfterBuild)
 				Destroy(gameObject);

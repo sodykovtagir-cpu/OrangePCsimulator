@@ -12,27 +12,32 @@ using UnityEngine;
 /// * Destruction (и его наследник Glass — стеклянные крышки) вообще
 ///   уничтожает объект и подменяет его осколками.
 ///
-/// Решение — на время установки сделать Rigidbody кинематическим:
-/// кинематическое тело не участвует в расчёте импульсов, поэтому урона
-/// не будет ни при каком контакте. Триггеры при этом работают штатно, так
-/// что Slot.OnTriggerEnter ловит деталь как обычно.
+/// Что здесь делается, пока деталь не подключилась:
 ///
-/// Дополнительно на время установки отключаются сами компоненты-разрушители:
-/// одной кинематики мало, если деталь толкнёт другое динамическое тело
-/// (например, соседняя карта в плотно набитом майнере) — импульс в таком
-/// контакте всё равно посчитается.
+/// 1. отключаются сами компоненты-разрушители (Breakable, Destruction);
+/// 2. деталь удерживается ровно в целевой позе, а её скорости обнуляются
+///    каждый FixedUpdate — тело почти не накапливает импульс, поэтому даже
+///    включённые обработчики урона не нашли бы повода сработать.
 ///
-/// По истечении срока компонент возвращает всё как было и удаляет сам себя,
-/// так что дальше деталь ведёт себя полностью обычно: её можно разбить,
-/// сломать и разобрать.
+/// Важно: деталь НЕ делается кинематической. Кинематическое тело не создаёт
+/// нормальных контактов, слот не успевает подхватить его штатным путём, а
+/// FixedJoint, который Slot.SetComponent вешает на деталь, к кинематическому
+/// телу просто не применяется — деталь так и остаётся висеть в воздухе рядом
+/// со слотом. Именно поэтому удержание сделано «мягким», через сброс
+/// скоростей, а не через isKinematic.
+///
+/// Как только слот принял деталь (на ней появляется Connector) или истекает
+/// срок, компонент возвращает всё как было и удаляет сам себя.
 /// </summary>
 [DisallowMultipleComponent]
 public class ImpactGuard : MonoBehaviour
 {
 	private float until;
-	private Rigidbody body;
-	private bool wasKinematic;
 	private bool armed;
+
+	private Rigidbody body;
+	private Vector3 holdPosition;
+	private Quaternion holdRotation;
 
 	// Компоненты, которые ломают деталь по импульсу столкновения.
 	// Храним только те, что были включены — чтобы не включить лишнее.
@@ -50,12 +55,13 @@ public class ImpactGuard : MonoBehaviour
 		armed = true;
 
 		body = GetComponent<Rigidbody>();
+		holdPosition = transform.position;
+		holdRotation = transform.rotation;
+
 		if (body != null)
 		{
-			wasKinematic = body.isKinematic;
 			body.velocity = Vector3.zero;
 			body.angularVelocity = Vector3.zero;
-			body.isKinematic = true;
 		}
 
 		breakable = GetComponent<Breakable>();
@@ -79,10 +85,32 @@ public class ImpactGuard : MonoBehaviour
 
 	private void FixedUpdate()
 	{
-		if (Time.time < until) return;
+		if (!armed) return;
 
-		Release();
-		Destroy(this);
+		// Connector слот вешает на деталь в момент подключения. Появился —
+		// значит деталь уже в слоте и держать её больше не нужно.
+		bool connected = GetComponent<Connector>() != null;
+
+		if (connected || Time.time >= until)
+		{
+			Release();
+			Destroy(this);
+			return;
+		}
+
+		// Удерживаем деталь в целевой позе: без этого она за пару кадров
+		// успевает соскользнуть из триггера слота и «промахивается» мимо него.
+		if (body != null)
+		{
+			body.velocity = Vector3.zero;
+			body.angularVelocity = Vector3.zero;
+			body.MovePosition(holdPosition);
+			body.MoveRotation(holdRotation);
+		}
+		else
+		{
+			transform.SetPositionAndRotation(holdPosition, holdRotation);
+		}
 	}
 
 	private void OnDestroy()
@@ -97,9 +125,6 @@ public class ImpactGuard : MonoBehaviour
 
 		if (body != null)
 		{
-			// Если слот успел подключить деталь, у неё уже есть FixedJoint —
-			// возврат в динамический режим ему не мешает, соединение держится.
-			body.isKinematic = wasKinematic;
 			body.velocity = Vector3.zero;
 			body.angularVelocity = Vector3.zero;
 		}
