@@ -1,0 +1,198 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4671239990028079720
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 828376817325055814}
+  - component: {fileID: 5246810285097348005}
+  m_Layer: 0
+  m_Name: ReadyMiner_Ultra
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &828376817325055814
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4671239990028079720}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5246810285097348005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4671239990028079720}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01aba92678a70fdad133966614ce5f35, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  basePrefab: {fileID: 32095820392500313, guid: c05a70581d0032c418c44d40a1de8d3f, type: 3}
+  parts:
+  - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
+    localPosition: {x: -0.3, y: 3.8, z: -0.98}
+    localEuler: {x: 270, y: 180, z: 0}
+    order: 0
+  - prefab: {fileID: 1743462487490901, guid: 469a502fe839c3243bd60307436c9b5f, type: 3}
+    localPosition: {x: -0.31, y: 3.54, z: -0.907}
+    localEuler: {x: 270, y: 180, z: 0}
+    order: 1
+  - prefab: {fileID: 1231632343404861, guid: 79e52514a44a98f49a564b8ab4f6d2ba, type: 3}
+    localPosition: {x: -0.31, y: 3.54, z: -0.344}
+    localEuler: {x: 270, y: 180, z: 0}
+    order: 2
+  - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
+    localPosition: {x: 0.4496, y: 3.68758, z: -0.71}
+    localEuler: {x: 0, y: 180, z: 90}
+    order: 3
+  - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
+    localPosition: {x: 0.5504, y: 3.68758, z: -0.71}
+    localEuler: {x: 0, y: 180, z: 90}
+    order: 4
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.07, y: -4.44, z: -0.56}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 5
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.11, y: -3.296, z: -0.5}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 6
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.07, y: -3.06, z: -0.56}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 7
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.11, y: -1.947, z: -0.5}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 8
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.07, y: -1.67, z: -0.56}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 9
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+    localPosition: {x: 0.07, y: -0.4, z: -0.56}
+    localEuler: {x: 0, y: 90, z: 90}
+    order: 10
+  - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
+    localPosition: {x: -0.878, y: 0.699, z: -0.86}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 11
+  - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
+    localPosition: {x: -0.878, y: 0.699, z: -0.509}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 12
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -4.896, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 13
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -4.786, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 14
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -4.276, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 15
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -4.166, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 16
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -3.656, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 17
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -3.546, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 18
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -3.036, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 19
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -2.926, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 20
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -2.416, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 21
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -2.306, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 22
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -1.796, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 23
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -1.686, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 24
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -1.176, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 25
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -1.066, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 26
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: 0.074, y: -0.556, z: 0.483}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 27
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: -0.446, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 28
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 0.194, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 29
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 0.814, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 30
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 1.434, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 31
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 2.054, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 32
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 2.674, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 33
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 3.294, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 34
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 3.914, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 35
+  - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
+    localPosition: {x: -0.02791, y: 4.534, z: 0.489}
+    localEuler: {x: 0, y: 180, z: 180}
+    order: 36
+  stepDelay: 0.05
+  destroyAfterBuild: 1

@@ -1,0 +1,110 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4797928028741757737
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4030944361499066125}
+  - component: {fileID: 6465061645890910838}
+  m_Layer: 0
+  m_Name: ReadyMiner_Medium
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4030944361499066125
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4797928028741757737}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6465061645890910838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4797928028741757737}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01aba92678a70fdad133966614ce5f35, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  basePrefab: {fileID: 1989475925588944, guid: f95f9a5113e866f4fa7828f3c8ce0944, type: 3}
+  parts:
+  - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
+    localPosition: {x: -0.3, y: -1.08, z: 1.4}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 0
+  - prefab: {fileID: 1895436721047867, guid: 384e3de8577e29840b7db5e06b58c200, type: 3}
+    localPosition: {x: -0.31, y: -1.007, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 1
+  - prefab: {fileID: 1231632343404861, guid: 79e52514a44a98f49a564b8ab4f6d2ba, type: 3}
+    localPosition: {x: -0.31, y: -0.444, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 2
+  - prefab: {fileID: 1418733553814852, guid: 9eb88e8457ba0d64099e1c2f5e616f0d, type: 3}
+    localPosition: {x: 0.4496, y: -0.81, z: 1.51242}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 3
+  - prefab: {fileID: 1420016328669017, guid: 185d4e02bad8c6f4da76f4a9cb8b3ea8, type: 3}
+    localPosition: {x: -0.7, y: -0.7, z: -1.7}
+    localEuler: {x: 0, y: 270, z: 0}
+    order: 4
+  - prefab: {fileID: 1420016328669017, guid: 185d4e02bad8c6f4da76f4a9cb8b3ea8, type: 3}
+    localPosition: {x: -0.7, y: -0.7, z: -0.35}
+    localEuler: {x: 0, y: 270, z: 0}
+    order: 5
+  - prefab: {fileID: 1377971778360680, guid: 6667d33e36a35dc48bd6e0923d098a32, type: 3}
+    localPosition: {x: 0.914, y: -0.965, z: -1.748}
+    localEuler: {x: 0, y: 0, z: 0}
+    order: 6
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -2.17761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 7
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -1.55761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 8
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -0.93761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 9
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -0.31761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 10
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: 0.30239}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 11
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: 0.92239}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 12
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: 1.54239}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 13
+  - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: 2.16239}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 14
+  stepDelay: 0.05
+  destroyAfterBuild: 1

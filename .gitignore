@@ -100,3 +100,4 @@ Hosting/workshop/promo_claimed.json
 Hosting/workshop/uploads/
 Hosting/workshop/users.json
 Hosting/workshop/tg_pending.json
+tools/__pycache__/
