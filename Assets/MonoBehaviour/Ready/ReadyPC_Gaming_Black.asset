@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 5315
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 52e52e08ed834a945865945b8fecc204, type: 2}
-  spawn: {fileID: 6607998683316775260, guid: 24e4361f1314eb64125ad51d9f28df81, type: 3}
+  spawn: {fileID: 537173754770550435, guid: 52932cb89f61b73234b3948d9abdb6e1, type: 3}
   large: 1
   translateDescription: 1
   description: 'Gaming PC Description'

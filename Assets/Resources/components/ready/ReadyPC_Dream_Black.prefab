@@ -50,7 +50,7 @@ MonoBehaviour:
     localPosition: {x: -0.72, y: 0.44, z: -0.835}
     localEuler: {x: 90, y: 90, z: 0}
     order: 0
-  - prefab: {fileID: 1105020807176550, guid: 02cde2b27cf815f4aba1d19765f8dcbd, type: 3}
+  - prefab: {fileID: 1874669844494836, guid: e49aab5a509c3854b95249d4abaafd8b, type: 3}
     localPosition: {x: -0.647, y: 1.05242, z: -0.72467}
     localEuler: {x: 90, y: 90, z: 0}
     order: 1

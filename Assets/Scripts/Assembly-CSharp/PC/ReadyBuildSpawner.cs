@@ -51,6 +51,10 @@ namespace PC
 		[Tooltip("Уничтожить пустышку-спавнер после сборки")]
 		private bool destroyAfterBuild = true;
 
+		[SerializeField]
+		[Tooltip("Сколько ждать приземления корпуса, прежде чем ставить детали")]
+		private float settleTimeout = 5f;
+
 		private void Start()
 		{
 			StartCoroutine(Build());
@@ -65,9 +69,16 @@ namespace PC
 			}
 
 			var root = Instantiate(basePrefab, transform.position, transform.rotation);
+			var rootBody = root.GetComponent<Rigidbody>();
+
+			// Корпус может появиться в воздухе (портал доставки, вскрытый ящик).
+			// Расставлять детали сразу нельзя: связка «корпус + деталь»
+			// приземляется как одно тело, удар приходится по деталям и
+			// Breakable/Storage засчитывают им урон. Поэтому сперва даём
+			// корпусу спокойно упасть и улечься.
+			yield return StartCoroutine(WaitUntilSettled(rootBody));
 
 			// Пока детали расставляются, корпус не должен уехать от толчков.
-			var rootBody = root.GetComponent<Rigidbody>();
 			bool restoreKinematic = false;
 			if (rootBody != null && !rootBody.isKinematic)
 			{
@@ -102,6 +113,13 @@ namespace PC
 						body.angularVelocity = Vector3.zero;
 					}
 
+					// Пока деталь не поймана слотом, она не должна получать
+					// урон от касания корпуса: коллизия «деталь в корпусе»
+					// на первом же FixedUpdate даёт импульс, а Breakable и
+					// Storage ломают железо по импульсу.
+					var guard = spawned.AddComponent<ImpactGuard>();
+					guard.Disarm(stepDelay + 0.5f);
+
 					// Даём физике шаг: OnTriggerEnter слота срабатывает
 					// на следующем FixedUpdate после появления коллайдера.
 					if (stepDelay > 0f)
@@ -118,6 +136,39 @@ namespace PC
 
 			if (destroyAfterBuild)
 				Destroy(gameObject);
+		}
+
+		/// <summary>
+		/// Ждёт, пока корпус перестанет двигаться (или истечёт таймаут).
+		/// Кинематический и уснувший Rigidbody считаются готовыми сразу.
+		/// </summary>
+		private IEnumerator WaitUntilSettled(Rigidbody body)
+		{
+			if (body == null || body.isKinematic)
+			{
+				yield return new WaitForFixedUpdate();
+				yield break;
+			}
+
+			float deadline = Time.time + Mathf.Max(0f, settleTimeout);
+			int calmFrames = 0;
+
+			while (Time.time < deadline)
+			{
+				yield return new WaitForFixedUpdate();
+
+				if (body == null) yield break;
+
+				bool calm = body.IsSleeping()
+					|| (body.velocity.sqrMagnitude < 0.01f
+						&& body.angularVelocity.sqrMagnitude < 0.01f);
+
+				calmFrames = calm ? calmFrames + 1 : 0;
+
+				// Несколько спокойных шагов подряд — корпус точно лежит,
+				// а не завис в верхней точке отскока.
+				if (calmFrames >= 5) yield break;
+			}
 		}
 	}
 }

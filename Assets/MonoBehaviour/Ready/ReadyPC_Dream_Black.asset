@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: ReadyPC_Dream_Black
   m_EditorClassIdentifier: 
   itemName: '{Dream PC} ({Black})'
-  price: 15520
+  price: 15300
   bitcoin: 0
   sprite: {fileID: 21300000, guid: c6bad9cdeaf782f40ad4ea3abba03ae9, type: 2}
-  spawn: {fileID: 3125270931585662628, guid: 73e4732218964cc91517e2dfba1b33b1, type: 3}
+  spawn: {fileID: 2556544496470639101, guid: 8a5cd29ad9879141225d5f79de232e5a, type: 3}
   large: 1
   translateDescription: 1
   description: 'Dream PC Description'

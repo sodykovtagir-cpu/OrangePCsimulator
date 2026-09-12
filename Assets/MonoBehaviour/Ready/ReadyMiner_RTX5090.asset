@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 65815
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 7d955df2ef2771c409116615374b28bc, type: 2}
-  spawn: {fileID: 1806925585756163624, guid: e93e25784887b23d1cb5e1717574c9cb, type: 3}
+  spawn: {fileID: 1385550457415843721, guid: 39498b781f096bfc72d74a0e73be17f6, type: 3}
   large: 1
   translateDescription: 1
   description: 'Flagship Miner Description'

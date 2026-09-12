@@ -38,6 +38,7 @@ from unity_asset_tool import (  # noqa: E402
     quat_to_euler,
     read_meta_guid,
     shop_add_page,
+    write_crate_prefab,
 )
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -276,7 +277,7 @@ def dream_pc(case: str) -> List[PartRef]:
     """Полный фарш: EXATX, 512 ГБ RGB-памяти, RTX 5090 и Titan V."""
     parts = [
         p("EXATX", "Motherboard"),
-        p("CPU i9-7900X", "CPU", host="EXATX"),
+        p("CPU RMD Ryzen 9 7950X", "CPU", host="EXATX"),
         p("WaterCooler", "Cooler", host="EXATX"),
     ]
     parts += [p("RAM 64GB(RGB)", "RAM", host="EXATX") for _ in range(8)]
@@ -450,6 +451,34 @@ def _make_builds() -> List[BuildSpec]:
     return builds
 
 
+# Ящик доставки. Обычные корпуса приезжают запакованными: ShopItem.spawn
+# ссылается на Crate_*, а не на сам корпус. Готовые сборки делаем так же —
+# иначе ПК вываливается из портала в воздухе, падает и разбивается.
+# Значение — ящик-образец, у которого берутся меши, коллайдеры и звук.
+CRATE_TEMPLATE_BY_CASE = {
+    "Case_ITX(Black)": "Crate_Case_ITX(Black)",
+    "Case_ITX(White)": "Crate_Case_ITX(White)",
+    "Case_ITX(Blue)": "Crate_Case_ITX(Blue)",
+    "Case_ITX(Red)": "Crate_Case_ITX(Red)",
+    "Case_ATX(Black)": "Crate_Case_ATX(Black)",
+    "Case_ATX(White)": "Crate_Case_ATX(White)",
+    "Case_ATX 2(Black)": "Crate_Case_ATX 2(Black)",
+    "Case_ATX 2(White)": "Crate_Case_ATX 2(White)",
+    "Aquarium_ATX(Black)": "Crate_Case_ATX_Aquarium_Black",
+    "Aquarium_ATX(White)": "Crate_Case_ATX_Aquarium_White",
+    # Рамы майнеров своих ящиков не имеют — берём самый большой корпусной.
+    "Miner": "Crate_Case_ATX 2(Black)",
+    "BigMiner": "Crate_Case_ATX 2(Black)",
+}
+
+
+def crate_template_for(case_prefab_name: str) -> str:
+    try:
+        return CRATE_TEMPLATE_BY_CASE[case_prefab_name]
+    except KeyError:
+        raise SystemExit(f"Нет ящика-образца для корпуса '{case_prefab_name}'")
+
+
 # Иконка берётся у соответствующего корпуса из магазина.
 SPRITE_BY_CASE = {
     "Case_ITX(Black)": "Case_ITX(Black)",
@@ -533,16 +562,31 @@ def main() -> int:
             parts=resolved,
         )
 
+        # Ящик доставки: внутрь кладём спавнер сборки. Игрок вскрывает ящик
+        # молотком, как и любой другой крупный товар, и только тогда
+        # начинается сборка — на полу, а не в воздухе.
+        crate_name = "Crate_" + spec.key
+        crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
+        template = os.path.join(
+            REPO, COMP, crate_template_for(case_name) + ".prefab")
+        crate_guid, crate_root = write_crate_prefab(
+            path=crate_path,
+            crate_name=crate_name,
+            template_prefab=template,
+            content_guid=prefab_guid,
+            content_file_id=go_id,
+        )
+
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         item = ShopItemAsset(
             name=spec.key,
             item_name=spec.title,
             price=price,
-            spawn_guid=prefab_guid,
-            spawn_file_id=go_id,
+            spawn_guid=crate_guid,
+            spawn_file_id=crate_root,
             sprite_guid=sprite_of(spec.sprite_from),
             bitcoin=0,
-            large=1,  # готовый ПК приезжает порталом, а не в коробке
+            large=1,  # крупный товар: приезжает порталом, как и корпуса
             description=spec.description,
         )
         asset_guid = item.write(asset_path, guid=make_guid("asset:" + spec.key))
