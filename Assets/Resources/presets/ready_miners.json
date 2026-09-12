@@ -112,5 +112,72 @@
     "powerConsumption": "1500W",
     "miningAlgorithm": "SHA-256",
     "efficiency": "7.5 J/TH"
+  },
+  {
+    "name": "Large Bitcoin Miner Farm",
+    "description": "Industrial-scale Bitcoin mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "10x ASUS B250 Mining Expert", "price": 3300},
+      {"type": "CPU", "name": "10x Intel Celeron G5900", "price": 660},
+      {"type": "GPU", "name": "80x NVIDIA RTX 4090", "price": 176000},
+      {"type": "RAM", "name": "320GB DDR4-3200", "price": 1320},
+      {"type": "Storage", "name": "10x 1TB SATA SSD", "price": 1100},
+      {"type": "PSU", "name": "20x 1600W Platinum", "price": 17600},
+      {"type": "Cooler", "name": "Industrial Cooling System x10", "price": 4400},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x10", "price": 5500},
+      {"type": "Power Distribution", "name": "Industrial PDU", "price": 8800},
+      {"type": "Ventilation", "name": "Industrial Ventilation System", "price": 11000}
+    ],
+    "totalPrice": 238680,
+    "hashRate": "8000 TH/s",
+    "powerConsumption": "60000W",
+    "miningAlgorithm": "SHA-256",
+    "efficiency": "7.5 J/TH"
+  },
+  {
+    "name": "Large Ethereum Miner Farm",
+    "description": "Industrial-scale Ethereum mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "15x ASUS B250 Mining Expert", "price": 4950},
+      {"type": "CPU", "name": "15x Intel Celeron G5900", "price": 990},
+      {"type": "GPU", "name": "180x AMD RX 7900 XTX", "price": 297000},
+      {"type": "RAM", "name": "960GB DDR4-3200", "price": 3300},
+      {"type": "Storage", "name": "15x 2TB SATA SSD", "price": 3300},
+      {"type": "PSU", "name": "30x 2000W Server PSU", "price": 33000},
+      {"type": "Cooler", "name": "Industrial Cooling System x15", "price": 8250},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x15", "price": 9900},
+      {"type": "Power Distribution", "name": "Industrial PDU", "price": 11000},
+      {"type": "Ventilation", "name": "Industrial Ventilation System", "price": 16500}
+    ],
+    "totalPrice": 394190,
+    "hashRate": "54 GH/s",
+    "powerConsumption": "112500W",
+    "miningAlgorithm": "Ethash",
+    "efficiency": "2.08 W/MH"
+  },
+  {
+    "name": "Large Mixed Miner Farm",
+    "description": "Large-scale mixed algorithm mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "20x ASUS B250 Mining Expert", "price": 6600},
+      {"type": "CPU", "name": "20x AMD Ryzen 7 5700X", "price": 8800},
+      {"type": "GPU", "name": "120x NVIDIA RTX 4090", "price": 198000},
+      {"type": "GPU", "name": "80x AMD RX 7900 XTX", "price": 176000},
+      {"type": "RAM", "name": "1.2TB DDR4-3200", "price": 6600},
+      {"type": "Storage", "name": "20x 2TB NVMe SSD", "price": 11000},
+      {"type": "PSU", "name": "50x 2000W Server PSU", "price": 55000},
+      {"type": "Cooler", "name": "Industrial Cooling System x20", "price": 11000},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x20", "price": 17600},
+      {"type": "Power Distribution", "name": "Industrial PDU x2", "price": 22000},
+      {"type": "Ventilation", "name": "Industrial Ventilation System x2", "price": 33000}
+    ],
+    "totalPrice": 446600,
+    "hashRate": "4000 TH/s + 24 GH/s",
+    "powerConsumption": "150000W",
+    "miningAlgorithm": "Mixed (SHA-256 + Ethash)",
+    "efficiency": "37.5 J/TH"
   }
 ]
