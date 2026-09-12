@@ -309,6 +309,48 @@ check(guard_cs.exists(), "ImpactGuard.cs существует")
 check(_guid_exists("7c1f4b6ae2d84a1d9b3f5e08c7a26d41"),
       "у ImpactGuard.cs есть .meta с guid")
 
+guard_src = guard_cs.read_text(encoding="utf-8")
+# Стеклянные крышки — Glass : Destruction. Этот компонент не помечает
+# деталь сломанной, а уничтожает её, поэтому кинематики мало: его надо
+# гасить явно, иначе аквариумные сборки бьются прямо при установке.
+check("Destruction" in guard_src, "ImpactGuard гасит Destruction (стекло)")
+check("Breakable" in guard_src, "ImpactGuard гасит Breakable")
+check("isKinematic" in guard_src, "ImpactGuard делает деталь кинематической")
+
+# Защита обязана держаться до конца сборки: пока ставятся оставшиеся
+# детали, уже установленные тоже могут получить импульс.
+check(spawner_cs.count("Disarm") >= 2,
+      "спавнер продлевает защиту уже установленным деталям")
+
+# ---------------------------------------------------------------------------
+print("\n.meta текстур совместимы с Unity 2022.3")
+
+# .meta от Unity 6 (TextureImporter serializedVersion: 13) импортёр 2022.3
+# не читает: «Unknown error occurred while loading ...», иконка не грузится.
+import fix_texture_meta as texmeta  # noqa: E402
+
+bad_meta = []
+for dirpath, _dirs, files in os.walk(ROOT / "Assets"):
+    for fn in files:
+        if not fn.endswith(".meta"):
+            continue
+        full = os.path.join(dirpath, fn)
+        with open(full, encoding="utf-8", errors="replace") as fh:
+            content = fh.read()
+        if "TextureImporter:" in content and texmeta.needs_fix(content):
+            bad_meta.append(os.path.relpath(full, ROOT))
+
+check(not bad_meta,
+      "нет .meta текстур от новой Unity"
+      + (f" (сломано: {len(bad_meta)}, напр. {bad_meta[0]})" if bad_meta else ""))
+
+# Иконки готовых сборок обязаны существовать и импортироваться.
+for spec in gen.BUILDS:
+    asset = (ROOT / gen.OUT_ASSETS / f"{spec.key}.asset").read_text(encoding="utf-8")
+    ref = re.search(r"sprite: \{fileID: \d+, guid: (\w+)", asset)
+    check(ref is not None and _guid_exists(ref.group(1)),
+          f"{spec.key}: иконка существует в проекте")
+
 # ---------------------------------------------------------------------------
 print("\nГенератор идемпотентен")
 

@@ -93,6 +93,8 @@ namespace PC
 				var ordered = new List<Part>(parts);
 				ordered.Sort((a, b) => a.order.CompareTo(b.order));
 
+				var guards = new List<ImpactGuard>();
+
 				for (int i = 0; i < ordered.Count; i++)
 				{
 					var part = ordered[i];
@@ -114,11 +116,20 @@ namespace PC
 					}
 
 					// Пока деталь не поймана слотом, она не должна получать
-					// урон от касания корпуса: коллизия «деталь в корпусе»
-					// на первом же FixedUpdate даёт импульс, а Breakable и
-					// Storage ломают железо по импульсу.
+					// урон от касания корпуса и соседних деталей: Breakable и
+					// Storage ломают железо по импульсу, а Destruction/Glass
+					// (стеклянные крышки) вовсе разлетаются осколками.
 					var guard = spawned.AddComponent<ImpactGuard>();
 					guard.Disarm(stepDelay + 0.5f);
+					guards.Add(guard);
+
+					// Защита держится до конца сборки: пока ставятся
+					// оставшиеся детали, уже установленные тоже под ударом.
+					float rest = (ordered.Count - i) * Mathf.Max(stepDelay, 0.02f) + 0.5f;
+					for (int g = 0; g < guards.Count; g++)
+					{
+						if (guards[g] != null) guards[g].Disarm(rest);
+					}
 
 					// Даём физике шаг: OnTriggerEnter слота срабатывает
 					// на следующем FixedUpdate после появления коллайдера.
