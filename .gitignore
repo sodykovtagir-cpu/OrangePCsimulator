@@ -100,5 +100,4 @@ Hosting/workshop/promo_claimed.json
 Hosting/workshop/uploads/
 Hosting/workshop/users.json
 Hosting/workshop/tg_pending.json
-Assets/Resources/presets/ready_miners.json
-Assets/Resources/presets/ready_pcs.json
+tools/__pycache__/

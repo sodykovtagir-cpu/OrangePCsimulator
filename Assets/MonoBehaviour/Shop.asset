@@ -149,10 +149,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 140454d517a8f434698d43f7d2502215, type: 2}
     - {fileID: 11400000, guid: 7a6741183785ad247804e0e149783254, type: 2}
     - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}
-
-  - pageName: Готовые ПК
+  - pageName: Ready PC
     item:
-    - {fileID: 11400000, guid: a0000000000000000000000000000001, type: 2}
-    - {fileID: 11400000, guid: a0000000000000000000000000000002, type: 2}
-    - {fileID: 11400000, guid: a0000000000000000000000000000003, type: 2}
-    - {fileID: 11400000, guid: a0000000000000000000000000000004, type: 2}
+    - {fileID: 11400000, guid: 0235d606c4c3b8585559382420b80f1e, type: 2}
+    - {fileID: 11400000, guid: 01bdbc3c4eec2dfe748abe0859cd0bbb, type: 2}
+    - {fileID: 11400000, guid: eed95391f826ed5f2c565f7bb599cdc7, type: 2}
+  - pageName: Ready Miner
+    item:
+    - {fileID: 11400000, guid: a686bb43c1f327094cb8f73291f47e3b, type: 2}
+    - {fileID: 11400000, guid: a21b78346bae76ee8069f5dbf8daec01, type: 2}
+    - {fileID: 11400000, guid: a2e75cf4619ef1e6a58122e91eeffa2d, type: 2}

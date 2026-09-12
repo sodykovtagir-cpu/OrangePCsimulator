@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &5084852638244515866
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1725524812634910735}
+  - component: {fileID: 3139605917985193629}
+  m_Layer: 0
+  m_Name: ReadyMiner_Cheap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1725524812634910735
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5084852638244515866}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3139605917985193629
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5084852638244515866}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01aba92678a70fdad133966614ce5f35, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  basePrefab: {fileID: 1989475925588944, guid: f95f9a5113e866f4fa7828f3c8ce0944, type: 3}
+  parts:
+  - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
+    localPosition: {x: -0.3, y: -1.08, z: 1.4}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 0
+  - prefab: {fileID: 1620822713256812, guid: e37ef9731de56ba4c9d4889b3779f76e, type: 3}
+    localPosition: {x: -0.31, y: -1.007, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 1
+  - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
+    localPosition: {x: -0.31, y: -0.444, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 2
+  - prefab: {fileID: 1152505560745033, guid: aa6339e70c50cb647bf5107eea5f13e9, type: 3}
+    localPosition: {x: 0.4496, y: -0.81, z: 1.51242}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 3
+  - prefab: {fileID: 1604227188511014, guid: 36b5c41c8f2198e47a472e4e570c371a, type: 3}
+    localPosition: {x: -0.7, y: -0.7, z: -1.7}
+    localEuler: {x: 0, y: 270, z: 0}
+    order: 4
+  - prefab: {fileID: 1351015575704072, guid: ea53f2dac788b8a4a81c1154502f6ba1, type: 3}
+    localPosition: {x: 0.914, y: -0.965, z: -1.748}
+    localEuler: {x: 0, y: 0, z: 0}
+    order: 5
+  - prefab: {fileID: 1740957987744813, guid: 437666673272e9345aaf7a82bc8a11e0, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -2.17761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 6
+  - prefab: {fileID: 1740957987744813, guid: 437666673272e9345aaf7a82bc8a11e0, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -1.55761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 7
+  - prefab: {fileID: 1740957987744813, guid: 437666673272e9345aaf7a82bc8a11e0, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -0.93761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 8
+  - prefab: {fileID: 1740957987744813, guid: 437666673272e9345aaf7a82bc8a11e0, type: 3}
+    localPosition: {x: 0.074, y: 0.3855, z: -0.31761}
+    localEuler: {x: 90, y: 180, z: 0}
+    order: 9
+  stepDelay: 0.05
+  destroyAfterBuild: 1
