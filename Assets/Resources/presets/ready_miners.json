@@ -1,0 +1,375 @@
+[
+  {
+    "name": "Bitcoin Miner Pro",
+    "description": "High-performance Bitcoin mining rig",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "ASUS B250 Mining Expert",
+        "price": 330
+      },
+      {
+        "type": "CPU",
+        "name": "Intel Celeron G5900",
+        "price": 66
+      },
+      {
+        "type": "GPU",
+        "name": "8x NVIDIA RTX 4090",
+        "price": 17600
+      },
+      {
+        "type": "RAM",
+        "name": "32GB DDR4-3200",
+        "price": 132
+      },
+      {
+        "type": "Storage",
+        "name": "512GB SATA SSD",
+        "price": 66
+      },
+      {
+        "type": "PSU",
+        "name": "2x 1600W Platinum",
+        "price": 880
+      },
+      {
+        "type": "Cooler",
+        "name": "Industrial Cooling System",
+        "price": 440
+      },
+      {
+        "type": "Mining Frame",
+        "name": "Aluminum Mining Rig Frame",
+        "price": 220
+      }
+    ],
+    "totalPrice": 20734,
+    "hashRate": "800 TH/s",
+    "powerConsumption": "6000W",
+    "miningAlgorithm": "SHA-256",
+    "efficiency": "45 J/TH"
+  },
+  {
+    "name": "Ethereum Miner Pro",
+    "description": "GPU mining rig for Ethereum and other Ethash coins",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "ASUS B250 Mining Expert",
+        "price": 330
+      },
+      {
+        "type": "CPU",
+        "name": "Intel Celeron G5900",
+        "price": 66
+      },
+      {
+        "type": "GPU",
+        "name": "12x AMD RX 7900 XTX",
+        "price": 19800
+      },
+      {
+        "type": "RAM",
+        "name": "64GB DDR4-3200",
+        "price": 220
+      },
+      {
+        "type": "Storage",
+        "name": "1TB SATA SSD",
+        "price": 110
+      },
+      {
+        "type": "PSU",
+        "name": "2x 2000W Server PSU",
+        "price": 1100
+      },
+      {
+        "type": "Cooler",
+        "name": "Industrial Cooling System",
+        "price": 550
+      },
+      {
+        "type": "Mining Frame",
+        "name": "Steel Mining Rig Frame",
+        "price": 330
+      }
+    ],
+    "totalPrice": 22506,
+    "hashRate": "3.6 GH/s",
+    "powerConsumption": "7500W",
+    "miningAlgorithm": "Ethash",
+    "efficiency": "2.08 W/MH"
+  },
+  {
+    "name": "Litecoin Miner",
+    "description": "Scrypt mining rig for Litecoin and Dogecoin",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "MSI H110 Pro",
+        "price": 220
+      },
+      {
+        "type": "CPU",
+        "name": "Intel Pentium G4400",
+        "price": 55
+      },
+      {
+        "type": "GPU",
+        "name": "6x NVIDIA RTX 3070",
+        "price": 4400
+      },
+      {
+        "type": "RAM",
+        "name": "16GB DDR4-2400",
+        "price": 88
+      },
+      {
+        "type": "Storage",
+        "name": "256GB SATA SSD",
+        "price": 44
+      },
+      {
+        "type": "PSU",
+        "name": "2x 1000W Gold",
+        "price": 440
+      },
+      {
+        "type": "Cooler",
+        "name": "Industrial Cooling",
+        "price": 330
+      },
+      {
+        "type": "Mining Frame",
+        "name": "Aluminum Mining Rig Frame",
+        "price": 220
+      }
+    ],
+    "totalPrice": 5797,
+    "hashRate": "1.2 GH/s",
+    "powerConsumption": "3000W",
+    "miningAlgorithm": "Scrypt",
+    "efficiency": "2.5 W/MH"
+  },
+  {
+    "name": "Monero Miner",
+    "description": "RandomX mining rig for Monero",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "ASUS Prime B550-Plus",
+        "price": 165
+      },
+      {
+        "type": "CPU",
+        "name": "8x AMD Ryzen 9 7950X",
+        "price": 7040
+      },
+      {
+        "type": "GPU",
+        "name": "Integrated Graphics",
+        "price": 0
+      },
+      {
+        "type": "RAM",
+        "name": "128GB DDR5-4800",
+        "price": 550
+      },
+      {
+        "type": "Storage",
+        "name": "2TB NVMe SSD",
+        "price": 176
+      },
+      {
+        "type": "PSU",
+        "name": "2x 1200W Platinum",
+        "price": 770
+      },
+      {
+        "type": "Cooler",
+        "name": "8x Liquid Cooler",
+        "price": 1320
+      },
+      {
+        "type": "Server Rack",
+        "name": "4U Server Rack",
+        "price": 440
+      }
+    ],
+    "totalPrice": 10461,
+    "hashRate": "1.2 MH/s",
+    "powerConsumption": "4500W",
+    "miningAlgorithm": "RandomX",
+    "efficiency": "3.75 W/kH"
+  },
+  {
+    "name": "Ravencoin Miner",
+    "description": "KawPow mining rig for Ravencoin",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "ASUS B250 Mining Expert",
+        "price": 330
+      },
+      {
+        "type": "CPU",
+        "name": "Intel Celeron G5900",
+        "price": 66
+      },
+      {
+        "type": "GPU",
+        "name": "8x NVIDIA RTX 4070 Ti",
+        "price": 13200
+      },
+      {
+        "type": "RAM",
+        "name": "32GB DDR4-3200",
+        "price": 132
+      },
+      {
+        "type": "Storage",
+        "name": "512GB SATA SSD",
+        "price": 66
+      },
+      {
+        "type": "PSU",
+        "name": "2x 1600W Platinum",
+        "price": 880
+      },
+      {
+        "type": "Cooler",
+        "name": "Industrial Cooling System",
+        "price": 440
+      },
+      {
+        "type": "Mining Frame",
+        "name": "Steel Mining Rig Frame",
+        "price": 330
+      }
+    ],
+    "totalPrice": 15444,
+    "hashRate": "80 MH/s",
+    "powerConsumption": "5000W",
+    "miningAlgorithm": "KawPow",
+    "efficiency": "62.5 J/MH"
+  },
+  {
+    "name": "Budget Bitcoin Miner",
+    "description": "Entry-level Bitcoin mining rig",
+    "components": [
+      {
+        "type": "Motherboard",
+        "name": "Gigabyte H110-D3A",
+        "price": 176
+      },
+      {
+        "type": "CPU",
+        "name": "Intel Celeron G3900",
+        "price": 44
+      },
+      {
+        "type": "GPU",
+        "name": "4x NVIDIA RTX 3060",
+        "price": 2200
+      },
+      {
+        "type": "RAM",
+        "name": "8GB DDR4-2133",
+        "price": 55
+      },
+      {
+        "type": "Storage",
+        "name": "120GB SATA SSD",
+        "price": 33
+      },
+      {
+        "type": "PSU",
+        "name": "1000W Gold",
+        "price": 176
+      },
+      {
+        "type": "Cooler",
+        "name": "Basic Cooling",
+        "price": 88
+      },
+      {
+        "type": "Mining Frame",
+        "name": "Basic Mining Rig Frame",
+        "price": 110
+      }
+    ],
+    "totalPrice": 2882,
+    "hashRate": "200 TH/s",
+    "powerConsumption": "1500W",
+    "miningAlgorithm": "SHA-256",
+    "efficiency": "7.5 J/TH"
+  },
+  {
+    "name": "Large Bitcoin Miner Farm",
+    "description": "Industrial-scale Bitcoin mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "10x ASUS B250 Mining Expert", "price": 3300},
+      {"type": "CPU", "name": "10x Intel Celeron G5900", "price": 660},
+      {"type": "GPU", "name": "80x NVIDIA RTX 4090", "price": 176000},
+      {"type": "RAM", "name": "320GB DDR4-3200", "price": 1320},
+      {"type": "Storage", "name": "10x 1TB SATA SSD", "price": 1100},
+      {"type": "PSU", "name": "20x 1600W Platinum", "price": 17600},
+      {"type": "Cooler", "name": "Industrial Cooling System x10", "price": 4400},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x10", "price": 5500},
+      {"type": "Power Distribution", "name": "Industrial PDU", "price": 8800},
+      {"type": "Ventilation", "name": "Industrial Ventilation System", "price": 11000}
+    ],
+    "totalPrice": 238680,
+    "hashRate": "8000 TH/s",
+    "powerConsumption": "60000W",
+    "miningAlgorithm": "SHA-256",
+    "efficiency": "7.5 J/TH"
+  },
+  {
+    "name": "Large Ethereum Miner Farm",
+    "description": "Industrial-scale Ethereum mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "15x ASUS B250 Mining Expert", "price": 4950},
+      {"type": "CPU", "name": "15x Intel Celeron G5900", "price": 990},
+      {"type": "GPU", "name": "180x AMD RX 7900 XTX", "price": 297000},
+      {"type": "RAM", "name": "960GB DDR4-3200", "price": 3300},
+      {"type": "Storage", "name": "15x 2TB SATA SSD", "price": 3300},
+      {"type": "PSU", "name": "30x 2000W Server PSU", "price": 33000},
+      {"type": "Cooler", "name": "Industrial Cooling System x15", "price": 8250},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x15", "price": 9900},
+      {"type": "Power Distribution", "name": "Industrial PDU", "price": 11000},
+      {"type": "Ventilation", "name": "Industrial Ventilation System", "price": 16500}
+    ],
+    "totalPrice": 394190,
+    "hashRate": "54 GH/s",
+    "powerConsumption": "112500W",
+    "miningAlgorithm": "Ethash",
+    "efficiency": "2.08 W/MH"
+  },
+  {
+    "name": "Large Mixed Miner Farm",
+    "description": "Large-scale mixed algorithm mining farm",
+    "isLarge": true,
+    "components": [
+      {"type": "Motherboard", "name": "20x ASUS B250 Mining Expert", "price": 6600},
+      {"type": "CPU", "name": "20x AMD Ryzen 7 5700X", "price": 8800},
+      {"type": "GPU", "name": "120x NVIDIA RTX 4090", "price": 198000},
+      {"type": "GPU", "name": "80x AMD RX 7900 XTX", "price": 176000},
+      {"type": "RAM", "name": "1.2TB DDR4-3200", "price": 6600},
+      {"type": "Storage", "name": "20x 2TB NVMe SSD", "price": 11000},
+      {"type": "PSU", "name": "50x 2000W Server PSU", "price": 55000},
+      {"type": "Cooler", "name": "Industrial Cooling System x20", "price": 11000},
+      {"type": "Mining Frame", "name": "Industrial Mining Rack x20", "price": 17600},
+      {"type": "Power Distribution", "name": "Industrial PDU x2", "price": 22000},
+      {"type": "Ventilation", "name": "Industrial Ventilation System x2", "price": 33000}
+    ],
+    "totalPrice": 446600,
+    "hashRate": "4000 TH/s + 24 GH/s",
+    "powerConsumption": "150000W",
+    "miningAlgorithm": "Mixed (SHA-256 + Ethash)",
+    "efficiency": "37.5 J/TH"
+  }
+]

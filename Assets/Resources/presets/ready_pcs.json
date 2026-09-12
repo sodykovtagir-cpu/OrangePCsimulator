@@ -1,0 +1,70 @@
+[
+  {
+    "name": "Gaming PC",
+    "description": "High-performance gaming computer",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASUS ROG Strix Z790-E", "price": 330},
+      {"type": "CPU", "name": "Intel Core i9-14900K", "price": 660},
+      {"type": "GPU", "name": "NVIDIA RTX 4090", "price": 1980},
+      {"type": "RAM", "name": "64GB DDR5-6000", "price": 180},
+      {"type": "Storage", "name": "2TB NVMe SSD", "price": 165},
+      {"type": "PSU", "name": "1200W Platinum", "price": 260},
+      {"type": "Cooler", "name": "Liquid Cooler 360mm", "price": 180},
+      {"type": "Case", "name": "Gaming Case", "price": 165}
+    ],
+    "totalPrice": 3920,
+    "performance": "Ultra"
+  },
+  {
+    "name": "Office PC",
+    "description": "Basic office computer for work",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "ASUS Prime B660", "price": 132},
+      {"type": "CPU", "name": "Intel Core i5-12400F", "price": 220},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "16GB DDR4-3200", "price": 77},
+      {"type": "Storage", "name": "512GB SATA SSD", "price": 66},
+      {"type": "PSU", "name": "500W 80+", "price": 88},
+      {"type": "Cooler", "name": "Stock Cooler", "price": 22},
+      {"type": "Case", "name": "Office Case", "price": 77}
+    ],
+    "totalPrice": 682,
+    "performance": "Medium"
+  },
+  {
+    "name": "Budget PC",
+    "description": "Affordable basic computer",
+    "caseColors": ["Black", "White"],
+    "components": [
+      {"type": "Motherboard", "name": "Gigabyte B560M", "price": 110},
+      {"type": "CPU", "name": "Intel Core i3-12100F", "price": 132},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "8GB DDR4-3200", "price": 44},
+      {"type": "Storage", "name": "256GB SATA SSD", "price": 44},
+      {"type": "PSU", "name": "400W 80+", "price": 55},
+      {"type": "Cooler", "name": "Stock Cooler", "price": 11},
+      {"type": "Case", "name": "Budget Case", "price": 44}
+    ],
+    "totalPrice": 440,
+    "performance": "Low"
+  },
+  {
+    "name": "Server PC",
+    "description": "Reliable server computer",
+    "caseColors": ["Black"],
+    "components": [
+      {"type": "Motherboard", "name": "Supermicro X11SSH-F", "price": 275},
+      {"type": "CPU", "name": "Intel Xeon E-2236", "price": 385},
+      {"type": "GPU", "name": "Integrated Graphics", "price": 0},
+      {"type": "RAM", "name": "64GB DDR4-2666 ECC", "price": 330},
+      {"type": "Storage", "name": "4x 2TB SATA SSD", "price": 440},
+      {"type": "PSU", "name": "600W Redundant", "price": 220},
+      {"type": "Cooler", "name": "Server Cooler", "price": 88},
+      {"type": "Case", "name": "Server Rack Case", "price": 275}
+    ],
+    "totalPrice": 2013,
+    "performance": "Medium"
+  }
+]
