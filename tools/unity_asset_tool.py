@@ -806,6 +806,17 @@ class PrefabResolver:
                     return outer_id
         return node.game_object_id
 
+    def is_variant(self) -> bool:
+        """Prefab Variant: только PrefabInstance, без собственных GameObject.
+
+        Так сделаны RTX4080/4080Ti/RTX5090 — цепочка вариантов поверх RTX3080Ti.
+        У таких префабов нет своего корневого GameObject в файле: Unity выдаёт
+        ему fileID, вычисляемый при импорте, и в YAML он просто не хранится.
+        Поэтому ссылаться на них надо fileID из уже существующих ассетов.
+        """
+        own_go = [o for o in self.doc.find(class_id=1) if not o.stripped]
+        return not own_go and bool(self.doc.find(class_id=1001))
+
 
 def _apply_vec_mods(base: Vec3, mods: Dict[str, str], prefix: str) -> Vec3:
     x, y, z = base
@@ -856,6 +867,76 @@ def slot_placements(doc_or_path, root_dir: str = ".") -> List[dict]:
             }
         )
     return out
+
+
+def find_existing_reference(guid: str, root_dir: str = ".") -> Optional[int]:
+    """Найти fileID, которым проект уже ссылается на префаб с этим guid.
+
+    Нужно для Prefab Variant'ов: их корневой GameObject не записан в YAML, а
+    fileID Unity вычисляет при импорте. Угадывать его нельзя — но в проекте уже
+    есть корректные ссылки (Box_*.prefab, ShopItem'ы), сделанные редактором.
+    Берём fileID оттуда: это ровно тот идентификатор, который ждёт Unity.
+    """
+    cache = getattr(find_existing_reference, "_cache", None)
+    if cache is None:
+        cache = {}
+        # Считаем только «настоящие» ссылки вида `поле: {fileID: N, guid: G}`.
+        # Строки `- target:` внутри m_Modifications и служебные поля вариантов
+        # указывают на внутренности исходного префаба, а не на его корень —
+        # если их учитывать, побеждает случайный внутренний объект.
+        pattern = re.compile(
+            r"^\s*(?!- target:)(?!m_SourcePrefab:)"
+            r"(?!m_CorrespondingSourceObject:)(?!m_PrefabInstance:)"
+            r"[\w ]+:\s*\{fileID: (-?\d+), guid: (\w+), type: 3\}",
+            re.M,
+        )
+        for dirpath, _dirs, files in os.walk(os.path.join(root_dir, "Assets")):
+            for fn in files:
+                if not (fn.endswith(".prefab") or fn.endswith(".asset")
+                        or fn.endswith(".unity")):
+                    continue
+                full = os.path.join(dirpath, fn)
+                try:
+                    text = open(full, encoding="utf-8", errors="replace").read()
+                except OSError:
+                    continue
+                for fid, g in pattern.findall(text):
+                    fid_i = int(fid)
+                    # fileID: 100100000 — это сам ассет префаба, не GameObject.
+                    if fid_i in (100100000, 0):
+                        continue
+                    cache.setdefault(g, {}).setdefault(fid_i, 0)
+                    cache[g][fid_i] += 1
+        find_existing_reference._cache = cache
+
+    refs = cache.get(guid)
+    if not refs:
+        return None
+    # Самый частый fileID — корневой GameObject (на него ссылаются Box и магазин).
+    return max(refs.items(), key=lambda kv: (kv[1], -kv[0]))[0]
+
+
+def prefab_spawn_ref(prefab_path: str, root_dir: str = ".") -> Tuple[str, int]:
+    """(guid, fileID корневого GameObject) для ссылки на префаб.
+
+    Для обычных префабов корень читается прямо из YAML, для вариантов —
+    берётся из существующих ссылок проекта.
+    """
+    guid = read_meta_guid(prefab_path)
+    resolver = PrefabResolver(prefab_path, root_dir)
+    if resolver.is_variant():
+        fid = find_existing_reference(guid, root_dir)
+        if fid is None:
+            raise ValueError(
+                f"{os.path.basename(prefab_path)} — Prefab Variant, и на него "
+                f"ещё нет ссылок в проекте: fileID корня определить нечем. "
+                f"Сошлись на него хотя бы из одного ассета в Unity."
+            )
+        return guid, fid
+    root = resolver.root_game_object_id()
+    if root is None:
+        raise ValueError(f"{prefab_path}: не найден корневой GameObject")
+    return guid, root
 
 
 def item_info(doc: UnityDoc) -> dict:
@@ -998,13 +1079,15 @@ class ReadyBuild:
             )
 
             part_name = os.path.splitext(os.path.basename(part.prefab_path))[0]
-            root_go = info["root"]
+            # Для Prefab Variant'ов (RTX4080/4080Ti/5090) корень не записан в
+            # YAML — ссылку берём так же, как её делает Unity.
+            part_guid, part_root = prefab_spawn_ref(part_full, root)
             resolved.append(
                 {
                     "path": part.prefab_path,
                     "name": part_name,
-                    "guid": read_meta_guid(part_full),
-                    "root_file_id": root_go.file_id if root_go else None,
+                    "guid": part_guid,
+                    "root_file_id": part_root,
                     "target": part.slot_target,
                     "index": idx,
                     "host": host_name,

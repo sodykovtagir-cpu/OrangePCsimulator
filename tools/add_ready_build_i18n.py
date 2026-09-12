@@ -134,6 +134,111 @@ NAMES = {
         "Ultra mainaris", "Máy đào ultra", "Ultra miner", "Ультра майнер",
         "Ultra ťažobný stroj", "Ultra-miner", "ماینر اولترا",
     ],
+    "Workstation PC": [
+        "Workstation PC", "Munkaállomás", "Werkstation-pc",
+        "PC estación de trabajo", "PC stație de lucru", "Stacja robocza",
+        "Pracovní stanice", "Radna stanica", "PC workstation",
+        "PC workstation", "Tööjaam", "Station de travail",
+        "Station de travail", "워크스테이션 PC", "工作站电脑", "工作站電腦",
+        "Радна станица", "Рабочая станция", "İş istasyonu", "Työasema",
+        "Работна станция", "Робоча станція", "Workstation-PC",
+        "Estació de treball", "Workstation", "ワークステーションPC",
+        "Darbo stotis", "محطة عمل", "Жұмыс станциясы", "Arbeidsstasjon",
+        "PC workstation", "वर्कस्टेशन पीसी", "เวิร์กสเตชัน", "PC workstation",
+        "სამუშაო სადგური", "Darbstacija", "PC máy trạm",
+        "Σταθμός εργασίας", "Працоўная станцыя", "Pracovná stanica",
+        "Arbetsstation", "ایستگاه کاری",
+    ],
+    "Aquarium PC": [
+        "Aquarium PC", "Akvárium PC", "Aquarium-pc", "PC acuario",
+        "PC acvariu", "PC akwarium", "Akvárium PC", "Akvarijum PC",
+        "PC aquário", "PC aquário", "Akvaariumiarvuti", "PC aquarium",
+        "PC aquarium", "아쿠아리움 PC", "鱼缸电脑", "魚缸電腦",
+        "Акваријум рачунар", "Аквариумный ПК", "Akvaryum PC",
+        "Akvaariotietokone", "Аквариум компютър", "Акваріумний ПК",
+        "Aquarium-PC", "PC aquari", "PC acquario", "アクアリウムPC",
+        "Akvariumo kompiuteris", "حاسوب الحوض", "Аквариум ДК",
+        "Akvarium-PC", "PC akwaryum", "एक्वेरियम पीसी", "พีซีตู้ปลา",
+        "PC akuarium", "აკვარიუმის კომპიუტერი", "Akvārija dators",
+        "PC bể cá", "PC ενυδρείο", "Акварыумны ПК", "Akváriové PC",
+        "Akvariedator", "رایانه آکواریومی",
+    ],
+    "Dream PC": [
+        "Dream PC", "Álom PC", "Droom-pc", "PC de ensueño", "PC de vis",
+        "PC marzeń", "Vysněné PC", "PC iz snova", "PC dos sonhos",
+        "PC de sonho", "Unistuste arvuti", "PC de rêve", "PC de rêve",
+        "드림 PC", "梦幻电脑", "夢幻電腦", "Рачунар из снова",
+        "ПК мечты", "Rüya PC", "Unelmatietokone", "Компютър мечта",
+        "ПК мрії", "Traum-PC", "PC de somni", "PC dei sogni", "ドリームPC",
+        "Svajonių kompiuteris", "حاسوب الأحلام", "Арман ДК", "Drømme-PC",
+        "PC pangarap", "ड्रीम पीसी", "พีซีในฝัน", "PC impian",
+        "ოცნების კომპიუტერი", "Sapņu dators", "PC trong mơ",
+        "PC των ονείρων", "ПК мары", "Vysnívané PC", "Drömdator",
+        "رایانه رویایی",
+    ],
+    "Titan Miner": [
+        "Titan Miner", "Titan bányász", "Titan-miner", "Minero Titan",
+        "Miner Titan", "Koparka Titan", "Titan těžební stroj", "Titan rudar",
+        "Mineradora Titan", "Mineradora Titan", "Titan kaevur",
+        "Mineur Titan", "Mineur Titan", "타이탄 채굴기", "泰坦矿机",
+        "泰坦礦機", "Титан рудар", "Titan майнер", "Titan madenci",
+        "Titan-louhija", "Титан копач", "Titan майнер", "Titan-Miner",
+        "Miner Titan", "Miner Titan", "タイタンマイナー", "Titan kasėjas",
+        "معدّن تيتان", "Titan майнер", "Titan-miner", "Titan miner",
+        "टाइटन माइनर", "เครื่องขุดไททัน", "Penambang Titan",
+        "ტიტან მაინერი", "Titan mainaris", "Máy đào Titan",
+        "Titan miner", "Titan майнер", "Titan ťažobný stroj",
+        "Titan-miner", "ماینر تایتان",
+    ],
+    "Flagship Miner": [
+        "Flagship Miner", "Csúcs bányász", "Vlaggenschip-miner",
+        "Minero insignia", "Miner de top", "Flagowa koparka",
+        "Vlajkový těžební stroj", "Vodeći rudar", "Mineradora topo de linha",
+        "Mineradora topo de gama", "Tippkaevur", "Mineur haut de gamme",
+        "Mineur haut de gamme", "플래그십 채굴기", "旗舰级矿机",
+        "旗艦級礦機", "Водећи рудар", "Флагманский майнер",
+        "Amiral gemisi madenci", "Lippulaivalouhija", "Флагмански копач",
+        "Флагманський майнер", "Flaggschiff-Miner", "Miner insígnia",
+        "Miner di punta", "フラッグシップマイナー", "Flagmanas kasėjas",
+        "معدّن رائد", "Флагмандық майнер", "Flaggskip-miner",
+        "Pangunahing miner", "फ्लैगशिप माइनर", "เครื่องขุดเรือธง",
+        "Penambang unggulan", "ფლაგმანი მაინერი", "Flagmaņa mainaris",
+        "Máy đào đầu bảng", "Ναυαρχίδα miner", "Флагманскі майнер",
+        "Vlajkový ťažobný stroj", "Flaggskeppsminer", "ماینر پرچم‌دار",
+    ],
+    "Black": [
+        "Black", "Fekete", "Zwart", "Negro", "Negru", "Czarny", "Černá",
+        "Crna", "Preto", "Preto", "Must", "Noir", "Noir", "블랙", "黑色",
+        "黑色", "Црна", "Чёрный", "Siyah", "Musta", "Черен", "Чорний",
+        "Schwarz", "Negre", "Nero", "ブラック", "Juoda", "أسود", "Қара",
+        "Svart", "Itim", "काला", "สีดำ", "Hitam", "შავი", "Melns", "Đen",
+        "Μαύρο", "Чорны", "Čierna", "Svart", "مشکی",
+    ],
+    "White": [
+        "White", "Fehér", "Wit", "Blanco", "Alb", "Biały", "Bílá", "Bela",
+        "Branco", "Branco", "Valge", "Blanc", "Blanc", "화이트", "白色",
+        "白色", "Бела", "Белый", "Beyaz", "Valkoinen", "Бял", "Білий",
+        "Weiß", "Blanc", "Bianco", "ホワイト", "Balta", "أبيض", "Ақ",
+        "Hvit", "Puti", "सफेद", "สีขาว", "Putih", "თეთრი", "Balts",
+        "Trắng", "Λευκό", "Белы", "Biela", "Vit", "سفید",
+    ],
+    "Blue": [
+        "Blue", "Kék", "Blauw", "Azul", "Albastru", "Niebieski", "Modrá",
+        "Plava", "Azul", "Azul", "Sinine", "Bleu", "Bleu", "블루", "蓝色",
+        "藍色", "Плава", "Синий", "Mavi", "Sininen", "Син", "Синій",
+        "Blau", "Blau", "Blu", "ブルー", "Mėlyna", "أزرق", "Көк", "Blå",
+        "Asul", "नीला", "สีน้ำเงิน", "Biru", "ლურჯი", "Zils", "Xanh dương",
+        "Μπλε", "Сіні", "Modrá", "Blå", "آبی",
+    ],
+    "Red": [
+        "Red", "Piros", "Rood", "Rojo", "Roșu", "Czerwony", "Červená",
+        "Crvena", "Vermelho", "Vermelho", "Punane", "Rouge", "Rouge",
+        "레드", "红色", "紅色", "Црвена", "Красный", "Kırmızı", "Punainen",
+        "Червен", "Червоний", "Rot", "Vermell", "Rosso", "レッド",
+        "Raudona", "أحمر", "Қызыл", "Rød", "Pula", "लाल", "สีแดง",
+        "Merah", "წითელი", "Sarkans", "Đỏ", "Κόκκινο", "Чырвоны",
+        "Červená", "Röd", "قرمز",
+    ],
 }
 
 # Описания — спецификации. Названия железа интернациональны, поэтому строка
@@ -151,6 +256,19 @@ SPECS = {
         "8 x RX 570 / Core i3-8300 / 8 GB / 256 GB SSD / 2 x 1 kW",
     "Ultra Miner Description":
         "24 x RTX 3080 / Core i7-8700K / 32 GB / 2 x 512 GB SSD / 6 x 2 kW",
+    "Workstation PC Description":
+        "Ryzen 9 7950X / 512 GB RGB (8 x 64) / RTX 4080 Ti + Titan V / "
+        "2 x 1 TB M.2 + 2 TB SSD / 2 kW / EXATX",
+    "Aquarium PC Description":
+        "Core i7-14700K / 128 GB RGB / RTX 5090 / 2 TB + 1 TB SSD / "
+        "1.1 kW / Aquarium ATX",
+    "Dream PC Description":
+        "Core i9-7900X / 512 GB RGB (8 x 64) / RTX 5090 + RTX 4080 Ti / "
+        "2 x 1 TB M.2 + 2 x 2 TB SSD / 2 kW / EXATX / Aquarium",
+    "Titan Miner Description":
+        "8 x Titan V / Core i7-14700K / 64 GB / 1 TB SSD / 2 x 2 kW",
+    "Flagship Miner Description":
+        "24 x RTX 5090 / Ryzen 9 7950X / 64 GB RGB / 2 x 1 TB M.2 / 6 x 2 kW",
 }
 
 
