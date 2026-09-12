@@ -60,27 +60,13 @@ namespace PC.Shop
                 icon.sprite = item.sprite;
             }
 
-            string displayName = item.itemName;
-
-            if (!string.IsNullOrEmpty(displayName))
-            {
-                int start = displayName.IndexOf('{');
-                int end = displayName.LastIndexOf('}');
-
-                if (start != -1 && end != -1 && end > start)
-                {
-                    string key = displayName.Substring(start + 1, end - start - 1);
-                    string value = Localization.GetText(key);
-
-                    displayName = displayName
-                        .Remove(end, 1)
-                        .Remove(start, 1)
-                        .Replace(key, value);
-                }
-            }
-
+            // Раньше здесь был свой разбор скобок по первой '{' и последней '}'.
+            // На однотокенных именах он работал, но у названий вида
+            // "{Office PC} ({Black})" захватывал всё между крайними скобками и
+            // выдавал мусор "Office PC} ({Black". Item.TranslateBracket
+            // обрабатывает каждый токен отдельно и умеет их несколько.
             if (nameText != null)
-                nameText.text = displayName;
+                nameText.text = Item.TranslateBracket(item.itemName);
 
             if (priceText != null)
                 priceText.text = $"{item.price}$";

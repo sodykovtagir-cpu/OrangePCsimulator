@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 29160
   bitcoin: 0
   sprite: {fileID: 21300000, guid: a2a47c3e39a00494e9ebc5597be5e4e1, type: 2}
-  spawn: {fileID: 3897462054029552084, guid: 214e9e5611401efc687bffd4d357ad04, type: 3}
+  spawn: {fileID: 8456578771721443586, guid: e18b91a48e80e68040a4776ce997755b, type: 3}
   large: 1
   translateDescription: 1
   description: 'Titan Miner Description'

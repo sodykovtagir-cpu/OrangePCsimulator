@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 6445
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 57366effb45f43c4e94535733298b9ff, type: 2}
-  spawn: {fileID: 2575274012911822913, guid: 1e97fa22f299e3f612a51b0616454afc, type: 3}
+  spawn: {fileID: 3644933808625926152, guid: 765269ca2ada2e64e8c03f45d47ee362, type: 3}
   large: 1
   translateDescription: 1
   description: 'Aquarium PC Description'

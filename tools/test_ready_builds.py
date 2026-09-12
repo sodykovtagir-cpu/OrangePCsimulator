@@ -193,6 +193,123 @@ check(all(by_key[k][en] != by_key[k][ru] for k in i18n.NAMES),
       "названия сборок действительно переведены на русский, а не скопированы")
 
 # ---------------------------------------------------------------------------
+print("\nДоставка в ящике")
+
+# Готовая сборка обязана приезжать в ящике, как и любой крупный товар.
+# Если ShopItem ссылается прямо на спавнер, ПК вываливается из портала
+# в воздухе, падает и разбивается ещё до того, как игрок его увидит.
+from unity_asset_tool import _find_root_game_object  # noqa: E402
+
+seen_file_ids: dict[str, str] = {}
+
+for spec in gen.BUILDS:
+    crate_path = ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab"
+    check(crate_path.exists(), f"{spec.key}: ящик доставки создан")
+    if not crate_path.exists():
+        continue
+
+    crate = crate_path.read_text(encoding="utf-8")
+    crate_guid = read_meta_guid(str(crate_path))
+
+    # ShopItem должен указывать на ящик, а не на спавнер.
+    asset = (ROOT / gen.OUT_ASSETS / f"{spec.key}.asset").read_text(encoding="utf-8")
+    spawn = re.search(r"spawn: \{fileID: (\d+), guid: (\w+)", asset)
+    check(spawn is not None and spawn.group(2) == crate_guid,
+          f"{spec.key}: ShopItem спавнит ящик")
+
+    root = _find_root_game_object(crate)
+    check(spawn is not None and root is not None and spawn.group(1) == root,
+          f"{spec.key}: ShopItem ссылается на корень ящика")
+
+    # Корень ящика должен иметь тег Crate, иначе молоток его не вскроет.
+    root_doc = next(
+        (d for d in re.split(r"^--- ", crate, flags=re.M)[1:]
+         if re.match(rf"!u!1 &{root}\b", d)), "")
+    check("m_TagString: Crate" in root_doc, f"{spec.key}: ящик имеет тег Crate")
+
+    # SaveManager грузит предметы по Resources.Load($"Components/{spawnId}"),
+    # поэтому spawnId обязан совпасть с именем файла.
+    check(f"spawnId: Crate_{spec.key}" in crate,
+          f"{spec.key}: spawnId ящика совпадает с именем префаба")
+
+    # Внутри ящика лежит спавнер именно этой сборки.
+    spawner_guid = read_meta_guid(str(ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab"))
+    box_at = crate.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    check(box_at != -1, f"{spec.key}: в ящике есть компонент Box")
+    if box_at != -1:
+        content = re.search(r"prefab: \{fileID: \d+, guid: (\w+)", crate[box_at:])
+        check(content is not None and content.group(1) == spawner_guid,
+              f"{spec.key}: ящик содержит спавнер своей сборки")
+
+    # Клонирование ящика обязано перенумеровать все fileID: одинаковые
+    # идентификаторы в разных префабах Unity воспринимает как один объект.
+    for fid in re.findall(r"^--- !u!\d+ &(\d+)", crate, flags=re.M):
+        owner = seen_file_ids.get(fid)
+        if owner is not None and owner != spec.key:
+            check(False, f"{spec.key}: fileID {fid} уже занят ящиком {owner}")
+        seen_file_ids[fid] = spec.key
+
+check(True, f"fileID ящиков уникальны ({len(seen_file_ids)} объектов)")
+
+# ---------------------------------------------------------------------------
+print("\nЛокализация названий со скобками")
+
+# Названия готовых ПК содержат два токена: "{Office PC} ({Black})".
+# Старый разбор в ShopUI брал первую '{' и последнюю '}' и выдавал мусор.
+shop_ui = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Shop/ShopUI.cs").read_text(
+    encoding="utf-8")
+check("LastIndexOf('}')" not in shop_ui,
+      "ShopUI больше не разбирает скобки вручную")
+check("Item.TranslateBracket(item.itemName)" in shop_ui,
+      "ShopUI переводит название через Item.TranslateBracket")
+
+for spec in gen.BUILDS:
+    for token in re.findall(r"\{([^}]+)\}", spec.title):
+        check(token in by_key, f"ключ '{token}' из '{spec.key}' есть в переводе")
+
+# ---------------------------------------------------------------------------
+print("\nShopItem'ы видеокарт спавнят свои коробки")
+
+# Предсуществующий баг проекта: RTX4080 и RTX4080Ti ссылались на Box_RTX5090,
+# поэтому за деньги игрок получал не ту карту.
+_guid_to_path: dict[str, str] = {}
+for dirpath, _dirs, files in os.walk(ROOT / "Assets"):
+    for fn in files:
+        if not fn.endswith(".meta"):
+            continue
+        full = os.path.join(dirpath, fn)
+        with open(full, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if line.startswith("guid:"):
+                    _guid_to_path[line.split(":", 1)[1].strip()] = full[:-5]
+                    break
+
+for gpu in ("RTX4080", "RTX4080Ti", "RTX5090", "RTX3080", "GTX1060",
+            "GT1030", "GT440", "RX570", "Titan V"):
+    item_path = ROOT / "Assets/MonoBehaviour" / f"{gpu}.asset"
+    if not item_path.exists():
+        continue
+    text = item_path.read_text(encoding="utf-8")
+    ref = re.search(r"spawn: \{fileID: \d+, guid: (\w+)", text)
+    box = _guid_to_path.get(ref.group(1), "") if ref else ""
+    check(os.path.basename(box) == f"Box_{gpu}.prefab",
+          f"{gpu}: ShopItem спавнит Box_{gpu} (сейчас {os.path.basename(box)})")
+
+# ---------------------------------------------------------------------------
+print("\nЗащита деталей при установке")
+
+spawner_cs = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
+    encoding="utf-8")
+check("WaitUntilSettled" in spawner_cs,
+      "спавнер ждёт приземления корпуса перед установкой деталей")
+check("ImpactGuard" in spawner_cs, "спавнер защищает детали от урона")
+
+guard_cs = ROOT / "Assets/Scripts/Assembly-CSharp/ImpactGuard.cs"
+check(guard_cs.exists(), "ImpactGuard.cs существует")
+check(_guid_exists("7c1f4b6ae2d84a1d9b3f5e08c7a26d41"),
+      "у ImpactGuard.cs есть .meta с guid")
+
+# ---------------------------------------------------------------------------
 print("\nГенератор идемпотентен")
 
 import subprocess  # noqa: E402
@@ -200,6 +317,7 @@ import subprocess  # noqa: E402
 before = {}
 for spec in gen.BUILDS:
     for path in [ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab",
+                 ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab",
                  ROOT / gen.OUT_ASSETS / f"{spec.key}.asset"]:
         before[str(path)] = path.read_text(encoding="utf-8") if path.exists() else None
 

@@ -52,8 +52,11 @@ SCRIPT_GUIDS = {
     "Case": "671d1448274186bd3d8efabeb9529196",
     "HardwareSlot": "39ea76bbc8e6a7d7f146fcb3b48b957b",
     "Slot": "f35567f78c6622a51b9c18ad8b24fb7e",
-    "Receiver": "8a5265d90941f5ea7581d7dbd7e12e35",
-    "Crate": "d7f903f50f13e21af61667d85cf95dde",
+    # Раньше эти две строки были перепутаны местами и «Crate» указывал на
+    # скрипт Box. Сверено с Assets/Scripts/Assembly-CSharp/*.cs.meta.
+    "Crate": "8a5265d90941f5ea7581d7dbd7e12e35",
+    "Receiver": "46655a7f7503170198a223c11988a65a",
+    "Box": "d7f903f50f13e21af61667d85cf95dde",
 }
 
 # Unity class id -> человекочитаемое имя (только те, что реально встречаются)
@@ -1236,6 +1239,116 @@ def write_spawner_prefab(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
+def _find_root_game_object(text: str) -> Optional[str]:
+    """fileID GameObject'а, чей Transform не имеет родителя (m_Father = 0)."""
+    for doc in re.split(r"^--- ", text, flags=re.M)[1:]:
+        header = doc.split("\n", 2)[1].strip()
+        if header not in ("Transform:", "RectTransform:"):
+            continue
+        father = re.search(r"m_Father: \{fileID: (\d+)\}", doc)
+        if not father or father.group(1) != "0":
+            continue
+        go = re.search(r"m_GameObject: \{fileID: (\d+)\}", doc)
+        if go:
+            return go.group(1)
+    return None
+
+
+def write_crate_prefab(
+    path: str,
+    crate_name: str,
+    template_prefab: str,
+    content_guid: str,
+    content_file_id: int,
+) -> Tuple[str, int]:
+    """Создать ящик доставки для готовой сборки на основе ящика-образца.
+
+    Обычные крупные товары приезжают не «голым» предметом, а в деревянном
+    ящике: ShopItem.spawn ссылается на Crate_*, внутри которого компонент Box
+    хранит ссылку на настоящее содержимое, а Crate вскрывается молотком.
+    Готовые сборки должны вести себя так же, иначе ПК падает из портала
+    и разбивается.
+
+    Ящик — сложный префаб с мешами, коллайдерами и звуком, поэтому он не
+    пишется с нуля: берётся ящик соответствующего корпуса, у него меняются
+    имя, spawnId и ссылка Box.prefab, а все fileID пересчитываются
+    детерминированно, чтобы два ящика не делили идентификаторы объектов.
+
+    Возвращает (guid ассета, fileID корневого GameObject).
+    """
+    with open(template_prefab, encoding="utf-8") as fh:
+        text = fh.read()
+
+    # Корневой GameObject — тот, чей Transform не имеет родителя. Брать
+    # «первый GameObject в файле» нельзя: Unity пишет документы в произвольном
+    # порядке, и у части ящиков первым идёт обломок BrokenCrate.
+    template_root = _find_root_game_object(text)
+    if template_root is None:
+        raise ValueError(f"{template_prefab}: не найден корневой GameObject")
+
+    # Все локальные fileID документа → новые, уникальные для этого ящика.
+    old_ids = sorted(set(re.findall(r"^--- !u!\d+ &(\d+)", text, flags=re.M)))
+    mapping = {
+        old: str(make_file_id(f"{crate_name}:obj:{old}")) for old in old_ids
+    }
+
+    def _swap(match: "re.Match[str]") -> str:
+        old = match.group(1)
+        return "fileID: " + mapping.get(old, old)
+
+    # Ссылки внутри документа: только «голые» fileID без guid — объекты с
+    # guid принадлежат другим ассетам и трогать их нельзя.
+    text = re.sub(r"fileID: (\d+)(?!\s*,\s*guid)", _swap, text)
+    text = re.sub(
+        r"^--- !u!(\d+) &(\d+)",
+        lambda m2: f"--- !u!{m2.group(1)} &{mapping[m2.group(2)]}",
+        text,
+        flags=re.M,
+    )
+
+    # Имя ящика и его spawnId: SaveManager грузит предметы по
+    # Resources.Load($"Components/{spawnId}"), поэтому они обязаны совпадать
+    # с именем файла префаба.
+    text = re.sub(
+        r"^(\s*)m_Name: Crate_.*$",
+        lambda m3: f"{m3.group(1)}m_Name: {crate_name}",
+        text,
+        count=1,
+        flags=re.M,
+    )
+    text = re.sub(
+        r"^(\s*)spawnId: Crate_.*$",
+        lambda m4: f"{m4.group(1)}spawnId: {crate_name}",
+        text,
+        count=1,
+        flags=re.M,
+    )
+
+    # Содержимое ящика: Box.prefab указывает на спавнер готовой сборки.
+    box_marker = f"m_Script: {{fileID: 11500000, guid: {SCRIPT_GUIDS['Box']}, type: 3}}"
+    idx = text.find(box_marker)
+    if idx == -1:
+        raise ValueError(f"{template_prefab}: не найден компонент Box")
+    head, tail = text[:idx], text[idx:]
+    tail = re.sub(
+        r"prefab: \{fileID: \d+, guid: \w+, type: \d+\}",
+        f"prefab: {{fileID: {content_file_id}, guid: {content_guid}, type: 3}}",
+        tail,
+        count=1,
+    )
+    text = head + tail
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+    guid = read_meta_guid(path) or make_guid("prefab:" + crate_name)
+    write_meta(path, guid, kind="prefab")
+
+    root_id = int(mapping[template_root]) if template_root else 0
+    return guid, root_id
+
 
 def _cli(argv: List[str]) -> int:
     if len(argv) < 2:

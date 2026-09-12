@@ -263,7 +263,7 @@ SPECS = {
         "Core i7-14700K / 128 GB RGB / RTX 5090 / 2 TB + 1 TB SSD / "
         "1.1 kW / Aquarium ATX",
     "Dream PC Description":
-        "Core i9-7900X / 512 GB RGB (8 x 64) / RTX 5090 + RTX 4080 Ti / "
+        "Ryzen 9 7950X / 512 GB RGB (8 x 64) / RTX 5090 + RTX 4080 Ti / "
         "2 x 1 TB M.2 + 2 x 2 TB SSD / 2 kW / EXATX / Aquarium",
     "Titan Miner Description":
         "8 x Titan V / Core i7-14700K / 64 GB / 1 TB SSD / 2 x 2 kW",

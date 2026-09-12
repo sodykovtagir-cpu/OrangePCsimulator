@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 1340
   bitcoin: 0
   sprite: {fileID: 21300000, guid: a2a47c3e39a00494e9ebc5597be5e4e1, type: 2}
-  spawn: {fileID: 5084852638244515866, guid: 11eb76bdca63e24e82d23fc0d350a3e2, type: 3}
+  spawn: {fileID: 2518932100636624368, guid: 2991e289ebef2e3840621e0d790c84fa, type: 3}
   large: 1
   translateDescription: 1
   description: 'Cheap Miner Description'

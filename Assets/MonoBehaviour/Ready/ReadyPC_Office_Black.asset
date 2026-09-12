@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 640
   bitcoin: 0
   sprite: {fileID: 21300000, guid: cef7dd228a2052f48ae40b7235033ee6, type: 2}
-  spawn: {fileID: 952531065319006709, guid: 37033ff8ac56d3d39299718cf08f160e, type: 3}
+  spawn: {fileID: 1936241241406705316, guid: 8e869bf1a704743c9906d56ecce06be8, type: 3}
   large: 1
   translateDescription: 1
   description: 'Office PC Description'
