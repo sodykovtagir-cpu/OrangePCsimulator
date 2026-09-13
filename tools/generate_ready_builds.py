@@ -149,10 +149,6 @@ class BuildSpec:
     # Префабы приложений из Assets/Resources/apps, которые едут вместе с PCOS
     # на системном накопителе сборки. Пустой список = машина без системы.
     apps: List[str] = field(default_factory=list)
-    # Ехать без деревянного ящика, прямо через портал. Так в ванильной игре
-    # доставляются Miner и Big Miner: их ShopItem.spawn ссылается сразу на
-    # префаб рамы. Ящик им не подходит физически — см. crate_fit.
-    bare: bool = False
 
 
 def p(path: str, target: str, host: Optional[str] = None, index: Optional[int] = None) -> PartRef:
@@ -497,7 +493,6 @@ def _make_builds() -> List[BuildSpec]:
                 sprite_from=sprite,
                 description=desc,
                 apps=APPS_BY_MODEL["Miner"],
-                bare=True,
             )
         )
     return builds
@@ -569,48 +564,6 @@ def base_ref(prefab_rel: str):
     return prefab_spawn_ref(os.path.join(REPO, prefab_rel), REPO)
 
 
-# Зазор между содержимым и внутренней стенкой ящика. Меньше — предмет
-# цепляется за стенку при вскрытии, больше — ящик выглядит раздутым.
-CRATE_CLEARANCE = 0.30
-
-# Толщина стенки ящика-образца: внешний габарит 3.0 x 4.5 x 5.0 при
-# внутренней полости 2.8 x 4.3 x 4.8.
-CRATE_WALL = 0.10
-
-
-def crate_fits(case_prefab: str, resolved: List[dict], template_name: str):
-    """Влезает ли собранная машина во внутреннюю полость ящика-образца.
-
-    Ящик НЕ масштабируется. Он состоит из семи отдельных Rigidbody-стенок, и
-    растягивание корневого Transform неравномерным масштабом ломает их
-    коллайдеры: стенки меняют видимый размер при смене ракурса, проваливаются
-    внутрь содержимого и выталкивают из него детали. Поэтому здесь только
-    проверка — а то, что в ящик не помещается (рамы майнеров), доставляется
-    вообще без ящика, как в ванильной игре.
-
-    Возвращает (влезает, габарит содержимого, внутренний размер ящика).
-    """
-    from unity_asset_tool import build_bounds, prefab_bounds
-
-    lo, hi = build_bounds(case_prefab, resolved, REPO)
-    content = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
-
-    tpl_rel = os.path.join(COMP, template_name + ".prefab")
-    tb = prefab_bounds(tpl_rel, REPO)
-    if tb is None:
-        raise SystemExit(f"{template_name}: у ящика-образца нет коллайдеров")
-    tlo, thi = tb
-    # Критерий — ВНЕШНИЙ габарит ящика, а не полость. Разъёмы материнской
-    # платы у ванильных ATX-сборок торчат за корпус примерно на 0.3 и заходят
-    # в толщу стенки; это нормально, потому что плата жёстко закреплена
-    # FixedJoint и свободным телом не является. Недопустимо другое — когда
-    # содержимое пробивает ящик насквозь, как рама майнера.
-    outer = tuple(thi[i] - tlo[i] for i in range(3))
-
-    fits = all(outer[i] >= content[i] for i in range(3))
-    return fits, content, outer
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="только проверить, не писать")
@@ -664,46 +617,32 @@ def main() -> int:
             root_dir=REPO,
         )
 
-        # Доставка. Обычный ПК едет в деревянном ящике: игрок вскрывает его
-        # молотком, и сборка начинается на полу, а не в воздухе.
+        # Доставка в деревянном ящике, как у любого крупного товара: иначе
+        # сборка вываливается из портала в воздухе и разбивается.
         #
-        # Майнеры едут БЕЗ ящика, прямо через портал — ровно так доставляются
-        # ванильные Miner и Big Miner (их ShopItem.spawn ссылается сразу на
-        # префаб рамы). Причина не в лени: ящик состоит из семи отдельных
-        # Rigidbody-стенок, и растягивание корня неравномерным масштабом
-        # ломает их коллайдеры — стенки "плавают" при смене ракурса, залезают
-        # внутрь рамы и вышибают из неё видеокарты. Масштабировать физический
-        # ящик нельзя, а рама майнера в него не помещается — значит ящика
-        # быть не должно.
-        if spec.bare:
-            spawn_guid, spawn_root = prefab_guid, go_id
-            print("    едет без ящика, прямо через портал (как ванильный Miner)")
-        else:
-            crate_name = "Crate_" + spec.key
-            crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
-            template = os.path.join(
-                REPO, COMP, crate_template_for(case_name) + ".prefab")
+        # Размер ящика значения не имеет, и растягивать его НЕ НАДО. Содержимое
+        # не лежит внутри коробки: компонент Box висит на BrokenCrate, который
+        # активируется только при ударе молотком, когда сам ящик уже
+        # уничтожается (Crate.OnCollisionEnter). До вскрытия внутри ящика
+        # пусто, после вскрытия ящика уже нет. Поэтому в ванильной игре
+        # восьмиметровый Table спокойно приезжает в ящике 3 x 4.5 x 5.
+        #
+        # Попытка подогнать ящик под габарит сборки делала только хуже: ящик
+        # собран из семи отдельных Rigidbody-стенок, и неравномерный масштаб
+        # корня ломает их коллайдеры — стенки меняли видимый размер при смене
+        # ракурса и вышибали видеокарты из рамы майнера.
+        crate_name = "Crate_" + spec.key
+        crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
+        template = os.path.join(
+            REPO, COMP, crate_template_for(case_name) + ".prefab")
 
-            # Проверяем, что содержимое влезает. Масштаб ящика не трогаем —
-            # см. комментарий выше; вместо растягивания подбираем образец.
-            fits, content_size, inner = crate_fits(
-                spec.case, resolved,
-                os.path.basename(template)[:-len(".prefab")])
-            if not fits:
-                raise SystemExit(
-                    f"{spec.key}: сборка "
-                    f"({content_size[0]:.2f}, {content_size[1]:.2f}, "
-                    f"{content_size[2]:.2f}) не влезает в ящик "
-                    f"{os.path.basename(template)} "
-                    f"({inner[0]:.2f}, {inner[1]:.2f}, {inner[2]:.2f})")
-
-            spawn_guid, spawn_root = write_crate_prefab(
-                path=crate_path,
-                crate_name=crate_name,
-                template_prefab=template,
-                content_guid=prefab_guid,
-                content_file_id=go_id,
-            )
+        spawn_guid, spawn_root = write_crate_prefab(
+            path=crate_path,
+            crate_name=crate_name,
+            template_prefab=template,
+            content_guid=prefab_guid,
+            content_file_id=go_id,
+        )
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)

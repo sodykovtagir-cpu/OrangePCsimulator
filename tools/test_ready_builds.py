@@ -213,16 +213,15 @@ print("\nДоставка в ящике")
 # ShopItem ссылается прямо на спавнер, ПК вываливается из портала в воздухе,
 # падает и разбивается ещё до того, как игрок его увидит.
 #
-# Исключение — рамы майнеров (spec.bare). Они крупнее ящика, а растянуть ящик
-# нельзя: его семь Rigidbody-стенок при неравномерном масштабе ломаются.
-# Ванильные Miner и Big Miner доставляются ровно так же, без ящика.
+# Габарит сборки значения не имеет: содержимое не лежит внутри коробки.
+# Компонент Box висит на BrokenCrate, который активируется только при ударе
+# молотком, когда сам ящик уничтожается. Поэтому в ванили и восьмиметровый
+# Table приезжает в том же ящике 3 x 4.5 x 5.
 from unity_asset_tool import _find_root_game_object  # noqa: E402
 
 seen_file_ids: dict[str, str] = {}
 
 for spec in gen.BUILDS:
-    if spec.bare:
-        continue
     crate_path = ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab"
     check(crate_path.exists(), f"{spec.key}: ящик доставки создан")
     if not crate_path.exists():
@@ -526,55 +525,40 @@ for spec in gen.BUILDS:
           f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
 
 # ---------------------------------------------------------------------------
-print("\nДоставка: ящик по размеру, рамы майнеров — без ящика")
+print("\nЯщик доставки не масштабируется")
 
-# Ящик состоит из семи отдельных Rigidbody-стенок. Растягивать его нельзя:
-# неравномерный масштаб корня ломает коллайдеры — стенки меняют видимый
-# размер при смене ракурса, проваливаются внутрь содержимого и вышибают из
-# майнера видеокарты. Поэтому масштаб обязан остаться единичным, а то, что
-# в ящик не влезает, едет без ящика — как ванильные Miner и Big Miner.
+# Регресс: я растягивал ящик под габарит сборки, и стало хуже. Ящик собран из
+# семи отдельных Rigidbody-стенок; неравномерный масштаб корня ломает их
+# коллайдеры — стенки меняли видимый размер при смене ракурса, проваливались
+# внутрь рамы майнера и выталкивали оттуда видеокарты.
+#
+# Растягивать и не нужно: содержимое никогда не находится внутри ящика.
+# Box висит на BrokenCrate и срабатывает в момент, когда ящик уничтожается.
 for spec in gen.BUILDS:
-    _crate = ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab"
-    if spec.bare:
-        check(not _crate.exists(),
-              f"{spec.key}: ящика нет, сборка едет порталом")
-        continue
-
-    check(_crate.exists(), f"{spec.key}: ящик доставки существует")
-    if not _crate.exists():
-        continue
-
-    _scale = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))
-    check(all(abs(v - 1.0) < 1e-6 for v in _scale),
-          f"{spec.key}: ящик не масштабирован "
+    _crate_rel = f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab"
+    _scale = root_scale(_crate_rel, str(ROOT))
+    check(all(abs(v - 1.0) < 1e-9 for v in _scale),
+          f"{spec.key}: масштаб ящика единичный "
           f"(scale={tuple(round(v, 2) for v in _scale)})")
 
-    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
-    _case_name = os.path.splitext(os.path.basename(spec.case))[0]
-    _fits, _content, _outer = gen.crate_fits(
-        spec.case, _resolved, gen.crate_template_for(_case_name))
-    check(_fits,
-          f"{spec.key}: сборка ({_content[0]:.2f}, {_content[1]:.2f}, "
-          f"{_content[2]:.2f}) не крупнее ящика ({_outer[0]:.2f}, "
-          f"{_outer[1]:.2f}, {_outer[2]:.2f})")
-
-# Ванильные майнеры доставляются именно так — сверяемся с их ShopItem'ами.
-for _vanilla in ("Miner", "Big Miner"):
-    _text = (ROOT / "Assets/MonoBehaviour" / f"{_vanilla}.asset").read_text(
-        encoding="utf-8", errors="replace")
-    _spawn = re.search(r"spawn: \{fileID: \d+, guid: (\w+)", _text)
-    check(_spawn is not None and not _guid_is_crate(_spawn.group(1)),
-          f"ванильный '{_vanilla}' едет без ящика — наши майнеры тоже")
-
-# ShopItem готового майнера обязан ссылаться прямо на спавнер сборки.
+# Содержимое выдаётся уничтожаемым ящиком, а не лежит в нём: компонент Box
+# обязан висеть на BrokenCrate, иначе предмет появится внутри стенок.
 for spec in gen.BUILDS:
-    if not spec.bare:
-        continue
-    _asset = (ROOT / gen.OUT_ASSETS / f"{spec.key}.asset").read_text(encoding="utf-8")
-    _spawn_guid = re.search(r"spawn: \{fileID: \d+, guid: (\w+)", _asset).group(1)
-    _want = read_meta_guid(str(ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab"))
-    check(_spawn_guid == _want,
-          f"{spec.key}: spawn указывает на сам спавнер, а не на ящик")
+    _crate = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(
+        encoding="utf-8")
+    _doc = UnityDoc.load(ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab")
+    _names = {o.file_id: o.get("m_Name") for o in _doc.objects if o.class_id == 1}
+    _owner = None
+    for _o in _doc.objects:
+        if _o.class_id != 114:
+            continue
+        if SCRIPT_GUIDS["Box"] not in (_o.get("m_Script") or ""):
+            continue
+        _m = re.search(r"fileID: (-?\d+)", _o.get("m_GameObject") or "")
+        if _m:
+            _owner = _names.get(int(_m.group(1)))
+    check(_owner == "BrokenCrate",
+          f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
 print("\nPCOS предустановлена с нужным набором приложений")
