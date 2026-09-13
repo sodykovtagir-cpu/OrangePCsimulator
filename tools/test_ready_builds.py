@@ -23,6 +23,7 @@ from unity_asset_tool import (  # noqa: E402
     app_info,
     build_bounds,
     prefab_bounds,
+    prefab_spawn_ref,
     root_scale,
     BOOT_FILE_SIZE as gen_boot_size,
     quat_to_euler,
@@ -446,6 +447,35 @@ check("root.GetComponentsInChildren<Slot>" not in spawner_cs,
       "нет поиска слотов только от корпуса")
 
 # ---------------------------------------------------------------------------
+print("\nbasePrefab спавнера указывает на реальный корень рамы")
+
+# Регресс: жадный разбор m_RemovedGameObjects захватывал соседний блок
+# m_AddedGameObjects и «удалял» корневой Transform рамы. prefab_spawn_ref
+# начинал возвращать чужой fileID, спавнер создавал не тот объект — и в игре
+# не находилось НИ ОДНОГО слота, даже Motherboard.
+#
+# Эталон — ShopItem ванильной рамы: он ссылается на её настоящий корень.
+_VANILLA_ROOT = {
+    "Miner": "Miner",
+    "BigMiner": "Big Miner",
+}
+for _rig, _asset_name in _VANILLA_ROOT.items():
+    _asset = (ROOT / "Assets/MonoBehaviour" / f"{_asset_name}.asset").read_text(
+        encoding="utf-8", errors="replace")
+    _want = re.search(r"spawn: \{fileID: (\d+)", _asset).group(1)
+    _guid, _got = prefab_spawn_ref(
+        f"Assets/Resources/components/{_rig}.prefab", str(ROOT))
+    check(str(_got) == _want,
+          f"{_rig}: корень {_got} совпадает с ванильным ShopItem ({_want})")
+
+for spec in gen.BUILDS:
+    _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    _m = re.search(r"basePrefab: \{fileID: (\d+), guid: (\w+)", _text)
+    _guid, _root = prefab_spawn_ref(spec.case, str(ROOT))
+    check(_m is not None and _m.group(1) == str(_root) and _m.group(2) == _guid,
+          f"{spec.key}: basePrefab ссылается на корень своей рамы/корпуса")
+
+# ---------------------------------------------------------------------------
 print("\nВариант префаба может удалять унаследованные слоты")
 
 # Регресс: BigMiner — это вариант обычного Miner, но он УДАЛЯЕТ унаследованный
@@ -525,27 +555,39 @@ for spec in gen.BUILDS:
           f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
 
 # ---------------------------------------------------------------------------
-print("\nЯщик доставки не масштабируется")
+print("\nЯщик масштабируется только равномерно")
 
-# Регресс: я растягивал ящик под габарит сборки, и стало хуже. Ящик собран из
-# семи отдельных Rigidbody-стенок; неравномерный масштаб корня ломает их
-# коллайдеры — стенки меняли видимый размер при смене ракурса, проваливались
-# внутрь рамы майнера и выталкивали оттуда видеокарты.
+# Регресс: я растягивал ящик по осям под габарит сборки (1.61, 2.6, 1) — и
+# физика поехала. Ящик собран из семи отдельных Rigidbody-стенок; при
+# неравномерном масштабе их коллайдеры меняли видимый размер при смене
+# ракурса, проваливались внутрь рамы майнера и выталкивали видеокарты.
 #
-# Растягивать и не нужно: содержимое никогда не находится внутри ящика.
-# Box висит на BrokenCrate и срабатывает в момент, когда ящик уничтожается.
+# Равномерный масштаб Unity обрабатывает корректно, поэтому размер коробки
+# под раму BigMiner подогнан именно так — иначе она выглядит втрое меньше
+# своего груза.
 for spec in gen.BUILDS:
     _crate_rel = f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab"
     _scale = root_scale(_crate_rel, str(ROOT))
-    check(all(abs(v - 1.0) < 1e-9 for v in _scale),
-          f"{spec.key}: масштаб ящика единичный "
+    check(abs(_scale[0] - _scale[1]) < 1e-9 and abs(_scale[1] - _scale[2]) < 1e-9,
+          f"{spec.key}: масштаб ящика равномерный "
           f"(scale={tuple(round(v, 2) for v in _scale)})")
+    check(_scale[0] >= 1.0 - 1e-9,
+          f"{spec.key}: ящик не ужимается (scale={_scale[0]:.2f})")
+
+# Коробка должна быть не мельче своего груза — это чисто про внешний вид.
+for spec in gen.BUILDS:
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _lo, _hi = build_bounds(spec.case, _resolved, str(ROOT))
+    _content = tuple(_hi[i] - _lo[i] for i in range(3))
+    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
+    _inner = tuple(v * _k for v in gen.CRATE_INNER)
+    check(all(_inner[i] >= _content[i] - 1e-6 for i in range(3)),
+          f"{spec.key}: ящик ({_inner[0]:.2f}, {_inner[1]:.2f}, {_inner[2]:.2f}) "
+          f"не мельче груза ({_content[0]:.2f}, {_content[1]:.2f}, {_content[2]:.2f})")
 
 # Содержимое выдаётся уничтожаемым ящиком, а не лежит в нём: компонент Box
 # обязан висеть на BrokenCrate, иначе предмет появится внутри стенок.
 for spec in gen.BUILDS:
-    _crate = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(
-        encoding="utf-8")
     _doc = UnityDoc.load(ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab")
     _names = {o.file_id: o.get("m_Name") for o in _doc.objects if o.class_id == 1}
     _owner = None

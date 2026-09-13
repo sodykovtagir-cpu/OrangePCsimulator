@@ -564,6 +564,30 @@ def base_ref(prefab_rel: str):
     return prefab_spawn_ref(os.path.join(REPO, prefab_rel), REPO)
 
 
+# Внутренняя полость ящика-образца (внешне 3 x 4.5 x 5, стенка 0.1).
+CRATE_INNER = (2.8, 4.3, 4.8)
+
+
+def crate_scale_for(case_prefab: str, resolved: List[dict]) -> float:
+    """РАВНОМЕРНЫЙ коэффициент размера ящика под габарит сборки.
+
+    Зачем вообще масштаб, если содержимое не лежит внутри ящика (Box висит на
+    BrokenCrate и срабатывает в момент его уничтожения)? Чисто ради вида:
+    коробка, втрое меньше выезжающей из неё рамы BigMiner, выглядит нелепо.
+
+    Масштаб строго равномерный. Неравномерный (1.61, 2.6, 1) ломает физику:
+    ящик собран из семи отдельных Rigidbody-стенок, их коллайдеры начинают
+    менять видимый размер при смене ракурса и выталкивать содержимое.
+    """
+    from unity_asset_tool import build_bounds
+
+    lo, hi = build_bounds(case_prefab, resolved, REPO)
+    content = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
+    need = max(content[i] / CRATE_INNER[i] for i in range(3))
+    # Округляем вверх до 0.05, чтобы значение не плавало от версии к версии.
+    return max(1.0, math.ceil(need * 20) / 20)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="только проверить, не писать")
@@ -627,22 +651,26 @@ def main() -> int:
         # пусто, после вскрытия ящика уже нет. Поэтому в ванильной игре
         # восьмиметровый Table спокойно приезжает в ящике 3 x 4.5 x 5.
         #
-        # Попытка подогнать ящик под габарит сборки делала только хуже: ящик
-        # собран из семи отдельных Rigidbody-стенок, и неравномерный масштаб
-        # корня ломает их коллайдеры — стенки меняли видимый размер при смене
+        # Размер ящика — вопрос только внешнего вида, и меняется он строго
+        # РАВНОМЕРНО. Неравномерный масштаб (1.61, 2.6, 1) ломает физику семи
+        # Rigidbody-стенок: их коллайдеры меняли видимый размер при смене
         # ракурса и вышибали видеокарты из рамы майнера.
         crate_name = "Crate_" + spec.key
         crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
         template = os.path.join(
             REPO, COMP, crate_template_for(case_name) + ".prefab")
 
+        crate_scale = crate_scale_for(spec.case, resolved)
         spawn_guid, spawn_root = write_crate_prefab(
             path=crate_path,
             crate_name=crate_name,
             template_prefab=template,
             content_guid=prefab_guid,
             content_file_id=go_id,
+            scale=crate_scale,
         )
+        if crate_scale > 1.0:
+            print(f"    ящик увеличен равномерно x{crate_scale:.2f}")
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)

@@ -712,12 +712,20 @@ class PrefabResolver:
         # весь объект Slots и ставит свои слоты. Без учёта этого списка
         # резолвер видел фантомные слоты (6 Supply вместо 4), генератор
         # раскладывал по ним детали, а в игре слота не оказывалось.
+        # ВАЖНО: блок читается строго до следующего ключа того же уровня.
+        # Жадный разбор захватывал соседний m_AddedGameObjects и «удалял»
+        # корневой Transform рамы — тогда в сборке не находилось ни одного
+        # слота вообще, включая Motherboard.
+        removed_block = re.search(
+            r"^\s*m_RemovedGameObjects:\n((?:\s+-.*\n)*)",
+            pi.body,
+            re.M,
+        )
         removed_gos = {
             int(fid)
             for fid in re.findall(
-                r"m_RemovedGameObjects:(.*?)(?=\n  [a-zA-Z_]+:)", pi.body, re.S
+                r"fileID: (\d+)", removed_block.group(1) if removed_block else ""
             )
-            for fid in re.findall(r"fileID: (\d+)", fid)
         }
         removed_keys = self._descendants_of(sub, removed_gos)
 
@@ -1536,12 +1544,35 @@ def _find_root_game_object(text: str) -> Optional[str]:
     return None
 
 
+def _scale_root_transform(text: str, root_go_id: str, factor: float) -> str:
+    """Проставить РАВНОМЕРНЫЙ масштаб корневому Transform префаба.
+
+    Только равномерный: Unity корректно пересчитывает коллайдеры и инерцию
+    при одинаковом масштабе по всем осям. Неравномерный (например 1.61, 2.6, 1)
+    ломает физику составного ящика — его семь Rigidbody-стенок начинали менять
+    видимый размер при смене ракурса и выталкивали содержимое.
+    """
+    pattern = re.compile(
+        r"(--- !u!4 &\d+\nTransform:\n(?:.*\n)*?"
+        r"  m_GameObject: \{fileID: " + re.escape(str(root_go_id)) + r"\}\n"
+        r"(?:.*\n)*?)"
+        r"(  m_LocalScale: )\{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}"
+    )
+    v = _f(factor)
+    new_text, n = pattern.subn(
+        r"\g<1>\g<2>" + "{{x: {0}, y: {0}, z: {0}}}".format(v), text, count=1)
+    if n != 1:
+        raise ValueError("не найден m_LocalScale корневого Transform ящика")
+    return new_text
+
+
 def write_crate_prefab(
     path: str,
     crate_name: str,
     template_prefab: str,
     content_guid: str,
     content_file_id: int,
+    scale: float = 1.0,
 ) -> Tuple[str, int]:
     """Создать ящик доставки для готовой сборки на основе ящика-образца.
 
@@ -1556,10 +1587,9 @@ def write_crate_prefab(
     имя, spawnId и ссылка Box.prefab, а все fileID пересчитываются
     детерминированно, чтобы два ящика не делили идентификаторы объектов.
 
-    Ящик НЕ масштабируется: он собран из семи отдельных Rigidbody-стенок, и
-    растягивание корня неравномерным масштабом ломает их коллайдеры — стенки
-    меняют видимый размер при смене ракурса и выталкивают содержимое. То, что
-    в ящик не помещается (рамы майнеров), доставляется без ящика.
+    scale — РАВНОМЕРНЫЙ коэффициент размера ящика, чтобы коробка под раму
+    майнера не выглядела втрое меньше своего груза. Только равномерный:
+    неравномерный масштаб ломает физику семи Rigidbody-стенок.
 
     Возвращает (guid ассета, fileID корневого GameObject).
     """
@@ -1624,6 +1654,9 @@ def write_crate_prefab(
         count=1,
     )
     text = head + tail
+
+    if abs(scale - 1.0) > 1e-9:
+        text = _scale_root_transform(text, mapping[template_root], scale)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
