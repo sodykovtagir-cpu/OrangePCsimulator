@@ -401,6 +401,33 @@ for spec in gen.BUILDS:
           f"{spec.key}: иконка существует в проекте")
 
 # ---------------------------------------------------------------------------
+print("\nСлоты ищутся не только в иерархии корпуса")
+
+# Регресс: слот Motherboard во ВСЕХ корпусах и рамах объявлен с setParent: 0 —
+# плата не становится потомком корпуса, её держит только FixedJoint. Спавнер
+# искал слоты через root.GetComponentsInChildren<Slot>() от корпуса и потому
+# не видел CPU/Cooler/RAM/GPU самой платы: в игре это давало
+# «не нашлось слота 'CPU' для детали 'CPU Celeron G3920'».
+for _case in sorted({spec.case for spec in gen.BUILDS}):
+    _doc = UnityDoc.load(ROOT / _case)
+    _mb = [o for o in _doc.objects
+           if o.get("target") == "Motherboard" and o.get("setParent") is not None]
+    if not _mb:
+        continue
+    _detached = [o for o in _mb if str(o.get("setParent")).strip() == "0"]
+    if _detached:
+        check("hosts" in spawner_cs and "hosts.Add" in spawner_cs,
+              f"{Path(_case).name}: слот Motherboard с setParent:0 — спавнер "
+              f"обязан собирать слоты и с подключённых деталей")
+
+check("private bool Attach(List<GameObject> hosts" in spawner_cs,
+      "Attach ищет слоты по списку хостов, а не только в корпусе")
+check("hosts.Add(spawned)" in spawner_cs,
+      "подключённая деталь добавляется в список хостов (плата приносит свои слоты)")
+check("root.GetComponentsInChildren<Slot>" not in spawner_cs,
+      "нет поиска слотов только от корпуса")
+
+# ---------------------------------------------------------------------------
 print("\nMatch-совместимость деталей со слотами")
 
 # Регресс на баг, из-за которого офисный ПК не собирался: item_info() искал

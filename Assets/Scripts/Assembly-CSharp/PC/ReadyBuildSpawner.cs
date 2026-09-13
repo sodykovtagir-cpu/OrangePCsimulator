@@ -96,6 +96,13 @@ namespace PC
 			// Слоту нужен кадр, чтобы отработал его Start.
 			yield return null;
 
+			// Хосты слотов. Корпус — первый, дальше сюда попадает каждая
+			// подключённая деталь: у слота Motherboard во всех корпусах и
+			// рамах стоит setParent: 0, поэтому плата НЕ становится потомком
+			// корпуса (её держит только FixedJoint) и её слоты недостижимы
+			// через GetComponentsInChildren от корпуса.
+			var hosts = new List<GameObject> { root };
+
 			if (parts != null)
 			{
 				var ordered = new List<Part>(parts);
@@ -118,7 +125,7 @@ namespace PC
 						continue;
 					}
 
-					if (!Attach(root, item, part.slotTarget))
+					if (!Attach(hosts, item, part.slotTarget))
 					{
 						Debug.LogWarning(
 							$"{name}: не нашлось слота '{part.slotTarget}' " +
@@ -126,6 +133,10 @@ namespace PC
 						Destroy(spawned);
 						continue;
 					}
+
+					// Деталь могла сама принести слоты (материнская плата),
+					// и достижимы они только через неё.
+					hosts.Add(spawned);
 
 					// Пауза не обязательна для корректности — слоты уже
 					// заняты синхронно, — но даёт материнке отработать
@@ -142,25 +153,32 @@ namespace PC
 		/// <summary>
 		/// Найти свободный подходящий слот и подключить деталь.
 		///
-		/// Слоты ищутся по всей текущей иерархии сборки, поэтому слоты
-		/// материнской платы становятся доступны сразу после того, как сама
-		/// плата встала в корпус.
+		/// Слоты ищутся по всем уже собранным объектам: корпусу и каждой
+		/// подключённой детали. Одним корпусом обойтись нельзя — слот
+		/// Motherboard везде объявлен с setParent: 0, так что плата остаётся
+		/// вне иерархии корпуса и её слоты CPU/Cooler/RAM/GPU не попадают в
+		/// GetComponentsInChildren корпуса.
 		/// </summary>
-		private bool Attach(GameObject root, Item item, string slotTarget)
+		private bool Attach(List<GameObject> hosts, Item item, string slotTarget)
 		{
-			var slots = root.GetComponentsInChildren<Slot>(true);
-
-			foreach (var slot in slots)
+			foreach (var host in hosts)
 			{
-				if (slot == null || slot.IsUsing) continue;
+				if (host == null) continue;
 
-				// Пустой slotTarget — «в любой подходящий»: TryAttach сам
-				// проверит тег и match.
-				if (!string.IsNullOrEmpty(slotTarget) && slot.target != slotTarget)
-					continue;
+				var slots = host.GetComponentsInChildren<Slot>(true);
 
-				if (slot.TryAttach(item))
-					return true;
+				foreach (var slot in slots)
+				{
+					if (slot == null || slot.IsUsing) continue;
+
+					// Пустой slotTarget — «в любой подходящий»: TryAttach сам
+					// проверит тег и match.
+					if (!string.IsNullOrEmpty(slotTarget) && slot.target != slotTarget)
+						continue;
+
+					if (slot.TryAttach(item))
+						return true;
+				}
 			}
 
 			return false;
