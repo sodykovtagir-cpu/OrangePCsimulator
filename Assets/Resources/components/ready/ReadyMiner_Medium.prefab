@@ -66,12 +66,12 @@ MonoBehaviour:
     localEuler: {x: 90, y: 90, z: 0}
     order: 3
     slotTarget: RAM
-  - prefab: {fileID: 1420016328669017, guid: 185d4e02bad8c6f4da76f4a9cb8b3ea8, type: 3}
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: -0.7, y: -0.7, z: -1.7}
     localEuler: {x: 0, y: 270, z: 0}
     order: 4
     slotTarget: Supply
-  - prefab: {fileID: 1420016328669017, guid: 185d4e02bad8c6f4da76f4a9cb8b3ea8, type: 3}
+  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: -0.7, y: -0.7, z: -0.35}
     localEuler: {x: 0, y: 270, z: 0}
     order: 5
@@ -82,42 +82,42 @@ MonoBehaviour:
     order: 6
     slotTarget: Drive
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: -2.17761}
+    localPosition: {x: 0.174, y: 0.5155, z: -2.32761}
     localEuler: {x: 90, y: 180, z: 0}
     order: 7
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: -1.55761}
+    localPosition: {x: 0.174, y: 0.5155, z: -1.70761}
     localEuler: {x: 90, y: 180, z: 0}
     order: 8
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: -0.93761}
+    localPosition: {x: 0.174, y: 0.5155, z: -1.08761}
     localEuler: {x: 90, y: 180, z: 0}
     order: 9
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: -0.31761}
+    localPosition: {x: 0.174, y: 0.5155, z: -0.46761}
     localEuler: {x: 90, y: 180, z: 0}
     order: 10
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: 0.30239}
+    localPosition: {x: 0.174, y: 0.5155, z: 0.15239}
     localEuler: {x: 90, y: 180, z: 0}
     order: 11
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: 0.92239}
+    localPosition: {x: 0.174, y: 0.5155, z: 0.77239}
     localEuler: {x: 90, y: 180, z: 0}
     order: 12
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: 1.54239}
+    localPosition: {x: 0.174, y: 0.5155, z: 1.39239}
     localEuler: {x: 90, y: 180, z: 0}
     order: 13
     slotTarget: GPU
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
-    localPosition: {x: 0.074, y: 0.3855, z: 2.16239}
+    localPosition: {x: 0.174, y: 0.5155, z: 2.01239}
     localEuler: {x: 90, y: 180, z: 0}
     order: 14
     slotTarget: GPU

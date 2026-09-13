@@ -57,7 +57,7 @@ MonoBehaviour:
     order: 1
     slotTarget: CPU
   - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
-    localPosition: {x: -0.31, y: 3.54, z: -0.344}
+    localPosition: {x: -0.31, y: 3.54, z: -0.684}
     localEuler: {x: 270, y: 180, z: 0}
     order: 2
     slotTarget: Cooler
@@ -101,12 +101,12 @@ MonoBehaviour:
     localEuler: {x: 0, y: 90, z: 90}
     order: 10
     slotTarget: Supply
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+  - prefab: {fileID: 1220951341831658, guid: b6610df4c0723974d83f325d2fdb6b8b, type: 3}
     localPosition: {x: -0.878, y: 0.699, z: -0.86}
     localEuler: {x: 0, y: 270, z: 270}
     order: 11
     slotTarget: Drive
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+  - prefab: {fileID: 1220951341831658, guid: b6610df4c0723974d83f325d2fdb6b8b, type: 3}
     localPosition: {x: -0.878, y: 0.699, z: -0.509}
     localEuler: {x: 0, y: 270, z: 270}
     order: 12

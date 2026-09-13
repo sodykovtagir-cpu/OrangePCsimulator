@@ -57,7 +57,7 @@ MonoBehaviour:
     order: 1
     slotTarget: CPU
   - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
-    localPosition: {x: -0.084, y: 1.2, z: -1.015}
+    localPosition: {x: -0.424, y: 1.2, z: -1.015}
     localEuler: {x: 90, y: 90, z: 0}
     order: 2
     slotTarget: Cooler

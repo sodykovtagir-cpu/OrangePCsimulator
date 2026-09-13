@@ -47,81 +47,81 @@ MonoBehaviour:
   basePrefab: {fileID: 1145151083250059, guid: bc5e2532bebc9a448b1f3ec2004878d7, type: 3}
   parts:
   - prefab: {fileID: 1569340072111286, guid: c5280c08bb5d6134e84569e137d4869e, type: 3}
-    localPosition: {x: -0.72, y: 0.44, z: -0.91}
+    localPosition: {x: -0.72, y: 0.44, z: -0.81}
     localEuler: {x: 90, y: 90, z: 0}
     order: 0
     slotTarget: Motherboard
   - prefab: {fileID: 1874669844494836, guid: e49aab5a509c3854b95249d4abaafd8b, type: 3}
-    localPosition: {x: -0.647, y: 1.05242, z: -0.79967}
+    localPosition: {x: -0.647, y: 1.05242, z: -0.69967}
     localEuler: {x: 90, y: 90, z: 0}
     order: 1
     slotTarget: CPU
   - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
-    localPosition: {x: -0.084, y: 1.05242, z: -0.79967}
+    localPosition: {x: -0.424, y: 1.05242, z: -0.69967}
     localEuler: {x: 90, y: 90, z: 0}
     order: 2
     slotTarget: Cooler
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.7304}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.6304}
     localEuler: {x: 0, y: 270, z: 270}
     order: 3
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.6296}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.5296}
     localEuler: {x: 0, y: 270, z: 270}
     order: 4
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.4784}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.3784}
     localEuler: {x: 0, y: 270, z: 270}
     order: 5
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.3776}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.2776}
     localEuler: {x: 0, y: 270, z: 270}
     order: 6
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -0.22175}
+    localPosition: {x: -0.45, y: 1.05242, z: -0.12175}
     localEuler: {x: 0, y: 270, z: 270}
     order: 7
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -0.12095}
+    localPosition: {x: -0.45, y: 1.05242, z: -0.02095}
     localEuler: {x: 0, y: 270, z: 270}
     order: 8
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: 0.03025}
+    localPosition: {x: -0.45, y: 1.05242, z: 0.13025}
     localEuler: {x: 0, y: 270, z: 270}
     order: 9
     slotTarget: RAM
   - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: 0.13105}
+    localPosition: {x: -0.45, y: 1.05242, z: 0.23105}
     localEuler: {x: 0, y: 270, z: 270}
     order: 10
     slotTarget: RAM
   - prefab: {fileID: 7209420444613088609, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
-    localPosition: {x: -0.1895, y: -0.63306, z: -0.96286}
+    localPosition: {x: -0.1895, y: -0.63306, z: -0.86286}
     localEuler: {x: 0, y: 270, z: 180}
     order: 11
     slotTarget: GPU
   - prefab: {fileID: 1969907941431608, guid: 3fc3e1b3a1a11814480f0290653b3aff, type: 3}
-    localPosition: {x: -0.1895, y: 0.00141, z: -0.96286}
+    localPosition: {x: -0.1895, y: 0.00141, z: -0.86286}
     localEuler: {x: 0, y: 270, z: 180}
     order: 12
     slotTarget: GPU
   - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
-    localPosition: {x: -0.64033, y: -0.782, z: -1.25763}
+    localPosition: {x: -0.64033, y: -0.782, z: -1.15763}
     localEuler: {x: 270, y: 270, z: 0}
     order: 13
     slotTarget: Drive
   - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
-    localPosition: {x: -0.64033, y: -0.109, z: -1.25763}
+    localPosition: {x: -0.64033, y: -0.109, z: -1.15763}
     localEuler: {x: 270, y: 270, z: 0}
     order: 14
     slotTarget: Drive
-  - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
+  - prefab: {fileID: 1420016328669017, guid: 5ab2284208a33514d96e4fcfe5e4a0b6, type: 3}
     localPosition: {x: -0.0875, y: -1.55, z: -1.575}
     localEuler: {x: 0, y: 180, z: 0}
     order: 15

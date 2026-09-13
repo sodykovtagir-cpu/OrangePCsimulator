@@ -19,6 +19,7 @@ from unity_asset_tool import (  # noqa: E402
     PrefabResolver,
     ReadyBuild,
     UnityDoc,
+    item_info,
     quat_to_euler,
     read_meta_guid,
     shop_pages,
@@ -398,6 +399,56 @@ for spec in gen.BUILDS:
     ref = re.search(r"sprite: \{fileID: \d+, guid: (\w+)", asset)
     check(ref is not None and _guid_exists(ref.group(1)),
           f"{spec.key}: иконка существует в проекте")
+
+# ---------------------------------------------------------------------------
+print("\nMatch-совместимость деталей со слотами")
+
+# Регресс на баг, из-за которого офисный ПК не собирался: item_info() искал
+# поле match строго по guid компонента Item, но на реальных деталях висит
+# наследник (Motherboard, Hardware, CPU, Storage), и match читался как None.
+# Вся match-валидация молча пропускалась, а в игре Slot.TryAttach отклонял
+# плату Micro_ATX (match=1) в корпусе Case_ITX (matches=00).
+_MATCH_REF = {
+    "Micro_ATX": 1,      # компонент Motherboard, не Item
+    "Mini_ITX": 0,
+    "EXATX": 1,
+    "PSU 2kW": 1,        # компонент Supply
+    "PSU 1.1kW": 0,
+    "SSD_M.2 1TB": 1,    # компонент Storage
+    "SSD 2TB": 0,
+    "GT440": 0,          # компонент Hardware
+}
+for _name, _want in _MATCH_REF.items():
+    _doc = UnityDoc.load(ROOT / "Assets/Resources/components" / f"{_name}.prefab")
+    _got = item_info(_doc)["match"]
+    check(_got == _want,
+          f"{_name}: match читается у наследника Item (ожидали {_want}, получили {_got})")
+
+# Каждая деталь каждой сборки обязана проходить фильтр matches своего слота,
+# иначе Slot.TryAttach вернёт false и деталь просто не встанет.
+for spec in gen.BUILDS:
+    try:
+        ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+        _ok, _err = True, ""
+    except ValueError as exc:
+        _ok, _err = False, str(exc)
+    check(_ok, f"{spec.key}: все детали проходят match слотов" + (f" — {_err}" if _err else ""))
+
+# ---------------------------------------------------------------------------
+print("\nСсылки на иконки совпадают с донорскими")
+
+# Регресс: генератор жёстко писал 'type: 2', хотя доноры Big_Miner и
+# AquariumCaseAtx* ссылаются на свой спрайт с 'type: 3'. Unity отвечал на это
+# "Unknown error occurred while loading" прямо в ShopUI.Init/ShopPanel.Awake.
+_SPRITE_RE = re.compile(r"sprite: \{fileID: \d+, guid: (\w+), type: (\d+)")
+for spec in gen.BUILDS:
+    _donor = (ROOT / "Assets/MonoBehaviour" / f"{spec.sprite_from}.asset").read_text(
+        encoding="utf-8", errors="replace")
+    _mine = (ROOT / gen.OUT_ASSETS / f"{spec.key}.asset").read_text(encoding="utf-8")
+    _d, _m = _SPRITE_RE.search(_donor), _SPRITE_RE.search(_mine)
+    check(_d is not None and _m is not None and _d.groups() == _m.groups(),
+          f"{spec.key}: ссылка на иконку идентична донору {spec.sprite_from} "
+          f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
 
 # ---------------------------------------------------------------------------
 print("\nГенератор идемпотентен")

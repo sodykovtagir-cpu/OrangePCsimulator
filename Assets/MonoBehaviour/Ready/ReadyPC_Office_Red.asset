@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ReadyPC_Office_Red
   m_EditorClassIdentifier: 
   itemName: '{Office PC} ({Red})'
-  price: 660
+  price: 505
   bitcoin: 0
   sprite: {fileID: 21300000, guid: fdbbb8a10d9086344905520a43b4ba53, type: 2}
   spawn: {fileID: 320145892924376804, guid: a7932f0702a87462e61590ab4c69106a, type: 3}

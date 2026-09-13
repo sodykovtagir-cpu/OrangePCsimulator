@@ -316,7 +316,7 @@ MonoBehaviour:
   itemName: '{item_name}'
   price: {price}
   bitcoin: {bitcoin}
-  sprite: {{fileID: 21300000, guid: {sprite_guid}, type: 2}}
+  sprite: {{fileID: 21300000, guid: {sprite_guid}, type: {sprite_type}}}
   spawn: {{fileID: {spawn_file_id}, guid: {spawn_guid}, type: 3}}
   large: {large}
   translateDescription: {translate_description}
@@ -334,6 +334,10 @@ class ShopItemAsset:
     spawn_guid: str
     spawn_file_id: int
     sprite_guid: str
+    # Тип ссылки на спрайт копируется у ShopItem-донора: у части текстур в
+    # проекте это 3, и подмена на 2 ломает импорт ('Unknown error occurred
+    # while loading' для Big_Miner и AquariumCaseAtx*).
+    sprite_type: int = 2
     bitcoin: float = 0
     large: int = 1
     description: str = ""
@@ -350,6 +354,7 @@ class ShopItemAsset:
             price=self.price,
             bitcoin=_num(self.bitcoin),
             sprite_guid=self.sprite_guid,
+            sprite_type=self.sprite_type,
             spawn_file_id=self.spawn_file_id,
             spawn_guid=self.spawn_guid,
             large=self.large,
@@ -946,13 +951,24 @@ def item_info(doc: UnityDoc) -> dict:
     """Данные компонента-детали: корневой GameObject, match, slotOffset."""
     root = doc.root_game_object()
     info = {"root": root, "match": None, "slot_offset": (0.0, 0.0, 0.0)}
-    for o in doc.find(class_id=114, script_guid=SCRIPT_GUIDS["Item"]):
+
+    # Поля match и slotOffset объявлены в Item, но на реальных деталях висит
+    # не сам Item, а его наследник: Motherboard, Hardware, CPU, Storage и др.
+    # Искать строго по guid'у Item нельзя — у Micro_ATX такого компонента нет,
+    # match=1 лежит в компоненте Motherboard. Раньше из-за этого item_info
+    # возвращал match=None, проверка совместимости молча пропускалась, и в
+    # Case_ITX (matches=00) уезжала плата Micro_ATX (match=1): в игре слот её
+    # не принимал, а следом отваливались все CPU/RAM/GPU этой платы.
+    # Поэтому ищем любой MonoBehaviour на корне, у которого есть поле match.
+    for o in doc.find(class_id=114):
         go_ref = o.get("m_GameObject") or ""
         m = re.search(r"fileID:\s*(-?\d+)", go_ref)
         if root is not None and m and int(m.group(1)) != root.file_id:
             continue
         match = o.get("match")
-        info["match"] = int(match) if match and match.isdigit() else 0
+        if match is None:
+            continue
+        info["match"] = int(match) if match.isdigit() else 0
         info["slot_offset"] = _vec(o.get("slotOffset"))
         break
     # Transform корня — чтобы знать его собственный локальный поворот

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ReadyMiner_Medium
   m_EditorClassIdentifier: 
   itemName: '{Medium Miner}'
-  price: 4895
+  price: 5225
   bitcoin: 0
   sprite: {fileID: 21300000, guid: a2a47c3e39a00494e9ebc5597be5e4e1, type: 2}
   spawn: {fileID: 1530241821533884800, guid: e63a44e6d525392ccd030d98b83e7657, type: 3}

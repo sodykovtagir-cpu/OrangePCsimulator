@@ -23,7 +23,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -176,14 +176,20 @@ def cover_for(case_prefab_name: str) -> str:
 
 
 def office_pc(case: str) -> List[PartRef]:
-    """Офисный: минимум для работы. Дёшево и тихо."""
+    """Офисный: минимум для работы. Дёшево и тихо.
+
+    Корпус ITX принимает только платы с match=0, то есть Mini_ITX: Micro_ATX
+    (match=1) в него физически не влезает. У Mini_ITX нет слота GPU — как и у
+    эталонного Assets/GameObject/Office PC.prefab, собранного вручную.
+    Видеокарта офисному ПК не нужна: Motherboard.Done() требует только CPU,
+    RAM и питание, так что машина включается и работает на встроенной графике.
+    """
     return [
-        p("Micro_ATX", "Motherboard"),
-        p("CPU Celeron G3920", "CPU", host="Micro_ATX"),
-        p("Cooler", "Cooler", host="Micro_ATX"),
-        p("RAM 4GB", "RAM", host="Micro_ATX"),
-        p("RAM 4GB", "RAM", host="Micro_ATX"),
-        p("GT440", "GPU", host="Micro_ATX"),
+        p("Mini_ITX", "Motherboard"),
+        p("CPU Celeron G3920", "CPU", host="Mini_ITX"),
+        p("Cooler", "Cooler", host="Mini_ITX"),
+        p("RAM 4GB", "RAM", host="Mini_ITX"),
+        p("RAM 4GB", "RAM", host="Mini_ITX"),
         p("PSU 300W", "Supply"),
         p("HDD 500GB", "Drive"),
         p("CaseFan", "Fan"),
@@ -243,7 +249,9 @@ def workstation_pc(case: str) -> List[PartRef]:
         # Два слота M.2 живут на самой плате (matches=01).
         p("SSD_M.2 1TB", "Drive", host="EXATX"),
         p("SSD_M.2 1TB", "Drive", host="EXATX"),
-        p("PSU 2kW", "Supply"),
+        # Корпусные слоты Supply принимают только match=0, то есть до
+        # 1.1 кВт: PSU 2kW (match=1) ставится лишь в рамы майнеров.
+        p("PSU 1.1kW", "Supply"),
         p("SSD 2TB", "Drive"),
         p("CaseFan(RGB)", "Fan"),
         p(cover_for(case), "Cover"),
@@ -286,7 +294,9 @@ def dream_pc(case: str) -> List[PartRef]:
         p("RTX4080Ti", "GPU", host="EXATX"),
         p("SSD_M.2 1TB", "Drive", host="EXATX"),
         p("SSD_M.2 1TB", "Drive", host="EXATX"),
-        p("PSU 2kW", "Supply"),
+        # Корпусные слоты Supply принимают только match=0, то есть до
+        # 1.1 кВт: PSU 2kW (match=1) ставится лишь в рамы майнеров.
+        p("PSU 1.1kW", "Supply"),
         p("SSD 2TB", "Drive"),
         p("SSD 2TB", "Drive"),
         p("CaseFan(RGB)", "Fan"),
@@ -302,7 +312,8 @@ def miner_cheap() -> List[PartRef]:
         p("CPU Celeron G3920", "CPU", host="Mini_ITX"),
         p("Cooler", "Cooler", host="Mini_ITX"),
         p("RAM 4GB", "RAM", host="Mini_ITX"),
-        p("PSU 500W", "Supply"),
+        # Слоты Supply у рам майнеров принимают только match=1 (PSU 2kW).
+        p("PSU 2kW", "Supply"),
         p("SSD 128GB", "Drive"),
     ]
     parts += [p("GT1030", "GPU") for _ in range(4)]
@@ -316,8 +327,9 @@ def miner_medium() -> List[PartRef]:
         p("CPU i3-8300", "CPU", host="Mini_ITX"),
         p("TowerCooler", "Cooler", host="Mini_ITX"),
         p("RAM 8GB", "RAM", host="Mini_ITX"),
-        p("PSU 1kW", "Supply"),
-        p("PSU 1kW", "Supply"),
+        # Слоты Supply у рам майнеров принимают только match=1 (PSU 2kW).
+        p("PSU 2kW", "Supply"),
+        p("PSU 2kW", "Supply"),
         p("SSD 256GB", "Drive"),
     ]
     parts += [p("RX570", "GPU") for _ in range(8)]
@@ -353,7 +365,9 @@ def miner_5090() -> List[PartRef]:
         p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
     ]
     parts += [p("PSU 2kW", "Supply") for _ in range(6)]
-    parts += [p("SSD_M.2 1TB", "Drive", index=i) for i in range(2)]
+    # Слоты Drive рамы принимают только match=0, а у платы Mini_ITX слотов M.2
+    # нет вовсе, поэтому ставим обычные SSD.
+    parts += [p("SSD 1TB", "Drive", index=i) for i in range(2)]
     parts += [p("RTX5090", "GPU") for _ in range(24)]
     return parts
 
@@ -500,10 +514,16 @@ BUILDS: List[BuildSpec] = _make_builds()
 # Вспомогательное
 # ---------------------------------------------------------------------------
 
-def sprite_of(asset_name: str) -> str:
+def sprite_of(asset_name: str) -> Tuple[str, int]:
+    """guid и type ссылки на иконку у ShopItem-донора.
+
+    type обязателен: у Big_Miner и AquariumCaseAtx* доноры ссылаются с type: 3,
+    и жёсткая подстановка type: 2 роняла импорт текстуры в Unity.
+    """
     path = os.path.join(REPO, "Assets/MonoBehaviour", asset_name + ".asset")
     text = open(path, encoding="utf-8", errors="replace").read()
-    return re.search(r"sprite: \{fileID: \d+, guid: (\w+)", text).group(1)
+    m = re.search(r"sprite: \{fileID: \d+, guid: (\w+), type: (\d+)", text)
+    return m.group(1), int(m.group(2))
 
 
 def base_ref(prefab_rel: str):
@@ -578,13 +598,15 @@ def main() -> int:
         )
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
+        _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)
         item = ShopItemAsset(
             name=spec.key,
             item_name=spec.title,
             price=price,
             spawn_guid=crate_guid,
             spawn_file_id=crate_root,
-            sprite_guid=sprite_of(spec.sprite_from),
+            sprite_guid=_sprite_guid,
+            sprite_type=_sprite_type,
             bitcoin=0,
             large=1,  # крупный товар: приезжает порталом, как и корпуса
             description=spec.description,
