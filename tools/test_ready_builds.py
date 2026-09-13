@@ -20,6 +20,11 @@ from unity_asset_tool import (  # noqa: E402
     ReadyBuild,
     UnityDoc,
     item_info,
+    app_info,
+    build_bounds,
+    prefab_bounds,
+    root_scale,
+    BOOT_FILE_SIZE as gen_boot_size,
     quat_to_euler,
     read_meta_guid,
     shop_pages,
@@ -476,6 +481,84 @@ for spec in gen.BUILDS:
     check(_d is not None and _m is not None and _d.groups() == _m.groups(),
           f"{spec.key}: ссылка на иконку идентична донору {spec.sprite_from} "
           f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
+
+# ---------------------------------------------------------------------------
+print("\nЯщик доставки вмещает свою сборку")
+
+# Регресс: стандартный ящик 3 x 4.5 x 5 меньше рамы майнера (3.46 x 2.5 x 5.3),
+# а BigMiner с высотой 10.5 не влезал втрое. Стенки оказывались внутри модели,
+# физика выталкивала их — майнер ломался прямо в коробке, а на полу
+# разваливался целиком.
+for spec in gen.BUILDS:
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _lo, _hi = build_bounds(spec.case, _resolved, str(ROOT))
+    _content = tuple(_hi[i] - _lo[i] for i in range(3))
+
+    _crate_rel = f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab"
+    _scale = root_scale(_crate_rel, str(ROOT))
+    _clo, _chi = prefab_bounds(_crate_rel, str(ROOT))
+    # Габарит ящика с учётом масштаба корня, минус стенки.
+    _inner = tuple((_chi[i] - _clo[i]) * _scale[i] - 2 * gen.CRATE_WALL
+                   for i in range(3))
+
+    _fits = all(_inner[i] >= _content[i] for i in range(3))
+    check(_fits,
+          f"{spec.key}: содержимое ("
+          f"{_content[0]:.2f}, {_content[1]:.2f}, {_content[2]:.2f}) "
+          f"помещается в ящик ("
+          f"{_inner[0]:.2f}, {_inner[1]:.2f}, {_inner[2]:.2f})")
+
+# Масштаб только растягивает: маленькие ПК должны ездить в обычной коробке.
+for spec in gen.BUILDS:
+    _scale = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))
+    check(all(v >= 1.0 - 1e-6 for v in _scale),
+          f"{spec.key}: ящик не ужимается (scale={tuple(round(v, 2) for v in _scale)})")
+
+# ---------------------------------------------------------------------------
+print("\nPCOS предустановлена с нужным набором приложений")
+
+_spawner_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
+    encoding="utf-8")
+check("System/boot.bin" in _spawner_src and '"pcos"' in _spawner_src,
+      "спавнер пишет загрузчик System/boot.bin с содержимым pcos")
+check("Resources.LoadAll<App>(\"apps\")" in _spawner_src,
+      "размер .exe берётся из каталога приложений, как в Installer")
+
+for spec in gen.BUILDS:
+    _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    _m = re.search(r"^  preinstalledApps:\n((?:  - .*\n)*)", _text, flags=re.M)
+    _listed = re.findall(r"^  - (.+)$", _m.group(1), flags=re.M) if _m else []
+    _want = [app_info(a, str(ROOT))[0] for a in spec.apps]
+    check(_listed == _want,
+          f"{spec.key}: список приложений {_listed} совпадает с ожидаемым {_want}")
+
+# Приложение должно существовать в Resources/apps, иначе ОС выдаст
+# "App (...) not found!" и иконка не появится.
+_catalog = {}
+for _p in sorted((ROOT / "Assets/Resources/apps").glob("*.prefab")):
+    try:
+        _n, _s = app_info(_p.stem, str(ROOT))
+    except Exception:
+        continue
+    _catalog[_n] = _s
+for _name in sorted({app_info(a, str(ROOT))[0] for spec in gen.BUILDS for a in spec.apps}):
+    check(_name in _catalog, f"приложение '{_name}' есть в Resources/apps")
+
+# Система плюс программы обязаны влезть на диск сборки: Storage.AddFile
+# молча откажет, если места не хватает.
+for spec in gen.BUILDS:
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _caps = []
+    for _part in _resolved:
+        _txt = (ROOT / _part["path"]).read_text(encoding="utf-8", errors="replace")
+        _cm = re.search(r"^\s*capacity:\s*(\d+)", _txt, flags=re.M)
+        if _cm:
+            _caps.append(int(_cm.group(1)))
+    if not _caps or not spec.apps:
+        continue
+    _need = gen_boot_size + sum(app_info(a, str(ROOT))[1] for a in spec.apps)
+    check(max(_caps) >= _need,
+          f"{spec.key}: PCOS и приложения ({_need}) влезают на диск ({max(_caps)})")
 
 # ---------------------------------------------------------------------------
 print("\nГенератор идемпотентен")

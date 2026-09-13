@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using PC.Component;
+using PC.Component.Software;
 using UnityEngine;
 
 namespace PC
@@ -75,6 +77,19 @@ namespace PC
 		private float stepDelay = 0.05f;
 
 		[SerializeField]
+		[Tooltip("Предустановить PCOS на первый накопитель сборки")]
+		private bool preinstallOS = true;
+
+		[SerializeField]
+		[Tooltip("Приложения, которые лежат на диске вместе с системой. " +
+			"Имена — как AppName в префабах из Resources/apps")]
+		private string[] preinstalledApps;
+
+		[SerializeField]
+		[Tooltip("Размер загрузчика PCOS (Installer.minimumSpace)")]
+		private int systemSize = 60000;
+
+		[SerializeField]
 		[Tooltip("Уничтожить пустышку-спавнер после сборки")]
 		private bool destroyAfterBuild = true;
 
@@ -146,8 +161,75 @@ namespace PC
 				}
 			}
 
+			if (preinstallOS)
+				InstallSystem(hosts);
+
 			if (destroyAfterBuild)
 				Destroy(gameObject);
+		}
+
+		/// <summary>
+		/// Записать PCOS и набор приложений на первый накопитель сборки.
+		///
+		/// Система — это просто файлы: Bios ищет System/boot.bin с содержимым
+		/// "pcos", а список установленных программ операционка восстанавливает
+		/// из .exe на диске (OperatingSystem.LoadFilesFromDisk). Поэтому нам
+		/// достаточно положить файлы, не трогая общие префабы накопителей.
+		///
+		/// Размер каждого .exe берётся из самого префаба приложения, как это
+		/// делает мастер установки: new File(app.AppName + ".exe", "", false,
+		/// app.size).
+		/// </summary>
+		private void InstallSystem(List<GameObject> hosts)
+		{
+			Storage disk = null;
+			foreach (var host in hosts)
+			{
+				if (host == null) continue;
+				disk = host.GetComponent<Storage>();
+				if (disk != null) break;
+			}
+
+			if (disk == null)
+			{
+				Debug.LogWarning($"{name}: не нашлось накопителя для установки PCOS");
+				return;
+			}
+
+			if (disk.files == null)
+				disk.files = new List<File>();
+
+			// Загрузчик: именно его ищет Bios, content обязан быть "pcos".
+			if (!disk.ContainsFile("System/boot.bin"))
+				disk.AddFile(new File("System/boot.bin", "pcos", true, systemSize));
+
+			if (preinstalledApps == null) return;
+
+			var catalog = Resources.LoadAll<App>("apps");
+
+			foreach (var appName in preinstalledApps)
+			{
+				if (string.IsNullOrEmpty(appName)) continue;
+
+				int size = 0;
+				if (catalog != null)
+				{
+					foreach (var candidate in catalog)
+					{
+						if (candidate == null) continue;
+						if (candidate.AppName != appName) continue;
+						size = candidate.size;
+						break;
+					}
+				}
+
+				var path = appName + ".exe";
+				if (disk.ContainsFile(path)) continue;
+
+				// AddFile сам откажет, если на диске не хватает места.
+				if (!disk.AddFile(new File(path, "", false, size)))
+					Debug.LogWarning($"{name}: на диске нет места под '{path}'");
+			}
 		}
 
 		/// <summary>

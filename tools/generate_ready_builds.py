@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import math
 import os
 import re
 import sys
@@ -39,6 +40,9 @@ from unity_asset_tool import (  # noqa: E402
     read_meta_guid,
     shop_add_page,
     write_crate_prefab,
+    build_bounds,
+    prefab_bounds,
+    preinstall_os,
 )
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -142,6 +146,9 @@ class BuildSpec:
     sprite_from: str         # у какого ShopItem позаимствовать иконку
     description: str = ""
     extra_markup: float = 0.0
+    # Префабы приложений из Assets/Resources/apps, которые едут вместе с PCOS
+    # на системном накопителе сборки. Пустой список = машина без системы.
+    apps: List[str] = field(default_factory=list)
 
 
 def p(path: str, target: str, host: Optional[str] = None, index: Optional[int] = None) -> PartRef:
@@ -390,6 +397,28 @@ def miner_titan() -> List[PartRef]:
 
 # Цветовые варианты: одна и та же начинка в разных корпусах.
 # Ключ локализации у них общий, а к названию дописывается цвет.
+# Набор приложений, который едет предустановленным вместе с PCOS.
+# Ключи — имена префабов из Assets/Resources/apps; реальное имя файла и его
+# размер берутся из самого префаба (поля appName и size), как это делает
+# Installer. ОС восстанавливает список установленного из файлов на диске
+# (OperatingSystem.LoadFilesFromDisk), поэтому достаточно положить .exe.
+APPS_BY_MODEL = {
+    # Офисная машина: работа с текстом, документами и сетью.
+    "Office": ["TextEditor", "LuaEditor", "Browser", "FileManager"],
+    # Домашняя: то же плюс развлечения.
+    "Home": ["TextEditor", "Browser", "FileManager", "Paint", "Video"],
+    # Игровая и мощнее: добавляем разгон и бенчмарк.
+    "Gaming": ["TextEditor", "Browser", "FileManager", "Overclock", "Benchmark"],
+    "Workstation": ["TextEditor", "LuaEditor", "Browser", "FileManager",
+                    "Overclock", "Benchmark"],
+    "Aquarium": ["TextEditor", "Browser", "FileManager", "RGB", "Personalization"],
+    "Dream": ["TextEditor", "LuaEditor", "Browser", "FileManager",
+              "Overclock", "Benchmark", "RGB"],
+    # Майнеры: только то, ради чего их покупают.
+    "Miner": ["Terminal", "Miner"],
+}
+
+
 PC_MODELS = [
     # (ключ, заголовок, описание, функция начинки, [(суффикс, корпус, цвет)])
     ("Office", "{Office PC}", "Office PC Description", office_pc, [
@@ -448,6 +477,7 @@ def _make_builds() -> List[BuildSpec]:
                     page="Ready PC",
                     sprite_from=SPRITE_BY_CASE[case],
                     description=desc,
+                    apps=APPS_BY_MODEL.get(key, []),
                 )
             )
     for key, title, desc, factory, case, sprite in MINER_MODELS:
@@ -460,6 +490,7 @@ def _make_builds() -> List[BuildSpec]:
                 page="Ready Miner",
                 sprite_from=sprite,
                 description=desc,
+                apps=APPS_BY_MODEL["Miner"],
             )
         )
     return builds
@@ -531,6 +562,61 @@ def base_ref(prefab_rel: str):
     return prefab_spawn_ref(os.path.join(REPO, prefab_rel), REPO)
 
 
+# Зазор между содержимым и внутренней стенкой ящика. Меньше — предмет
+# цепляется за стенку при вскрытии, больше — ящик выглядит раздутым.
+CRATE_CLEARANCE = 0.30
+
+# Толщина стенки ящика-образца: внешний габарит 3.0 x 4.5 x 5.0 при
+# внутренней полости 2.8 x 4.3 x 4.8.
+CRATE_WALL = 0.10
+
+
+def crate_fit(case_prefab: str, resolved: List[dict], template_name: str):
+    """Посчитать масштаб ящика и сдвиг точки выдачи содержимого.
+
+    Стандартный ящик 3 x 4.5 x 5 меньше рамы майнера (3.46 x 2.5 x 5.3), а
+    BigMiner с его 10.5 в высоту не помещается втрое. Куски ящика оказывались
+    внутри модели, физика выталкивала их — и сборка разлеталась.
+
+    Масштаб считается по КОЛЛАЙДЕРАМ собранной машины: берём её габарит,
+    добавляем зазор и требуем, чтобы внутренняя полость ящика была не меньше.
+    Уменьшать ящик не даём (масштаб снизу ограничен единицей): маленькие ПК
+    приезжают в привычной коробке.
+
+    Сдвиг по Y ставит машину на дно ящика: у BigMiner pivot в центре модели,
+    и без сдвига половина рамы оказывалась под полом.
+    """
+    from unity_asset_tool import build_bounds, prefab_bounds
+
+    lo, hi = build_bounds(case_prefab, resolved, REPO)
+    content = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
+
+    tpl_path = os.path.join(REPO, COMP, template_name + ".prefab")
+    tb = prefab_bounds(os.path.relpath(tpl_path, REPO), REPO)
+    if tb is None:
+        raise SystemExit(f"{template_name}: у ящика-образца нет коллайдеров")
+    tlo, thi = tb
+    outer = (thi[0] - tlo[0], thi[1] - tlo[1], thi[2] - tlo[2])
+    inner = tuple(max(0.01, outer[i] - 2 * CRATE_WALL) for i in range(3))
+
+    scale = []
+    for i in range(3):
+        need = content[i] + 2 * CRATE_CLEARANCE
+        scale.append(max(1.0, need / inner[i]))
+
+    # Округляем вверх до сотых, чтобы результат не зависел от плавающей точки.
+    scale = tuple(math.ceil(v * 100) / 100 for v in scale)
+
+    # Центр содержимого относительно pivot'а: Box выдаёт предмет в точке
+    # ящика, а pivot модели может быть где угодно.
+    offset = (
+        -(lo[0] + hi[0]) / 2.0,
+        -(lo[1] + hi[1]) / 2.0,
+        -(lo[2] + hi[2]) / 2.0,
+    )
+    return scale, offset, content
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="только проверить, не писать")
@@ -580,6 +666,8 @@ def main() -> int:
             base_prefab_guid=base_guid,
             base_prefab_file_id=base_fid,
             parts=resolved,
+            apps=spec.apps,
+            root_dir=REPO,
         )
 
         # Ящик доставки: внутрь кладём спавнер сборки. Игрок вскрывает ящик
@@ -589,13 +677,26 @@ def main() -> int:
         crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
         template = os.path.join(
             REPO, COMP, crate_template_for(case_name) + ".prefab")
+        # Ящик обязан быть больше своего содержимого: рама майнера шире и
+        # выше стандартной коробки, её куски оказывались внутри модели и
+        # физика разносила сборку.
+        crate_scale, crate_offset, content_size = crate_fit(
+            spec.case, resolved, os.path.basename(template)[:-len(".prefab")])
+
         crate_guid, crate_root = write_crate_prefab(
             path=crate_path,
             crate_name=crate_name,
             template_prefab=template,
             content_guid=prefab_guid,
             content_file_id=go_id,
+            scale=crate_scale,
+            content_offset=crate_offset,
         )
+        if max(crate_scale) > 1.0:
+            print(f"    ящик увеличен x({crate_scale[0]:.2f}, "
+                  f"{crate_scale[1]:.2f}, {crate_scale[2]:.2f}) под габарит "
+                  f"({content_size[0]:.2f}, {content_size[1]:.2f}, "
+                  f"{content_size[2]:.2f})")
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)

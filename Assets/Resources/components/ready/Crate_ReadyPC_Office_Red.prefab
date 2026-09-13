@@ -353,7 +353,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   prefab: {fileID: 5160378080948724515, guid: fe84a6ef2085fa2cda6aecb4a3f23aa7, type: 3}
-  position: {x: 0, y: 0, z: 0}
+  position: {x: -0.025, y: 0, z: 0.13}
   rotation: {x: 0, y: 0, z: 0}
 --- !u!82 &2436806531287841543
 AudioSource:

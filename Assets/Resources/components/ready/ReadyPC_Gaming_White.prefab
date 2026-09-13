@@ -103,3 +103,11 @@ MonoBehaviour:
     slotTarget: Cover
   stepDelay: 0.05
   destroyAfterBuild: 1
+  preinstallOS: 1
+  preinstalledApps:
+  - Text Editor
+  - Browser
+  - File Manager
+  - Frequency Settings
+  - Benchmark
+  systemSize: 60000

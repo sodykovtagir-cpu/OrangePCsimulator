@@ -1125,6 +1125,192 @@ class ReadyBuild:
 
 
 # ---------------------------------------------------------------------------
+# Предустановленная система PCOS на накопителе готовой сборки
+# ---------------------------------------------------------------------------
+
+# Размер и имя берутся из самого префаба приложения: Installer создаёт файл
+# как new File(app.AppName + ".exe", "", false, app.size), и ОС потом
+# восстанавливает список установленного из файлов диска (LoadFilesFromDisk).
+APPS_DIR = "Assets/Resources/apps"
+
+# Загрузчик PCOS: Bios ищет ровно этот файл, ComputerSystem требует content=pcos.
+BOOT_FILE_PATH = "System/boot.bin"
+BOOT_FILE_CONTENT = "pcos"
+BOOT_FILE_SIZE = 60000  # Installer.minimumSpace
+
+
+def app_info(app_prefab: str, root_dir: str = ".") -> Tuple[str, int]:
+    """(AppName, size) из префаба приложения — как их видит Installer."""
+    path = os.path.join(root_dir, APPS_DIR, app_prefab + ".prefab")
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    m_name = re.search(r"^\s*appName:\s*(.+?)\s*$", text, flags=re.M)
+    if not m_name:
+        raise ValueError(f"{path}: не найдено поле appName")
+    name = m_name.group(1).strip().strip("'\"")
+    m_size = re.search(r"^\s*size:\s*(\d+)\s*$", text, flags=re.M)
+    size = int(m_size.group(1)) if m_size else 0
+    return name, size
+
+
+def render_os_files(app_prefabs: List[str], root_dir: str = ".") -> Tuple[str, int]:
+    """YAML для Storage.files: загрузчик PCOS плюс .exe каждого приложения.
+
+    Возвращает (текст блока, суммарный размер).
+    Формат один в один как в готовом Assets/GameObject/Office PC.prefab.
+    """
+    lines = [
+        f"  - path: {BOOT_FILE_PATH}",
+        f"    content: {BOOT_FILE_CONTENT}",
+        "    hidden: 1",
+        f"    size: {BOOT_FILE_SIZE}",
+    ]
+    total = BOOT_FILE_SIZE
+    for prefab in app_prefabs:
+        name, size = app_info(prefab, root_dir)
+        lines.append(f"  - path: {name}.exe")
+        lines.append("    content: ")
+        lines.append("    hidden: 0")
+        lines.append(f"    size: {size}")
+        total += size
+    return "\n".join(lines) + "\n", total
+
+
+def preinstall_os(prefab_path: str, app_prefabs: List[str], root_dir: str = ".") -> int:
+    """Записать PCOS и приложения в поле files накопителя внутри префаба.
+
+    Накопитель в префабе детали хранит `files: []`. Заменяем пустой список
+    готовым содержимым — ОС при загрузке поднимет список приложений из файлов.
+    Возвращает суммарный размер записанного.
+    """
+    with open(prefab_path, encoding="utf-8") as fh:
+        text = fh.read()
+
+    block, total = render_os_files(app_prefabs, root_dir)
+
+    # Ищем накопитель: у Storage есть capacity, storageName и files.
+    if not re.search(r"^\s*files: \[\]\s*$", text, flags=re.M):
+        raise ValueError(f"{prefab_path}: не найдено пустое поле files накопителя")
+
+    text = re.sub(r"^(\s*)files: \[\]\s*$", "  files:\n" + block.rstrip("\n"),
+                  text, count=1, flags=re.M)
+
+    with open(prefab_path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return total
+
+
+# ---------------------------------------------------------------------------
+# Габариты: нужны, чтобы ящик доставки был не меньше своего содержимого
+# ---------------------------------------------------------------------------
+
+
+def prefab_bounds(path: str, root_dir: str = ".") -> Optional[Tuple[Vec3, Vec3]]:
+    """AABB префаба по его BoxCollider'ам, в координатах корня префаба.
+
+    Возвращает (минимум, максимум) или None, если коллайдеров нет.
+    Считается по коллайдерам, а не по мешам: именно они решают, застрянет
+    предмет в стенке ящика или нет.
+    """
+    resolver = PrefabResolver(os.path.join(root_dir, path), root_dir)
+    go_to_key = {}
+    for key, node in resolver.nodes.items():
+        go_id = getattr(node, "game_object_id", None)
+        if go_id is not None:
+            go_to_key[go_id] = key
+
+    lo = [float("inf")] * 3
+    hi = [float("-inf")] * 3
+    found = False
+
+    for obj in resolver.doc.objects:
+        if obj.class_id != 65:  # BoxCollider
+            continue
+        go_ref = obj.get("m_GameObject")
+        if not go_ref:
+            continue
+        m = re.search(r"fileID:\s*(-?\d+)", go_ref)
+        if not m:
+            continue
+        key = go_to_key.get(int(m.group(1)))
+        if key is None:
+            continue
+        try:
+            pos, rot = resolver.relative_to_root(key)
+        except Exception:
+            continue
+        size = _vec(obj.get("m_Size"), (1.0, 1.0, 1.0))
+        center = _vec(obj.get("m_Center"), (0.0, 0.0, 0.0))
+        for sx in (-0.5, 0.5):
+            for sy in (-0.5, 0.5):
+                for sz in (-0.5, 0.5):
+                    corner = (
+                        center[0] + size[0] * sx,
+                        center[1] + size[1] * sy,
+                        center[2] + size[2] * sz,
+                    )
+                    w = q_rotate(rot, corner)
+                    for i in range(3):
+                        v = pos[i] + w[i]
+                        lo[i] = min(lo[i], v)
+                        hi[i] = max(hi[i], v)
+        found = True
+
+    if not found:
+        return None
+    return (lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2])
+
+
+def root_scale(path: str, root_dir: str = ".") -> Vec3:
+    """m_LocalScale корневого Transform префаба."""
+    resolver = PrefabResolver(os.path.join(root_dir, path), root_dir)
+    root_key = resolver.root_key()
+    node = resolver.nodes.get(root_key)
+    scale = getattr(node, "scale", None)
+    if scale is not None:
+        return scale
+    # Запасной путь: читаем YAML напрямую.
+    doc = UnityDoc.load(os.path.join(root_dir, path))
+    root_go = _find_root_game_object(doc.render())
+    if root_go is None:
+        return (1.0, 1.0, 1.0)
+    for obj in doc.objects:
+        if obj.class_id != 4:
+            continue
+        ref = obj.get("m_GameObject") or ""
+        m = re.search(r"fileID:\s*(-?\d+)", ref)
+        if m and m.group(1) == str(root_go):
+            return _vec(obj.get("m_LocalScale"), (1.0, 1.0, 1.0))
+    return (1.0, 1.0, 1.0)
+
+
+def build_bounds(case_prefab: str, resolved: List[dict], root_dir: str = ".") -> Tuple[Vec3, Vec3]:
+    """AABB всей собранной машины: корпус плюс каждая деталь в своей позе."""
+    lo = [float("inf")] * 3
+    hi = [float("-inf")] * 3
+
+    def add(prefab_rel: str, base_pos: Vec3, base_rot: Quat) -> None:
+        b = prefab_bounds(prefab_rel, root_dir)
+        if b is None:
+            return
+        plo, phi = b
+        for sx in (plo[0], phi[0]):
+            for sy in (plo[1], phi[1]):
+                for sz in (plo[2], phi[2]):
+                    w = q_rotate(base_rot, (sx, sy, sz))
+                    for i in range(3):
+                        v = base_pos[i] + w[i]
+                        lo[i] = min(lo[i], v)
+                        hi[i] = max(hi[i], v)
+
+    add(case_prefab, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
+    for part in resolved:
+        add(part["path"], part["pos"], part["rot"])
+
+    return (lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2])
+
+
+# ---------------------------------------------------------------------------
 # Генерация префаба-спавнера готовой сборки
 # ---------------------------------------------------------------------------
 
@@ -1162,6 +1348,17 @@ def _f(v: float) -> str:
     return repr(r)
 
 
+def _render_app_list(apps: Optional[List[str]], root_dir: str) -> str:
+    """YAML-массив preinstalledApps: имена приложений, как их видит ОС."""
+    if not apps:
+        return "  preinstalledApps: []\n"
+    lines = ["  preinstalledApps:"]
+    for prefab in apps:
+        name, _size = app_info(prefab, root_dir)
+        lines.append(f"  - {name}")
+    return "\n".join(lines) + "\n"
+
+
 def write_spawner_prefab(
     path: str,
     build_name: str,
@@ -1169,8 +1366,15 @@ def write_spawner_prefab(
     base_prefab_file_id: int,
     parts: List[dict],
     step_delay: float = 0.05,
+    apps: Optional[List[str]] = None,
+    root_dir: str = ".",
 ) -> Tuple[str, int]:
     """Создать префаб-пустышку с компонентом ReadyBuildSpawner.
+
+    apps — префабы приложений из Assets/Resources/apps, которые спавнер
+    положит на диск вместе с PCOS. В префаб пишутся ИМЕНА приложений
+    (App.AppName), потому что именно по ним ОС ищет программу в каталоге
+    Resources.LoadAll<App>("apps").
 
     Возвращает (guid ассета, fileID корневого GameObject) — эти значения
     нужны ShopItem'у в поле `spawn`.
@@ -1246,6 +1450,9 @@ def write_spawner_prefab(
         + parts_yaml
         + f"  stepDelay: {_f(step_delay)}\n"
         "  destroyAfterBuild: 1\n"
+        + ("  preinstallOS: 1\n" if apps else "  preinstallOS: 0\n")
+        + _render_app_list(apps, root_dir)
+        + f"  systemSize: {BOOT_FILE_SIZE}\n"
     )
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1275,12 +1482,37 @@ def _find_root_game_object(text: str) -> Optional[str]:
     return None
 
 
+def _scale_root_transform(text: str, root_go_id: str, scale: Vec3) -> str:
+    """Проставить m_LocalScale корневому Transform префаба.
+
+    Корневой Transform — тот, чей m_GameObject указывает на корневой
+    GameObject. Масштабировать нужно именно его: дети (стенки, крышка,
+    обломки) заданы относительно корня и растянутся автоматически.
+    """
+    pattern = re.compile(
+        r"(--- !u!4 &\d+\nTransform:\n(?:.*\n)*?"
+        r"  m_GameObject: \{fileID: " + re.escape(str(root_go_id)) + r"\}\n"
+        r"(?:.*\n)*?)"
+        r"(  m_LocalScale: )\{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}"
+    )
+    replacement = (
+        r"\g<1>\g<2>"
+        + "{{x: {}, y: {}, z: {}}}".format(_f(scale[0]), _f(scale[1]), _f(scale[2]))
+    )
+    new_text, n = pattern.subn(replacement, text, count=1)
+    if n != 1:
+        raise ValueError("не найден m_LocalScale корневого Transform ящика")
+    return new_text
+
+
 def write_crate_prefab(
     path: str,
     crate_name: str,
     template_prefab: str,
     content_guid: str,
     content_file_id: int,
+    scale: Optional[Vec3] = None,
+    content_offset: Optional[Vec3] = None,
 ) -> Tuple[str, int]:
     """Создать ящик доставки для готовой сборки на основе ящика-образца.
 
@@ -1294,6 +1526,13 @@ def write_crate_prefab(
     пишется с нуля: берётся ящик соответствующего корпуса, у него меняются
     имя, spawnId и ссылка Box.prefab, а все fileID пересчитываются
     детерминированно, чтобы два ящика не делили идентификаторы объектов.
+
+    scale растягивает ящик: стандартный ящик 3x4.5x5 меньше рамы майнера, и
+    содержимое застревало в его стенках. Масштаб ставится на корневой
+    Transform, поэтому меши, коллайдеры и обломки BrokenCrate тянутся вместе.
+
+    content_offset сдвигает точку выдачи содержимого (поле position у Box) —
+    высокая рама BigMiner иначе появляется наполовину под полом.
 
     Возвращает (guid ассета, fileID корневого GameObject).
     """
@@ -1357,7 +1596,20 @@ def write_crate_prefab(
         tail,
         count=1,
     )
+    if content_offset is not None:
+        tail = re.sub(
+            r"position: \{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}",
+            "position: {{x: {}, y: {}, z: {}}}".format(
+                _f(content_offset[0]), _f(content_offset[1]), _f(content_offset[2])),
+            tail,
+            count=1,
+        )
     text = head + tail
+
+    if scale is not None:
+        # Масштаб — только на КОРНЕВОМ Transform ящика: дочерние стенки уже
+        # расставлены относительно него и растянутся вместе с ним.
+        text = _scale_root_transform(text, mapping[template_root], scale)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:

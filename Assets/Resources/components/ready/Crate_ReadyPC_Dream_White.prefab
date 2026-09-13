@@ -486,7 +486,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1.07, z: 1.14}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 178734669409033024}
@@ -1152,7 +1152,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prefab: {fileID: 4815228326480549640, guid: e8d3da6b984703f3fc57b59976c6c9cb, type: 3}
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 0, y: 0, z: 0.13}
   rotation: {x: 0, y: 0, z: 0}
 --- !u!82 &1125381999588705083
 AudioSource:
