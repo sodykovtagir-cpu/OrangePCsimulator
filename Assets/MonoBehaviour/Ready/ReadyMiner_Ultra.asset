@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ReadyMiner_Ultra
   m_EditorClassIdentifier: 
   itemName: '{Ultra Miner}'
-  price: 31305
+  price: 31275
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 7d955df2ef2771c409116615374b28bc, type: 3}
   spawn: {fileID: 3402969046119915133, guid: 5b7fd5bed1fc36e08fff85c3cd844ccc, type: 3}

@@ -332,7 +332,7 @@ def miner_medium() -> List[PartRef]:
     parts = [
         p("Mini_ITX", "Motherboard"),
         p("CPU i3-8300", "CPU", host="Mini_ITX"),
-        p("TowerCooler", "Cooler", host="Mini_ITX"),
+        p("Cooler", "Cooler", host="Mini_ITX"),
         p("RAM 8GB", "RAM", host="Mini_ITX"),
         # Слоты Supply у рам майнеров принимают только match=1 (PSU 2kW).
         p("PSU 2kW", "Supply"),
@@ -354,7 +354,7 @@ def miner_ultra() -> List[PartRef]:
     parts = [
         p("Mini_ITX", "Motherboard"),
         p("CPU i7-8700K", "CPU", host="Mini_ITX"),
-        p("TowerCooler", "Cooler", host="Mini_ITX"),
+        p("Cooler", "Cooler", host="Mini_ITX"),
         p("RAM 16GB", "RAM", host="Mini_ITX"),
         p("RAM 16GB", "RAM", host="Mini_ITX"),
     ]
@@ -369,7 +369,7 @@ def miner_5090() -> List[PartRef]:
     parts = [
         p("Mini_ITX", "Motherboard"),
         p("CPU RMD Ryzen 9 7950X", "CPU", host="Mini_ITX"),
-        p("WaterCooler", "Cooler", host="Mini_ITX"),
+        p("Cooler", "Cooler", host="Mini_ITX"),
         p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
         p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
     ]
@@ -386,7 +386,7 @@ def miner_titan() -> List[PartRef]:
     parts = [
         p("Mini_ITX", "Motherboard"),
         p("CPU i7-14700K", "CPU", host="Mini_ITX"),
-        p("TowerCooler(RGB)", "Cooler", host="Mini_ITX"),
+        p("Cooler(RGB)", "Cooler", host="Mini_ITX"),
         p("RAM 32GB", "RAM", host="Mini_ITX"),
         p("RAM 32GB", "RAM", host="Mini_ITX"),
         p("PSU 2kW", "Supply"),
@@ -517,6 +517,33 @@ CRATE_TEMPLATE_BY_CASE = {
     "Miner": "Crate_Case_ATX 2(Black)",
     "BigMiner": "Crate_Case_ATX 2(Black)",
 }
+
+
+# Рамы майнеров и кулеры, которые в них физически не помещаются.
+#
+# В раме над сокетом мало места: башенный кулер (1.25 в высоту) и водянка
+# (1.45, да ещё радиатор 3.06 в длину) не влезают и упираются в конструкцию.
+# Помещается только низкий кулер 0.63. Вертикальные — тоже нет.
+MINER_FRAMES = ("Miner", "BigMiner")
+MINER_FORBIDDEN_COOLERS = (
+    "TowerCooler", "TowerCooler(RGB)", "WaterCooler", "WaterCooler_1")
+
+
+def check_miner_coolers() -> List[str]:
+    """Убедиться, что в рамы майнеров не заехал крупный кулер."""
+    problems = []
+    for spec in BUILDS:
+        case = os.path.basename(spec.case)[:-len(".prefab")]
+        if case not in MINER_FRAMES:
+            continue
+        for part in spec.parts:
+            if part.slot_target != "Cooler":
+                continue
+            name = os.path.basename(part.prefab_path)[:-len(".prefab")]
+            if name in MINER_FORBIDDEN_COOLERS:
+                problems.append(
+                    f"{spec.key}: {name} не помещается в раму {case}")
+    return problems
 
 
 def crate_template_for(case_prefab_name: str) -> str:

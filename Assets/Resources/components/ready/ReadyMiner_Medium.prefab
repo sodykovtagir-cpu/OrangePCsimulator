@@ -56,7 +56,7 @@ MonoBehaviour:
     localEuler: {x: 0, y: 180, z: 0}
     order: 1
     slotTarget: CPU
-  - prefab: {fileID: 1231632343404861, guid: 79e52514a44a98f49a564b8ab4f6d2ba, type: 3}
+  - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
     localPosition: {x: -0.31, y: -0.444, z: 1.66}
     localEuler: {x: 0, y: 180, z: 0}
     order: 2

@@ -603,6 +603,36 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nВ рамы майнеров ставится только низкий кулер")
+
+# В раме над сокетом мало места: башенный кулер (1.25 в высоту) и водянка
+# (1.45 плюс радиатор 3.06 в длину) не помещаются — упираются в конструкцию
+# рамы. Влезает только низкий Cooler (0.63). Вертикальные тоже не годятся.
+for _problem in gen.check_miner_coolers():
+    check(False, _problem)
+check(not gen.check_miner_coolers(),
+      "ни в одну раму майнера не поставлен крупный кулер")
+
+_COOLER_H = {}
+for _c in ("Cooler", "Cooler(RGB)", "TowerCooler", "WaterCooler"):
+    _cb = prefab_bounds(f"Assets/Resources/components/{_c}.prefab", str(ROOT))
+    _COOLER_H[_c] = _cb[1][1] - _cb[0][1]
+check(_COOLER_H["Cooler"] < _COOLER_H["TowerCooler"] < _COOLER_H["WaterCooler"],
+      f"низкий кулер {_COOLER_H['Cooler']:.2f} ниже башенного "
+      f"{_COOLER_H['TowerCooler']:.2f} и водянки {_COOLER_H['WaterCooler']:.2f}")
+
+for spec in gen.BUILDS:
+    _case = os.path.basename(spec.case)[:-len(".prefab")]
+    if _case not in gen.MINER_FRAMES:
+        continue
+    for _part in spec.parts:
+        if _part.slot_target != "Cooler":
+            continue
+        _nm = os.path.basename(_part.prefab_path)[:-len(".prefab")]
+        check(_nm in ("Cooler", "Cooler(RGB)"),
+              f"{spec.key}: кулер {_nm} помещается в раму {_case}")
+
+# ---------------------------------------------------------------------------
 print("\nЯщик пролезает в помещение, детали склеены")
 
 _spawner_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
