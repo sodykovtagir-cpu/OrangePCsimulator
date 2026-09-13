@@ -93,6 +93,19 @@ namespace PC
 		[Tooltip("Уничтожить пустышку-спавнер после сборки")]
 		private bool destroyAfterBuild = true;
 
+		[SerializeField]
+		[Tooltip("Во сколько раз основа должна быть тяжелее всей навески")]
+		private float baseMassFactor = 4f;
+
+		[SerializeField]
+		[Tooltip("Нижняя граница массы основы")]
+		private float minBaseMass = 40f;
+
+		[SerializeField]
+		[Tooltip("Итераций решателя у основы: чем больше деталей, тем " +
+			"больше нужно, чтобы связка сошлась")]
+		private int baseSolverIterations = 40;
+
 		private void Start()
 		{
 			StartCoroutine(Build());
@@ -107,6 +120,62 @@ namespace PC
 			}
 
 			var root = Instantiate(basePrefab, transform.position, transform.rotation);
+
+			// Физика основы.
+			//
+			// Рама BigMiner весит 2.5, а деталей на неё вешается ~30 — тело
+			// в двенадцать раз тяжелее собственной опоры. PhysX решает такую
+			// перевёрнутую пирамиду за DefaultSolverIterations (в проекте их
+			// шесть) и не сходится: связка расползается и выплёвывает
+			// видеокарты. Именно поэтому Cheap/Medium/Titan (10-16 деталей,
+			// 5-8x) собирались нормально, а Ultra/RTX5090 (27 деталей) — нет.
+			//
+			// Лечим три вещи сразу:
+			//  * основа тяжелее всей навески — джойнт "лёгкое к тяжёлому"
+			//    устойчив, обратный расходится;
+			//  * решателю даём больше итераций, но только этому телу;
+			//  * на время сборки основа кинематическая, чтобы решатель не
+			//    гонял ещё и её саму, пока детали приезжают одна за другой.
+			//
+			// Всё это правится в рантайме у клона: общий префаб рамы не
+			// трогаем, иначе изменится поведение обычных майнеров в игре.
+			// Считаем навеску заранее, по самим префабам деталей: масса
+			// основы должна перекрывать её с запасом, а не быть просто
+			// «большим числом». У Ultra деталей на 29.5 — фиксированных
+			// сорока не хватило бы даже в полтора раза.
+			float partsMass = 0f;
+			if (parts != null)
+			{
+				foreach (var part in parts)
+				{
+					if (part == null || part.prefab == null) continue;
+					var prb = part.prefab.GetComponent<Rigidbody>();
+					if (prb != null) partsMass += prb.mass;
+				}
+			}
+
+			var baseBody = root.GetComponent<Rigidbody>();
+			bool baseWasKinematic = false;
+			if (baseBody != null)
+			{
+				baseWasKinematic = baseBody.isKinematic;
+
+				float wanted = Mathf.Max(minBaseMass, partsMass * baseMassFactor);
+				if (baseBody.mass < wanted)
+					baseBody.mass = wanted;
+
+				if (baseBody.solverIterations < baseSolverIterations)
+					baseBody.solverIterations = baseSolverIterations;
+				if (baseBody.solverVelocityIterations < baseSolverIterations)
+					baseBody.solverVelocityIterations = baseSolverIterations;
+
+				// Непрерывная проверка столкновений: тяжёлая рама на скорости
+				// иначе проскакивает сквозь пол.
+				baseBody.collisionDetectionMode =
+					CollisionDetectionMode.ContinuousDynamic;
+
+				baseBody.isKinematic = true;
+			}
 
 			// Слоту нужен кадр, чтобы отработал его Start.
 			yield return null;
@@ -159,6 +228,14 @@ namespace PC
 					if (stepDelay > 0f)
 						yield return new WaitForSeconds(stepDelay);
 				}
+			}
+
+			// Основу отпускаем только когда все детали на месте: дальше
+			// связка живёт обычной физикой и разбирается как всегда.
+			if (baseBody != null)
+			{
+				baseBody.isKinematic = baseWasKinematic;
+				baseBody.WakeUp();
 			}
 
 			if (preinstallOS)

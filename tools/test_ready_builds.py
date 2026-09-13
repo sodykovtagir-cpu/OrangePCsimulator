@@ -30,6 +30,7 @@ from unity_asset_tool import (  # noqa: E402
     read_meta_guid,
     shop_pages,
 )
+import unity_asset_tool as uat  # noqa: E402
 import generate_ready_builds as gen  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -354,8 +355,20 @@ check("TransformPoint(part.localPosition)" not in build_body,
 check(not (ROOT / "Assets/Scripts/Assembly-CSharp/ImpactGuard.cs").exists(),
       "ImpactGuard удалён — деталь подключается сразу, ломаться нечему")
 check("ImpactGuard" not in spawner_cs, "спавнер не ссылается на ImpactGuard")
-check("isKinematic" not in spawner_cs,
-      "спавнер не трогает кинематику (ломало FixedJoint и приём в слот)")
+# Кинематика ДЕТАЛЕЙ запрещена: это ломало FixedJoint и приём в слот —
+# проверено дважды. Заморозка ОСНОВЫ на время сборки — другое дело: у неё
+# нет входящего джойнта, и она отпускается сразу после последней детали.
+_attach_body = spawner_cs.split("private IEnumerator Build()")[1].split(
+    "private bool Attach")[0]
+for _line in _attach_body.splitlines():
+    if "isKinematic" not in _line:
+        continue
+    check("baseBody" in _line or "baseWasKinematic" in _line,
+          f"кинематика меняется только у основы, не у детали: {_line.strip()}")
+check("spawned.isKinematic" not in spawner_cs
+      and "item.isKinematic" not in spawner_cs
+      and "rb.isKinematic" not in spawner_cs,
+      "спавнер не трогает кинематику деталей (ломало FixedJoint и приём в слот)")
 
 # Каждая деталь должна нести тег своего слота, иначе спавнер её не пристроит.
 for spec in gen.BUILDS:
@@ -603,6 +616,60 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nОснова тяжелее навески и решатель усилен")
+
+_spawner_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
+    encoding="utf-8")
+
+# Рама BigMiner весит 2.5, а деталей на неё вешается до 29.5 — основа в
+# двенадцать раз легче навески. Решатель PhysX (в проекте 6 итераций) такую
+# перевёрнутую пирамиду не удерживает: связка расползается и выплёвывает
+# видеокарты. Cheap/Medium/Titan (10-16.5) собирались, Ultra/RTX5090 - нет.
+def _rb_mass(rel):
+    _p = ROOT / rel
+    if not _p.exists():
+        return 0.0
+    _t = _p.read_text(encoding="utf-8")
+    _m = re.search(r"--- !u!54 &\d+\nRigidbody:(.*?)(?=--- !u!|\Z)", _t, re.S)
+    if not _m:
+        return 0.0
+    _mm = re.search(r"m_Mass: ([\d.]+)", _m.group(1))
+    return float(_mm.group(1)) if _mm else 0.0
+
+
+check(uat.BASE_MASS_FACTOR >= 2.0,
+      f"основа тяжелее навески минимум вдвое (x{uat.BASE_MASS_FACTOR})")
+check(uat.BASE_SOLVER_ITERATIONS > 6,
+      f"решателю основы дано больше итераций, чем 6 по умолчанию "
+      f"({uat.BASE_SOLVER_ITERATIONS})")
+
+for spec in gen.BUILDS:
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _parts_mass = sum(_rb_mass(r["path"]) for r in _resolved)
+    _base = max(uat.BASE_MIN_MASS, _parts_mass * uat.BASE_MASS_FACTOR)
+    check(_parts_mass == 0 or _base >= _parts_mass * 2.0,
+          f"{spec.key}: основа {_base:.1f} тяжелее навески {_parts_mass:.1f} "
+          f"в {_base / _parts_mass if _parts_mass else 0:.1f} раза")
+
+# Поля обязаны доехать до префаба, иначе в игре останутся значения по
+# умолчанию из C# и правка ничего не изменит.
+for spec in gen.BUILDS:
+    _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    check("baseMassFactor:" in _text, f"{spec.key}: baseMassFactor записан")
+    check("baseSolverIterations:" in _text,
+          f"{spec.key}: baseSolverIterations записан")
+
+# Основа кинематическая на время сборки и обязательно отпускается потом,
+# иначе готовый майнер навсегда зависнет в воздухе.
+check("isKinematic = true" in _spawner_src,
+      "основа замораживается на время сборки")
+check("isKinematic = baseWasKinematic" in _spawner_src,
+      "основа возвращается в исходное состояние после сборки")
+check(_spawner_src.index("isKinematic = true")
+      < _spawner_src.index("isKinematic = baseWasKinematic"),
+      "заморозка идёт до разморозки, а не наоборот")
+
+# ---------------------------------------------------------------------------
 print("\nВ рамы майнеров ставится только низкий кулер")
 
 # В раме над сокетом мало места: башенный кулер (1.25 в высоту) и водянка
@@ -635,8 +702,6 @@ for spec in gen.BUILDS:
 # ---------------------------------------------------------------------------
 print("\nЯщик пролезает в помещение, детали склеены")
 
-_spawner_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
-    encoding="utf-8")
 
 # Регресс: ящик x2.5 (11 единиц в высоту) упирался в потолок — товар приезжает
 # порталом под крышей. Коробку зажимало, роняло, и видеокарты высыпались.

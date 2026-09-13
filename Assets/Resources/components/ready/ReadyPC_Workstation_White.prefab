@@ -152,3 +152,6 @@ MonoBehaviour:
   - Frequency Settings
   - Benchmark
   systemSize: 60000
+  baseMassFactor: 4
+  minBaseMass: 40
+  baseSolverIterations: 40

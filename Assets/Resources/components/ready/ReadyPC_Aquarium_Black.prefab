@@ -121,3 +121,6 @@ MonoBehaviour:
   - RGB Controller
   - Personalization
   systemSize: 60000
+  baseMassFactor: 4
+  minBaseMass: 40
+  baseSolverIterations: 40

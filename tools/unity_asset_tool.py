@@ -1200,6 +1200,17 @@ BOOT_FILE_PATH = "System/boot.bin"
 BOOT_FILE_CONTENT = "pcos"
 BOOT_FILE_SIZE = 60000  # Installer.minimumSpace
 
+# Физика готовой сборки.
+#
+# Рама BigMiner весит 2.5, а деталей на неё вешается около 30 — основа в
+# двенадцать раз легче своей навески, и решатель PhysX (в проекте всего
+# 6 итераций) такую перевёрнутую пирамиду не удерживает: связка расползается
+# и выплёвывает видеокарты. Масса основы поднимается выше суммарной массы
+# деталей, а решателю добавляются итерации — но только этому телу.
+BASE_MASS_FACTOR = 4.0
+BASE_MIN_MASS = 40.0
+BASE_SOLVER_ITERATIONS = 40
+
 
 def app_info(app_prefab: str, root_dir: str = ".") -> Tuple[str, int]:
     """(AppName, size) из префаба приложения — как их видит Installer."""
@@ -1515,6 +1526,11 @@ def write_spawner_prefab(
         + ("  preinstallOS: 1\n" if apps else "  preinstallOS: 0\n")
         + _render_app_list(apps, root_dir)
         + f"  systemSize: {BOOT_FILE_SIZE}\n"
+        # Основа обязана быть тяжелее всей навески, иначе FixedJoint'ы
+        # расходятся: рама BigMiner весит 2.5 при ~30 массы деталей.
+        + f"  baseMassFactor: {_f(BASE_MASS_FACTOR)}\n"
+        + f"  minBaseMass: {_f(BASE_MIN_MASS)}\n"
+        + f"  baseSolverIterations: {BASE_SOLVER_ITERATIONS}\n"
     )
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
