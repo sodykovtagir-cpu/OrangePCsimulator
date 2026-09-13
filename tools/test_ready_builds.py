@@ -37,6 +37,14 @@ SPAWNER_GUID = "01aba92678a70fdad133966614ce5f35"
 failures: list[str] = []
 
 
+def _guid_is_crate(guid: str) -> bool:
+    """Ссылается ли guid на префаб деревянного ящика."""
+    for meta in (ROOT / "Assets/Resources/components").rglob("*.prefab.meta"):
+        if read_meta_guid(str(meta)[: -len(".meta")]) == guid:
+            return meta.name.startswith("Crate_")
+    return False
+
+
 def _guid_exists(guid: str) -> bool:
     cache = getattr(_guid_exists, "_cache", None)
     if cache is None:
@@ -201,14 +209,20 @@ check(all(by_key[k][en] != by_key[k][ru] for k in i18n.NAMES),
 # ---------------------------------------------------------------------------
 print("\nДоставка в ящике")
 
-# Готовая сборка обязана приезжать в ящике, как и любой крупный товар.
-# Если ShopItem ссылается прямо на спавнер, ПК вываливается из портала
-# в воздухе, падает и разбивается ещё до того, как игрок его увидит.
+# Готовый ПК обязан приезжать в ящике, как и любой крупный товар: если
+# ShopItem ссылается прямо на спавнер, ПК вываливается из портала в воздухе,
+# падает и разбивается ещё до того, как игрок его увидит.
+#
+# Исключение — рамы майнеров (spec.bare). Они крупнее ящика, а растянуть ящик
+# нельзя: его семь Rigidbody-стенок при неравномерном масштабе ломаются.
+# Ванильные Miner и Big Miner доставляются ровно так же, без ящика.
 from unity_asset_tool import _find_root_game_object  # noqa: E402
 
 seen_file_ids: dict[str, str] = {}
 
 for spec in gen.BUILDS:
+    if spec.bare:
+        continue
     crate_path = ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab"
     check(crate_path.exists(), f"{spec.key}: ящик доставки создан")
     if not crate_path.exists():
@@ -433,6 +447,35 @@ check("root.GetComponentsInChildren<Slot>" not in spawner_cs,
       "нет поиска слотов только от корпуса")
 
 # ---------------------------------------------------------------------------
+print("\nВариант префаба может удалять унаследованные слоты")
+
+# Регресс: BigMiner — это вариант обычного Miner, но он УДАЛЯЕТ унаследованный
+# объект Slots целиком и ставит свои. Резолвер не читал m_RemovedGameObjects
+# и видел фантомные слоты: 6 Supply / 24 GPU / 10 Drive вместо 4 / 16 / 8.
+# Генератор раскладывал детали по несуществующим слотам, и в игре это давало
+# «не нашлось слота 'Supply' для детали 'PSU 2kW'», а лишние видеокарты
+# вываливались из рамы при сборке.
+_RIG_SLOTS = {
+    "Miner": {"Motherboard": 1, "Supply": 2, "GPU": 8, "Drive": 2},
+    "BigMiner": {"Motherboard": 1, "Supply": 4, "GPU": 16, "Drive": 8},
+}
+for _rig, _want in _RIG_SLOTS.items():
+    _res = PrefabResolver(ROOT / "Assets/Resources/components" / f"{_rig}.prefab", ROOT)
+    _got = {}
+    for _slot in _res.slots:
+        _got[_slot["target"]] = _got.get(_slot["target"], 0) + 1
+    check(_got == _want, f"{_rig}: слотов {_got}, ожидалось {_want}")
+
+# Ни одна сборка не должна просить слот с номером больше, чем есть в раме.
+for spec in gen.BUILDS:
+    try:
+        ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+        _ok, _err = True, ""
+    except ValueError as exc:
+        _ok, _err = False, str(exc)
+    check(_ok, f"{spec.key}: хватает реальных слотов" + (f" — {_err}" if _err else ""))
+
+# ---------------------------------------------------------------------------
 print("\nMatch-совместимость деталей со слотами")
 
 # Регресс на баг, из-за которого офисный ПК не собирался: item_info() искал
@@ -483,36 +526,55 @@ for spec in gen.BUILDS:
           f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
 
 # ---------------------------------------------------------------------------
-print("\nЯщик доставки вмещает свою сборку")
+print("\nДоставка: ящик по размеру, рамы майнеров — без ящика")
 
-# Регресс: стандартный ящик 3 x 4.5 x 5 меньше рамы майнера (3.46 x 2.5 x 5.3),
-# а BigMiner с высотой 10.5 не влезал втрое. Стенки оказывались внутри модели,
-# физика выталкивала их — майнер ломался прямо в коробке, а на полу
-# разваливался целиком.
+# Ящик состоит из семи отдельных Rigidbody-стенок. Растягивать его нельзя:
+# неравномерный масштаб корня ломает коллайдеры — стенки меняют видимый
+# размер при смене ракурса, проваливаются внутрь содержимого и вышибают из
+# майнера видеокарты. Поэтому масштаб обязан остаться единичным, а то, что
+# в ящик не влезает, едет без ящика — как ванильные Miner и Big Miner.
 for spec in gen.BUILDS:
-    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
-    _lo, _hi = build_bounds(spec.case, _resolved, str(ROOT))
-    _content = tuple(_hi[i] - _lo[i] for i in range(3))
+    _crate = ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab"
+    if spec.bare:
+        check(not _crate.exists(),
+              f"{spec.key}: ящика нет, сборка едет порталом")
+        continue
 
-    _crate_rel = f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab"
-    _scale = root_scale(_crate_rel, str(ROOT))
-    _clo, _chi = prefab_bounds(_crate_rel, str(ROOT))
-    # Габарит ящика с учётом масштаба корня, минус стенки.
-    _inner = tuple((_chi[i] - _clo[i]) * _scale[i] - 2 * gen.CRATE_WALL
-                   for i in range(3))
+    check(_crate.exists(), f"{spec.key}: ящик доставки существует")
+    if not _crate.exists():
+        continue
 
-    _fits = all(_inner[i] >= _content[i] for i in range(3))
-    check(_fits,
-          f"{spec.key}: содержимое ("
-          f"{_content[0]:.2f}, {_content[1]:.2f}, {_content[2]:.2f}) "
-          f"помещается в ящик ("
-          f"{_inner[0]:.2f}, {_inner[1]:.2f}, {_inner[2]:.2f})")
-
-# Масштаб только растягивает: маленькие ПК должны ездить в обычной коробке.
-for spec in gen.BUILDS:
     _scale = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))
-    check(all(v >= 1.0 - 1e-6 for v in _scale),
-          f"{spec.key}: ящик не ужимается (scale={tuple(round(v, 2) for v in _scale)})")
+    check(all(abs(v - 1.0) < 1e-6 for v in _scale),
+          f"{spec.key}: ящик не масштабирован "
+          f"(scale={tuple(round(v, 2) for v in _scale)})")
+
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _case_name = os.path.splitext(os.path.basename(spec.case))[0]
+    _fits, _content, _outer = gen.crate_fits(
+        spec.case, _resolved, gen.crate_template_for(_case_name))
+    check(_fits,
+          f"{spec.key}: сборка ({_content[0]:.2f}, {_content[1]:.2f}, "
+          f"{_content[2]:.2f}) не крупнее ящика ({_outer[0]:.2f}, "
+          f"{_outer[1]:.2f}, {_outer[2]:.2f})")
+
+# Ванильные майнеры доставляются именно так — сверяемся с их ShopItem'ами.
+for _vanilla in ("Miner", "Big Miner"):
+    _text = (ROOT / "Assets/MonoBehaviour" / f"{_vanilla}.asset").read_text(
+        encoding="utf-8", errors="replace")
+    _spawn = re.search(r"spawn: \{fileID: \d+, guid: (\w+)", _text)
+    check(_spawn is not None and not _guid_is_crate(_spawn.group(1)),
+          f"ванильный '{_vanilla}' едет без ящика — наши майнеры тоже")
+
+# ShopItem готового майнера обязан ссылаться прямо на спавнер сборки.
+for spec in gen.BUILDS:
+    if not spec.bare:
+        continue
+    _asset = (ROOT / gen.OUT_ASSETS / f"{spec.key}.asset").read_text(encoding="utf-8")
+    _spawn_guid = re.search(r"spawn: \{fileID: \d+, guid: (\w+)", _asset).group(1)
+    _want = read_meta_guid(str(ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab"))
+    check(_spawn_guid == _want,
+          f"{spec.key}: spawn указывает на сам спавнер, а не на ящик")
 
 # ---------------------------------------------------------------------------
 print("\nPCOS предустановлена с нужным набором приложений")

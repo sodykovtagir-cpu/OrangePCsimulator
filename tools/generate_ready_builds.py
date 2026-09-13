@@ -149,6 +149,10 @@ class BuildSpec:
     # Префабы приложений из Assets/Resources/apps, которые едут вместе с PCOS
     # на системном накопителе сборки. Пустой список = машина без системы.
     apps: List[str] = field(default_factory=list)
+    # Ехать без деревянного ящика, прямо через портал. Так в ванильной игре
+    # доставляются Miner и Big Miner: их ShopItem.spawn ссылается сразу на
+    # префаб рамы. Ящик им не подходит физически — см. crate_fit.
+    bare: bool = False
 
 
 def p(path: str, target: str, host: Optional[str] = None, index: Optional[int] = None) -> PartRef:
@@ -344,10 +348,12 @@ def miner_medium() -> List[PartRef]:
 
 
 def miner_ultra() -> List[PartRef]:
-    """Ультра-майнер: большая рама, все 24 слота GPU забиты RTX 3080.
+    """Ультра-майнер: большая рама, все 16 слотов GPU забиты RTX 3080.
 
-    BigMiner — это инстанс обычного Miner с надстроенными стойками, поэтому
-    слотов GPU у него 24: 16 своих плюс 8 унаследованных.
+    BigMiner — это вариант обычного Miner, но он УДАЛЯЕТ унаследованный
+    объект Slots со всеми слотами источника и ставит свои. Поэтому у него
+    ровно 16 GPU, 4 Supply и 8 Drive, а не 24/6/10, как получалось, пока
+    резолвер не учитывал m_RemovedGameObjects.
     """
     parts = [
         p("Mini_ITX", "Motherboard"),
@@ -356,14 +362,14 @@ def miner_ultra() -> List[PartRef]:
         p("RAM 16GB", "RAM", host="Mini_ITX"),
         p("RAM 16GB", "RAM", host="Mini_ITX"),
     ]
-    parts += [p("PSU 2kW", "Supply") for _ in range(6)]
+    parts += [p("PSU 2kW", "Supply") for _ in range(4)]
     parts += [p("SSD 512GB", "Drive") for _ in range(2)]
-    parts += [p("RTX3080", "GPU") for _ in range(24)]
+    parts += [p("RTX3080", "GPU") for _ in range(16)]
     return parts
 
 
 def miner_5090() -> List[PartRef]:
-    """Флагманская ферма: 24 x RTX 5090 — самое дорогое, что можно собрать."""
+    """Флагманская ферма: 16 x RTX 5090 — самое дорогое, что можно собрать."""
     parts = [
         p("Mini_ITX", "Motherboard"),
         p("CPU RMD Ryzen 9 7950X", "CPU", host="Mini_ITX"),
@@ -371,11 +377,11 @@ def miner_5090() -> List[PartRef]:
         p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
         p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
     ]
-    parts += [p("PSU 2kW", "Supply") for _ in range(6)]
+    parts += [p("PSU 2kW", "Supply") for _ in range(4)]
     # Слоты Drive рамы принимают только match=0, а у платы Mini_ITX слотов M.2
     # нет вовсе, поэтому ставим обычные SSD.
     parts += [p("SSD 1TB", "Drive", index=i) for i in range(2)]
-    parts += [p("RTX5090", "GPU") for _ in range(24)]
+    parts += [p("RTX5090", "GPU") for _ in range(16)]
     return parts
 
 
@@ -491,6 +497,7 @@ def _make_builds() -> List[BuildSpec]:
                 sprite_from=sprite,
                 description=desc,
                 apps=APPS_BY_MODEL["Miner"],
+                bare=True,
             )
         )
     return builds
@@ -571,50 +578,37 @@ CRATE_CLEARANCE = 0.30
 CRATE_WALL = 0.10
 
 
-def crate_fit(case_prefab: str, resolved: List[dict], template_name: str):
-    """Посчитать масштаб ящика и сдвиг точки выдачи содержимого.
+def crate_fits(case_prefab: str, resolved: List[dict], template_name: str):
+    """Влезает ли собранная машина во внутреннюю полость ящика-образца.
 
-    Стандартный ящик 3 x 4.5 x 5 меньше рамы майнера (3.46 x 2.5 x 5.3), а
-    BigMiner с его 10.5 в высоту не помещается втрое. Куски ящика оказывались
-    внутри модели, физика выталкивала их — и сборка разлеталась.
+    Ящик НЕ масштабируется. Он состоит из семи отдельных Rigidbody-стенок, и
+    растягивание корневого Transform неравномерным масштабом ломает их
+    коллайдеры: стенки меняют видимый размер при смене ракурса, проваливаются
+    внутрь содержимого и выталкивают из него детали. Поэтому здесь только
+    проверка — а то, что в ящик не помещается (рамы майнеров), доставляется
+    вообще без ящика, как в ванильной игре.
 
-    Масштаб считается по КОЛЛАЙДЕРАМ собранной машины: берём её габарит,
-    добавляем зазор и требуем, чтобы внутренняя полость ящика была не меньше.
-    Уменьшать ящик не даём (масштаб снизу ограничен единицей): маленькие ПК
-    приезжают в привычной коробке.
-
-    Сдвиг по Y ставит машину на дно ящика: у BigMiner pivot в центре модели,
-    и без сдвига половина рамы оказывалась под полом.
+    Возвращает (влезает, габарит содержимого, внутренний размер ящика).
     """
     from unity_asset_tool import build_bounds, prefab_bounds
 
     lo, hi = build_bounds(case_prefab, resolved, REPO)
     content = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
 
-    tpl_path = os.path.join(REPO, COMP, template_name + ".prefab")
-    tb = prefab_bounds(os.path.relpath(tpl_path, REPO), REPO)
+    tpl_rel = os.path.join(COMP, template_name + ".prefab")
+    tb = prefab_bounds(tpl_rel, REPO)
     if tb is None:
         raise SystemExit(f"{template_name}: у ящика-образца нет коллайдеров")
     tlo, thi = tb
-    outer = (thi[0] - tlo[0], thi[1] - tlo[1], thi[2] - tlo[2])
-    inner = tuple(max(0.01, outer[i] - 2 * CRATE_WALL) for i in range(3))
+    # Критерий — ВНЕШНИЙ габарит ящика, а не полость. Разъёмы материнской
+    # платы у ванильных ATX-сборок торчат за корпус примерно на 0.3 и заходят
+    # в толщу стенки; это нормально, потому что плата жёстко закреплена
+    # FixedJoint и свободным телом не является. Недопустимо другое — когда
+    # содержимое пробивает ящик насквозь, как рама майнера.
+    outer = tuple(thi[i] - tlo[i] for i in range(3))
 
-    scale = []
-    for i in range(3):
-        need = content[i] + 2 * CRATE_CLEARANCE
-        scale.append(max(1.0, need / inner[i]))
-
-    # Округляем вверх до сотых, чтобы результат не зависел от плавающей точки.
-    scale = tuple(math.ceil(v * 100) / 100 for v in scale)
-
-    # Центр содержимого относительно pivot'а: Box выдаёт предмет в точке
-    # ящика, а pivot модели может быть где угодно.
-    offset = (
-        -(lo[0] + hi[0]) / 2.0,
-        -(lo[1] + hi[1]) / 2.0,
-        -(lo[2] + hi[2]) / 2.0,
-    )
-    return scale, offset, content
+    fits = all(outer[i] >= content[i] for i in range(3))
+    return fits, content, outer
 
 
 def main() -> int:
@@ -670,33 +664,46 @@ def main() -> int:
             root_dir=REPO,
         )
 
-        # Ящик доставки: внутрь кладём спавнер сборки. Игрок вскрывает ящик
-        # молотком, как и любой другой крупный товар, и только тогда
-        # начинается сборка — на полу, а не в воздухе.
-        crate_name = "Crate_" + spec.key
-        crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
-        template = os.path.join(
-            REPO, COMP, crate_template_for(case_name) + ".prefab")
-        # Ящик обязан быть больше своего содержимого: рама майнера шире и
-        # выше стандартной коробки, её куски оказывались внутри модели и
-        # физика разносила сборку.
-        crate_scale, crate_offset, content_size = crate_fit(
-            spec.case, resolved, os.path.basename(template)[:-len(".prefab")])
+        # Доставка. Обычный ПК едет в деревянном ящике: игрок вскрывает его
+        # молотком, и сборка начинается на полу, а не в воздухе.
+        #
+        # Майнеры едут БЕЗ ящика, прямо через портал — ровно так доставляются
+        # ванильные Miner и Big Miner (их ShopItem.spawn ссылается сразу на
+        # префаб рамы). Причина не в лени: ящик состоит из семи отдельных
+        # Rigidbody-стенок, и растягивание корня неравномерным масштабом
+        # ломает их коллайдеры — стенки "плавают" при смене ракурса, залезают
+        # внутрь рамы и вышибают из неё видеокарты. Масштабировать физический
+        # ящик нельзя, а рама майнера в него не помещается — значит ящика
+        # быть не должно.
+        if spec.bare:
+            spawn_guid, spawn_root = prefab_guid, go_id
+            print("    едет без ящика, прямо через портал (как ванильный Miner)")
+        else:
+            crate_name = "Crate_" + spec.key
+            crate_path = os.path.join(REPO, OUT_PREFABS, crate_name + ".prefab")
+            template = os.path.join(
+                REPO, COMP, crate_template_for(case_name) + ".prefab")
 
-        crate_guid, crate_root = write_crate_prefab(
-            path=crate_path,
-            crate_name=crate_name,
-            template_prefab=template,
-            content_guid=prefab_guid,
-            content_file_id=go_id,
-            scale=crate_scale,
-            content_offset=crate_offset,
-        )
-        if max(crate_scale) > 1.0:
-            print(f"    ящик увеличен x({crate_scale[0]:.2f}, "
-                  f"{crate_scale[1]:.2f}, {crate_scale[2]:.2f}) под габарит "
-                  f"({content_size[0]:.2f}, {content_size[1]:.2f}, "
-                  f"{content_size[2]:.2f})")
+            # Проверяем, что содержимое влезает. Масштаб ящика не трогаем —
+            # см. комментарий выше; вместо растягивания подбираем образец.
+            fits, content_size, inner = crate_fits(
+                spec.case, resolved,
+                os.path.basename(template)[:-len(".prefab")])
+            if not fits:
+                raise SystemExit(
+                    f"{spec.key}: сборка "
+                    f"({content_size[0]:.2f}, {content_size[1]:.2f}, "
+                    f"{content_size[2]:.2f}) не влезает в ящик "
+                    f"{os.path.basename(template)} "
+                    f"({inner[0]:.2f}, {inner[1]:.2f}, {inner[2]:.2f})")
+
+            spawn_guid, spawn_root = write_crate_prefab(
+                path=crate_path,
+                crate_name=crate_name,
+                template_prefab=template,
+                content_guid=prefab_guid,
+                content_file_id=go_id,
+            )
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)
@@ -704,8 +711,8 @@ def main() -> int:
             name=spec.key,
             item_name=spec.title,
             price=price,
-            spawn_guid=crate_guid,
-            spawn_file_id=crate_root,
+            spawn_guid=spawn_guid,
+            spawn_file_id=spawn_root,
             sprite_guid=_sprite_guid,
             sprite_type=_sprite_type,
             bitcoin=0,

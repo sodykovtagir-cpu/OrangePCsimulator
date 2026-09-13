@@ -176,7 +176,7 @@ Transform:
   m_GameObject: {fileID: 5629303110610768336}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1.07, z: 1.17}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2077197048600695468}
@@ -353,7 +353,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   prefab: {fileID: 1284188352072276106, guid: eb5b1a0a7da08a67595ad9c1108db637, type: 3}
-  position: {x: -0.025, y: 0, z: 0.1425}
+  position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0}
 --- !u!82 &1096263299411599288
 AudioSource:

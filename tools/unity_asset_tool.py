@@ -656,6 +656,37 @@ class PrefabResolver:
         # 5. Слоты самого файла
         self._collect_slots(self.doc, key_of=lambda fid: fid, prefix=None)
 
+    @staticmethod
+    def _descendants_of(sub: "PrefabResolver", removed_go_ids: set) -> set:
+        """Transform'ы удалённых объектов вместе со всем их поддеревом.
+
+        В m_RemovedGameObjects Unity пишет fileID GameObject'ов. Удаление
+        родителя уносит и детей, поэтому список надо развернуть по дереву:
+        выбросив объект Slots, вариант выбрасывает и все слоты внутри него.
+        """
+        if not removed_go_ids:
+            return set()
+
+        direct = {
+            key
+            for key, node in sub.nodes.items()
+            if isinstance(key, int)
+            and (node.game_object_id in removed_go_ids or key in removed_go_ids)
+        }
+
+        removed = set(direct)
+        changed = True
+        while changed:
+            changed = False
+            for key, node in sub.nodes.items():
+                if not isinstance(key, int) or key in removed:
+                    continue
+                parent = sub.parents.get(key)
+                if parent in removed:
+                    removed.add(key)
+                    changed = True
+        return removed
+
     def _expand_instance(self, pi: UnityObject) -> None:
         src = re.search(r"m_SourcePrefab: \{fileID: \d+, guid: (\w+)", pi.body)
         if not src:
@@ -676,7 +707,23 @@ class PrefabResolver:
         parent_m = re.search(r"m_TransformParent: \{fileID: (-?\d+)\}", pi.body)
         outer_parent = int(parent_m.group(1)) if parent_m else 0
 
+        # Вариант может УДАЛЯТЬ объекты, унаследованные от источника.
+        # BigMiner именно так и сделан: он выбрасывает из вложенного Miner
+        # весь объект Slots и ставит свои слоты. Без учёта этого списка
+        # резолвер видел фантомные слоты (6 Supply вместо 4), генератор
+        # раскладывал по ним детали, а в игре слота не оказывалось.
+        removed_gos = {
+            int(fid)
+            for fid in re.findall(
+                r"m_RemovedGameObjects:(.*?)(?=\n  [a-zA-Z_]+:)", pi.body, re.S
+            )
+            for fid in re.findall(r"fileID: (\d+)", fid)
+        }
+        removed_keys = self._descendants_of(sub, removed_gos)
+
         for src_key, node in sub.nodes.items():
+            if src_key in removed_keys:
+                continue
             if not isinstance(src_key, int):
                 continue  # вложенность 3-го уровня в проекте не встречается
             key = (inst_id, src_key)
@@ -707,12 +754,16 @@ class PrefabResolver:
             )
             self.parents[key] = parent_key
 
-        # Слоты вложенного префаба
+        # Слоты вложенного префаба — кроме тех, что вариант удалил.
         self._collect_slots(
-            sub.doc, key_of=lambda fid: (inst_id, fid), prefix=inst_id
+            sub.doc,
+            key_of=lambda fid: (inst_id, fid),
+            prefix=inst_id,
+            skip_transforms=removed_keys,
         )
 
-    def _collect_slots(self, doc: UnityDoc, key_of, prefix) -> None:
+    def _collect_slots(self, doc: UnityDoc, key_of, prefix,
+                       skip_transforms=None) -> None:
         for o in doc.find(class_id=114):
             if o.script_guid not in (
                 SCRIPT_GUIDS["HardwareSlot"],
@@ -724,6 +775,9 @@ class PrefabResolver:
             if not m:
                 continue
             insert_id = int(m.group(1))
+            # Слот, живущий на удалённом варианте объекте, в игре не существует.
+            if skip_transforms and insert_id in skip_transforms:
+                continue
             key = key_of(insert_id)
             # Внешний файл может ссылаться на трансформ вложенного префаба.
             if key not in self.nodes and insert_id in self.stripped:
@@ -1482,37 +1536,12 @@ def _find_root_game_object(text: str) -> Optional[str]:
     return None
 
 
-def _scale_root_transform(text: str, root_go_id: str, scale: Vec3) -> str:
-    """Проставить m_LocalScale корневому Transform префаба.
-
-    Корневой Transform — тот, чей m_GameObject указывает на корневой
-    GameObject. Масштабировать нужно именно его: дети (стенки, крышка,
-    обломки) заданы относительно корня и растянутся автоматически.
-    """
-    pattern = re.compile(
-        r"(--- !u!4 &\d+\nTransform:\n(?:.*\n)*?"
-        r"  m_GameObject: \{fileID: " + re.escape(str(root_go_id)) + r"\}\n"
-        r"(?:.*\n)*?)"
-        r"(  m_LocalScale: )\{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}"
-    )
-    replacement = (
-        r"\g<1>\g<2>"
-        + "{{x: {}, y: {}, z: {}}}".format(_f(scale[0]), _f(scale[1]), _f(scale[2]))
-    )
-    new_text, n = pattern.subn(replacement, text, count=1)
-    if n != 1:
-        raise ValueError("не найден m_LocalScale корневого Transform ящика")
-    return new_text
-
-
 def write_crate_prefab(
     path: str,
     crate_name: str,
     template_prefab: str,
     content_guid: str,
     content_file_id: int,
-    scale: Optional[Vec3] = None,
-    content_offset: Optional[Vec3] = None,
 ) -> Tuple[str, int]:
     """Создать ящик доставки для готовой сборки на основе ящика-образца.
 
@@ -1527,12 +1556,10 @@ def write_crate_prefab(
     имя, spawnId и ссылка Box.prefab, а все fileID пересчитываются
     детерминированно, чтобы два ящика не делили идентификаторы объектов.
 
-    scale растягивает ящик: стандартный ящик 3x4.5x5 меньше рамы майнера, и
-    содержимое застревало в его стенках. Масштаб ставится на корневой
-    Transform, поэтому меши, коллайдеры и обломки BrokenCrate тянутся вместе.
-
-    content_offset сдвигает точку выдачи содержимого (поле position у Box) —
-    высокая рама BigMiner иначе появляется наполовину под полом.
+    Ящик НЕ масштабируется: он собран из семи отдельных Rigidbody-стенок, и
+    растягивание корня неравномерным масштабом ломает их коллайдеры — стенки
+    меняют видимый размер при смене ракурса и выталкивают содержимое. То, что
+    в ящик не помещается (рамы майнеров), доставляется без ящика.
 
     Возвращает (guid ассета, fileID корневого GameObject).
     """
@@ -1596,20 +1623,7 @@ def write_crate_prefab(
         tail,
         count=1,
     )
-    if content_offset is not None:
-        tail = re.sub(
-            r"position: \{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}",
-            "position: {{x: {}, y: {}, z: {}}}".format(
-                _f(content_offset[0]), _f(content_offset[1]), _f(content_offset[2])),
-            tail,
-            count=1,
-        )
     text = head + tail
-
-    if scale is not None:
-        # Масштаб — только на КОРНЕВОМ Transform ящика: дочерние стенки уже
-        # расставлены относительно него и растянутся вместе с ним.
-        text = _scale_root_transform(text, mapping[template_root], scale)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
