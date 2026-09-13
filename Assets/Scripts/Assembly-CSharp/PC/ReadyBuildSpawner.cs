@@ -77,6 +77,10 @@ namespace PC
 		private float stepDelay = 0.05f;
 
 		[SerializeField]
+		[Tooltip("Склеить детали: заводская сборка не разваливается от удара")]
+		private bool glueParts = true;
+
+		[SerializeField]
 		[Tooltip("Предустановить PCOS на первый накопитель сборки")]
 		private bool preinstallOS = true;
 
@@ -139,6 +143,17 @@ namespace PC
 							$"{name}: у '{part.prefab.name}' нет компонента Item");
 						continue;
 					}
+
+					// Склейка до подключения: Slot.SetComponent читает item.glue
+					// и, если он взведён, НЕ задаёт FixedJoint.breakForce —
+					// соединение становится неразрывным.
+					//
+					// Иначе деталь держится силой 400-520, а этого мало:
+					// ящик роняет сборку с высоты портала, joint'ы рвутся, и
+					// видеокарты с накопителями повисают в воздухе или
+					// высыпаются из рамы. Заводская сборка на то и заводская.
+					if (glueParts)
+						item.glue = true;
 
 					if (!Attach(hosts, item, part.slotTarget))
 					{

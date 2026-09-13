@@ -574,16 +574,16 @@ for spec in gen.BUILDS:
     check(_scale[0] >= 1.0 - 1e-9,
           f"{spec.key}: ящик не ужимается (scale={_scale[0]:.2f})")
 
-# Коробка должна быть не мельче своего груза — это чисто про внешний вид.
+# Ящик НЕ обязан вмещать груз: содержимое появляется только после того, как
+# ящик уничтожен (Box на BrokenCrate). Требование "коробка не мельче груза"
+# отменено — из-за него ящик BigMiner раздувался до 11 единиц и упирался в
+# потолок. Проверяем обратное: масштаб выбран ровно тот, что считает генератор.
 for spec in gen.BUILDS:
     _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
-    _lo, _hi = build_bounds(spec.case, _resolved, str(ROOT))
-    _content = tuple(_hi[i] - _lo[i] for i in range(3))
-    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
-    _inner = tuple(v * _k for v in gen.CRATE_INNER)
-    check(all(_inner[i] >= _content[i] - 1e-6 for i in range(3)),
-          f"{spec.key}: ящик ({_inner[0]:.2f}, {_inner[1]:.2f}, {_inner[2]:.2f}) "
-          f"не мельче груза ({_content[0]:.2f}, {_content[1]:.2f}, {_content[2]:.2f})")
+    _want = gen.crate_scale_for(spec.case, _resolved)
+    _got = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
+    check(abs(_got - _want) < 1e-9,
+          f"{spec.key}: масштаб ящика x{_got:.2f} совпадает с расчётным x{_want:.2f}")
 
 # Содержимое выдаётся уничтожаемым ящиком, а не лежит в нём: компонент Box
 # обязан висеть на BrokenCrate, иначе предмет появится внутри стенок.
@@ -603,10 +603,48 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
-print("\nPCOS предустановлена с нужным набором приложений")
+print("\nЯщик пролезает в помещение, детали склеены")
 
 _spawner_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
     encoding="utf-8")
+
+# Регресс: ящик x2.5 (11 единиц в высоту) упирался в потолок — товар приезжает
+# порталом под крышей. Коробку зажимало, роняло, и видеокарты высыпались.
+_VANILLA_CRATE_H = 4.5
+# Абсолютный потолок высоты ящика, НЕ завязанный на константу генератора:
+# иначе достаточно поднять CRATE_MAX_SCALE, и тест поедет следом. Ящик x2.5
+# давал 11.25 и застревал в потолке помещения; 7 единиц — безопасный предел.
+_MAX_CRATE_HEIGHT = 7.0
+for spec in gen.BUILDS:
+    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
+    _h = _VANILLA_CRATE_H * _k
+    check(_h <= _MAX_CRATE_HEIGHT,
+          f"{spec.key}: высота ящика {_h:.2f} не упирается в потолок "
+          f"(предел {_MAX_CRATE_HEIGHT})")
+
+# Ящик не обязан вмещать груз — прецедент прямо в игре: восьмиметровый Table
+# приезжает в ящике высотой 4.5. Содержимое появляется только после того, как
+# ящик уничтожен, поэтому упираться в потолок вреднее, чем быть меньше груза.
+_table = prefab_bounds("Assets/Resources/components/Table.prefab", str(ROOT))
+if _table is not None:
+    _tlo, _thi = _table
+    check(max(_thi[i] - _tlo[i] for i in range(3)) > _VANILLA_CRATE_H,
+          "ванильный Table крупнее своего ящика — груз крупнее коробки это норма")
+
+# Детали заводской сборки склеены: Slot.SetComponent при item.glue не задаёт
+# breakForce, и FixedJoint становится неразрывным. Без этого joint'ы силой
+# 400-520 рвутся при падении, а видеокарты и накопители повисают в воздухе.
+check("item.glue = true" in _spawner_src,
+      "спавнер склеивает детали перед подключением в слот")
+check("if (!item.glue)" in slot_cs,
+      "Slot.SetComponent уважает glue и не ставит breakForce склеенным")
+for spec in gen.BUILDS:
+    _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    check("glueParts: 1" in _text, f"{spec.key}: склейка деталей включена")
+
+# ---------------------------------------------------------------------------
+print("\nPCOS предустановлена с нужным набором приложений")
+
 check("System/boot.bin" in _spawner_src and '"pcos"' in _spawner_src,
       "спавнер пишет загрузчик System/boot.bin с содержимым pcos")
 check("Resources.LoadAll<App>(\"apps\")" in _spawner_src,

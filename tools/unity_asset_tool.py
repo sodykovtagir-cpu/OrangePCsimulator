@@ -1512,6 +1512,7 @@ def write_spawner_prefab(
         + parts_yaml
         + f"  stepDelay: {_f(step_delay)}\n"
         "  destroyAfterBuild: 1\n"
+        + "  glueParts: 1\n"
         + ("  preinstallOS: 1\n" if apps else "  preinstallOS: 0\n")
         + _render_app_list(apps, root_dir)
         + f"  systemSize: {BOOT_FILE_SIZE}\n"

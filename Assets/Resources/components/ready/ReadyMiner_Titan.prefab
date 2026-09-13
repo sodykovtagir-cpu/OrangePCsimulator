@@ -128,6 +128,7 @@ MonoBehaviour:
     slotTarget: GPU
   stepDelay: 0.05
   destroyAfterBuild: 1
+  glueParts: 1
   preinstallOS: 1
   preinstalledApps:
   - Terminal
