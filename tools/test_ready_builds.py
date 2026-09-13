@@ -296,54 +296,79 @@ for gpu in ("RTX4080", "RTX4080Ti", "RTX5090", "RTX3080", "GTX1060",
           f"{gpu}: ShopItem спавнит Box_{gpu} (сейчас {os.path.basename(box)})")
 
 # ---------------------------------------------------------------------------
-print("\nЗащита деталей при установке")
+print("\nСборка через прямое подключение в слот")
 
 spawner_cs = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
     encoding="utf-8")
-check("WaitUntilSettled" in spawner_cs,
-      "спавнер ждёт приземления корпуса перед установкой деталей")
-check("ImpactGuard" in spawner_cs, "спавнер защищает детали от урона")
+slot_cs = (ROOT / "Assets/Scripts/Assembly-CSharp/Slot.cs").read_text(encoding="utf-8")
 
-guard_cs = ROOT / "Assets/Scripts/Assembly-CSharp/ImpactGuard.cs"
-check(guard_cs.exists(), "ImpactGuard.cs существует")
-check(_guid_exists("7c1f4b6ae2d84a1d9b3f5e08c7a26d41"),
-      "у ImpactGuard.cs есть .meta с guid")
+# Деталь подключается тем же кодом, что и при ручной сборке, но напрямую:
+# OnTriggerEnter ненадёжен, если деталь создана сразу внутри триггера.
+check("public bool TryAttach(Item item)" in slot_cs,
+      "Slot.TryAttach существует")
+check("SetComponent(item)" in slot_cs.split("TryAttach")[1],
+      "TryAttach вызывает тот же SetComponent, что и обычная установка")
+check("IsMatch(item.Match)" in slot_cs.split("TryAttach")[1],
+      "TryAttach проверяет match (M.2 не попадёт в слот корпуса)")
+check("item.CompareTag(target)" in slot_cs.split("TryAttach")[1],
+      "TryAttach проверяет тег слота")
+check("public bool IsUsing" in slot_cs, "Slot.IsUsing доступен сборщику")
 
-guard_src = guard_cs.read_text(encoding="utf-8")
-# Стеклянные крышки — Glass : Destruction. Этот компонент не помечает
-# деталь сломанной, а уничтожает её, поэтому его надо гасить явно,
-# иначе аквариумные сборки бьются прямо при установке.
-check("Destruction" in guard_src, "ImpactGuard гасит Destruction (стекло)")
-check("Breakable" in guard_src, "ImpactGuard гасит Breakable")
+check("TryAttach" in spawner_cs, "спавнер подключает детали через TryAttach")
+check("GetComponentsInChildren<Slot>" in spawner_cs,
+      "спавнер ищет слоты по всей иерархии (включая слоты материнки)")
+check("slotTarget" in spawner_cs, "спавнер учитывает целевой слот детали")
 
-# Деталь НЕ должна становиться кинематической: кинематическое тело не даёт
-# нормальных контактов, слот его не подхватывает, а FixedJoint из
-# Slot.SetComponent к нему не применяется — деталь повисает в воздухе.
-guard_code = "\n".join(
-    line for line in guard_src.split("\n") if not line.strip().startswith("//"))
-check("isKinematic" not in guard_code,
-      "ImpactGuard не делает деталь кинематической (иначе слот её не примет)")
-check("Connector" in guard_src,
-      "ImpactGuard снимает защиту, как только слот принял деталь")
+# Позу и поворот задаёт слот из своего insertPos. Раньше спавнер выставлял
+# их сам по заранее вычисленным координатам, и ошибка в кватернионе давала
+# видеокарты, стоящие вверх ногами.
+build_body = spawner_cs.split("private IEnumerator Build()")[1].split(
+    "private bool Attach")[0]
+check("Quaternion.Euler(part.localEuler)" not in build_body,
+      "спавнер не выставляет поворот детали вручную (поворот берётся из слота)")
+check("TransformPoint(part.localPosition)" not in build_body,
+      "спавнер не выставляет позицию детали вручную (позицию берёт слот)")
 
-# Корпус на время сборки замораживается ограничениями, а не кинематикой:
-# FixedJoint детали цепляется к Rigidbody корпуса и требует динамическое тело.
-check("RigidbodyConstraints.FreezeAll" in spawner_cs,
-      "спавнер морозит корпус ограничениями, а не isKinematic")
-check("rootBody.isKinematic = true" not in spawner_cs,
-      "спавнер не делает корпус кинематическим")
+# ImpactGuard больше не нужен: деталь подключается мгновенно и не успевает
+# ни упасть, ни получить урон.
+check(not (ROOT / "Assets/Scripts/Assembly-CSharp/ImpactGuard.cs").exists(),
+      "ImpactGuard удалён — деталь подключается сразу, ломаться нечему")
+check("ImpactGuard" not in spawner_cs, "спавнер не ссылается на ImpactGuard")
+check("isKinematic" not in spawner_cs,
+      "спавнер не трогает кинематику (ломало FixedJoint и приём в слот)")
 
-# OnTriggerEnter срабатывает только на вход коллайдера в зону, поэтому
-# деталь, созданную сразу внутри триггера, нужно «внести» в слот заново.
-check("SetActive(false)" in spawner_cs and "SetActive(true)" in spawner_cs,
-      "спавнер перевходит деталь в триггер слота")
-check("не попала в слот" in spawner_cs,
-      "спавнер предупреждает в логе о неподключённой детали")
+# Каждая деталь должна нести тег своего слота, иначе спавнер её не пристроит.
+for spec in gen.BUILDS:
+    prefab = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    targets = re.findall(r"slotTarget: (\S+)", prefab)
+    check(len(targets) == len(spec.parts),
+          f"{spec.key}: у всех {len(spec.parts)} деталей задан slotTarget")
 
-# Защита обязана держаться до конца сборки: пока ставятся оставшиеся
-# детали, уже установленные тоже могут получить импульс.
-check(spawner_cs.count("Disarm") >= 2,
-      "спавнер продлевает защиту уже установленным деталям")
+# Слотов в корпусе и на плате должно хватать на все детали сборки.
+from collections import Counter  # noqa: E402
+from unity_asset_tool import PrefabResolver  # noqa: E402
+
+for spec in gen.BUILDS:
+    build = ReadyBuild(name=spec.key, case_prefab=spec.case, parts=spec.parts)
+    resolved = build.resolve(str(ROOT))
+    need = Counter(r["target"] for r in resolved)
+
+    have = Counter(s["target"] for s in PrefabResolver(str(ROOT / spec.case),
+                                                       str(ROOT)).slots)
+    for r in resolved:
+        if r["target"] == "Motherboard":
+            mb_path = ROOT / gen.COMP / f"{r['name']}.prefab"
+            have.update(s["target"] for s in PrefabResolver(str(mb_path),
+                                                            str(ROOT)).slots)
+
+    short = {k: (v, have.get(k, 0)) for k, v in need.items() if v > have.get(k, 0)}
+    check(not short, f"{spec.key}: слотов хватает на все детали"
+          + (f" (нехватка: {short})" if short else ""))
+
+    # Материнка обязана вставать первой: её слоты нужны CPU, RAM и GPU.
+    mb_index = next((i for i, r in enumerate(resolved)
+                     if r["target"] == "Motherboard"), None)
+    check(mb_index in (None, 0), f"{spec.key}: материнская плата ставится первой")
 
 # ---------------------------------------------------------------------------
 print("\n.meta текстур совместимы с Unity 2022.3")

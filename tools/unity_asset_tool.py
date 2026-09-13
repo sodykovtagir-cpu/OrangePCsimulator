@@ -1171,6 +1171,10 @@ def write_spawner_prefab(
             f"    localPosition: {{x: {_f(p['pos'][0])}, y: {_f(p['pos'][1])}, z: {_f(p['pos'][2])}}}\n"
             f"    localEuler: {{x: {_f(euler[0])}, y: {_f(euler[1])}, z: {_f(euler[2])}}}\n"
             f"    order: {p['order']}\n"
+            # Тег слота: по нему спавнер находит, куда ставить деталь.
+            # Позиция и поворот остаются для справки и отладки — итоговую
+            # позу задаёт сам слот из своего insertPos.
+            f"    slotTarget: {p['target']}\n"
         )
     if not parts_yaml:
         parts_yaml = "  []\n"

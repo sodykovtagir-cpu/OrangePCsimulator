@@ -93,6 +93,36 @@ public class Slot : MonoBehaviour
 		RemoveComponent();
 	}
 
+	/// <summary>
+	/// Занят ли слот. Нужно сборщику готовых ПК, чтобы разложить детали
+	/// по свободным слотам, не полагаясь на физику.
+	/// </summary>
+	public bool IsUsing => isUsing;
+
+	/// <summary>
+	/// Установить деталь в слот напрямую, минуя триггер.
+	///
+	/// Обычный путь — OnTriggerEnter: игрок подносит деталь, коллайдер
+	/// входит в зону, слот её принимает. Для готовых сборок этот путь
+	/// ненадёжен: деталь создаётся сразу внутри триггера, событие входа
+	/// может не возникнуть, и деталь остаётся висеть неподключённой.
+	///
+	/// Здесь выполняются ровно те же проверки (тег и match) и вызывается
+	/// тот же SetComponent, поэтому результат неотличим от ручной сборки:
+	/// та же поза, FixedJoint, Connector, события и сохранение.
+	/// </summary>
+	public bool TryAttach(Item item)
+	{
+		if (isUsing || item == null) return false;
+		if (!item.CompareTag(target)) return false;
+		if (item.GetComponent<Connector>() != null) return false;
+		if (!IsMatch(item.Match)) return false;
+
+		isUsing = true;
+		SetComponent(item);
+		return true;
+	}
+
 	protected virtual void SetComponent(Item item)
 	{
 		Transform itrans = item.transform;
