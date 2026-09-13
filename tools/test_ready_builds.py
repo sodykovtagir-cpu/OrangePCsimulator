@@ -255,8 +255,11 @@ for spec in gen.BUILDS:
 
     # Внутри ящика лежит спавнер именно этой сборки.
     spawner_guid = read_meta_guid(str(ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab"))
-    box_at = crate.find(f"guid: {SCRIPT_GUIDS['Box']}")
-    check(box_at != -1, f"{spec.key}: в ящике есть компонент Box")
+    box_at = crate.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
+    check(box_at != -1,
+          f"{spec.key}: в ящике стоит ReadyBuildBox (разводит груз и обломки)")
+    check(SCRIPT_GUIDS["Box"] not in crate,
+          f"{spec.key}: штатный Box заменён — он ронял раму внутрь обломков")
     if box_at != -1:
         content = re.search(r"prefab: \{fileID: \d+, guid: (\w+)", crate[box_at:])
         check(content is not None and content.group(1) == spawner_guid,
@@ -607,13 +610,42 @@ for spec in gen.BUILDS:
     for _o in _doc.objects:
         if _o.class_id != 114:
             continue
-        if SCRIPT_GUIDS["Box"] not in (_o.get("m_Script") or ""):
+        if uat.READY_BOX_SCRIPT_GUID not in (_o.get("m_Script") or ""):
             continue
         _m = re.search(r"fileID: (-?\d+)", _o.get("m_GameObject") or "")
         if _m:
             _owner = _names.get(int(_m.group(1)))
     check(_owner == "BrokenCrate",
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
+
+# ---------------------------------------------------------------------------
+print("\nГруз не сталкивается с обломками вскрытого ящика")
+
+_box_cs_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildBox.cs"
+check(_box_cs_path.exists(), "ReadyBuildBox.cs на месте")
+_box_cs = _box_cs_path.read_text(encoding="utf-8")
+_box_meta = ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildBox.cs.meta"
+check(_box_meta.exists(), "у ReadyBuildBox есть .meta")
+check("MonoImporter" in _box_meta.read_text(encoding="utf-8"),
+      "ReadyBuildBox.cs.meta — MonoImporter, а не PrefabImporter")
+check(read_meta_guid(str(_box_cs_path)) == uat.READY_BOX_SCRIPT_GUID,
+      "guid ReadyBuildBox совпадает с тем, что тулза пишет в ящики")
+
+# Ящик к моменту выдачи груза — шесть обломков Part с Rigidbody. Рама
+# BigMiner (10.54 в высоту) рождается внутри них, и без развода коллизий
+# обломки выпихивают её вместе с видеокартами.
+check("Physics.IgnoreCollision" in _box_cs,
+      "ReadyBuildBox разводит коллизии груза и обломков")
+
+# Сборка появляется не мгновенно — спавнер ставит детали по одной за
+# несколько кадров. Разовый проход пропустил бы видеокарты, приехавшие позже.
+check("for (int pass" in _box_cs and "WaitForSeconds" in _box_cs,
+      "развод коллизий повторяется, пока спавнер доставляет детали")
+
+# Штатный Box общий для 31 ванильного ящика — его трогать нельзя.
+_vanilla_box = (ROOT / "Assets/Scripts/Assembly-CSharp/Box.cs").read_text(encoding="utf-8")
+check("Physics.IgnoreCollision" not in _vanilla_box,
+      "штатный Box.cs не тронут — он общий для всех ванильных ящиков")
 
 # ---------------------------------------------------------------------------
 print("\nОснова тяжелее навески и решатель усилен")
@@ -735,22 +767,38 @@ for spec in gen.BUILDS:
     _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
     check("glueParts" not in _text, f"{spec.key}: поля склейки нет")
 
-# Сборка не должна рождаться внутри пола. Box создаёт предмет в позиции ящика
-# и сдвигает на Box.position; пивот рамы BigMiner лежит на 5.09 выше её дна,
-# поэтому без подъёма рама появляется утопленной, физика выталкивает её
-# рывком и разбрасывает видеокарты.
+# Содержимое ящика НЕ смещается — как во всех 31 ванильном ящике.
+#
+# Была попытка поднимать сборку на высоту её пивота, чтобы рама BigMiner не
+# рождалась утопленной в пол. Стало хуже: Box создаёт предмет в точке ящика,
+# а ящик к этому моменту уже шесть обломков Part с Rigidbody, стоящих там же.
+# Подъём на 5.24 загонял раму внутрь обломков (перекрытие 3.79 по высоте), и
+# они выпихивали её вместе с видеокартами.
+#
+# Ванильный Table торчит из своего ящика на 1.37 вниз и никому не мешает:
+# игра роняет груз на пол и даёт физике его уложить.
 for spec in gen.BUILDS:
-    _rel = spec.case
-    _b = prefab_bounds(_rel, str(ROOT))
-    _sy = root_scale(_rel, str(ROOT))[1]
-    _need = max(0.0, -(_b[0][1] * _sy))
     _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
-    _i = _ct.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    _i = _ct.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
     _seg = _ct[_i:_i + 400]
-    _y = float(re.search(r"position: \{x: [-\d.e]+, y: ([-\d.e]+)", _seg).group(1))
-    check(_y >= _need - 1e-6,
-          f"{spec.key}: содержимое поднято на {_y:.2f} — не ниже дна корпуса "
-          f"({_need:.2f})")
+    _pos = re.search(
+        r"position: \{x: ([-\d.e]+), y: ([-\d.e]+), z: ([-\d.e]+)\}", _seg)
+    check(all(abs(float(v)) < 1e-9 for v in _pos.groups()),
+          f"{spec.key}: содержимое не смещено относительно ящика")
+
+_van = 0
+for _f in sorted((ROOT / gen.COMP).glob("Crate_*.prefab")):
+    _t = _f.read_text(encoding="utf-8")
+    _i = _t.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    if _i == -1:
+        continue
+    _m = re.search(
+        r"position: \{x: ([-\d.e]+), y: ([-\d.e]+), z: ([-\d.e]+)\}", _t[_i:_i + 400])
+    if _m and any(abs(float(v)) > 1e-9 for v in _m.groups()):
+        check(False, f"ваниль {_f.name} смещает содержимое — пересмотреть вывод")
+    _van += 1
+check(_van > 20,
+      f"проверено {_van} ванильных ящиков: ни один не смещает содержимое")
 
 # ЛОВУШКА: подъём правится в том же срезе текста, что и ссылка Box.prefab.
 # Отдельный проход по исходному тексту затирал ссылку, и ящик начинал везти
@@ -761,7 +809,7 @@ for spec in gen.BUILDS:
         r"guid: (\w+)",
         (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab.meta").read_text(encoding="utf-8"),
     ).group(1)
-    _i = _ct.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    _i = _ct.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
     _got = re.search(r"prefab: \{fileID: \d+, guid: (\w+)", _ct[_i:_i + 400]).group(1)
     check(_got == _want,
           f"{spec.key}: ящик везёт свою сборку, а не ванильный корпус")

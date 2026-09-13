@@ -349,11 +349,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 8319543324571594362}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7f903f50f13e21af61667d85cf95dde, type: 3}
+  m_Script: {fileID: 11500000, guid: 08b3f721008a46960d450c8ae0ba1816, type: 3}
   m_Name:
   m_EditorClassIdentifier:
   prefab: {fileID: 113953275590199562, guid: 503c30bfe41de9afd6288950a95026a8, type: 3}
-  position: {x: 0, y: 2.15, z: 0}
+  position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0}
 --- !u!82 &6853101402938131526
 AudioSource:
