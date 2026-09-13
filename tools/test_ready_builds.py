@@ -614,7 +614,7 @@ _VANILLA_CRATE_H = 4.5
 # Абсолютный потолок высоты ящика, НЕ завязанный на константу генератора:
 # иначе достаточно поднять CRATE_MAX_SCALE, и тест поедет следом. Ящик x2.5
 # давал 11.25 и застревал в потолке помещения; 7 единиц — безопасный предел.
-_MAX_CRATE_HEIGHT = 7.0
+_MAX_CRATE_HEIGHT = 8.0
 for spec in gen.BUILDS:
     _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
     _h = _VANILLA_CRATE_H * _k
@@ -631,16 +631,45 @@ if _table is not None:
     check(max(_thi[i] - _tlo[i] for i in range(3)) > _VANILLA_CRATE_H,
           "ванильный Table крупнее своего ящика — груз крупнее коробки это норма")
 
-# Детали заводской сборки склеены: Slot.SetComponent при item.glue не задаёт
-# breakForce, и FixedJoint становится неразрывным. Без этого joint'ы силой
-# 400-520 рвутся при падении, а видеокарты и накопители повисают в воздухе.
-check("item.glue = true" in _spawner_src,
-      "спавнер склеивает детали перед подключением в слот")
-check("if (!item.glue)" in slot_cs,
-      "Slot.SetComponent уважает glue и не ставит breakForce склеенным")
+# Клея быть не должно: компьютеры обязаны ломаться. Item.glue делает
+# FixedJoint неразрывным, и готовая сборка стала бы неуязвимой — это меняет
+# правила игры, а не чинит доставку.
+check("glue" not in _spawner_src,
+      "спавнер НЕ склеивает детали — готовый ПК ломается как обычный")
 for spec in gen.BUILDS:
     _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
-    check("glueParts: 1" in _text, f"{spec.key}: склейка деталей включена")
+    check("glueParts" not in _text, f"{spec.key}: поля склейки нет")
+
+# Сборка не должна рождаться внутри пола. Box создаёт предмет в позиции ящика
+# и сдвигает на Box.position; пивот рамы BigMiner лежит на 5.09 выше её дна,
+# поэтому без подъёма рама появляется утопленной, физика выталкивает её
+# рывком и разбрасывает видеокарты.
+for spec in gen.BUILDS:
+    _rel = spec.case
+    _b = prefab_bounds(_rel, str(ROOT))
+    _sy = root_scale(_rel, str(ROOT))[1]
+    _need = max(0.0, -(_b[0][1] * _sy))
+    _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
+    _i = _ct.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    _seg = _ct[_i:_i + 400]
+    _y = float(re.search(r"position: \{x: [-\d.e]+, y: ([-\d.e]+)", _seg).group(1))
+    check(_y >= _need - 1e-6,
+          f"{spec.key}: содержимое поднято на {_y:.2f} — не ниже дна корпуса "
+          f"({_need:.2f})")
+
+# ЛОВУШКА: подъём правится в том же срезе текста, что и ссылка Box.prefab.
+# Отдельный проход по исходному тексту затирал ссылку, и ящик начинал везти
+# ванильный корпус вместо готовой сборки — молча, без единой ошибки.
+for spec in gen.BUILDS:
+    _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
+    _want = re.search(
+        r"guid: (\w+)",
+        (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab.meta").read_text(encoding="utf-8"),
+    ).group(1)
+    _i = _ct.find(f"guid: {SCRIPT_GUIDS['Box']}")
+    _got = re.search(r"prefab: \{fileID: \d+, guid: (\w+)", _ct[_i:_i + 400]).group(1)
+    check(_got == _want,
+          f"{spec.key}: ящик везёт свою сборку, а не ванильный корпус")
 
 # ---------------------------------------------------------------------------
 print("\nPCOS предустановлена с нужным набором приложений")

@@ -1512,7 +1512,6 @@ def write_spawner_prefab(
         + parts_yaml
         + f"  stepDelay: {_f(step_delay)}\n"
         "  destroyAfterBuild: 1\n"
-        + "  glueParts: 1\n"
         + ("  preinstallOS: 1\n" if apps else "  preinstallOS: 0\n")
         + _render_app_list(apps, root_dir)
         + f"  systemSize: {BOOT_FILE_SIZE}\n"
@@ -1574,6 +1573,7 @@ def write_crate_prefab(
     content_guid: str,
     content_file_id: int,
     scale: float = 1.0,
+    lift: float = 0.0,
 ) -> Tuple[str, int]:
     """Создать ящик доставки для готовой сборки на основе ящика-образца.
 
@@ -1591,6 +1591,11 @@ def write_crate_prefab(
     scale — РАВНОМЕРНЫЙ коэффициент размера ящика, чтобы коробка под раму
     майнера не выглядела втрое меньше своего груза. Только равномерный:
     неравномерный масштаб ломает физику семи Rigidbody-стенок.
+
+    lift — на сколько поднять содержимое над точкой вскрытия ящика. Box
+    создаёт предмет в своей позиции и сдвигает на Box.position, а пивот рамы
+    BigMiner лежит на 5.09 выше её дна: рама рождается утопленной в пол,
+    физика выталкивает её рывком и разбрасывает видеокарты.
 
     Возвращает (guid ассета, fileID корневого GameObject).
     """
@@ -1654,6 +1659,19 @@ def write_crate_prefab(
         tail,
         count=1,
     )
+
+    # Подъём содержимого над полом — штатным полем Box.position, а не правкой
+    # самой сборки: ящик знает, что именно он везёт. Правим тот же tail, что
+    # и ссылку выше: отдельный проход по исходному text затирал бы её.
+    if abs(lift) > 1e-9:
+        tail = re.sub(
+            r"position: \{x: ([-\d.e]+), y: ([-\d.e]+), z: ([-\d.e]+)\}",
+            lambda m: "position: {x: %s, y: %s, z: %s}" % (
+                m.group(1), _f(float(m.group(2)) + lift), m.group(3)),
+            tail,
+            count=1,
+        )
+
     text = head + tail
 
     if abs(scale - 1.0) > 1e-9:

@@ -567,11 +567,39 @@ def base_ref(prefab_rel: str):
 # Внутренняя полость ящика-образца (внешне 3 x 4.5 x 5, стенка 0.1).
 CRATE_INNER = (2.8, 4.3, 4.8)
 
-# Предел увеличения ящика. Товар приезжает через портал под потолком, и
-# ящик x2.5 (11 единиц в высоту) в этот потолок упирался: его зажимало,
-# роняло, и видеокарты высыпались из рамы. Потолок масштаба держит коробку
-# в пределах дверного проёма.
-CRATE_MAX_SCALE = 1.25
+# Предел увеличения ящика. Ящик x2.5 (11.25 в высоту) упирался в потолок:
+# товар приезжает порталом на высоте 8, коробку зажимало и роняло. x1.75
+# даёт 7.88 — заметно крупнее ванильного ящика, но проходит под перекрытие.
+#
+# Масштаб строго равномерный, поэтому стенки не "плывут": видимый размер
+# коллайдера менялся при смене ракурса именно из-за неравномерного (1.61,
+# 2.6, 1), когда Unity не может честно пересчитать составной коллайдер.
+CRATE_MAX_SCALE = 1.75
+
+
+def crate_lift_for(case_prefab: str) -> float:
+    """На сколько поднять сборку, чтобы она не родилась внутри пола.
+
+    Box создаёт предмет в позиции ящика и сдвигает на Box.position. Пивот
+    рамы BigMiner лежит на 5.09 выше её дна, у Miner — на 1.25: без подъёма
+    рама появляется утопленной в пол, физика выталкивает её рывком и
+    разбрасывает видеокарты.
+
+    Подъём берём из геометрии самого корпуса плюс небольшой зазор, чтобы
+    сборка легла на пол, а не пересекала его в первый же кадр.
+    """
+    from unity_asset_tool import prefab_bounds, root_scale
+
+    rel = case_prefab
+    bounds = prefab_bounds(rel, REPO)
+    if bounds is None:
+        return 0.0
+    lo, _hi = bounds
+    sy = root_scale(rel, REPO)[1]
+    bottom = lo[1] * sy
+    if bottom >= 0:
+        return 0.0
+    return round(-bottom + 0.15, 2)
 
 
 def crate_scale_for(case_prefab: str, resolved: List[dict]) -> float:
@@ -669,6 +697,7 @@ def main() -> int:
             REPO, COMP, crate_template_for(case_name) + ".prefab")
 
         crate_scale = crate_scale_for(spec.case, resolved)
+        crate_lift = crate_lift_for(spec.case)
         spawn_guid, spawn_root = write_crate_prefab(
             path=crate_path,
             crate_name=crate_name,
@@ -676,9 +705,12 @@ def main() -> int:
             content_guid=prefab_guid,
             content_file_id=go_id,
             scale=crate_scale,
+            lift=crate_lift,
         )
         if crate_scale > 1.0:
             print(f"    ящик увеличен равномерно x{crate_scale:.2f}")
+        if crate_lift > 0:
+            print(f"    сборка поднята над полом на {crate_lift:.2f}")
 
         asset_path = os.path.join(REPO, OUT_ASSETS, spec.key + ".asset")
         _sprite_guid, _sprite_type = sprite_of(spec.sprite_from)
