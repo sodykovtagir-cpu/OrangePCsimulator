@@ -51,56 +51,67 @@ MonoBehaviour:
     localEuler: {x: 90, y: 90, z: 0}
     order: 0
     slotTarget: Motherboard
+    hostPrefabName: Case_ATX(Black)
   - prefab: {fileID: 1613355028108336, guid: 8351821c84023b449b90527432b26a28, type: 3}
     localPosition: {x: -0.647, y: 1.2, z: -1.015}
     localEuler: {x: 90, y: 90, z: 0}
     order: 1
     slotTarget: CPU
+    hostPrefabName: ATX
   - prefab: {fileID: 1231632343404861, guid: 79e52514a44a98f49a564b8ab4f6d2ba, type: 3}
     localPosition: {x: -0.084, y: 1.2, z: -1.015}
     localEuler: {x: 90, y: 90, z: 0}
     order: 2
     slotTarget: Cooler
+    hostPrefabName: ATX
   - prefab: {fileID: 1418733553814852, guid: 9eb88e8457ba0d64099e1c2f5e616f0d, type: 3}
     localPosition: {x: -0.45, y: 1.05242, z: -0.2554}
     localEuler: {x: 0, y: 270, z: 270}
     order: 3
     slotTarget: RAM
+    hostPrefabName: ATX
   - prefab: {fileID: 1418733553814852, guid: 9eb88e8457ba0d64099e1c2f5e616f0d, type: 3}
     localPosition: {x: -0.45, y: 1.05242, z: -0.1546}
     localEuler: {x: 0, y: 270, z: 270}
     order: 4
     slotTarget: RAM
+    hostPrefabName: ATX
   - prefab: {fileID: 1084078525943739, guid: 0ac9c5065a6faaa419d802c313a4dd7a, type: 3}
     localPosition: {x: -0.1895, y: -0.63306, z: -0.78786}
     localEuler: {x: 0, y: 270, z: 180}
     order: 5
     slotTarget: GPU
+    hostPrefabName: ATX
   - prefab: {fileID: 1604227188511014, guid: 36b5c41c8f2198e47a472e4e570c371a, type: 3}
     localPosition: {x: -0.0875, y: -1.55, z: -1.5}
     localEuler: {x: 0, y: 180, z: 0}
     order: 6
     slotTarget: Supply
+    hostPrefabName: Case_ATX(Black)
   - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
     localPosition: {x: -0.135, y: -1.815, z: 1.714}
     localEuler: {x: 0, y: 270, z: 0}
     order: 7
     slotTarget: Drive
+    hostPrefabName: Case_ATX(Black)
   - prefab: {fileID: 1472865988662461, guid: b6380eaab02fa4b4b9c885f52144b329, type: 3}
     localPosition: {x: -0.135, y: -1.415, z: 1.714}
     localEuler: {x: 0, y: 270, z: 0}
     order: 8
     slotTarget: Drive
+    hostPrefabName: Case_ATX(Black)
   - prefab: {fileID: 1817751328439239, guid: eb29df575d77b8647993471f41e9038a, type: 3}
     localPosition: {x: 0.275, y: 1.15, z: -2.11}
     localEuler: {x: 90, y: 180, z: 0}
     order: 9
     slotTarget: Fan
+    hostPrefabName: Case_ATX(Black)
   - prefab: {fileID: 1259261443996259, guid: acbc07b4fa7706c4d8654fb6f99fc24b, type: 3}
     localPosition: {x: 0.9125, y: 0, z: 0}
     localEuler: {x: 0, y: 90, z: 0}
     order: 10
     slotTarget: Cover
+    hostPrefabName: Case_ATX(Black)
   stepDelay: 0.05
   destroyAfterBuild: 1
   preinstallOS: 1

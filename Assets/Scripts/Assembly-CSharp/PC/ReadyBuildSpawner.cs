@@ -63,6 +63,10 @@ namespace PC
 
 			[Tooltip("Тег слота: Motherboard, CPU, RAM, GPU, Drive, Supply...")]
 			public string slotTarget;
+
+			[Tooltip("Имя префаба-хозяина слота: рама/корпус или плата. " +
+				"Нужно, чтобы заранее знать нагрузку на каждую опору")]
+			public string hostPrefabName;
 		}
 
 		[SerializeField]
@@ -222,6 +226,20 @@ namespace PC
 					// и достижимы они только через неё.
 					hosts.Add(spawned);
 
+					// Утяжеляем деталь, которая сама станет опорой.
+					//
+					// Починить массу одной лишь рамы мало: пирамида
+					// двухуровневая. Материнская плата весит 1.0 и несёт
+					// CPU, кулер и две планки памяти — ещё 2.5, то есть
+					// перегружена в два с половиной раза. Вдобавок её слот
+					// объявлен setParent: 0, поэтому плата НЕ становится
+					// потомком рамы и держится на единственном FixedJoint.
+					//
+					// Пока в раму приезжали шестнадцать видеокарт, рама
+					// дёргалась, этот джойнт рвался — и плата отваливалась
+					// вместе с процессором и кулером, уже будучи собранной.
+					StabilizeHost(spawned, part.slotTarget);
+
 					// Пауза не обязательна для корректности — слоты уже
 					// заняты синхронно, — но даёт материнке отработать
 					// события подключения до следующей детали.
@@ -318,6 +336,50 @@ namespace PC
 		/// вне иерархии корпуса и её слоты CPU/Cooler/RAM/GPU не попадают в
 		/// GetComponentsInChildren корпуса.
 		/// </summary>
+		/// <summary>
+		/// Сделать деталь надёжной опорой для того, что встанет уже в неё.
+		///
+		/// Считаем массу всего, что по плану поедет в слоты этой детали, и
+		/// поднимаем её собственную массу выше — правило то же, что и для
+		/// рамы: джойнт «лёгкое к тяжёлому» устойчив, обратный расходится.
+		/// Решателю добавляем итераций, иначе он не успевает за длинной
+		/// цепочкой рама → плата → процессор.
+		///
+		/// Трогаем только клон: общий префаб платы остаётся как был, иначе
+		/// изменилось бы поведение вручную собираемых компьютеров.
+		/// </summary>
+		private void StabilizeHost(GameObject host, string hostSlotTarget)
+		{
+			if (host == null || parts == null) return;
+
+			var body = host.GetComponent<Rigidbody>();
+			if (body == null) return;
+
+			// Что поедет в слоты этой детали: у таких записей host совпадает
+			// с именем префаба, который мы только что поставили.
+			float load = 0f;
+			foreach (var part in parts)
+			{
+				if (part == null || part.prefab == null) continue;
+				if (part.hostPrefabName != host.name.Replace("(Clone)", "")) continue;
+				var prb = part.prefab.GetComponent<Rigidbody>();
+				if (prb != null) load += prb.mass;
+			}
+
+			if (load <= 0f) return;
+
+			float wanted = load * baseMassFactor;
+			if (body.mass < wanted)
+				body.mass = wanted;
+
+			if (body.solverIterations < baseSolverIterations)
+				body.solverIterations = baseSolverIterations;
+			if (body.solverVelocityIterations < baseSolverIterations)
+				body.solverVelocityIterations = baseSolverIterations;
+
+			_ = hostSlotTarget;
+		}
+
 		private bool Attach(List<GameObject> hosts, Item item, string slotTarget)
 		{
 			foreach (var host in hosts)
