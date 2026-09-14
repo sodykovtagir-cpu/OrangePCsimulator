@@ -767,24 +767,51 @@ for spec in gen.BUILDS:
     _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
     check("glueParts" not in _text, f"{spec.key}: поля склейки нет")
 
-# Содержимое ящика НЕ смещается — как во всех 31 ванильном ящике.
+# Груз не должен родиться ниже пола.
 #
-# Была попытка поднимать сборку на высоту её пивота, чтобы рама BigMiner не
-# рождалась утопленной в пол. Стало хуже: Box создаёт предмет в точке ящика,
-# а ящик к этому моменту уже шесть обломков Part с Rigidbody, стоящих там же.
-# Подъём на 5.24 загонял раму внутрь обломков (перекрытие 3.79 по высоте), и
-# они выпихивали её вместе с видеокартами.
-#
-# Ванильный Table торчит из своего ящика на 1.37 вниз и никому не мешает:
-# игра роняет груз на пол и даёт физике его уложить.
+# Он появляется в ПИВОТЕ ящика, а пивот ящика — его центр: когда ящик стоит
+# на полу, это 2.25 (умножить на масштаб). Дальше решает пивот самого груза.
+# У рамы BigMiner дно на -5.09, и при ящике x1.75 (пивот 3.94) оно уходит на
+# 1.15 НИЖЕ пола — рама спавнится в полу, физика выталкивает её рывком.
+_tb = prefab_bounds(f"{gen.COMP}/Crate_Case_ATX 2(Black).prefab", str(ROOT))
+_half = -_tb[0][1]
 for spec in gen.BUILDS:
+    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[1]
+    _cb = prefab_bounds(spec.case, str(ROOT))
+    _bottom = _cb[0][1] * root_scale(spec.case, str(ROOT))[1]
+
     _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
     _i = _ct.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
-    _seg = _ct[_i:_i + 400]
-    _pos = re.search(
-        r"position: \{x: ([-\d.e]+), y: ([-\d.e]+), z: ([-\d.e]+)\}", _seg)
-    check(all(abs(float(v)) < 1e-9 for v in _pos.groups()),
-          f"{spec.key}: содержимое не смещено относительно ящика")
+    _lift = float(re.search(
+        r"position: \{x: [-\d.e]+, y: ([-\d.e]+)", _ct[_i:_i + 400]).group(1))
+
+    _ground = _half * _k + _bottom + _lift
+    check(_ground >= 0,
+          f"{spec.key}: дно груза на {_ground:+.2f} — не ниже пола "
+          f"(масштаб x{_k:.2f}, подъём {_lift:.2f})")
+
+# Подъём строго минимальный. Прошлая версия поднимала на всю высоту пивота
+# (5.24) вслепую — это загоняло раму глубоко внутрь обломков вскрытого ящика.
+for spec in gen.BUILDS:
+    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[1]
+    _want = gen.crate_lift_for(spec.case, _k)
+    _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
+    _i = _ct.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
+    _got = float(re.search(
+        r"position: \{x: [-\d.e]+, y: ([-\d.e]+)", _ct[_i:_i + 400]).group(1))
+    check(abs(_got - _want) < 1e-6,
+          f"{spec.key}: подъём {_got:.2f} — ровно расчётный минимум {_want:.2f}")
+    check(_got <= 2.0,
+          f"{spec.key}: подъём {_got:.2f} не задран (5.24 загонял раму в обломки)")
+
+# У большинства сборок подъём не нужен вовсе — как во всех 31 ванильном ящике.
+_lifted = 0
+for spec in gen.BUILDS:
+    _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[1]
+    if gen.crate_lift_for(spec.case, _k) > 0:
+        _lifted += 1
+check(_lifted <= 2,
+      f"подъём понадобился только {_lifted} сборкам на раме BigMiner")
 
 _van = 0
 for _f in sorted((ROOT / gen.COMP).glob("Crate_*.prefab")):

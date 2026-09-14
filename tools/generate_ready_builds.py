@@ -604,22 +604,47 @@ CRATE_INNER = (2.8, 4.3, 4.8)
 CRATE_MAX_SCALE = 1.75
 
 
-def crate_lift_for(case_prefab: str) -> float:
-    """Смещение содержимого ящика. Всегда ноль — и это не упущение.
+# Просвет между дном груза и полом после выдачи из ящика.
+CRATE_GROUND_CLEARANCE = 0.15
 
-    Была попытка поднимать сборку на высоту её пивота, чтобы рама BigMiner
-    не рождалась утопленной в пол. Вышло хуже: Box создаёт предмет в позиции
-    ящика, а ящик к этому моменту уже превратился в шесть обломков Part с
-    тегом Box — они физические и стоят ровно там же. Подъём на 5.24 загонял
-    раму внутрь обломков (перекрытие 3.79 по высоте), и те выпихивали её
-    вместе с видеокартами.
 
-    Ни один из 31 ванильного ящика содержимое не смещает. Ванильный Table
-    торчит из своего ящика на 1.37 вниз — игра просто роняет груз на пол и
-    даёт физике его уложить. Делаем так же.
+def crate_lift_for(case_prefab: str, crate_scale: float = 1.0) -> float:
+    """Подъём содержимого, чтобы оно не родилось ниже пола.
+
+    Груз появляется в ПИВОТЕ ящика, а пивот у ящика — его центр: когда ящик
+    стоит на полу, это высота его полувысоты (2.25 при масштабе 1). Дальше всё
+    решает пивот самого груза. У корпусов и рамы Miner дно лежит на -1.25 ..
+    -2.00, и груз оказывается над полом сам. А у рамы BigMiner дно на -5.09:
+    при ящике x1.75 (пивот 3.94) её дно уходит на 1.15 НИЖЕ пола — рама
+    спавнится в полу, физика выталкивает её рывком и срывает видеокарты.
+
+    Поднимаем ровно настолько, чтобы дно встало на пол с небольшим просветом,
+    и ни сантиметром больше. Прошлая попытка поднимала на всю высоту пивота
+    (5.24) — это загоняло раму внутрь обломков вскрытого ящика, перекрытие
+    3.79 по высоте, и обломки её выпихивали.
     """
-    del case_prefab
-    return 0.0
+    from unity_asset_tool import prefab_bounds, root_scale
+
+    bounds = prefab_bounds(case_prefab, REPO)
+    if bounds is None:
+        return 0.0
+
+    # Дно груза относительно его собственного пивота.
+    bottom = bounds[0][1] * root_scale(case_prefab, REPO)[1]
+
+    # Пивот ящика над полом: полувысота ящика-образца с учётом масштаба.
+    template = os.path.join(
+        REPO, COMP, crate_template_for(os.path.basename(case_prefab)[:-len(".prefab")])
+        + ".prefab")
+    tb = prefab_bounds(os.path.relpath(template, REPO), REPO)
+    if tb is None:
+        return 0.0
+    pivot_height = -tb[0][1] * crate_scale
+
+    ground = pivot_height + bottom
+    if ground >= CRATE_GROUND_CLEARANCE:
+        return 0.0
+    return round(CRATE_GROUND_CLEARANCE - ground, 2)
 
 
 def crate_scale_for(case_prefab: str, resolved: List[dict]) -> float:
@@ -717,7 +742,7 @@ def main() -> int:
             REPO, COMP, crate_template_for(case_name) + ".prefab")
 
         crate_scale = crate_scale_for(spec.case, resolved)
-        crate_lift = crate_lift_for(spec.case)
+        crate_lift = crate_lift_for(spec.case, crate_scale)
         spawn_guid, spawn_root = write_crate_prefab(
             path=crate_path,
             crate_name=crate_name,
