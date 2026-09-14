@@ -718,6 +718,47 @@ for spec in gen.BUILDS:
               f"{spec.key}: опора {_host} станет {_new:.1f} против навески "
               f"{_l:.1f} — не отвалится при тряске рамы")
 
+# КРИТИЧНО: тяжесть — временный костыль на время сборки, а НЕ свойство
+# готовой сборки. Игра таскает предметы SpringJoint'ом (Raycast.cs,
+# targetSpring = 100), провисание пружины это m*g/k — рама массой 108
+# провисла бы на 10.6 метра, её физически невозможно поднять и перенести.
+_raycast = (ROOT / "Assets/Scripts/Assembly-CSharp/Raycast.cs").read_text(encoding="utf-8")
+_spring = re.search(r"targetSpring\s*=\s*([\d.]+)f", _raycast)
+check(_spring is not None,
+      "в Raycast.cs есть жёсткость пружины переноса — от неё зависит предел массы")
+if _spring:
+    _k = float(_spring.group(1))
+    _sag = 108.0 * 9.81 / _k
+    check(_sag > 1.5,
+          f"при жёсткости {_k:.0f} масса 108 давала бы провисание {_sag:.1f} м — "
+          f"поэтому массу обязательно возвращать")
+
+check("RestoreMasses" in _spawner_src,
+      "спавнер умеет возвращать исходные массы")
+# Считать вхождения мало: объявление метода и вызов в OnDestroy дают два
+# совпадения даже когда возврат из цикла сборки удалён — то есть ровно при
+# том баге, из-за которого готовый майнер весил 108 и его нельзя было поднять.
+_build_only = _spawner_src.split("private IEnumerator Build()")[1].split(
+    "private struct MassBackup")[0].split("private void RestoreMasses")[0]
+check("RestoreMasses()" in _build_only,
+      "массы возвращаются В САМОМ методе сборки, а не только в OnDestroy")
+_ondestroy = _spawner_src.split("private void OnDestroy()")[1][:200] \
+    if "private void OnDestroy()" in _spawner_src else ""
+check("RestoreMasses()" in _ondestroy,
+      "OnDestroy тоже возвращает массы")
+check("private void OnDestroy" in _spawner_src,
+      "массы возвращаются даже если спавнер уничтожат посреди сборки")
+check("restoreMass.Add" in _spawner_src,
+      "перед утяжелением спавнер запоминает настоящую массу")
+
+# Возврат массы должен идти ПОСЛЕ установки деталей, иначе смысла нет.
+# Резкая смена массы без гашения скорости даёт рывок и срывает детали.
+_restore_body = _spawner_src.split("private void RestoreMasses()")[1][:700]
+check("velocity = Vector3.zero" in _restore_body,
+      "перед сменой массы гасится скорость — иначе рывок сорвёт детали")
+check("angularVelocity = Vector3.zero" in _restore_body,
+      "угловая скорость тоже гасится")
+
 # Хозяин обязан доехать до префаба, иначе спавнер не поймёт, что укреплять.
 for spec in gen.BUILDS:
     _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")

@@ -110,9 +110,27 @@ namespace PC
 			"больше нужно, чтобы связка сошлась")]
 		private int baseSolverIterations = 40;
 
+		private struct MassBackup
+		{
+			public Rigidbody body;
+			public float mass;
+		}
+
+		private readonly List<MassBackup> restoreMass = new List<MassBackup>();
+
 		private void Start()
 		{
 			StartCoroutine(Build());
+		}
+
+		/// <summary>
+		/// Страховка: если спавнер уничтожат посреди сборки (перезагрузка
+		/// сцены, выход в меню), временно утяжелённые детали не должны
+		/// остаться такими навсегда — иначе их нельзя будет поднять.
+		/// </summary>
+		private void OnDestroy()
+		{
+			RestoreMasses();
 		}
 
 		private IEnumerator Build()
@@ -166,7 +184,14 @@ namespace PC
 
 				float wanted = Mathf.Max(minBaseMass, partsMass * baseMassFactor);
 				if (baseBody.mass < wanted)
+				{
+					restoreMass.Add(new MassBackup
+					{
+						body = baseBody,
+						mass = baseBody.mass,
+					});
 					baseBody.mass = wanted;
+				}
 
 				if (baseBody.solverIterations < baseSolverIterations)
 					baseBody.solverIterations = baseSolverIterations;
@@ -255,6 +280,10 @@ namespace PC
 				baseBody.isKinematic = baseWasKinematic;
 				baseBody.WakeUp();
 			}
+
+			// Сборка закончена — возвращаем настоящие массы, иначе готовый
+			// майнер невозможно будет поднять и перенести.
+			RestoreMasses();
 
 			if (preinstallOS)
 				InstallSystem(hosts);
@@ -348,6 +377,33 @@ namespace PC
 		/// Трогаем только клон: общий префаб платы остаётся как был, иначе
 		/// изменилось бы поведение вручную собираемых компьютеров.
 		/// </summary>
+		/// <summary>
+		/// Вернуть всем укреплённым телам их настоящую массу.
+		///
+		/// Без этого готовый майнер весил бы 108 вместо 2.5 и его нельзя было
+		/// бы ни поднять, ни перенести: SpringJoint в Raycast.cs имеет
+		/// фиксированную жёсткость 100, и предмет провисал бы на десять
+		/// метров. Тяжесть — временный костыль на время сборки, а не
+		/// свойство готовой сборки.
+		/// </summary>
+		private void RestoreMasses()
+		{
+			foreach (var backup in restoreMass)
+			{
+				if (backup.body == null) continue;
+
+				// Гасим накопленную скорость перед сменой массы. Иначе
+				// импульс, безобидный для тела массой 108, после возврата
+				// к 2.5 превращается в рывок и срывает детали с джойнтов.
+				backup.body.velocity = Vector3.zero;
+				backup.body.angularVelocity = Vector3.zero;
+
+				backup.body.mass = backup.mass;
+				backup.body.WakeUp();
+			}
+			restoreMass.Clear();
+		}
+
 		private void StabilizeHost(GameObject host, string hostSlotTarget)
 		{
 			if (host == null || parts == null) return;
@@ -370,7 +426,14 @@ namespace PC
 
 			float wanted = load * baseMassFactor;
 			if (body.mass < wanted)
+			{
+				// Масса нужна ТОЛЬКО на время сборки. Игра таскает предметы
+				// SpringJoint'ом с жёсткостью 100, и тяжёлую деталь потом
+				// просто не поднять: провисание пружины это m*g/k, то есть
+				// почти метр уже при массе 10.
+				restoreMass.Add(new MassBackup { body = body, mass = body.mass });
 				body.mass = wanted;
+			}
 
 			if (body.solverIterations < baseSolverIterations)
 				body.solverIterations = baseSolverIterations;
