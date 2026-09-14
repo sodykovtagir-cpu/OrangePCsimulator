@@ -51,136 +51,163 @@ MonoBehaviour:
     localEuler: {x: 270, y: 180, z: 0}
     order: 0
     slotTarget: Motherboard
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1743462487490901, guid: 469a502fe839c3243bd60307436c9b5f, type: 3}
     localPosition: {x: -0.24397, y: 3.54, z: -0.78608}
     localEuler: {x: 270, y: 180, z: 0}
     order: 1
     slotTarget: CPU
+    hostPrefabName: Mini_ITX
   - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
     localPosition: {x: -0.24397, y: 3.54, z: -0.22308}
     localEuler: {x: 270, y: 180, z: 0}
     order: 2
     slotTarget: Cooler
+    hostPrefabName: Mini_ITX
   - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
     localPosition: {x: 0.51563, y: 3.68758, z: -0.58908}
     localEuler: {x: 0, y: 180, z: 90}
     order: 3
     slotTarget: RAM
+    hostPrefabName: Mini_ITX
   - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
     localPosition: {x: 0.61643, y: 3.68758, z: -0.58908}
     localEuler: {x: 0, y: 180, z: 90}
     order: 4
     slotTarget: RAM
+    hostPrefabName: Mini_ITX
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: 0.07, y: -4.44, z: -0.56}
     localEuler: {x: 0, y: 90, z: 90}
     order: 5
     slotTarget: Supply
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: 0.07, y: -3.06, z: -0.56}
     localEuler: {x: 0, y: 90, z: 90}
     order: 6
     slotTarget: Supply
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: 0.07, y: -1.67, z: -0.56}
     localEuler: {x: 0, y: 90, z: 90}
     order: 7
     slotTarget: Supply
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: 0.07, y: -0.4, z: -0.56}
     localEuler: {x: 0, y: 90, z: 90}
     order: 8
     slotTarget: Supply
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
     localPosition: {x: -0.6719, y: 0.879, z: -0.85245}
     localEuler: {x: 0, y: 270, z: 270}
     order: 9
     slotTarget: Drive
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1255870119829033, guid: dd7df7edf5b8cd346926380ace1d50e7, type: 3}
     localPosition: {x: -0.6719, y: 0.879, z: -0.50245}
     localEuler: {x: 0, y: 270, z: 270}
     order: 10
     slotTarget: Drive
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -4.786, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 11
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -4.166, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 12
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -3.546, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 13
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -2.926, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 14
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -2.306, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 15
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -1.686, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 16
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -1.066, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 17
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: -0.446, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 18
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 0.194, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 19
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 0.814, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 20
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 1.434, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 21
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 2.054, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 22
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 2.674, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 23
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 3.294, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 24
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 3.914, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 25
     slotTarget: GPU
+    hostPrefabName: BigMiner
   - prefab: {fileID: 1494408145991856, guid: a29f0ac864e11074899893fffd2c7465, type: 3}
     localPosition: {x: -0.11253, y: 4.534, z: 0.489}
     localEuler: {x: 0, y: 180, z: 180}
     order: 26
     slotTarget: GPU
+    hostPrefabName: BigMiner
   stepDelay: 0.05
   destroyAfterBuild: 1
   preinstallOS: 1

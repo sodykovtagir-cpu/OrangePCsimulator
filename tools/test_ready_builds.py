@@ -683,6 +683,48 @@ for spec in gen.BUILDS:
           f"{spec.key}: основа {_base:.1f} тяжелее навески {_parts_mass:.1f} "
           f"в {_base / _parts_mass if _parts_mass else 0:.1f} раза")
 
+# Пирамида двухуровневая: утяжелить одну раму мало. Материнская плата весит
+# 1.0 и несёт CPU, кулер и память — ещё 2.5. Её слот объявлен setParent: 0,
+# поэтому плата НЕ становится потомком рамы и держится на одном FixedJoint.
+# Пока в раму приезжали 16 видеокарт, рама дёргалась, джойнт рвался — и плата
+# отваливалась вместе с процессором и кулером.
+check("private void StabilizeHost" in _spawner_src,
+      "у спавнера есть StabilizeHost для детали-опоры")
+# Метод мало объявить — его должны ВЫЗЫВАТЬ в цикле сборки, сразу после
+# того как деталь добавлена в hosts.
+_build_part = _spawner_src.split("private IEnumerator Build()")[1].split(
+    "private void StabilizeHost")[0]
+check("StabilizeHost(" in _build_part,
+      "спавнер вызывает StabilizeHost в цикле сборки, а не просто объявляет")
+check("hostPrefabName" in _spawner_src,
+      "у детали записан хозяин слота — по нему считается нагрузка на опору")
+
+for spec in gen.BUILDS:
+    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
+    _case_name = os.path.basename(spec.case)[:-len(".prefab")]
+    _load = {}
+    _paths = {}
+    for _r in _resolved:
+        _load[_r["host"]] = _load.get(_r["host"], 0.0) + _rb_mass(_r["path"])
+        _paths[os.path.basename(_r["path"])[:-len(".prefab")]] = _r["path"]
+
+    for _host, _l in _load.items():
+        if _host == _case_name or _l <= 0:
+            continue
+        # Опора второго уровня — например материнская плата.
+        _own = _rb_mass(_paths.get(_host, ""))
+        _new = max(_own, _l * uat.BASE_MASS_FACTOR)
+        check(_new >= _l * 2.0,
+              f"{spec.key}: опора {_host} станет {_new:.1f} против навески "
+              f"{_l:.1f} — не отвалится при тряске рамы")
+
+# Хозяин обязан доехать до префаба, иначе спавнер не поймёт, что укреплять.
+for spec in gen.BUILDS:
+    _text = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    _n_parts = _text.count("    slotTarget:")
+    check(_text.count("    hostPrefabName:") == _n_parts,
+          f"{spec.key}: у всех {_n_parts} деталей записан hostPrefabName")
+
 # Поля обязаны доехать до префаба, иначе в игре останутся значения по
 # умолчанию из C# и правка ничего не изменит.
 for spec in gen.BUILDS:
