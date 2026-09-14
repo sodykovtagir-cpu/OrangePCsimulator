@@ -46,120 +46,120 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   basePrefab: {fileID: 1969764158608991, guid: b143c080808e18c4da3ec863c8a06d03, type: 3}
   parts:
-  - prefab: {fileID: 1569340072111286, guid: c5280c08bb5d6134e84569e137d4869e, type: 3}
-    localPosition: {x: -0.72, y: 0.44, z: -0.81}
-    localEuler: {x: 90, y: 90, z: 0}
-    order: 0
-    slotTarget: Motherboard
-    hostPrefabName: Case_ATX 2(Black)
-  - prefab: {fileID: 1874669844494836, guid: e49aab5a509c3854b95249d4abaafd8b, type: 3}
-    localPosition: {x: -0.647, y: 1.05242, z: -0.69967}
-    localEuler: {x: 90, y: 90, z: 0}
-    order: 1
-    slotTarget: CPU
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
-    localPosition: {x: -0.424, y: 1.05242, z: -0.69967}
-    localEuler: {x: 90, y: 90, z: 0}
-    order: 2
-    slotTarget: Cooler
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.6304}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 3
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.5296}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 4
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.3784}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 5
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -1.2776}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 6
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -0.12175}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 7
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: -0.02095}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 8
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: 0.13025}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 9
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
-    localPosition: {x: -0.45, y: 1.05242, z: 0.23105}
-    localEuler: {x: 0, y: 270, z: 270}
-    order: 10
-    slotTarget: RAM
-    hostPrefabName: EXATX
-  - prefab: {fileID: 7209420444613088609, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
-    localPosition: {x: -0.1895, y: -0.63306, z: -0.86286}
-    localEuler: {x: 0, y: 270, z: 180}
-    order: 11
-    slotTarget: GPU
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1969907941431608, guid: 3fc3e1b3a1a11814480f0290653b3aff, type: 3}
-    localPosition: {x: -0.1895, y: 0.00141, z: -0.86286}
-    localEuler: {x: 0, y: 270, z: 180}
-    order: 12
-    slotTarget: GPU
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
-    localPosition: {x: -0.64033, y: -0.782, z: -1.15763}
-    localEuler: {x: 270, y: 270, z: 0}
-    order: 13
-    slotTarget: Drive
-    hostPrefabName: EXATX
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
-    localPosition: {x: -0.64033, y: -0.109, z: -1.15763}
-    localEuler: {x: 270, y: 270, z: 0}
-    order: 14
-    slotTarget: Drive
-    hostPrefabName: EXATX
   - prefab: {fileID: 1420016328669017, guid: 5ab2284208a33514d96e4fcfe5e4a0b6, type: 3}
     localPosition: {x: -0.0875, y: -1.55, z: -1.575}
     localEuler: {x: 0, y: 180, z: 0}
-    order: 15
+    order: 0
     slotTarget: Supply
     hostPrefabName: Case_ATX 2(Black)
   - prefab: {fileID: 1860561877774784, guid: c534afe25d6945d49a64d9a52208ec18, type: 3}
     localPosition: {x: -0.135, y: -1.815, z: 1.395}
     localEuler: {x: 0, y: 270, z: 0}
-    order: 16
+    order: 1
     slotTarget: Drive
     hostPrefabName: Case_ATX 2(Black)
   - prefab: {fileID: 1489055312754450, guid: d83ea1e6ccccbc94b9fe170c34c63f34, type: 3}
     localPosition: {x: 0, y: -1.15, z: 2.035}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 17
+    order: 2
     slotTarget: Fan
     hostPrefabName: Case_ATX 2(Black)
   - prefab: {fileID: 1937937842954910, guid: 58005a3b98665db488f2341909876164, type: 3}
     localPosition: {x: 0.9125, y: 0, z: -0.075}
     localEuler: {x: 0, y: 90, z: 0}
-    order: 18
+    order: 3
     slotTarget: Cover
     hostPrefabName: Case_ATX 2(Black)
+  - prefab: {fileID: 1569340072111286, guid: c5280c08bb5d6134e84569e137d4869e, type: 3}
+    localPosition: {x: -0.72, y: 0.44, z: -0.81}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 4
+    slotTarget: Motherboard
+    hostPrefabName: Case_ATX 2(Black)
+  - prefab: {fileID: 1874669844494836, guid: e49aab5a509c3854b95249d4abaafd8b, type: 3}
+    localPosition: {x: -0.647, y: 1.05242, z: -0.69967}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 5
+    slotTarget: CPU
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1929254830125739, guid: ec2d834889ff8ff4aa06ebbf064c475f, type: 3}
+    localPosition: {x: -0.424, y: 1.05242, z: -0.69967}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 6
+    slotTarget: Cooler
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.6304}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 7
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.5296}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 8
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.3784}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 9
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -1.2776}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 10
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -0.12175}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 11
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: -0.02095}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 12
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: 0.13025}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 13
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1399950458602353, guid: bfcbca2691bfdbb43a269b3b10300b1f, type: 3}
+    localPosition: {x: -0.45, y: 1.05242, z: 0.23105}
+    localEuler: {x: 0, y: 270, z: 270}
+    order: 14
+    slotTarget: RAM
+    hostPrefabName: EXATX
+  - prefab: {fileID: 7209420444613088609, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
+    localPosition: {x: -0.1895, y: -0.63306, z: -0.86286}
+    localEuler: {x: 0, y: 270, z: 180}
+    order: 15
+    slotTarget: GPU
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1969907941431608, guid: 3fc3e1b3a1a11814480f0290653b3aff, type: 3}
+    localPosition: {x: -0.1895, y: 0.00141, z: -0.86286}
+    localEuler: {x: 0, y: 270, z: 180}
+    order: 16
+    slotTarget: GPU
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+    localPosition: {x: -0.64033, y: -0.782, z: -1.15763}
+    localEuler: {x: 270, y: 270, z: 0}
+    order: 17
+    slotTarget: Drive
+    hostPrefabName: EXATX
+  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+    localPosition: {x: -0.64033, y: -0.109, z: -1.15763}
+    localEuler: {x: 270, y: 270, z: 0}
+    order: 18
+    slotTarget: Drive
+    hostPrefabName: EXATX
   stepDelay: 0.05
   destroyAfterBuild: 1
   preinstallOS: 1

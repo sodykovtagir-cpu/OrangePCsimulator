@@ -1108,8 +1108,34 @@ class ReadyBuild:
         hosts[case_name] = load_host(self.case_prefab, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
         default_host = case_name
 
+        # Материнскую плату и всё, что стоит НА ней, ставим последними.
+        #
+        # Плата держится на единственном FixedJoint: её слот объявлен
+        # setParent: 0, потомком рамы она не становится. Если поставить её
+        # первой, все последующие установки — шестнадцать видеокарт, четыре
+        # блока питания, накопители — трясут раму, и каждый удар приходится
+        # по этому одному креплению. Плата срывалась вместе с процессором и
+        # кулером, уже будучи собранной.
+        #
+        # Ставим её в конец: к этому моменту рама загружена и успокоилась.
+        # Порядок внутри группы сохраняем — плата обязана встать раньше
+        # своего процессора и памяти, иначе слотов ещё не существует.
+        board_hosts = {
+            os.path.splitext(os.path.basename(p.prefab_path))[0]
+            for p in self.parts
+            if p.slot_target == "Motherboard"
+        }
+
+        def _is_board_group(part: PartRef) -> bool:
+            if part.slot_target == "Motherboard":
+                return True
+            return part.host in board_hosts
+
+        ordered_parts = [p for p in self.parts if not _is_board_group(p)]
+        ordered_parts += [p for p in self.parts if _is_board_group(p)]
+
         resolved: List[dict] = []
-        for order, part in enumerate(self.parts):
+        for order, part in enumerate(ordered_parts):
             part_full = os.path.join(root, part.prefab_path)
             if not os.path.exists(part_full):
                 raise FileNotFoundError(part_full)

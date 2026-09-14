@@ -46,96 +46,96 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   basePrefab: {fileID: 1989475925588944, guid: f95f9a5113e866f4fa7828f3c8ce0944, type: 3}
   parts:
-  - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
-    localPosition: {x: -0.3, y: -1.08, z: 1.4}
-    localEuler: {x: 0, y: 180, z: 0}
-    order: 0
-    slotTarget: Motherboard
-    hostPrefabName: Miner
-  - prefab: {fileID: 1895436721047867, guid: 384e3de8577e29840b7db5e06b58c200, type: 3}
-    localPosition: {x: -0.31, y: -1.007, z: 1.66}
-    localEuler: {x: 0, y: 180, z: 0}
-    order: 1
-    slotTarget: CPU
-    hostPrefabName: Mini_ITX
-  - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
-    localPosition: {x: -0.31, y: -0.444, z: 1.66}
-    localEuler: {x: 0, y: 180, z: 0}
-    order: 2
-    slotTarget: Cooler
-    hostPrefabName: Mini_ITX
-  - prefab: {fileID: 1418733553814852, guid: 9eb88e8457ba0d64099e1c2f5e616f0d, type: 3}
-    localPosition: {x: 0.4496, y: -0.81, z: 1.51242}
-    localEuler: {x: 90, y: 90, z: 0}
-    order: 3
-    slotTarget: RAM
-    hostPrefabName: Mini_ITX
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: -0.7, y: -0.7, z: -1.7}
     localEuler: {x: 0, y: 270, z: 0}
-    order: 4
+    order: 0
     slotTarget: Supply
     hostPrefabName: Miner
   - prefab: {fileID: 1486622415076089, guid: 54396d7578b7f8f4b8ff1bdc7485ff08, type: 3}
     localPosition: {x: -0.7, y: -0.7, z: -0.35}
     localEuler: {x: 0, y: 270, z: 0}
-    order: 5
+    order: 1
     slotTarget: Supply
     hostPrefabName: Miner
   - prefab: {fileID: 1377971778360680, guid: 6667d33e36a35dc48bd6e0923d098a32, type: 3}
     localPosition: {x: 0.914, y: -0.965, z: -1.748}
     localEuler: {x: 0, y: 0, z: 0}
-    order: 6
+    order: 2
     slotTarget: Drive
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: -2.32761}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 7
+    order: 3
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: -1.70761}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 8
+    order: 4
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: -1.08761}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 9
+    order: 5
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: -0.46761}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 10
+    order: 6
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: 0.15239}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 11
+    order: 7
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: 0.77239}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 12
+    order: 8
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: 1.39239}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 13
+    order: 9
     slotTarget: GPU
     hostPrefabName: Miner
   - prefab: {fileID: 1339293257148341, guid: f3c9de28ca10c8c48a1af96a03c9b1dd, type: 3}
     localPosition: {x: 0.174, y: 0.5155, z: 2.01239}
     localEuler: {x: 90, y: 180, z: 0}
-    order: 14
+    order: 10
     slotTarget: GPU
     hostPrefabName: Miner
+  - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
+    localPosition: {x: -0.3, y: -1.08, z: 1.4}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 11
+    slotTarget: Motherboard
+    hostPrefabName: Miner
+  - prefab: {fileID: 1895436721047867, guid: 384e3de8577e29840b7db5e06b58c200, type: 3}
+    localPosition: {x: -0.31, y: -1.007, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 12
+    slotTarget: CPU
+    hostPrefabName: Mini_ITX
+  - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
+    localPosition: {x: -0.31, y: -0.444, z: 1.66}
+    localEuler: {x: 0, y: 180, z: 0}
+    order: 13
+    slotTarget: Cooler
+    hostPrefabName: Mini_ITX
+  - prefab: {fileID: 1418733553814852, guid: 9eb88e8457ba0d64099e1c2f5e616f0d, type: 3}
+    localPosition: {x: 0.4496, y: -0.81, z: 1.51242}
+    localEuler: {x: 90, y: 90, z: 0}
+    order: 14
+    slotTarget: RAM
+    hostPrefabName: Mini_ITX
   stepDelay: 0.05
   destroyAfterBuild: 1
   preinstallOS: 1

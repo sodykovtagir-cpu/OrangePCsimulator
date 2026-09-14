@@ -401,10 +401,16 @@ for spec in gen.BUILDS:
     check(not short, f"{spec.key}: слотов хватает на все детали"
           + (f" (нехватка: {short})" if short else ""))
 
-    # Материнка обязана вставать первой: её слоты нужны CPU, RAM и GPU.
-    mb_index = next((i for i, r in enumerate(resolved)
-                     if r["target"] == "Motherboard"), None)
-    check(mb_index in (None, 0), f"{spec.key}: материнская плата ставится первой")
+    # Материнка обязана вставать раньше СВОИХ деталей (её слоты нужны CPU и
+    # RAM), но не раньше всех вообще: плата держится на единственном джойнте,
+    # и если поставить её первой, каждая следующая деталь трясёт раму и бьёт
+    # по этому креплению. Поэтому плата и её группа идут последними.
+    mb = next((r for r in resolved if r["target"] == "Motherboard"), None)
+    if mb is not None:
+        mb_order = mb["order"]
+        mb_kids = [r for r in resolved if r["host"] == mb["name"]]
+        check(all(k["order"] > mb_order for k in mb_kids),
+              f"{spec.key}: материнская плата ставится раньше своих деталей")
 
 # ---------------------------------------------------------------------------
 print("\n.meta текстур совместимы с Unity 2022.3")
@@ -699,24 +705,42 @@ check("StabilizeHost(" in _build_part,
 check("hostPrefabName" in _spawner_src,
       "у детали записан хозяин слота — по нему считается нагрузка на опору")
 
-for spec in gen.BUILDS:
-    _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
-    _case_name = os.path.basename(spec.case)[:-len(".prefab")]
-    _load = {}
-    _paths = {}
-    for _r in _resolved:
-        _load[_r["host"]] = _load.get(_r["host"], 0.0) + _rb_mass(_r["path"])
-        _paths[os.path.basename(_r["path"])[:-len(".prefab")]] = _r["path"]
+# Материнскую плату утяжелять НЕЛЬЗЯ. Нагрузка на её крепление это F = m*a,
+# а держится она на ЕДИНСТВЕННОМ FixedJoint: слот объявлен setParent: 0,
+# потомком рамы плата не становится. Утяжеление в десять раз во столько же
+# увеличивает силу на этом джойнте — при breakForce 800 хватает ускорения 80,
+# и плата срывается вместе с процессором и кулером.
+_stab_body = _spawner_src.split("private void StabilizeHost")[1].split(
+    "private bool Attach")[0]
+check("body.mass" not in _stab_body,
+      "StabilizeHost НЕ трогает массу детали-опоры (плату это срывало)")
+check("solverIterations" in _stab_body,
+      "StabilizeHost всё же поднимает итерации решателя — они ничего не весят")
+check(_spawner_src.count("restoreMass.Add") == 1,
+      "запоминается масса только основы — больше никого не утяжеляем")
 
-    for _host, _l in _load.items():
-        if _host == _case_name or _l <= 0:
-            continue
-        # Опора второго уровня — например материнская плата.
-        _own = _rb_mass(_paths.get(_host, ""))
-        _new = max(_own, _l * uat.BASE_MASS_FACTOR)
-        check(_new >= _l * 2.0,
-              f"{spec.key}: опора {_host} станет {_new:.1f} против навески "
-              f"{_l:.1f} — не отвалится при тряске рамы")
+# Плата и всё, что стоит на ней, ставятся ПОСЛЕДНИМИ: иначе каждая из
+# шестнадцати видеокарт трясёт раму, и удар приходится по единственному
+# креплению уже собранной платы.
+for spec in gen.BUILDS:
+    _resolved = sorted(
+        ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT)),
+        key=lambda r: r["order"])
+    _board = [r for r in _resolved if r["target"] == "Motherboard"]
+    if not _board:
+        continue
+    _bo = _board[0]["order"]
+    _bn = _board[0]["name"]
+
+    _after = [r for r in _resolved
+              if r["order"] > _bo and r["host"] != _bn]
+    check(not _after,
+          f"{spec.key}: после платы (#{_bo}) в раму больше ничего не ставится")
+
+    # Но сама плата обязана встать раньше своих процессора и памяти.
+    _kids = [r for r in _resolved if r["host"] == _bn]
+    check(all(k["order"] > _bo for k in _kids),
+          f"{spec.key}: плата встаёт раньше своих {len(_kids)} деталей")
 
 # КРИТИЧНО: тяжесть — временный костыль на время сборки, а НЕ свойство
 # готовой сборки. Игра таскает предметы SpringJoint'ом (Raycast.cs,
