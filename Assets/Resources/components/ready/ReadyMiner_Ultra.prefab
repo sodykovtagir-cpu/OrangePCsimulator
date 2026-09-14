@@ -47,31 +47,31 @@ MonoBehaviour:
   basePrefab: {fileID: 38789075049819013, guid: c05a70581d0032c418c44d40a1de8d3f, type: 3}
   parts:
   - prefab: {fileID: 1859128289024943, guid: a70ce602ae02e314aa16d468cce7778b, type: 3}
-    localPosition: {x: -0.23397, y: 3.8, z: -0.85908}
+    localPosition: {x: -0.23397, y: 3.8, z: -0.955}
     localEuler: {x: 270, y: 180, z: 0}
     order: 0
     slotTarget: Motherboard
     hostPrefabName: BigMiner
   - prefab: {fileID: 1743462487490901, guid: 469a502fe839c3243bd60307436c9b5f, type: 3}
-    localPosition: {x: -0.24397, y: 3.54, z: -0.78608}
+    localPosition: {x: -0.24397, y: 3.54, z: -0.882}
     localEuler: {x: 270, y: 180, z: 0}
     order: 1
     slotTarget: CPU
     hostPrefabName: Mini_ITX
   - prefab: {fileID: 1520160776569731, guid: e2484f44eb2e0654e9951af7c7d8d8c7, type: 3}
-    localPosition: {x: -0.24397, y: 3.54, z: -0.22308}
+    localPosition: {x: -0.24397, y: 3.54, z: -0.319}
     localEuler: {x: 270, y: 180, z: 0}
     order: 2
     slotTarget: Cooler
     hostPrefabName: Mini_ITX
   - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
-    localPosition: {x: 0.51563, y: 3.68758, z: -0.58908}
+    localPosition: {x: 0.51563, y: 3.68758, z: -0.685}
     localEuler: {x: 0, y: 180, z: 90}
     order: 3
     slotTarget: RAM
     hostPrefabName: Mini_ITX
   - prefab: {fileID: 1649285652419294, guid: fb34706b181955d4bb80e77f5c74506c, type: 3}
-    localPosition: {x: 0.61643, y: 3.68758, z: -0.58908}
+    localPosition: {x: 0.61643, y: 3.68758, z: -0.685}
     localEuler: {x: 0, y: 180, z: 90}
     order: 4
     slotTarget: RAM
