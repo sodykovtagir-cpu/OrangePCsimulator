@@ -625,6 +625,59 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nСборка устойчива к помехам")
+
+# App Downloader обязан быть на каждой машине: без него систему нечем
+# пополнять и предустановленный набор становится потолком. В обычной игре
+# его приносит мастер установки, а у готовых сборок мастера нет.
+for spec in gen.BUILDS:
+    check("Downloader" in spec.apps,
+          f"{spec.key}: App Downloader предустановлен")
+    _t = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    check("App Downloader" in _t,
+          f"{spec.key}: App Downloader.exe попал в префаб спавнера")
+
+
+_sp = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
+    encoding="utf-8")
+
+# Вся сборка идёт за один кадр. Пауза 0.05 c на деталь давала 1.35 секунды
+# живой физики у флагмана — всё это время недособранная машина стояла в мире
+# и её мог задеть игрок, обломки ящика или собственная деталь.
+for spec in gen.BUILDS:
+    _t = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    _sd = re.search(r"stepDelay: ([-\d.e]+)", _t)
+    check(_sd is not None and abs(float(_sd.group(1))) < 1e-9,
+          f"{spec.key}: stepDelay = 0, сборка укладывается в один кадр")
+
+# Деталь до подключения — обычное физическое тело. Гасим её движение, иначе
+# она успевает отскочить от обломков ящика.
+check("spawnedBody.velocity = Vector3.zero" in _sp,
+      "скорость детали гасится до установки в слот")
+
+# Но кинематической деталь делать нельзя — это ломало FixedJoint и приём
+# в слот, проверено дважды.
+check("spawnedBody.isKinematic" not in _sp,
+      "деталь НЕ делается кинематической (это ломало приём в слот)")
+
+# Одна неудачная попытка не должна оставлять сборку неполной навсегда:
+# Slot.Start держит preparing целую секунду, и первая попытка может прийтись
+# ровно на это окно.
+check("attachRetries" in _sp, "у спавнера есть повтор попытки подключения")
+_slot_cs = (ROOT / "Assets/Scripts/Assembly-CSharp/Slot.cs").read_text(encoding="utf-8")
+check("WaitForSeconds(1f)" in _slot_cs,
+      "Slot.Start действительно держит preparing секунду — повтор оправдан")
+for spec in gen.BUILDS:
+    _t = (ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab").read_text(encoding="utf-8")
+    _ar = re.search(r"attachRetries: (\d+)", _t)
+    check(_ar is not None and int(_ar.group(1)) >= 5,
+          f"{spec.key}: повторов подключения хватит переждать preparing")
+
+# Неполная сборка обязана быть заметной, а не молча уезжать к игроку.
+check("сборка неполная" in _sp,
+      "спавнер сообщает, если часть деталей не встала")
+
+# ---------------------------------------------------------------------------
 print("\nГруз не сталкивается с обломками вскрытого ящика")
 
 _box_cs_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildBox.cs"

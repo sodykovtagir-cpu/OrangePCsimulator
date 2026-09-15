@@ -404,6 +404,12 @@ def miner_titan() -> List[PartRef]:
 # размер берутся из самого префаба (поля appName и size), как это делает
 # Installer. ОС восстанавливает список установленного из файлов на диске
 # (OperatingSystem.LoadFilesFromDisk), поэтому достаточно положить .exe.
+# App Downloader ставится ВЕЗДЕ: без него в системе нечем доустанавливать
+# программы, и предустановленный набор становится потолком возможностей.
+# В обычной игре его приносит мастер установки, а у готовых сборок мастера
+# нет — систему пишет спавнер, поэтому добавляем явно.
+BASE_APPS = ["Downloader"]
+
 APPS_BY_MODEL = {
     # Офисная машина: работа с текстом, документами и сетью.
     "Office": ["TextEditor", "LuaEditor", "Browser", "FileManager"],
@@ -479,7 +485,7 @@ def _make_builds() -> List[BuildSpec]:
                     page="Ready PC",
                     sprite_from=SPRITE_BY_CASE[case],
                     description=desc,
-                    apps=APPS_BY_MODEL.get(key, []),
+                    apps=BASE_APPS + APPS_BY_MODEL.get(key, []),
                 )
             )
     for key, title, desc, factory, case, sprite in MINER_MODELS:
@@ -492,7 +498,7 @@ def _make_builds() -> List[BuildSpec]:
                 page="Ready Miner",
                 sprite_from=sprite,
                 description=desc,
-                apps=APPS_BY_MODEL["Miner"],
+                apps=BASE_APPS + APPS_BY_MODEL["Miner"],
             )
         )
     return builds

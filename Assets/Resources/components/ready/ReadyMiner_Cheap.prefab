@@ -106,10 +106,12 @@ MonoBehaviour:
     order: 9
     slotTarget: RAM
     hostPrefabName: Mini_ITX
-  stepDelay: 0.05
+  stepDelay: 0
   destroyAfterBuild: 1
+  attachRetries: 20
   preinstallOS: 1
   preinstalledApps:
+  - App Downloader
   - Terminal
   - EZ Mining
   systemSize: 60000

@@ -1238,6 +1238,7 @@ BOOT_FILE_SIZE = 60000  # Installer.minimumSpace
 # них и иначе выталкивается вместе с видеокартами.
 READY_BOX_SCRIPT_GUID = "08b3f721008a46960d450c8ae0ba1816"
 
+ATTACH_RETRIES = 20
 BASE_MASS_FACTOR = 4.0
 BASE_MIN_MASS = 40.0
 BASE_SOLVER_ITERATIONS = 40
@@ -1469,7 +1470,11 @@ def write_spawner_prefab(
     base_prefab_guid: str,
     base_prefab_file_id: int,
     parts: List[dict],
-    step_delay: float = 0.05,
+    # Ноль: вся сборка укладывается в один кадр, и у физики не остаётся
+    # промежутка, чтобы толкнуть недособранную машину. Пауза была нужна
+    # "чтобы слоты успели обновиться", но Slot.TryAttach отрабатывает
+    # синхронно — ждать нечего.
+    step_delay: float = 0.0,
     apps: Optional[List[str]] = None,
     root_dir: str = ".",
 ) -> Tuple[str, int]:
@@ -1559,6 +1564,10 @@ def write_spawner_prefab(
         + parts_yaml
         + f"  stepDelay: {_f(step_delay)}\n"
         "  destroyAfterBuild: 1\n"
+        # Повтор попытки: Slot.Start держит preparing целую секунду, и первая
+        # попытка может прийтись ровно на это окно. Без повтора одна неудача
+        # оставляет сборку навсегда неполной.
+        f"  attachRetries: {ATTACH_RETRIES}\n"
         + ("  preinstallOS: 1\n" if apps else "  preinstallOS: 0\n")
         + _render_app_list(apps, root_dir)
         + f"  systemSize: {BOOT_FILE_SIZE}\n"

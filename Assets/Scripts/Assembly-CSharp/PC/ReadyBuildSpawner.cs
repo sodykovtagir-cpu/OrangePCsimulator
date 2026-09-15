@@ -77,8 +77,9 @@ namespace PC
 		private Part[] parts;
 
 		[SerializeField]
-		[Tooltip("Пауза между установками, чтобы слоты успели обновиться")]
-		private float stepDelay = 0.05f;
+		[Tooltip("Пауза между установками. Ноль — вся сборка за один кадр, " +
+			"физика не успевает ничего сломать")]
+		private float stepDelay;
 
 		[SerializeField]
 		[Tooltip("Предустановить PCOS на первый накопитель сборки")]
@@ -96,6 +97,11 @@ namespace PC
 		[SerializeField]
 		[Tooltip("Уничтожить пустышку-спавнер после сборки")]
 		private bool destroyAfterBuild = true;
+
+		[SerializeField]
+		[Tooltip("Сколько раз повторить попытку, если слот занят или ещё " +
+			"не готов: Slot.Start держит preparing целую секунду")]
+		private int attachRetries = 20;
 
 		[SerializeField]
 		[Tooltip("Во сколько раз основа должна быть тяжелее всей навески")]
@@ -215,6 +221,7 @@ namespace PC
 			// корпуса (её держит только FixedJoint) и её слоты недостижимы
 			// через GetComponentsInChildren от корпуса.
 			var hosts = new List<GameObject> { root };
+			int failed = 0;
 
 			if (parts != null)
 			{
@@ -230,6 +237,19 @@ namespace PC
 					var spawned = Instantiate(part.prefab, root.transform.position,
 						root.transform.rotation);
 
+					// Пока деталь не подключена, она обычное физическое тело:
+					// падает, отскакивает, сталкивается с обломками ящика и
+					// с уже собранным. Гасим её движение до установки — так
+					// у физики не остаётся ни одного кадра, чтобы разбросать
+					// детали. Кинематической НЕ делаем: это ломает приём в
+					// слот и FixedJoint (проверено дважды).
+					var spawnedBody = spawned.GetComponent<Rigidbody>();
+					if (spawnedBody != null)
+					{
+						spawnedBody.velocity = Vector3.zero;
+						spawnedBody.angularVelocity = Vector3.zero;
+					}
+
 					var item = spawned.GetComponent<Item>();
 					if (item == null)
 					{
@@ -240,11 +260,27 @@ namespace PC
 
 					if (!Attach(hosts, item, part.slotTarget))
 					{
-						Debug.LogWarning(
-							$"{name}: не нашлось слота '{part.slotTarget}' " +
-							$"для детали '{part.prefab.name}'");
-						Destroy(spawned);
-						continue;
+						// Слот мог быть ещё не готов: Slot.Start держит
+						// preparing целую секунду, а спавн ящика и обломков
+						// приходится ровно на это время. Даём физике кадр и
+						// пробуем ещё раз, прежде чем сдаться — иначе одна
+						// неудача оставляет сборку навсегда неполной.
+						bool attached = false;
+						for (int retry = 0; retry < attachRetries && !attached; retry++)
+						{
+							yield return new WaitForFixedUpdate();
+							attached = Attach(hosts, item, part.slotTarget);
+						}
+
+						if (!attached)
+						{
+							Debug.LogWarning(
+								$"{name}: не нашлось слота '{part.slotTarget}' " +
+								$"для детали '{part.prefab.name}'");
+							Destroy(spawned);
+							failed++;
+							continue;
+						}
 					}
 
 					// Деталь могла сама принести слоты (материнская плата),
@@ -274,6 +310,10 @@ namespace PC
 				}
 			}
 
+			// Даём физике один кадр на осадку уже соединённой связки, пока
+			// основа ещё кинематическая и ничего не может разъехаться.
+			yield return new WaitForFixedUpdate();
+
 			// Основу отпускаем только когда все детали на месте: дальше
 			// связка живёт обычной физикой и разбирается как всегда.
 			if (baseBody != null)
@@ -285,6 +325,13 @@ namespace PC
 			// Сборка закончена — возвращаем настоящие массы, иначе готовый
 			// майнер невозможно будет поднять и перенести.
 			RestoreMasses();
+
+			if (failed > 0)
+			{
+				Debug.LogError(
+					$"{name}: сборка неполная — не установлено деталей: {failed}. " +
+					"Остальное собрано и работоспособно.");
+			}
 
 			if (preinstallOS)
 				InstallSystem(hosts);

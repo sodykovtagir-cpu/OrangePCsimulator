@@ -124,10 +124,12 @@ MonoBehaviour:
     order: 12
     slotTarget: GPU
     hostPrefabName: ATX
-  stepDelay: 0.05
+  stepDelay: 0
   destroyAfterBuild: 1
+  attachRetries: 20
   preinstallOS: 1
   preinstalledApps:
+  - App Downloader
   - Text Editor
   - Browser
   - File Manager
