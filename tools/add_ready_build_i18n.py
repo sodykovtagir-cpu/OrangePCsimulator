@@ -55,18 +55,21 @@ NAMES = {
         "Máy đào dựng sẵn", "Έτοιμοι miner", "Гатовыя майнеры",
         "Hotové ťažobné stroje", "Färdiga miners", "ماینرهای آماده",
     ],
+    # Название-прозвище вместо сухого "Office PC" — выбран вариант A.
+    # По языкам подобран смысловой аналог "рабочей лошадки", а не калька:
+    # там, где такого разговорного слова нет, берётся ближайшее по духу
+    # ("труженик", "работник", "вьючная лошадка").
     "Office PC": [
-        "Office PC", "Irodai PC", "Kantoor-pc", "PC de oficina", "PC de birou",
-        "PC biurowy", "Kancelářské PC", "Kancelarijski PC", "PC de escritório",
-        "PC de escritório", "Kontoriarvuti", "PC de bureau", "PC de bureau",
-        "사무용 PC", "办公电脑", "辦公電腦", "Канцеларијски рачунар",
-        "Офисный ПК", "Ofis PC", "Toimistotietokone", "Офис компютър",
-        "Офісний ПК", "Büro-PC", "PC d'oficina", "PC da ufficio", "オフィスPC",
-        "Biuro kompiuteris", "حاسوب مكتبي", "Кеңсе ДК", "Kontor-PC",
-        "PC pang-opisina", "ऑफिस पीसी", "พีซีสำนักงาน", "PC kantor",
-        "საოფისე კომპიუტერი", "Biroja dators", "PC văn phòng",
-        "PC γραφείου", "Офісны ПК", "Kancelárske PC", "Kontorsdator",
-        "رایانه اداری",
+        "Workhorse", "Igásló", "Werkpaard", "Caballo de batalla",
+        "Cal de bătaie", "Koń roboczy", "Tahoun", "Radni konj",
+        "Cavalo de batalha", "Cavalo de batalha", "Veohobune",
+        "Cheval de trait", "Cheval de trait", "일꾼", "老黄牛", "老黃牛",
+        "Радни коњ", "Работяга", "İş beygiri", "Työjuhta", "Работяга",
+        "Роботяга", "Arbeitstier", "Cavall de batalla", "Cavallo da lavoro",
+        "働き者", "Darbinis arklys", "حصان العمل", "Жұмысқор",
+        "Arbeidshest", "Masipag", "मेहनती", "ม้างาน", "Kuda beban",
+        "შრომისმოყვარე", "Darba zirgs", "Ngựa thồ", "Εργάτης",
+        "Працаўнік", "Ťažný kôň", "Arbetshäst", "اسب بارکش",
     ],
     "Home PC": [
         "Home PC", "Otthoni PC", "Thuis-pc", "PC doméstico", "PC de acasă",
