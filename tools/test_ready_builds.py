@@ -651,6 +651,39 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nНазвания сборок переведены целиком")
+
+# Названия задаёт пользователь, и живут они только в Translate.txt — ключи
+# вида {Office PC} не меняются. Проверяем, что ни один язык не остался с
+# английской заглушкой и что строка TSV не поехала по колонкам.
+_tr_rows = [l.rstrip("\n").split("\t")
+            for l in (ROOT / "Assets/Resources/Translate.txt").read_text(
+                encoding="utf-8").splitlines() if l.strip()]
+_tr_width = len(_tr_rows[0])
+_tr = {r[0]: r for r in _tr_rows}
+
+_title_keys = set()
+for spec in gen.BUILDS:
+    for _k in re.findall(r"\{([^}]*)\}", spec.title):
+        _title_keys.add(_k)
+
+for _k in sorted(_title_keys):
+    check(_k in _tr, f"название '{_k}' есть в Translate.txt")
+    if _k not in _tr:
+        continue
+    check(len(_tr[_k]) == _tr_width,
+          f"'{_k}': строка не поехала по колонкам ({len(_tr[_k])} из {_tr_width})")
+    _vals = [v for v in _tr[_k][1:] if v.strip()]
+    check(len(_vals) == _tr_width - 1,
+          f"'{_k}': переведён на все языки, пустых нет")
+
+# Название и описание — разные вещи: в описании лежат характеристики, и
+# переименование не должно было их задеть.
+for spec in gen.BUILDS:
+    _d = spec.description
+    if _d in _tr:
+        check("/" in _tr[_d][1], f"'{_d}': описание осталось перечнем железа")
+
 print("\nДоски ручного ящика не превращаются в обычные")
 
 # При загрузке сейва SaveManager воссоздаёт предмет из Resources/Components/
