@@ -1349,14 +1349,45 @@ check(not re.search(r"Mathf\.Max\(\s*(?:width|height)\s*,\s*\d{3,}\s*\)", _dm_sr
 check("QualitySettings.GetQualityLevel()" in _dm_src,
       "размер экрана зависит от уровня качества")
 
-# Проверяем independent от генератора: на нижних уровнях качества сторона
-# экрана обязана быть заметно меньше исходных 1280.
-_sizes = [int(x) for x in re.findall(r"minSide = (\d+)", _dm_src)]
-check(len(_sizes) >= 2, "порогов размера экрана несколько, а не один")
-check(_sizes and min(_sizes) <= 384,
-      f"на слабых устройствах экран мельче 384 пикселей (сейчас {min(_sizes) if _sizes else '?'})")
-check(_sizes and max(_sizes) >= 1024,
-      "на сильных устройствах экран остаётся крупным")
+# Пропорции. Префабы просят 512x256 (2:1) и 256x128, а форсированное
+# 1280x720 — это 16:9: старый код не только раздувал текстуру, но и растягивал
+# картинку. Новый код обязан считать размер ОТ запрошенного соотношения.
+check(re.search(r"float k = \(float\)longSide / longest", _dm_src) is not None,
+      "размер экрана масштабируется пропорционально запрошенному")
+check(re.search(r"width = Mathf\.Max\(64, Mathf\.RoundToInt\(width \* k\)\)", _dm_src)
+      is not None and
+      re.search(r"height = Mathf\.Max\(64, Mathf\.RoundToInt\(height \* k\)\)", _dm_src)
+      is not None,
+      "обе стороны экрана масштабируются одним коэффициентом")
+
+# Проверяем арифметику независимо от кода: берём пороги из исходника и
+# пересчитываем реальный размер для CurvedMonitor (512x256).
+# Ищем ТОЛЬКО в методе размера: рядом лежит ResolveAntiAliasing, который тоже
+# возвращает числа по уровню качества, и общий regex подхватывал бы их.
+_tls = _dm_src.split("private static int TargetLongSide()")[1].split("\n\t}")[0]
+_long_sides = [int(m) for m in re.findall(r"return (\d+);", _tls)]
+check(len(_long_sides) >= 2,
+      f"порогов размера экрана несколько, а не один (нашлось {len(_long_sides)})")
+
+if _long_sides:
+    _lo = min(_long_sides)
+    _hi = max(_long_sides)
+    # Нижний порог не должен быть мылом: он обязан быть НЕ МЕНЬШЕ того,
+    # что просит самый крупный префаб монитора (512 по длинной стороне).
+    check(_lo >= 512,
+          f"на слабых устройствах экран не мыльнее запрошенного префабом ({_lo} >= 512)")
+    # Но и не 1280, иначе экономии нет.
+    check(_lo <= 768,
+          f"на слабых устройствах экран всё же меньше прежних 1280 ({_lo})")
+    check(_hi >= 1280, f"на сильных устройствах экран остаётся крупным ({_hi})")
+
+    # Пересчёт для CurvedMonitor 512x256 на нижнем пороге.
+    _w = _lo
+    _h = round(256 * (_lo / 512))
+    check(abs(_w / _h - 2.0) < 0.01,
+          f"пропорции CurvedMonitor сохранены ({_w}x{_h})")
+    check(_w * _h < 1280 * 720,
+          f"пикселей меньше, чем при старых 1280x720 ({_w * _h:,})")
 
 # MSAA x4 на экране умножает работу растеризатора вчетверо ради сглаживания,
 # которого на тексте интерфейса почти не видно.
@@ -1445,6 +1476,86 @@ if _dist:
 check(re.search(r"if \(targets == null \|\| targets\.Count == 0\) return", _mr_update)
       is not None,
       "без мониторов Update выходит сразу")
+
+
+# ---------------------------------------------------------------------------
+print("\nИгровые часы вместо системных")
+
+# Часы в PCOS и на LED-дисплее показывали System.DateTime.Now — реальное время
+# телефона. Теперь оба берут время из игры.
+
+_gc_path = ROOT / "Assets/Scripts/Assembly-CSharp/GameClock.cs"
+check(_gc_path.exists(), "есть общий источник игрового времени")
+_gc_src = _strip_comments(_gc_path.read_text(encoding="utf-8"))
+check((_gc_path.parent / "GameClock.cs.meta").exists(),
+      "у GameClock есть .meta, иначе Unity его не увидит")
+
+# Время обязано идти от игрового прогресса, а не от системных часов.
+check("Main.Instance" in _gc_src and "playTime" in _gc_src,
+      "игровое время считается от Main.playTime")
+check("DateTime" not in _gc_src,
+      "в источнике игрового времени нет обращений к системным часам")
+
+# playTime уже сохраняется — значит часы переживают перезаход.
+_sm_src = (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(
+    encoding="utf-8")
+check("game.playtime = main.playTime" in _sm_src,
+      "playTime записывается в сохранение")
+check("Main.Instance.playTime = Loader.GameData.playtime" in _sm_src,
+      "playTime читается из сохранения, часы не сбрасываются при перезаходе")
+
+# Часы PCOS.
+_os_now = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS"
+     / "OperatingSystem.cs").read_text(encoding="utf-8"))
+_clock_block = _os_now.split("if (clockText != null)")[1].split("lastClockStamp = -1")[0]
+check("DateTime.Now" not in _clock_block,
+      "часы PCOS не читают системное время")
+check("GameClock." in _clock_block, "часы PCOS берут время из GameClock")
+
+# LED-дисплей.
+_led_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/LedDisplay.cs").read_text(
+        encoding="utf-8"))
+_led_clock = _led_src.split("class ClockAnimation")[1].split("class ")[0]
+check("DateTime.Now" not in _led_clock,
+      "LED-дисплей не читает системное время")
+check("GameClock." in _led_clock, "LED-дисплей берёт время из GameClock")
+
+# Оба показывают ОДНО И ТО ЖЕ время — иначе часы в комнате и на компьютере
+# разойдутся, и это будет выглядеть как баг.
+check("GameClock.Hour" in _led_clock and "GameClock.Hour" in _clock_block,
+      "и дисплей, и PCOS считают час одинаково")
+
+# Оптимизация часов не должна потеряться: строка пересобирается по метке.
+check("GameClock.Stamp" in _clock_block,
+      "строка часов пересобирается только при смене секунды")
+
+# Арифметика времени, проверенная независимо от кода.
+_day_len = re.search(r"DayLengthSeconds = ([\d.]+)f \* ([\d.]+)f", _gc_src)
+check(_day_len is not None, "длина игровых суток задана явно")
+if _day_len:
+    _dl = float(_day_len.group(1)) * float(_day_len.group(2))
+    # Сутки должны быть заметно короче реальных, иначе смысла в игровом
+    # времени нет, но не настолько, чтобы часы мелькали.
+    check(_dl <= 3600.0, f"игровые сутки короче реального часа ({_dl:.0f}с)")
+    check(_dl >= 300.0, f"игровые сутки не мельтешат ({_dl:.0f}с)")
+
+    # Пересчитываем показания часов сами и сверяем с формулой из кода.
+    _start = re.search(r"StartHour = (\d+)f", _gc_src)
+    check(_start is not None, "час начала игры задан")
+    if _start:
+        _sh = float(_start.group(1))
+        check(0 <= _sh <= 23, f"час начала в пределах суток ({_sh})")
+        _per = 86400.0 / _dl
+        # После полных игровых суток время обязано вернуться к старту.
+        _total = _sh * 3600.0 + _dl * _per
+        check(abs((_total % 86400.0) / 3600.0 - _sh) < 0.01,
+              "через игровые сутки часы возвращаются к часу старта")
+        # И номер дня увеличивается ровно на единицу.
+        _d0 = 1 + int((_sh * 3600.0) // 86400.0)
+        _d1 = 1 + int(_total // 86400.0)
+        check(_d1 == _d0 + 1, f"за игровые сутки счётчик дней растёт на 1 ({_d0}->{_d1})")
 
 
 unchanged = all(

@@ -115,8 +115,11 @@ public class LedDisplay : Device
 
 		public override void Refresh()
 		{
-			var now = System.DateTime.Now;
-			NumericDisplay(now.Minute * 100 + now.Second, 4);
+			// Игровое время, а не время телефона: тот же источник, что и у
+			// часов в PCOS, поэтому показания всегда совпадают.
+			// Показываем часы и минуты — на этом дисплее время суток
+			// полезнее, чем бегущие секунды.
+			NumericDisplay(GameClock.Hour * 100 + GameClock.Minute, 4);
 		}
 	}
 

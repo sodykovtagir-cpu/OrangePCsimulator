@@ -2115,15 +2115,18 @@ namespace PC.Component.Software.OS
                 // Теперь строка пересобирается только когда сменилась
                 // секунда, и без интерполяции: из заранее нарезанных двух
                 // символов на число. Экономия — 59 из 60 кадров.
-                var now = System.DateTime.Now;
-                int stamp = now.Hour * 3600 + now.Minute * 60 + now.Second;
+                // Время берётся не с телефона, а из игры: GameClock считает
+                // его от Main.playTime, которое идёт только пока игрок играет
+                // и сохраняется вместе с прогрессом. Часы на компьютере
+                // показывают то же время, что и LED-дисплей в комнате.
+                int stamp = GameClock.Stamp;
                 if (stamp != lastClockStamp)
                 {
                     lastClockStamp = stamp;
                     clockText.text = string.Concat(
-                        TwoDigits(now.Hour), ":",
-                        TwoDigits(now.Minute), ":",
-                        TwoDigits(now.Second));
+                        TwoDigits(GameClock.Hour), ":",
+                        TwoDigits(GameClock.Minute), ":",
+                        TwoDigits(GameClock.Second));
                 }
             }
         }
