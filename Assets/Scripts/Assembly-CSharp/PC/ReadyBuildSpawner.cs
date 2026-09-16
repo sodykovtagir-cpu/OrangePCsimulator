@@ -120,6 +120,14 @@ namespace PC
 		{
 			public Rigidbody body;
 			public float mass;
+
+			// Solver 40 против штатных 6 и ContinuousDynamic нужны только
+			// на время сборки. Если оставить их навсегда, каждый купленный
+			// ПК до конца партии считается в разы дороже штатного — на
+			// слабом телефоне это заметно проседающий FPS.
+			public int solver;
+			public int solverVelocity;
+			public CollisionDetectionMode collision;
 		}
 
 		private readonly List<MassBackup> restoreMass = new List<MassBackup>();
@@ -188,16 +196,23 @@ namespace PC
 			{
 				baseWasKinematic = baseBody.isKinematic;
 
+				// Запоминаем ВСЁ, что собираемся менять, и делаем это
+				// безусловно. Раньше запись в restoreMass стояла внутри
+				// проверки массы: если масса уже была достаточной, солвер и
+				// режим коллизий менялись, но в бэкап не попадали — и
+				// оставались задранными навсегда.
+				restoreMass.Add(new MassBackup
+				{
+					body = baseBody,
+					mass = baseBody.mass,
+					solver = baseBody.solverIterations,
+					solverVelocity = baseBody.solverVelocityIterations,
+					collision = baseBody.collisionDetectionMode,
+				});
+
 				float wanted = Mathf.Max(minBaseMass, partsMass * baseMassFactor);
 				if (baseBody.mass < wanted)
-				{
-					restoreMass.Add(new MassBackup
-					{
-						body = baseBody,
-						mass = baseBody.mass,
-					});
 					baseBody.mass = wanted;
-				}
 
 				if (baseBody.solverIterations < baseSolverIterations)
 					baseBody.solverIterations = baseSolverIterations;
@@ -205,7 +220,8 @@ namespace PC
 					baseBody.solverVelocityIterations = baseSolverIterations;
 
 				// Непрерывная проверка столкновений: тяжёлая рама на скорости
-				// иначе проскакивает сквозь пол.
+				// иначе проскакивает сквозь пол. Режим дорогой, поэтому он
+				// тоже только на время сборки.
 				baseBody.collisionDetectionMode =
 					CollisionDetectionMode.ContinuousDynamic;
 
@@ -447,7 +463,23 @@ namespace PC
 				backup.body.angularVelocity = Vector3.zero;
 
 				backup.body.mass = backup.mass;
-				backup.body.WakeUp();
+
+				// Возвращаем и стоимость расчёта: solver 40 и
+				// ContinuousDynamic нужны были только на время сборки, а
+				// платит за них каждый кадр до конца партии.
+				backup.body.solverIterations = backup.solver;
+				backup.body.solverVelocityIterations = backup.solverVelocity;
+				backup.body.collisionDetectionMode = backup.collision;
+
+				// Раньше здесь стоял WakeUp(). Он нужен был, чтобы тело
+				// заметило новую массу, но заодно поднимал всю связку на
+				// ноги: разбуженный Rigidbody считается физикой до тех пор,
+				// пока сам не успокоится. У флагмана это 28 тел сразу.
+				//
+				// Скорости уже обнулены строкой выше, деталь стоит в слоте и
+				// держится FixedJoint — будить её незачем. Пусть засыпает:
+				// спящие тела PhysX не считает вовсе.
+				backup.body.Sleep();
 			}
 			restoreMass.Clear();
 		}
@@ -476,6 +508,18 @@ namespace PC
 			// висит на единственном джойнте, и лишняя масса только рвёт его.
 			// Решателю итерации добавить можно: они ничего не утяжеляют,
 			// а длинную цепочку рама -> плата -> процессор считают точнее.
+			//
+			// Но и они временные: сорок итераций против штатных шести стоят
+			// процессорного времени каждый кадр, пока предмет существует.
+			restoreMass.Add(new MassBackup
+			{
+				body = body,
+				mass = body.mass,
+				solver = body.solverIterations,
+				solverVelocity = body.solverVelocityIterations,
+				collision = body.collisionDetectionMode,
+			});
+
 			if (body.solverIterations < baseSolverIterations)
 				body.solverIterations = baseSolverIterations;
 			if (body.solverVelocityIterations < baseSolverIterations)

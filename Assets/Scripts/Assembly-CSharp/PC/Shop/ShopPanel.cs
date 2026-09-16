@@ -54,6 +54,16 @@ namespace PC.Shop
 
             contents = new Page[component.pages.Length];
 
+            // Раньше здесь создавались карточки ВСЕХ страниц сразу: 136 товаров
+            // по восемь объектов в каждой карточке — больше тысячи UI-объектов
+            // за один кадр, плюс Instantiate, GetComponentInChildren и разбор
+            // локализации на каждый. На слабом телефоне это и есть подвисание
+            // при открытии магазина.
+            //
+            // Теперь в Awake делается только меню сверху: кнопки страниц лёгкие
+            // и нужны сразу. Сами карточки страница строит при первом показе,
+            // то есть максимум 22 штуки вместо 136, и только те, что игрок
+            // действительно открыл.
             for (int i = 0; i < component.pages.Length; i++)
             {
                 var pageGo = Instantiate(pagePrefab, pageParent);
@@ -76,21 +86,38 @@ namespace PC.Shop
                     menuBtn.onClick.AddListener(() => DisplayPage(pageIndex));
                 }
 
-                var items = component.pages[i].item;
-                if (items != null)
-                {
-                    contents[i].graphics = new ShopUI[items.Length];
-                    var parent = pageGo != null ? pageGo.transform : null;
-                    for (int j = 0; j < items.Length; j++)
-                    {
-                        var ui = Instantiate(selectionPrefab, parent);
-                        ui.Init(items[j]);
-                        if (m != null) ui.OnBuy += m.Buy;
-                        contents[i].graphics[j] = ui;
-                    }
-                }
-
                 if (pageGo != null) pageGo.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Создать карточки товаров страницы, если они ещё не созданы.
+        /// </summary>
+        private void BuildPage(int index)
+        {
+            if (contents == null || index < 0 || index >= contents.Length) return;
+            if (contents[index].graphics != null) return;
+            if (component == null || component.pages == null) return;
+            if (index >= component.pages.Length) return;
+
+            var items = component.pages[index].item;
+            if (items == null)
+            {
+                contents[index].graphics = new ShopUI[0];
+                return;
+            }
+
+            var m = Main.Instance;
+            var pageGo = contents[index].page;
+            var parent = pageGo != null ? pageGo.transform : null;
+
+            contents[index].graphics = new ShopUI[items.Length];
+            for (int j = 0; j < items.Length; j++)
+            {
+                var ui = Instantiate(selectionPrefab, parent);
+                ui.Init(items[j]);
+                if (m != null) ui.OnBuy += m.Buy;
+                contents[index].graphics[j] = ui;
             }
         }
 
@@ -100,6 +127,8 @@ namespace PC.Shop
             if (m == null) return;
             m.StopAllControl();
             RefreshMenuTexts();
+            // Страница, на которой магазин закрыли, могла быть ещё не создана.
+            BuildPage(selectedPage);
             UpdatePage();
             var ads = AdManager.Instance;
             if (ads != null) ads.HideBanner(true);
@@ -133,6 +162,7 @@ namespace PC.Shop
                 if (go == null) continue;
 
                 bool active = i == index;
+                if (active) BuildPage(i);
                 go.SetActive(active);
 
                 if (active && scroll != null)

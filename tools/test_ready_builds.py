@@ -651,6 +651,82 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nПроизводительность: ничего дорогого не остаётся навсегда")
+
+_sp_perf = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(
+    encoding="utf-8")
+
+# Solver 40 против штатных 6 и ContinuousDynamic — самый дорогой режим
+# коллизий. Нужны на время сборки, но если оставить их навсегда, каждый
+# купленный ПК до конца партии считается в разы дороже штатного. На слабом
+# телефоне это заметно проседающий FPS.
+_dyn = (ROOT / "ProjectSettings/DynamicsManager.asset").read_text(encoding="utf-8")
+_default_solver = int(re.search(r"m_DefaultSolverIterations: (\d+)", _dyn).group(1))
+_used_solver = int(re.search(r"baseSolverIterations = (\d+)", _sp_perf).group(1))
+check(_used_solver > _default_solver,
+      f"солвер сборки ({_used_solver}) выше штатного ({_default_solver}) — "
+      "потому и обязан возвращаться")
+
+check("public int solver;" in _sp_perf,
+      "в бэкапе есть поле для итераций решателя")
+check("public CollisionDetectionMode collision;" in _sp_perf,
+      "в бэкапе есть поле для режима коллизий")
+check("solverIterations = backup.solver" in _sp_perf,
+      "итерации решателя возвращаются к исходным")
+check("collisionDetectionMode = backup.collision" in _sp_perf,
+      "режим коллизий возвращается к исходному")
+
+# Бэкап обязан писаться БЕЗУСЛОВНО. Раньше запись стояла внутри проверки
+# массы: если масса уже была достаточной, солвер менялся, но в бэкап не
+# попадал — и оставался задранным навсегда.
+_base_block = _sp_perf.split("var baseBody = root.GetComponent<Rigidbody>();")[1]
+_base_block = _base_block.split("yield return null;")[0]
+# Проверять один лишь порядок мало: условие можно навесить прямо на саму
+# строку Add, и порядок останется прежним. Требуем, чтобы Add начинался с
+# начала строки без всякого if.
+_add_line = None
+for _ln in _base_block.splitlines():
+    if "restoreMass.Add" in _ln:
+        _add_line = _ln.strip()
+        break
+check(_add_line is not None and _add_line.startswith("restoreMass.Add"),
+      f"бэкап основы пишется безусловно (строка: {_add_line!r})")
+
+_add_at = _base_block.find("restoreMass.Add")
+_if_at = _base_block.find("if (baseBody.mass < wanted)")
+check(_add_at != -1 and _if_at != -1 and _add_at < _if_at,
+      "бэкап основы пишется ДО проверки массы, а не внутри неё")
+
+# Готовый ПК должен засыпать: спящие тела PhysX не считает. У флагмана это
+# 28 Rigidbody, которые иначе крутятся в расчёте до самоуспокоения.
+_restore = _sp_perf.split("private void RestoreMasses()")[1].split("private void")[0]
+check(".Sleep()" in _restore,
+      "после сборки тела усыпляются, а не будятся")
+check(".WakeUp()" not in _restore,
+      "WakeUp в RestoreMasses больше нет — он мешал связке заснуть")
+
+# Магазин: карточки строятся по требованию, а не все разом.
+_panel = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Shop/ShopPanel.cs").read_text(
+    encoding="utf-8")
+check("private void BuildPage(int index)" in _panel,
+      "у панели магазина есть отложенная сборка страницы")
+_awake = _panel.split("private void Awake()")[1].split("private void BuildPage")[0]
+check("ui.Init(" not in _awake and "selectionPrefab" not in _awake,
+      "Awake магазина больше не создаёт карточки всех страниц")
+check("BuildPage(i)" in _panel or "BuildPage(index)" in _panel,
+      "страница строится при показе")
+
+# Сколько карточек это экономит на старте — считаем по реальному Shop.asset.
+_shop_txt = (ROOT / "Assets/MonoBehaviour/Shop.asset").read_text(encoding="utf-8")
+_pages = re.split(r"- pageName: ", _shop_txt)[1:]
+_counts = [len(re.findall(r"\{fileID: -?\d+, guid: [0-9a-f]{32}, type: 2\}", b))
+           for b in _pages]
+_total_cards = sum(_counts)
+_worst_page = max(_counts) if _counts else 0
+check(_total_cards > _worst_page * 2,
+      f"отложенная сборка экономит: {_total_cards} карточек разом против "
+      f"{_worst_page} на самой большой странице")
+
 print("\nНазвания сборок переведены целиком")
 
 # Названия задаёт пользователь, и живут они только в Translate.txt — ключи
@@ -861,12 +937,22 @@ check("hostPrefabName" in _spawner_src,
 # и плата срывается вместе с процессором и кулером.
 _stab_body = _spawner_src.split("private void StabilizeHost")[1].split(
     "private bool Attach")[0]
-check("body.mass" not in _stab_body,
-      "StabilizeHost НЕ трогает массу детали-опоры (плату это срывало)")
+# Массу опоры менять нельзя, но ЗАПОМНИТЬ её в бэкапе нужно: там же лежат
+# итерации решателя, которые StabilizeHost поднимает и обязан вернуть.
+# Поэтому ищем не упоминание body.mass вообще, а именно присваивание.
+check(not re.search(r"body\.mass\s*=", _stab_body),
+      "StabilizeHost НЕ меняет массу детали-опоры (плату это срывало)")
+check("mass = body.mass" in _stab_body,
+      "но исходную массу опоры он запоминает вместе с остальной физикой")
 check("solverIterations" in _stab_body,
       "StabilizeHost всё же поднимает итерации решателя — они ничего не весят")
-check(_spawner_src.count("restoreMass.Add") == 1,
-      "запоминается масса только основы — больше никого не утяжеляем")
+# Бэкапов теперь два: основа и опора. Опору не утяжеляем, но ей поднимают
+# итерации решателя — значит и её нужно вернуть в исходное состояние.
+check(_spawner_src.count("restoreMass.Add") == 2,
+      "бэкап пишется и для основы, и для опоры (солвер возвращают обоим)")
+_mass_writes = re.findall(r"^\s*(?:base)?[Bb]ody\.mass\s*=", _spawner_src, re.M)
+check(len(_mass_writes) == 1,
+      f"массу меняем ровно в одном месте — только основе (нашлось {len(_mass_writes)})")
 
 # Плата и всё, что стоит на ней, ставятся ПОСЛЕДНИМИ: иначе каждая из
 # шестнадцати видеокарт трясёт раму, и удар приходится по единственному
