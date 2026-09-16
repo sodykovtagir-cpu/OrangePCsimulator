@@ -488,14 +488,15 @@ MINER_MODELS = [
      "Miner", "Miner"),
     ("Titan", "{Titan Miner}", "Titan Miner Description", miner_titan,
      "Miner", "Miner"),
+    # Компактная ферма на тех же RTX 5090, но на обычной раме: восемь карт
+    # вместо шестнадцати. Стоит сразу после Titan — это последняя сборка на
+    # обычной раме, дальше идут большие.
+    ("Compact5090", "{Compact 5090 Miner}", "Compact 5090 Miner Description",
+     miner_5090_small, "Miner", "Miner"),
     ("Ultra", "{Ultra Miner}", "Ultra Miner Description", miner_ultra,
      "BigMiner", "Big Miner"),
     ("RTX5090", "{Flagship Miner}", "Flagship Miner Description", miner_5090,
      "BigMiner", "Big Miner"),
-    # Компактная ферма на тех же RTX 5090, но на обычной раме: восемь карт
-    # вместо шестнадцати.
-    ("Compact5090", "{Compact 5090 Miner}", "Compact 5090 Miner Description",
-     miner_5090_small, "Miner", "Miner"),
 ]
 
 

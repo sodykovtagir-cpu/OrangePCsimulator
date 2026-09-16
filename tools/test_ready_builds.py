@@ -651,6 +651,43 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nДоски ручного ящика не превращаются в обычные")
+
+# При загрузке сейва SaveManager воссоздаёт предмет из Resources/Components/
+# по его spawnId. Доски ручного ящика BigMiner несли spawnId "Part".."Part_5"
+# — те же, что у обычного ящика, — и после перезахода игра подставляла им
+# ОБЫЧНЫЕ доски: коробка теряла блендер-геометрию.
+_bm_tpl = (ROOT / gen.COMP / "Crate_BigMiner.prefab").read_text(encoding="utf-8")
+_bm_ids = re.findall(r"spawnId: (.*)", _bm_tpl)
+_bm_planks = [i.strip() for i in _bm_ids if i.strip().startswith(("Part", "BigMinerPart"))]
+check(_bm_planks and all(i.startswith("BigMinerPart") for i in _bm_planks),
+      "у досок ручного ящика собственные spawnId, а не общие Part*")
+
+# Каждому spawnId обязан соответствовать префаб в Resources/Components,
+# иначе SaveManager пишет "Prefab of ... not found!" и доска пропадает.
+for _sid in _bm_planks:
+    check((ROOT / gen.COMP / f"{_sid}.prefab").exists(),
+          f"префаб {_sid}.prefab существует — SaveManager его найдёт")
+    _pl = (ROOT / gen.COMP / f"{_sid}.prefab").read_text(encoding="utf-8")
+    check(f"spawnId: {_sid}" in _pl,
+          f"{_sid}: spawnId внутри префаба совпадает с именем файла")
+
+# Геометрия досок — из блендер-модели, а не от обычного ящика.
+_fbx_guid = re.search(
+    r"guid: ([0-9a-f]{32})",
+    (ROOT / gen.COMP / "box for bigminer.fbx.meta").read_text(encoding="utf-8")).group(1)
+for _sid in _bm_planks:
+    _pl = (ROOT / gen.COMP / f"{_sid}.prefab").read_text(encoding="utf-8")
+    check(_fbx_guid in _pl, f"{_sid}: меш взят из блендер-модели")
+
+# А у обычных ящиков доски остаются обычными — их трогать не надо.
+for spec in gen.BUILDS:
+    if os.path.basename(spec.case)[:-len(".prefab")] in gen.CRATE_READY_MADE:
+        continue
+    _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
+    check("BigMinerPart" not in _ct,
+          f"{spec.key}: обычный ящик не тянет доски от большой коробки")
+
 print("\nСборка устойчива к помехам")
 
 # App Downloader обязан быть на каждой машине: без него систему нечем

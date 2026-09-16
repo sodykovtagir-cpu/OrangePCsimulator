@@ -557,7 +557,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part
+  spawnId: BigMinerPart
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
@@ -668,7 +668,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part_1
+  spawnId: BigMinerPart_1
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
@@ -779,7 +779,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part_2
+  spawnId: BigMinerPart_2
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
@@ -890,7 +890,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part_3
+  spawnId: BigMinerPart_3
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
@@ -1001,7 +1001,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part_4
+  spawnId: BigMinerPart_4
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
@@ -1112,7 +1112,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: Part_5
+  spawnId: BigMinerPart_5
   info:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
