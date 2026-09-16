@@ -2104,9 +2104,50 @@ namespace PC.Component.Software.OS
 
             if (clockText != null)
             {
+                // Часы показывают секунды, но Update вызывается 60 раз в
+                // секунду. Раньше строка собиралась каждый кадр: интерполяция
+                // $"{...}" — это boxing трёх int, три подстроки и склейка,
+                // то есть мусор в куче на каждый кадр КАЖДОГО компьютера в
+                // мире. Десяток включённых машин давал тысячи аллокаций в
+                // секунду, а на слабом Android каждая сборка мусора — это
+                // видимый фриз.
+                //
+                // Теперь строка пересобирается только когда сменилась
+                // секунда, и без интерполяции: из заранее нарезанных двух
+                // символов на число. Экономия — 59 из 60 кадров.
                 var now = System.DateTime.Now;
-                clockText.text = $"{now.Hour:00}:{now.Minute:00}:{now.Second:00}";
+                int stamp = now.Hour * 3600 + now.Minute * 60 + now.Second;
+                if (stamp != lastClockStamp)
+                {
+                    lastClockStamp = stamp;
+                    clockText.text = string.Concat(
+                        TwoDigits(now.Hour), ":",
+                        TwoDigits(now.Minute), ":",
+                        TwoDigits(now.Second));
+                }
             }
+        }
+
+        // Секунда меняется раз в 60 кадров — запоминаем, что уже показано.
+        private int lastClockStamp = -1;
+
+        // Готовые строки "00".."59": числа в часах не выходят за этот предел,
+        // поэтому ToString() и его аллокация не нужны вовсе.
+        private static readonly string[] twoDigitCache = CreateTwoDigits();
+
+        private static string[] CreateTwoDigits()
+        {
+            var table = new string[60];
+            for (int i = 0; i < table.Length; i++)
+                table[i] = i < 10 ? "0" + i : i.ToString();
+            return table;
+        }
+
+        private static string TwoDigits(int value)
+        {
+            if (value >= 0 && value < twoDigitCache.Length)
+                return twoDigitCache[value];
+            return value < 10 ? "0" + value : value.ToString();
         }
 
         private void ToggleStartMenu()

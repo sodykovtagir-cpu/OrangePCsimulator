@@ -651,6 +651,54 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nПроизводительность: нет мусора в каждом кадре")
+
+# Жалобы: 20 FPS на Huawei Nova y91 и Redmi 10X, бэкенд пометил игру как
+# power-hungry. Это нагрузка на процессор, а не на видео: на низких
+# настройках тени уже выключены.
+
+# Часы ОС собирали строку КАЖДЫЙ кадр ради значения, которое меняется раз в
+# секунду. Интерполяция $"{x:00}" — это boxing трёх int плюс склейка, то есть
+# мусор в куче на каждый кадр каждого компьютера в мире.
+_os_src = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS"
+           / "OperatingSystem.cs").read_text(encoding="utf-8")
+_os_update = _os_src.split("void Update()")[1].split("private int lastClockStamp")[0]
+# Комментарии выкидываем: объяснение "$" внутри текста — не вызов.
+_os_code = "\n".join(l for l in _os_update.splitlines()
+                     if not l.strip().startswith("//"))
+check("$\"" not in _os_code,
+      "часы ОС не собирают интерполированную строку каждый кадр")
+check("lastClockStamp" in _os_update,
+      "часы обновляются только при смене секунды")
+check("twoDigitCache" in _os_src,
+      "двузначные числа берутся из готовой таблицы, без ToString в кадре")
+
+# Поле ввода каждый кадр склеивало имя каретки и звало Transform.Find.
+# Для поля, которого игрок не касался, это продолжалось всю партию.
+_ifm = (ROOT / "Assets/Scripts/Assembly-CSharp/InputFieldMod.cs").read_text(
+    encoding="utf-8")
+_ifm_update = _ifm.split("private void Update()")[1]
+check("cachedCaretName" in _ifm_update,
+      "имя каретки считается один раз, а не каждый кадр")
+check("childCount == 0" in _ifm_update,
+      "пока у поля нет детей, Find не вызывается вовсе")
+check('+ " Input Caret"' not in _ifm_update.split("cachedCaretName == null")[-1][:200]
+      or _ifm_update.count('+ " Input Caret"') == 1,
+      "строка имени склеивается максимум один раз за жизнь поля")
+
+# Спираль смерти физики: Maximum Allowed Timestep задаёт, сколько шагов
+# физики Unity разрешает догнать за один кадр. При 0.333 и шаге 0.02 это до
+# 16 шагов подряд — чем медленнее устройство, тем больше работы, тем
+# медленнее кадр.
+_time = (ROOT / "ProjectSettings/TimeManager.asset").read_text(encoding="utf-8")
+_fixed = float(re.search(r"Fixed Timestep: ([\d.]+)", _time).group(1))
+_maxstep = float(re.search(r"Maximum Allowed Timestep: ([\d.]+)", _time).group(1))
+_catchup = _maxstep / _fixed
+check(_catchup <= 5.0,
+      f"физика догоняет максимум {_catchup:.0f} шагов за кадр — нет спирали смерти")
+check(_maxstep >= _fixed * 2,
+      "но запас на догон остаётся: физика не встаёт при просадке")
+
 print("\nПроизводительность: ничего дорогого не остаётся навсегда")
 
 _sp_perf = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs").read_text(

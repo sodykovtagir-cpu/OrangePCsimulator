@@ -74,6 +74,9 @@ public class InputFieldMod : UIBehaviour
 		onChange.AddListener(ResizeInput);
 	}
 
+	// Имя каретки постоянно — склеивать его каждый кадр незачем.
+	private string cachedCaretName;
+
 	private void Update()
 	{
 		if (caret != null) return;
@@ -85,8 +88,21 @@ public class InputFieldMod : UIBehaviour
 		var selfTransform = input.transform;
 		if (root == null || selfTransform == null) return;
 
-		var caretName = selfTransform.name + " Input Caret";
-		var caretTransform = root.Find(caretName);
+		// Каретку Unity создаёт только когда поле получает фокус. Пока этого
+		// не произошло, метод раньше каждый кадр склеивал строку имени и звал
+		// Transform.Find — то есть искал по всем детям по имени, выделяя мусор.
+		// Для поля, которого игрок ни разу не коснулся, это продолжалось всю
+		// партию.
+		//
+		// Имя каретки не меняется — считаем его один раз. А Find зовём только
+		// когда у поля вообще есть дети: без фокуса их ноль, и проверка стоит
+		// одно сравнение вместо поиска.
+		if (root.childCount == 0) return;
+
+		if (cachedCaretName == null)
+			cachedCaretName = selfTransform.name + " Input Caret";
+
+		var caretTransform = root.Find(cachedCaretName);
 		if (caretTransform == null) return;
 
 		var graphic = caretTransform.GetComponent<Graphic>();
