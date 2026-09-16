@@ -577,24 +577,42 @@ for spec in gen.BUILDS:
           f"({_d.groups() if _d else None} vs {_m.groups() if _m else None})")
 
 # ---------------------------------------------------------------------------
-print("\nЯщик масштабируется только равномерно")
+print("\nСтенки ящика подогнаны под груз")
 
-# Регресс: я растягивал ящик по осям под габарит сборки (1.61, 2.6, 1) — и
-# физика поехала. Ящик собран из семи отдельных Rigidbody-стенок; при
-# неравномерном масштабе их коллайдеры меняли видимый размер при смене
-# ракурса, проваливались внутрь рамы майнера и выталкивали видеокарты.
-#
-# Равномерный масштаб Unity обрабатывает корректно, поэтому размер коробки
-# под раму BigMiner подогнан именно так — иначе она выглядит втрое меньше
-# своего груза.
+# Неравномерный масштаб когда-то поехал, и запрет казался оправданным. Но
+# ломался не тот объект: семь Rigidbody-стенок — это BrokenCrate, груда
+# обломков ПОСЛЕ удара молотком. Целый ящик, который едет к игроку, это один
+# объект с пятью BoxCollider'ами, и вращение у всех его узлов единичное — а
+# при единичном вращении оси коллайдера совпадают с осями меша, и растяжение
+# по осям их не перекашивает.
+_crate_src = (ROOT / "Assets/Resources/components/Crate.prefab").read_text(
+    encoding="utf-8")
+check(_crate_src.count("--- !u!4 &") == 1,
+      "целый ящик — ОДИН Transform, а не семь Rigidbody-стенок")
+check(_crate_src.count("--- !u!65 &") == 5,
+      "у целого ящика пять BoxCollider'ов")
+check("m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}" in _crate_src,
+      "вращение ящика единичное — растяжение по осям безопасно")
+
 for spec in gen.BUILDS:
     _crate_rel = f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab"
     _scale = root_scale(_crate_rel, str(ROOT))
-    check(abs(_scale[0] - _scale[1]) < 1e-9 and abs(_scale[1] - _scale[2]) < 1e-9,
-          f"{spec.key}: масштаб ящика равномерный "
-          f"(scale={tuple(round(v, 2) for v in _scale)})")
-    check(_scale[0] >= 1.0 - 1e-9,
-          f"{spec.key}: ящик не ужимается (scale={_scale[0]:.2f})")
+    for _ax, _v in zip("xyz", _scale):
+        check(_v >= 1.0 - 1e-9,
+              f"{spec.key}: ящик не ужимается по {_ax} ({_v:.2f})")
+
+    # Высота ограничена комнатой: портал на y=8.0, лампа на 5.69. Ящик выше
+    # пяти метров начнёт цеплять потолок по дороге к игроку.
+    # Высоту мерим по РЕАЛЬНОМУ габариту шаблона (4.5), а не по коллайдеру:
+    # коллайдер по Y даёт 1.78 — это толщина боковой стенки, и на ней легко
+    # ошибиться втрое. Порог берём не из константы генератора, иначе проверка
+    # поедет вместе с ней: лампа сцены на 5.69 — физический потолок комнаты.
+    _tpl_h = uat.prefab_bounds(
+        f"{gen.COMP}/{gen.crate_template_for(os.path.basename(spec.case)[:-7])}.prefab",
+        str(ROOT))
+    _height = (_tpl_h[1][1] - _tpl_h[0][1]) * _scale[1]
+    check(_height <= 5.69,
+          f"{spec.key}: ящик высотой {_height:.2f} проходит под лампой (5.69)")
 
 # Ящик НЕ обязан вмещать груз: содержимое появляется только после того, как
 # ящик уничтожен (Box на BrokenCrate). Требование "коробка не мельче груза"
@@ -603,9 +621,10 @@ for spec in gen.BUILDS:
 for spec in gen.BUILDS:
     _resolved = ReadyBuild(spec.key, spec.case, spec.parts).resolve(str(ROOT))
     _want = gen.crate_scale_for(spec.case, _resolved)
-    _got = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[0]
-    check(abs(_got - _want) < 1e-9,
-          f"{spec.key}: масштаб ящика x{_got:.2f} совпадает с расчётным x{_want:.2f}")
+    _got = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))
+    check(all(abs(_got[i] - _want[i]) < 1e-9 for i in range(3)),
+          f"{spec.key}: масштаб ящика {tuple(round(v, 2) for v in _got)} "
+          f"совпадает с расчётным {_want}")
 
 # Содержимое выдаётся уничтожаемым ящиком, а не лежит в нём: компонент Box
 # обязан висеть на BrokenCrate, иначе предмет появится внутри стенок.
@@ -961,8 +980,27 @@ for spec in gen.BUILDS:
         r"position: \{x: [-\d.e]+, y: ([-\d.e]+)", _ct[_i:_i + 400]).group(1))
     check(abs(_got - _want) < 1e-6,
           f"{spec.key}: подъём {_got:.2f} — ровно расчётный минимум {_want:.2f}")
-    check(_got <= 2.0,
-          f"{spec.key}: подъём {_got:.2f} не задран (5.24 загонял раму в обломки)")
+    # Порог "не выше 2.0" был привязан к прежнему размеру ящика и сломался,
+    # как только стенки подогнали под груз: подъём считается от полувысоты
+    # ящика, и более высокая коробка честно требует большего подъёма.
+    #
+    # Проверяем не число, а СМЫСЛ: дно груза обязано оказаться ровно на
+    # CRATE_GROUND_CLEARANCE над полом. Это ловит и утопление в пол, и
+    # задранный подъём (5.24 загонял раму внутрь обломков).
+    _bottom = uat.prefab_bounds(spec.case, str(ROOT))[0][1] \
+        * uat.root_scale(spec.case, str(ROOT))[1]
+    _tpl = f"{gen.COMP}/{gen.crate_template_for(os.path.basename(spec.case)[:-7])}.prefab"
+    _pivot = -uat.prefab_bounds(_tpl, str(ROOT))[0][1] * _k
+    _clear = _pivot + _bottom + _got
+    # Груз не должен родиться в полу...
+    check(_clear >= gen.CRATE_GROUND_CLEARANCE - 0.02,
+          f"{spec.key}: дно груза на {_clear:.2f} над полом — не утоплено")
+    # ...и не должен быть задран: 5.24 загоняло раму внутрь обломков ящика.
+    # Подъём даём только тем, кому он нужен, и ровно минимальный.
+    if _got > 0:
+        check(abs(_clear - gen.CRATE_GROUND_CLEARANCE) < 0.02,
+              f"{spec.key}: подъём {_got:.2f} ровно минимальный "
+              f"(дно на {_clear:.2f})")
 
 # У большинства сборок подъём не нужен вовсе — как во всех 31 ванильном ящике.
 _lifted = 0

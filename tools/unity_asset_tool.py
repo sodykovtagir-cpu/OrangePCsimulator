@@ -1605,13 +1605,18 @@ def _find_root_game_object(text: str) -> Optional[str]:
     return None
 
 
-def _scale_root_transform(text: str, root_go_id: str, factor: float) -> str:
-    """Проставить РАВНОМЕРНЫЙ масштаб корневому Transform префаба.
+def _scale_root_transform(text: str, root_go_id: str, factor) -> str:
+    """Проставить масштаб корневому Transform префаба.
 
-    Только равномерный: Unity корректно пересчитывает коллайдеры и инерцию
-    при одинаковом масштабе по всем осям. Неравномерный (например 1.61, 2.6, 1)
-    ломает физику составного ящика — его семь Rigidbody-стенок начинали менять
-    видимый размер при смене ракурса и выталкивали содержимое.
+    factor — число (равномерно) либо кортеж (x, y, z) по осям.
+
+    Неравномерный масштаб долго считался запретным: пробовали 1.61, 2.6, 1 и
+    получили ящик, меняющий видимый размер при смене ракурса. Причина была в
+    другом объекте. Семь Rigidbody-стенок — это BrokenCrate, груда обломков
+    после удара молотком. Целый ящик, который едет к игроку, это ОДИН объект
+    с пятью BoxCollider'ами, и вращение у всех его узлов единичное. При
+    единичном вращении оси коллайдера совпадают с осями меша, и неравномерный
+    масштаб их не перекашивает.
     """
     pattern = re.compile(
         r"(--- !u!4 &\d+\nTransform:\n(?:.*\n)*?"
@@ -1619,9 +1624,13 @@ def _scale_root_transform(text: str, root_go_id: str, factor: float) -> str:
         r"(?:.*\n)*?)"
         r"(  m_LocalScale: )\{x: [-\d.e]+, y: [-\d.e]+, z: [-\d.e]+\}"
     )
-    v = _f(factor)
+    if isinstance(factor, (tuple, list)):
+        vx, vy, vz = (_f(factor[0]), _f(factor[1]), _f(factor[2]))
+    else:
+        vx = vy = vz = _f(factor)
     new_text, n = pattern.subn(
-        r"\g<1>\g<2>" + "{{x: {0}, y: {0}, z: {0}}}".format(v), text, count=1)
+        r"\g<1>\g<2>" + "{{x: {0}, y: {1}, z: {2}}}".format(vx, vy, vz),
+        text, count=1)
     if n != 1:
         raise ValueError("не найден m_LocalScale корневого Transform ящика")
     return new_text
@@ -1633,7 +1642,7 @@ def write_crate_prefab(
     template_prefab: str,
     content_guid: str,
     content_file_id: int,
-    scale: float = 1.0,
+    scale=1.0,
     lift: float = 0.0,
 ) -> Tuple[str, int]:
     """Создать ящик доставки для готовой сборки на основе ящика-образца.
@@ -1649,9 +1658,10 @@ def write_crate_prefab(
     имя, spawnId и ссылка Box.prefab, а все fileID пересчитываются
     детерминированно, чтобы два ящика не делили идентификаторы объектов.
 
-    scale — РАВНОМЕРНЫЙ коэффициент размера ящика, чтобы коробка под раму
-    майнера не выглядела втрое меньше своего груза. Только равномерный:
-    неравномерный масштаб ломает физику семи Rigidbody-стенок.
+    scale — размер ящика: число (равномерно) либо кортеж (x, y, z), чтобы
+    подогнать стенки под габарит конкретного груза. Целый ящик — один объект
+    с пятью BoxCollider'ами и единичным вращением, поэтому неравномерный
+    масштаб его коллайдеры не перекашивает.
 
     lift — на сколько поднять содержимое над точкой вскрытия ящика. Box
     создаёт предмет в своей позиции и сдвигает на Box.position, а пивот рамы
@@ -1746,7 +1756,9 @@ def write_crate_prefab(
 
     text = head + tail
 
-    if abs(scale - 1.0) > 1e-9:
+    _uniform_one = (not isinstance(scale, (tuple, list))
+                    and abs(scale - 1.0) <= 1e-9)
+    if not _uniform_one:
         text = _scale_root_transform(text, mapping[template_root], scale)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)

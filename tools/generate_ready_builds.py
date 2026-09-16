@@ -609,12 +609,22 @@ CRATE_INNER = (2.8, 4.3, 4.8)
 # 2.6, 1), когда Unity не может честно пересчитать составной коллайдер.
 CRATE_MAX_SCALE = 1.75
 
+# Предел высоты ящика в метрах. Лампа сцены висит на y = 5.69, портал на 8.0 —
+# ящик выше этого поедет сквозь потолок. Сам ящик-образец высотой 4.50, так
+# что запас по вертикали совсем небольшой.
+CRATE_MAX_HEIGHT = 5.5
+
+# Реальная высота ящика-образца (Crate_Case_*): нужна, чтобы пересчитать
+# предел в коэффициент масштаба. Коллайдер по Y даёт 1.78 — это ТОЛЩИНА
+# боковой стенки, а не высота коробки, на этом легко ошибиться.
+CRATE_TEMPLATE_HEIGHT = 4.5
+
 
 # Просвет между дном груза и полом после выдачи из ящика.
 CRATE_GROUND_CLEARANCE = 0.15
 
 
-def crate_lift_for(case_prefab: str, crate_scale: float = 1.0) -> float:
+def crate_lift_for(case_prefab: str, crate_scale=1.0) -> float:
     """Подъём содержимого, чтобы оно не родилось ниже пола.
 
     Груз появляется в ПИВОТЕ ящика, а пивот у ящика — его центр: когда ящик
@@ -645,7 +655,9 @@ def crate_lift_for(case_prefab: str, crate_scale: float = 1.0) -> float:
     tb = prefab_bounds(os.path.relpath(template, REPO), REPO)
     if tb is None:
         return 0.0
-    pivot_height = -tb[0][1] * crate_scale
+    # Ящик масштабируется по осям, и пивот поднимает только ВЕРТИКАЛЬНАЯ.
+    scale_y = crate_scale[1] if isinstance(crate_scale, (tuple, list)) else crate_scale
+    pivot_height = -tb[0][1] * scale_y
 
     ground = pivot_height + bottom
     if ground >= CRATE_GROUND_CLEARANCE:
@@ -653,26 +665,46 @@ def crate_lift_for(case_prefab: str, crate_scale: float = 1.0) -> float:
     return round(CRATE_GROUND_CLEARANCE - ground, 2)
 
 
-def crate_scale_for(case_prefab: str, resolved: List[dict]) -> float:
-    """РАВНОМЕРНЫЙ коэффициент размера ящика под габарит сборки.
+def crate_scale_for(case_prefab: str, resolved: List[dict]):
+    """Размер ящика по КАЖДОЙ оси отдельно, под габарит конкретной сборки.
 
-    Ящик НЕ обязан вмещать груз: содержимое не лежит внутри, компонент Box
-    висит на BrokenCrate и срабатывает в момент уничтожения ящика. В ванильной
-    игре восьмиметровый Table приезжает в ящике высотой 4.5 — и это нормально.
-    Масштаб нужен только чтобы коробка под раму BigMiner не выглядела совсем
-    игрушечной, поэтому он ограничен CRATE_MAX_SCALE.
+    Возвращает кортеж (x, y, z).
 
-    Масштаб строго равномерный. Неравномерный (1.61, 2.6, 1) ломает физику:
-    ящик собран из семи отдельных Rigidbody-стенок, их коллайдеры начинают
-    менять видимый размер при смене ракурса и выталкивать содержимое.
+    Раньше масштаб был строго равномерным: боялись, что неравномерный ломает
+    коллайдеры. Проверка показала, что опасение относилось не к тому объекту.
+    Из семи Rigidbody-стенок состоит BrokenCrate — груда обломков, которая
+    появляется уже ПОСЛЕ удара молотком. А целый ящик, который и едет к
+    игроку, это ОДИН объект с пятью BoxCollider'ами, и у всех его узлов
+    вращение единичное. При единичном вращении неравномерный масштаб не
+    перекашивает коллайдеры: оси меша и оси коллайдера совпадают.
+
+    Поэтому стенки подгоняются под груз по каждой оси: ширина и глубина —
+    точно по габариту, высота — насколько позволяет комната.
+
+    Ограничение по высоте физическое: портал висит на y = 8.0, лампа на 5.69,
+    и ящик выше пяти метров начнёт цеплять потолок по дороге к игроку. Раму
+    BigMiner (10.54 в высоту) целиком не накрыть никак, и это нормально: ящик
+    и не обязан вмещать груз. Содержимое не лежит внутри — компонент Box
+    висит на BrokenCrate и создаёт предмет в момент вскрытия. В ванильной игре
+    восьмиметровый Table приезжает в ящике высотой 4.5.
+
+    Класть груз набок тоже не годится: майнер приехал бы лежащим, и игроку
+    пришлось бы ставить его на ноги руками.
     """
     from unity_asset_tool import build_bounds
 
     lo, hi = build_bounds(case_prefab, resolved, REPO)
-    content = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
-    need = max(content[i] / CRATE_INNER[i] for i in range(3))
-    # Округляем вверх до 0.05, чтобы значение не плавало от версии к версии.
-    return min(CRATE_MAX_SCALE, max(1.0, math.ceil(need * 20) / 20))
+    content = [hi[i] - lo[i] for i in range(3)]
+
+    scale = []
+    for i in range(3):
+        need = content[i] / CRATE_INNER[i]
+        # Округляем вверх до 0.05, чтобы значение не плавало от версии к версии.
+        scale.append(max(1.0, math.ceil(need * 20) / 20))
+
+    # Высоту ограничиваем жёстко: выше ящик не пройдёт под потолок.
+    scale[1] = min(scale[1], CRATE_MAX_HEIGHT / CRATE_TEMPLATE_HEIGHT)
+    return tuple(round(v, 2) for v in scale)
 
 
 def main() -> int:
@@ -758,8 +790,10 @@ def main() -> int:
             scale=crate_scale,
             lift=crate_lift,
         )
-        if crate_scale > 1.0:
-            print(f"    ящик увеличен равномерно x{crate_scale:.2f}")
+        if any(v > 1.0 for v in crate_scale):
+            print("    стенки ящика подогнаны под груз: "
+                  f"x{crate_scale[0]:.2f} y{crate_scale[1]:.2f} "
+                  f"z{crate_scale[2]:.2f}")
         if crate_lift > 0:
             print(f"    сборка поднята над полом на {crate_lift:.2f}")
 
