@@ -343,6 +343,29 @@ def miner_medium() -> List[PartRef]:
     return parts
 
 
+def miner_5090_small() -> List[PartRef]:
+    """Компактная ферма на RTX 5090: обычная рама, все 8 слотов GPU.
+
+    Те же карты, что у флагмана, но вдвое меньше и на раме Miner — она
+    компактнее и едет в обычном корпусном ящике, без блендер-коробки.
+
+    Кулер только обычный: в раму не влезает ни башня, ни водянка.
+    """
+    parts = [
+        p("Mini_ITX", "Motherboard"),
+        p("CPU RMD Ryzen 9 7950X", "CPU", host="Mini_ITX"),
+        p("Cooler(RGB)", "Cooler", host="Mini_ITX"),
+        p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
+        p("RAM 32GB(RGB)", "RAM", host="Mini_ITX"),
+    ]
+    # У рамы Miner два слота Supply и два Drive, и оба принимают только
+    # match=0 — поэтому обычные SSD, а не M.2.
+    parts += [p("PSU 2kW", "Supply") for _ in range(2)]
+    parts += [p("SSD 1TB", "Drive") for _ in range(2)]
+    parts += [p("RTX5090", "GPU") for _ in range(8)]
+    return parts
+
+
 def miner_ultra() -> List[PartRef]:
     """Ультра-майнер: большая рама, все 16 слотов GPU забиты RTX 3080.
 
@@ -469,6 +492,10 @@ MINER_MODELS = [
      "BigMiner", "Big Miner"),
     ("RTX5090", "{Flagship Miner}", "Flagship Miner Description", miner_5090,
      "BigMiner", "Big Miner"),
+    # Компактная ферма на тех же RTX 5090, но на обычной раме: восемь карт
+    # вместо шестнадцати.
+    ("Compact5090", "{Compact 5090 Miner}", "Compact 5090 Miner Description",
+     miner_5090_small, "Miner", "Miner"),
 ]
 
 
