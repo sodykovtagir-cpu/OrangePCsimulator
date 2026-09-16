@@ -1501,6 +1501,11 @@ check("Main.Instance" in _gc_src and "playTime" in _gc_src,
 check("DateTime" not in _gc_src,
       "в источнике игрового времени нет обращений к системным часам")
 
+# Длина игровых суток нужна и ниже, для проверки частоты обновления часов.
+_dl_m = re.search(r"DayLengthSeconds = ([\d.]+)f \* ([\d.]+)f", _gc_src)
+_day_len_ok = _dl_m is not None
+_dl_val = float(_dl_m.group(1)) * float(_dl_m.group(2)) if _dl_m else 0.0
+
 # playTime уже сохраняется — значит часы переживают перезаход.
 _sm_src = (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(
     encoding="utf-8")
@@ -1518,6 +1523,32 @@ check("DateTime.Now" not in _clock_block,
       "часы PCOS не читают системное время")
 check("GameClock." in _clock_block, "часы PCOS берут время из GameClock")
 
+# Формат ЧЧ:ММ — секунды убраны по просьбе. Проверяем и наличие часов с
+# минутами, и отсутствие секунд: иначе тест пропустит любой из двух промахов.
+check("GameClock.Hour" in _clock_block and "GameClock.Minute" in _clock_block,
+      "часы PCOS показывают часы и минуты")
+check("GameClock.Second" not in _clock_block,
+      "секунды в часах PCOS не показываются")
+# Разделитель должен остаться ровно один: "ЧЧ:ММ", а не "ЧЧ:ММ:".
+check(_clock_block.count('":"') == 1,
+      f"в часах ровно один разделитель (нашлось {_clock_block.count(chr(34) + ':' + chr(34))})")
+
+# Метка перерисовки обязана считаться по МИНУТАМ, а не по секундам. Игровая
+# секунда идёт в 60 раз быстрее реальной, поэтому посекундная метка менялась бы
+# почти каждый кадр и вся экономия на строке пропала бы.
+_stamp = _gc_src.split("public static int Stamp")[1].split("\n")[0]
+check("/ 60f" in _stamp,
+      f"метка часов считается по игровым минутам, а не секундам ({_stamp.strip()})")
+
+# Независимая проверка арифметики: как часто метка меняется в реальном времени.
+if _day_len_ok:
+    _per_real = 86400.0 / _dl_val          # игровых секунд за реальную секунду
+    _stamp_hz = _per_real / 60.0           # смен метки в реальную секунду
+    check(_stamp_hz <= 2.0,
+          f"строка часов пересобирается не чаще 2 раз в секунду ({_stamp_hz:.2f} Гц)")
+    check(_stamp_hz >= 0.2,
+          f"часы всё же обновляются заметно для игрока ({_stamp_hz:.2f} Гц)")
+
 # LED-дисплей.
 _led_src = _strip_comments(
     (ROOT / "Assets/Scripts/Assembly-CSharp/LedDisplay.cs").read_text(
@@ -1534,7 +1565,7 @@ check("GameClock.Hour" in _led_clock and "GameClock.Hour" in _clock_block,
 
 # Оптимизация часов не должна потеряться: строка пересобирается по метке.
 check("GameClock.Stamp" in _clock_block,
-      "строка часов пересобирается только при смене секунды")
+      "строка часов пересобирается только при смене игровой минуты")
 
 # Арифметика времени, проверенная независимо от кода.
 _day_len = re.search(r"DayLengthSeconds = ([\d.]+)f \* ([\d.]+)f", _gc_src)
