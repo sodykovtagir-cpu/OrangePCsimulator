@@ -611,8 +611,15 @@ for spec in gen.BUILDS:
         f"{gen.COMP}/{gen.crate_template_for(os.path.basename(spec.case)[:-7])}.prefab",
         str(ROOT))
     _height = (_tpl_h[1][1] - _tpl_h[0][1]) * _scale[1]
-    check(_height <= 5.69,
-          f"{spec.key}: ящик высотой {_height:.2f} проходит под лампой (5.69)")
+    if os.path.basename(spec.case)[:-len(".prefab")] in gen.CRATE_READY_MADE:
+        # Ящик нарисован вручную специально под раму: он ВЫШЕ лампы и это
+        # осознанно — иначе рама торчала бы наружу. Он не едет через портал
+        # под потолком, а появляется у точки выдачи.
+        check(_height > 10.0,
+              f"{spec.key}: ручной ящик {_height:.2f} накрывает раму целиком")
+    else:
+        check(_height <= 5.69,
+              f"{spec.key}: ящик высотой {_height:.2f} проходит под лампой (5.69)")
 
 # Ящик НЕ обязан вмещать груз: содержимое появляется только после того, как
 # ящик уничтожен (Box на BrokenCrate). Требование "коробка не мельче груза"
@@ -952,9 +959,13 @@ for spec in gen.BUILDS:
 # на полу, это 2.25 (умножить на масштаб). Дальше решает пивот самого груза.
 # У рамы BigMiner дно на -5.09, и при ящике x1.75 (пивот 3.94) оно уходит на
 # 1.15 НИЖЕ пола — рама спавнится в полу, физика выталкивает её рывком.
-_tb = prefab_bounds(f"{gen.COMP}/Crate_Case_ATX 2(Black).prefab", str(ROOT))
-_half = -_tb[0][1]
+# Полувысоту берём у ШАБЛОНА КОНКРЕТНОЙ сборки, а не у одного корпусного
+# ящика: у BigMiner ящик собственный, нарисованный в Blender под раму, и его
+# пивот лежит совсем на другой высоте.
 for spec in gen.BUILDS:
+    _tpl_name = gen.crate_template_for(os.path.basename(spec.case)[:-len(".prefab")])
+    _tb = prefab_bounds(f"{gen.COMP}/{_tpl_name}.prefab", str(ROOT))
+    _half = -_tb[0][1]
     _k = root_scale(f"{gen.OUT_PREFABS}/Crate_{spec.key}.prefab", str(ROOT))[1]
     _cb = prefab_bounds(spec.case, str(ROOT))
     _bottom = _cb[0][1] * root_scale(spec.case, str(ROOT))[1]

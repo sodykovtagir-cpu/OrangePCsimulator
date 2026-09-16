@@ -508,6 +508,10 @@ def _make_builds() -> List[BuildSpec]:
 # ссылается на Crate_*, а не на сам корпус. Готовые сборки делаем так же —
 # иначе ПК вываливается из портала в воздухе, падает и разбивается.
 # Значение — ящик-образец, у которого берутся меши, коллайдеры и звук.
+# Корпуса, для которых ящик нарисован вручную и уже имеет нужный размер.
+# Такие ящики генератор не масштабирует.
+CRATE_READY_MADE = {"BigMiner"}
+
 CRATE_TEMPLATE_BY_CASE = {
     "Case_ITX(Black)": "Crate_Case_ITX(Black)",
     "Case_ITX(White)": "Crate_Case_ITX(White)",
@@ -521,7 +525,11 @@ CRATE_TEMPLATE_BY_CASE = {
     "Aquarium_ATX(White)": "Crate_Case_ATX_Aquarium_White",
     # Рамы майнеров своих ящиков не имеют — берём самый большой корпусной.
     "Miner": "Crate_Case_ATX 2(Black)",
-    "BigMiner": "Crate_Case_ATX 2(Black)",
+    # У BigMiner ящик собственный: модель из Blender, сделанная под раму.
+    # Габарит 4.66 x 11.32 x 5.00 — рама (10.54) накрывается целиком, чего
+    # растяжением корпусного ящика добиться было нельзя, он упирался в
+    # потолок. Масштабировать его НЕ нужно, он уже нужного размера.
+    "BigMiner": "Crate_BigMiner",
 }
 
 
@@ -692,6 +700,11 @@ def crate_scale_for(case_prefab: str, resolved: List[dict]):
     пришлось бы ставить его на ноги руками.
     """
     from unity_asset_tool import build_bounds
+
+    # Ящик BigMiner нарисован в Blender точно под раму — растягивать его
+    # нечего и нельзя: любой масштаб испортит выверенную геометрию.
+    if os.path.basename(case_prefab)[:-len(".prefab")] in CRATE_READY_MADE:
+        return (1.0, 1.0, 1.0)
 
     lo, hi = build_bounds(case_prefab, resolved, REPO)
     content = [hi[i] - lo[i] for i in range(3)]
