@@ -651,6 +651,76 @@ for spec in gen.BUILDS:
           f"{spec.key}: Box висит на BrokenCrate (сейчас '{_owner}')")
 
 # ---------------------------------------------------------------------------
+print("\nНазвания сборок переведены целиком")
+
+# Названия задаёт пользователь, и живут они только в Translate.txt — ключи
+# вида {Office PC} не меняются. Проверяем, что ни один язык не остался с
+# английской заглушкой и что строка TSV не поехала по колонкам.
+_tr_rows = [l.rstrip("\n").split("\t")
+            for l in (ROOT / "Assets/Resources/Translate.txt").read_text(
+                encoding="utf-8").splitlines() if l.strip()]
+_tr_width = len(_tr_rows[0])
+_tr = {r[0]: r for r in _tr_rows}
+
+_title_keys = set()
+for spec in gen.BUILDS:
+    for _k in re.findall(r"\{([^}]*)\}", spec.title):
+        _title_keys.add(_k)
+
+for _k in sorted(_title_keys):
+    check(_k in _tr, f"название '{_k}' есть в Translate.txt")
+    if _k not in _tr:
+        continue
+    check(len(_tr[_k]) == _tr_width,
+          f"'{_k}': строка не поехала по колонкам ({len(_tr[_k])} из {_tr_width})")
+    _vals = [v for v in _tr[_k][1:] if v.strip()]
+    check(len(_vals) == _tr_width - 1,
+          f"'{_k}': переведён на все языки, пустых нет")
+
+# Название и описание — разные вещи: в описании лежат характеристики, и
+# переименование не должно было их задеть.
+for spec in gen.BUILDS:
+    _d = spec.description
+    if _d in _tr:
+        check("/" in _tr[_d][1], f"'{_d}': описание осталось перечнем железа")
+
+print("\nДоски ручного ящика не превращаются в обычные")
+
+# При загрузке сейва SaveManager воссоздаёт предмет из Resources/Components/
+# по его spawnId. Доски ручного ящика BigMiner несли spawnId "Part".."Part_5"
+# — те же, что у обычного ящика, — и после перезахода игра подставляла им
+# ОБЫЧНЫЕ доски: коробка теряла блендер-геометрию.
+_bm_tpl = (ROOT / gen.COMP / "Crate_BigMiner.prefab").read_text(encoding="utf-8")
+_bm_ids = re.findall(r"spawnId: (.*)", _bm_tpl)
+_bm_planks = [i.strip() for i in _bm_ids if i.strip().startswith(("Part", "BigMinerPart"))]
+check(_bm_planks and all(i.startswith("BigMinerPart") for i in _bm_planks),
+      "у досок ручного ящика собственные spawnId, а не общие Part*")
+
+# Каждому spawnId обязан соответствовать префаб в Resources/Components,
+# иначе SaveManager пишет "Prefab of ... not found!" и доска пропадает.
+for _sid in _bm_planks:
+    check((ROOT / gen.COMP / f"{_sid}.prefab").exists(),
+          f"префаб {_sid}.prefab существует — SaveManager его найдёт")
+    _pl = (ROOT / gen.COMP / f"{_sid}.prefab").read_text(encoding="utf-8")
+    check(f"spawnId: {_sid}" in _pl,
+          f"{_sid}: spawnId внутри префаба совпадает с именем файла")
+
+# Геометрия досок — из блендер-модели, а не от обычного ящика.
+_fbx_guid = re.search(
+    r"guid: ([0-9a-f]{32})",
+    (ROOT / gen.COMP / "box for bigminer.fbx.meta").read_text(encoding="utf-8")).group(1)
+for _sid in _bm_planks:
+    _pl = (ROOT / gen.COMP / f"{_sid}.prefab").read_text(encoding="utf-8")
+    check(_fbx_guid in _pl, f"{_sid}: меш взят из блендер-модели")
+
+# А у обычных ящиков доски остаются обычными — их трогать не надо.
+for spec in gen.BUILDS:
+    if os.path.basename(spec.case)[:-len(".prefab")] in gen.CRATE_READY_MADE:
+        continue
+    _ct = (ROOT / gen.OUT_PREFABS / f"Crate_{spec.key}.prefab").read_text(encoding="utf-8")
+    check("BigMinerPart" not in _ct,
+          f"{spec.key}: обычный ящик не тянет доски от большой коробки")
+
 print("\nСборка устойчива к помехам")
 
 # App Downloader обязан быть на каждой машине: без него систему нечем
