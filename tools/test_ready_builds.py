@@ -1313,6 +1313,140 @@ for spec in gen.BUILDS:
 subprocess.run([sys.executable, str(ROOT / "tools/generate_ready_builds.py")],
                capture_output=True, check=True)
 
+# ---------------------------------------------------------------------------
+print("\nПроизводительность: экраны мониторов")
+
+# Каждый экран внутриигрового ПК — это отдельная камера, снимающая Canvas в
+# RenderTexture. Пока камера включена, Unity рисует её каждый кадр, независимо
+# от того, изменилось ли содержимое и видит ли игрок этот монитор.
+
+
+def _strip_comments(text):
+    """Убрать комментарии, чтобы не ловить паттерны в собственных пояснениях."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return "\n".join(ln for ln in text.splitlines()
+                     if not ln.strip().startswith("//"))
+
+
+_dm_path = ROOT / "Assets/Scripts/Assembly-CSharp/DisplayManager.cs"
+_dm_src = _strip_comments(_dm_path.read_text(encoding="utf-8"))
+
+_create = _dm_src.split("public RenderTexture CreateDisplay")[1].split("\n\tpublic ")[0]
+
+# Главная находка: монитор просит текстуру 256x256, а Mathf.Max поднимал её до
+# 1280x720 — в четырнадцать раз больше пикселей, всегда, на любом устройстве.
+# Смотрим ВЕСЬ файл, а не тело CreateDisplay: расчёт размера вынесен в
+# отдельный метод, и проверка только вызывающего кода мутацию пропускает.
+check(not re.search(r"Mathf\.Max\(\s*width\s*,\s*1280\s*\)", _dm_src),
+      "экран не растягивается принудительно до 1280 по ширине")
+check(not re.search(r"Mathf\.Max\(\s*height\s*,\s*720\s*\)", _dm_src),
+      "экран не растягивается принудительно до 720 по высоте")
+# Заодно запрещаем любую жёсткую нижнюю границу в размере экрана.
+check(not re.search(r"Mathf\.Max\(\s*(?:width|height)\s*,\s*\d{3,}\s*\)", _dm_src),
+      "нижняя граница размера экрана не задана константой напрямую")
+
+# Размер должен зависеть от уровня качества, а не быть константой.
+check("QualitySettings.GetQualityLevel()" in _dm_src,
+      "размер экрана зависит от уровня качества")
+
+# Проверяем independent от генератора: на нижних уровнях качества сторона
+# экрана обязана быть заметно меньше исходных 1280.
+_sizes = [int(x) for x in re.findall(r"minSide = (\d+)", _dm_src)]
+check(len(_sizes) >= 2, "порогов размера экрана несколько, а не один")
+check(_sizes and min(_sizes) <= 384,
+      f"на слабых устройствах экран мельче 384 пикселей (сейчас {min(_sizes) if _sizes else '?'})")
+check(_sizes and max(_sizes) >= 1024,
+      "на сильных устройствах экран остаётся крупным")
+
+# MSAA x4 на экране умножает работу растеризатора вчетверо ради сглаживания,
+# которого на тексте интерфейса почти не видно.
+check("rt.antiAliasing = 4" not in _create,
+      "сглаживание экрана не прибито к x4")
+_aa = [int(x) for x in re.findall(r"if \(level <= \d+\) return (\d+);", _dm_src)]
+check(_aa and min(_aa) == 1,
+      "на слабых устройствах сглаживание экрана отключено полностью")
+
+# Анизотропия на плоском экране, который смотрят фронтально, бесполезна.
+check("rt.anisoLevel = 4" not in _create, "анизотропия экрана не выкручена в 4")
+
+# Камера не должна оставаться включённой: это и есть рендер каждый кадр.
+check(re.search(r"cam\.enabled\s*=\s*false", _create) is not None,
+      "камера экрана создаётся выключенной")
+check(re.search(r"cam\.enabled\s*=\s*true", _dm_src) is None,
+      "камера экрана нигде не включается обратно на постоянный рендер")
+
+# Раз камера выключена, кто-то обязан рисовать её по расписанию, иначе экран
+# застынет навсегда. Это отдельная ловушка: отключить рендер легко, а вот
+# забыть про перерисовку — значит сломать игру вместо оптимизации.
+_pacer_path = ROOT / "Assets/Scripts/Assembly-CSharp/DisplayCameraPacer.cs"
+check(_pacer_path.exists(), "есть компонент, обновляющий экран по расписанию")
+check("DisplayCameraPacer" in _create,
+      "камера экрана получает этот компонент при создании")
+
+_pacer_src = _strip_comments(_pacer_path.read_text(encoding="utf-8"))
+check("target.Render()" in _pacer_src, "расписание действительно рисует кадр")
+
+# Частота обновления должна быть ниже кадровой (иначе смысла нет), но не
+# настолько низкой, чтобы интерфейс выглядел зависшим. Порог независимый:
+# сравниваем с targetFrameRate по умолчанию (30) из FpsSetting.
+_rate = re.search(r"redrawsPerSecond = (\d+(?:\.\d+)?)f", _pacer_src)
+check(_rate is not None, "частота перерисовки экрана задана явно")
+if _rate:
+    _r = float(_rate.group(1))
+    check(_r <= 20.0, f"экран обновляется реже 20 раз в секунду (сейчас {_r})")
+    check(_r >= 8.0, f"экран обновляется не реже 8 раз в секунду (сейчас {_r})")
+
+# Невидимый монитор не должен рисоваться вообще.
+_sda = _dm_src.split("public void SetDisplayActive")[1].split("\n\tpublic ")[0]
+check("SetVisible" in _sda,
+      "уход монитора из поля зрения останавливает перерисовку")
+check("visible" in _pacer_src and re.search(r"if \(.*!visible.*\) return", _pacer_src),
+      "невидимый экран пропускает отрисовку")
+
+# ---------------------------------------------------------------------------
+print("\nПроизводительность: поиск монитора под курсором")
+
+_mr_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/MonitorReceiver.cs")
+    .read_text(encoding="utf-8"))
+_mr_update = _mr_src.split("private void Update()")[1]
+
+# Camera.main — поиск объекта по тегу среди всей сцены, каждый кадр.
+# Один вызов допустим — как восстановление потерянной ссылки, но он обязан
+# стоять под проверкой на null, иначе поиск по тегу снова идёт каждый кадр.
+_bare_main = [ln.strip() for ln in _mr_update.splitlines()
+              if "Camera.main" in ln
+              and not re.match(r"if \(cachedCamera == null\)", ln.strip())]
+check(not _bare_main,
+      f"Camera.main не вызывается безусловно каждый кадр (нашлось: {_bare_main})")
+check("cachedCamera" in _mr_src, "ссылка на камеру закеширована")
+# Кеш обязан уметь восстанавливаться, иначе пересоздание камеры сломает ввод.
+check(re.search(r"if \(cachedCamera == null\) cachedCamera = Camera\.main", _mr_src)
+      is not None,
+      "камера ищется заново, если ссылка потерялась")
+
+# Луч без ограничений проверяет каждый коллайдер сцены, а их тут сотни.
+_ray = re.search(r"Physics\.Raycast\(ray, out var hit([^)]*)\)", _mr_update)
+check(_ray is not None, "Raycast на месте")
+if _ray:
+    check("RayDistance" in _ray.group(1),
+          "у луча есть предельная дистанция")
+    check("QueryTriggerInteraction.Ignore" in _ray.group(1),
+          "луч не цепляет триггеры слотов")
+
+_dist = re.search(r"RayDistance = (\d+(?:\.\d+)?)f", _mr_src)
+check(_dist is not None, "дистанция луча задана константой")
+if _dist:
+    _d = float(_dist.group(1))
+    check(_d >= 5.0, f"дистанции хватает, чтобы дотянуться до монитора ({_d})")
+    check(_d <= 50.0, f"луч не идёт через всю сцену ({_d})")
+
+# Пока мониторов нет, работать вообще незачем.
+check(re.search(r"if \(targets == null \|\| targets\.Count == 0\) return", _mr_update)
+      is not None,
+      "без мониторов Update выходит сразу")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

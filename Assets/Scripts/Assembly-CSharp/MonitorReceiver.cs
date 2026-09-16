@@ -44,6 +44,10 @@ public class MonitorReceiver : MonoBehaviour
 
 	private bool lastB;
 
+	// Дальше этого расстояния монитор всё равно не разглядеть, а луч по всей
+	// сцене стоит тем дороже, чем больше в ней предметов.
+	private const float RayDistance = 20f;
+
 	private void Start()
 	{
 		if (generations == null || allCanvas == null || mats == null || targets == null) return;
@@ -89,9 +93,17 @@ public class MonitorReceiver : MonoBehaviour
 		}
 	}
 
+	// Camera.main — это поиск по тегу MainCamera среди всех объектов сцены.
+	// Вызывать его каждый кадр незачем: камера за игру не меняется, а если
+	// её всё же пересоздали, ссылка станет null и мы найдём заново.
+	private Camera cachedCamera;
+
 	private void Update()
 	{
-		var cam = Camera.main;
+		if (targets == null || targets.Count == 0) return;
+
+		if (cachedCamera == null) cachedCamera = Camera.main;
+		var cam = cachedCamera;
 		if (cam == null) return;
 
 		var mousePos = Input.mousePosition;
@@ -99,7 +111,11 @@ public class MonitorReceiver : MonoBehaviour
 
 		b = false;
 
-		if (!Physics.Raycast(ray, out var hit)) return;
+		// Луч ограничен дистанцией и слоями монитора: раньше он шёл сквозь
+		// всю сцену и проверял каждый коллайдер на пути, включая детали
+		// компьютеров и обломки ящиков.
+		if (!Physics.Raycast(ray, out var hit, RayDistance, ~0,
+			QueryTriggerInteraction.Ignore)) return;
 
 		var tr = hit.transform;
 		if (tr == null || !tr.CompareTag("Monitor") || targets == null) return;
