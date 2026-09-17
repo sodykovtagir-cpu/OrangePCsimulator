@@ -123,6 +123,7 @@ MonoBehaviour:
   - {fileID: 114236579428648625, guid: 93a5f522a32524c46b549c2a4e71e003, type: 3}
   - {fileID: 114706950818030795, guid: 73e82dd027ab653439d83f2f8bef9d91, type: 3}
   - {fileID: 114482999165124040, guid: f2775c119ffead5498c55a70715e535e, type: 3}
+  - {fileID: 114482999165124040, guid: d241f9eef99c413db8d91882f5219878, type: 3}
   - {fileID: 114342092808814711, guid: 9cf99fff458eeb140b2a36ee366f16d9, type: 3}
 maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
 normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}

@@ -1594,6 +1594,161 @@ if _day_len:
         check(_d1 == _d0 + 1, f"за игровые сутки счётчик дней растёт на 1 ({_d0}->{_d1})")
 
 
+# ---------------------------------------------------------------------------
+print("\nАртефакты повреждённой видеокарты")
+
+_gpu_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/GPU.cs"
+check(_gpu_path.exists(), "есть отдельный класс видеокарты")
+_gpu_src = _strip_comments(_gpu_path.read_text(encoding="utf-8"))
+check((_gpu_path.parent / "GPU.cs.meta").exists(), "у GPU есть .meta")
+
+check("class GPU : Hardware" in _gpu_src, "GPU наследует Hardware")
+
+# Повреждение копится по ступеням, а не сразу убивает карту.
+_lv = re.search(r"MaxArtifactLevel = (\d+)", _gpu_src)
+check(_lv is not None, "число ступеней повреждения задано")
+if _lv:
+    _n = int(_lv.group(1))
+    check(_n >= 2, f"ступеней больше одной, иначе это обычная поломка ({_n})")
+    check(_n <= 6, f"ступеней не слишком много ({_n})")
+
+# Ключевое: до последней ступени карта РАБОТАЕТ, но артефачит.
+check("Artifacting" in _gpu_src and "ArtifactLevel < MaxArtifactLevel" in _gpu_src,
+      "есть состояние «повреждена, но работает»")
+check(re.search(r"if \(ArtifactLevel >= MaxArtifactLevel\) Damage\(\)", _gpu_src)
+      is not None,
+      "на последней ступени карта ломается совсем")
+
+# Сила искажения нормирована, чтобы эффект не зависел от числа ступеней.
+check("ArtifactStrength" in _gpu_src and "Mathf.Clamp01" in _gpu_src,
+      "сила артефактов нормирована в диапазон 0..1")
+
+# Падение должно повреждать карту. Раньше на префабах видеокарт не было даже
+# Breakable, то есть уронить их было нельзя вообще.
+check("OnCollisionEnter" in _gpu_src, "видеокарта реагирует на удар")
+check('CompareTag("Pillow")' in _gpu_src,
+      "подушка по-прежнему спасает от повреждений, как и для другого железа")
+
+# Уровень повреждения обязан переживать перезаход, иначе артефакты исчезнут
+# после загрузки сохранения.
+check('jObject["artifactLevel"] = ArtifactLevel' in _gpu_src,
+      "уровень повреждения сохраняется")
+check(re.search(r"token != null \? token\.ToObject<int>\(\) : 0", _gpu_src)
+      is not None,
+      "старые сохранения без этого поля читаются без ошибки")
+
+# Скрипт должен стоять на самих префабах видеокарт, иначе код мёртвый.
+_gpu_guid = re.search(r"guid: ([a-f0-9]+)",
+                      (_gpu_path.parent / "GPU.cs.meta").read_text(encoding="utf-8")).group(1)
+_cards = ["GT440", "GT1030", "GT1031", "GTX1060", "GTX1070", "GTX1070Ti",
+          "GTX1080", "GTX1080Ti", "RTX2080", "RTX2080Ti", "RTX3080",
+          "RTX3080Ti", "RX570", "Titan V"]
+_with_gpu = 0
+for _c in _cards:
+    _p = ROOT / f"Assets/Resources/components/{_c}.prefab"
+    if _p.exists() and _gpu_guid in _p.read_text(encoding="utf-8", errors="ignore"):
+        _with_gpu += 1
+check(_with_gpu == len(_cards),
+      f"скрипт GPU стоит на всех базовых видеокартах ({_with_gpu}/{len(_cards)})")
+
+# Эффект на экране.
+_art_path = ROOT / "Assets/Scripts/Assembly-CSharp/GpuArtifacts.cs"
+check(_art_path.exists(), "есть эффект артефактов на экране")
+_art_src = _strip_comments(_art_path.read_text(encoding="utf-8"))
+check("raycastTarget = false" in _art_src,
+      "полосы артефактов не перехватывают нажатия по рабочему столу")
+check("gpu.Damaged) continue" in _art_src,
+      "мёртвая карта не рисует артефакты — она вообще не даёт сигнала")
+
+# Эффект не должен сам стать причиной лагов: он обновляется по таймеру.
+# Наличия слова refreshInterval мало: важен сам ранний выход из LateUpdate.
+# Без него эффект перерисовывался бы каждый кадр и сам стал бы причиной лагов.
+check("refreshInterval" in _art_src and "Time.unscaledTime" in _art_src,
+      "артефакты перерисовываются по таймеру, а не каждый кадр")
+check(re.search(r"if \(now < nextRefresh\) return;", _art_src) is not None,
+      "до истечения интервала кадр пропускается")
+check(re.search(r"nextRefresh = now \+ ", _art_src) is not None,
+      "следующая перерисовка планируется от текущего момента")
+_lu = _art_src.split("private void LateUpdate()")[1].split("\n\tprivate ")[0]
+check("Redraw(" in _lu and _lu.index("if (now < nextRefresh) return;") < _lu.index("Redraw("),
+      "проверка таймера стоит ДО перерисовки, а не после")
+check(re.search(r"if \(strength <= 0f\)", _art_src) is not None,
+      "на целой видеокарте эффект ничего не делает")
+
+# Компонент вешается автоматически, иначе пришлось бы править 13 префабов.
+_disp_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Display.cs")
+    .read_text(encoding="utf-8"))
+check("AddComponent<GpuArtifacts>()" in _disp_src,
+      "монитор сам заводит эффект артефактов")
+check("ConnectedBoard" in _disp_src,
+      "эффект может узнать подключённую плату")
+
+# Локализация состояния.
+_tr = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+_tr_lines = _tr.replace("\r\n", "\n").split("\n")
+_cols = len(_tr_lines[0].split("\t"))
+_art_row = [l for l in _tr_lines if l.startswith("Artifacting\t")]
+check(len(_art_row) == 1, "строка перевода Artifacting добавлена один раз")
+if _art_row:
+    check(len(_art_row[0].split("\t")) == _cols,
+          "в строке Artifacting столько же колонок, сколько в шапке")
+    check(_art_row[0].split("\t")[18] == "Артефачит",
+          "русский перевод состояния на месте")
+
+# ---------------------------------------------------------------------------
+print("\nOndex Browser")
+
+_ond_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs"
+check(_ond_path.exists(), "есть скрипт Ondex")
+_ond_src = _strip_comments(_ond_path.read_text(encoding="utf-8"))
+check((_ond_path.parent / "Ondex.cs.meta").exists(), "у Ondex есть .meta")
+
+check("class Ondex : Browser" in _ond_src,
+      "Ondex — отдельный браузер на базе обычного")
+check("protected override void OpenSite" in _ond_src,
+      "заражение происходит при переходе на сайт")
+
+# Базовый Browser должен разрешать переопределение.
+_br_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Browser.cs")
+    .read_text(encoding="utf-8"))
+check("protected virtual void OpenSite" in _br_src,
+      "OpenSite в базовом браузере переопределяемый")
+
+# Шанс заражения высокий, но не стопроцентный: иначе приложением не пользуются.
+_ch = re.search(r"infectionChance = ([\d.]+)f", _ond_src)
+check(_ch is not None, "шанс заражения задан")
+if _ch:
+    _c = float(_ch.group(1))
+    check(_c >= 0.3, f"шанс заметный, шутка работает ({_c})")
+    check(_c < 1.0, f"шанс не стопроцентный ({_c})")
+
+check("if (infected) return" in _ond_src,
+      "уже заражённая система повторно не заражается")
+
+# Префаб приложения.
+_ond_prefab = ROOT / "Assets/Resources/apps/Ondex.prefab"
+check(_ond_prefab.exists(), "есть префаб Ondex")
+_op = _ond_prefab.read_text(encoding="utf-8", errors="ignore")
+_ond_guid = re.search(r"guid: ([a-f0-9]+)",
+                      (_ond_path.parent / "Ondex.cs.meta").read_text(encoding="utf-8")).group(1)
+check(_ond_guid in _op, "префаб использует скрипт Ondex, а не Browser")
+check("appName: Ondex" in _op,
+      "приложение называется Ondex, а не унаследованным Browser")
+check(re.search(r"virusPrefab: \{fileID: \d+, guid: [a-f0-9]+", _op) is not None,
+      "вирус подключён к префабу, иначе заражать нечем")
+
+# Приложение должно быть доступно игроку.
+_dl = (ROOT / "Assets/Resources/apps/Downloader.prefab").read_text(
+    encoding="utf-8", errors="ignore")
+_ond_prefab_guid = re.search(
+    r"guid: ([a-f0-9]+)",
+    (ROOT / "Assets/Resources/apps/Ondex.prefab.meta").read_text(encoding="utf-8")
+).group(1)
+check(_ond_prefab_guid in _dl, "Ondex есть в App Downloader")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
