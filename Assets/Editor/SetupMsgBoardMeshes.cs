@@ -6,7 +6,7 @@ using UnityEngine;
 namespace PC.Component.Tools
 {
     /// <summary>
-    /// Пересобрать плату EXATX1 на меши из нового FBX.
+    /// Пересобрать платы MSG на меши из нового FBX.
     /// </summary>
     /// <remarks>
     /// ПОЧЕМУ ЭТО EDITOR-СКРИПТ, А НЕ ПРАВКА ФАЙЛА ПРЕФАБА ТЕКСТОМ.
@@ -26,24 +26,39 @@ namespace PC.Component.Tools
     /// </remarks>
     public static class SetupMsgBoardMeshes
     {
-        private const string PrefabPath =
-            "Assets/Resources/components/EXATX1.prefab";
+        /// <summary>Платы, которые собираются из этой модели.</summary>
+        /// <remarks>
+        /// Чёрная и белая различаются только материалом, геометрия у них общая,
+        /// поэтому меши назначаются обеим за один проход.
+        /// </remarks>
+        private static readonly string[] PrefabPaths =
+        {
+            "Assets/Resources/components/MSG_ATX_Black.prefab",
+            "Assets/Resources/components/MSG_ATX_White.prefab",
+        };
 
         private const string FbxPath =
             "Assets/Resources/components/MsgMotherBoard_ATX_black.fbx";
 
-        private const string MaterialPath = "Assets/Material/Msg_black.mat";
+        /// <summary>Материал для каждой платы: чёрная и белая свои.</summary>
+        private static readonly string[] MaterialPaths =
+        {
+            "Assets/Material/Msg_black.mat",
+            "Assets/Material/Msg_white.mat",
+        };
 
         /// <summary>
         /// Имена объектов префаба, которые в FBX названы иначе.
         /// </summary>
         /// <remarks>
-        /// Корень платы в префабе переименован в EXATX1, а в модели он EXATX.
+        /// Корень платы в префабе зовётся MSG_ATX_Black/White, а в модели EXATX.
         /// Blender заменяет скобки на подчёркивания, отсюда M_2 (1) → M_2__1_.
         /// </remarks>
         private static readonly Dictionary<string, string> NameMap =
             new Dictionary<string, string>
             {
+                { "MSG_ATX_Black", "EXATX" },
+                { "MSG_ATX_White", "EXATX" },
                 { "EXATX1", "EXATX" },
                 { "M_2 (1)", "M_2__1_" },
                 { "Mark", "Mark" },
@@ -52,10 +67,17 @@ namespace PC.Component.Tools
         [MenuItem("Tools/Плата MSG/Назначить меши из FBX")]
         public static void Apply()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            for (int i = 0; i < PrefabPaths.Length; i++)
+                ApplyTo(PrefabPaths[i],
+                        i < MaterialPaths.Length ? MaterialPaths[i] : null);
+        }
+
+        private static void ApplyTo(string prefabPath, string materialPath)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             if (prefab == null)
             {
-                Debug.LogError($"Не найден префаб {PrefabPath}");
+                Debug.LogError($"Не найден префаб {prefabPath}");
                 return;
             }
 
@@ -78,12 +100,14 @@ namespace PC.Component.Tools
             Debug.Log($"Мешей в FBX: {meshes.Count} — " +
                       string.Join(", ", byName.Keys));
 
-            var material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+            var material = string.IsNullOrEmpty(materialPath)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<Material>(materialPath);
             if (material == null)
-                Debug.LogWarning($"Материал {MaterialPath} не найден, " +
+                Debug.LogWarning($"Материал {materialPath} не найден, " +
                                  "материалы останутся прежними.");
 
-            var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+            var root = PrefabUtility.LoadPrefabContents(prefabPath);
 
             int assigned = 0, missing = 0, skipped = 0;
             var notFound = new List<string>();
@@ -133,11 +157,12 @@ namespace PC.Component.Tools
                 if (changed) renderer.sharedMaterials = mats;
             }
 
-            PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             PrefabUtility.UnloadPrefabContents(root);
             AssetDatabase.Refresh();
 
-            Debug.Log($"Готово. Назначено мешей: {assigned}, " +
+            Debug.Log($"{System.IO.Path.GetFileName(prefabPath)}: " +
+                      $"назначено мешей: {assigned}, " +
                       $"уже стояли: {skipped}, не найдено в FBX: {missing}.");
 
             if (notFound.Count > 0)
@@ -167,7 +192,7 @@ namespace PC.Component.Tools
                 return;
             }
 
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPaths[0]);
             var used = new HashSet<string>();
             if (prefab != null)
             {

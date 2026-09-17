@@ -2225,7 +2225,7 @@ check(re.search(r"\n  brandLogo: \{fileID: [1-9]\d*\}", _bios_pf) is not None,
 
 _boards = [f for f in sorted((ROOT / "Assets/Resources/components").glob("*.prefab"))
            if "guid: e9b819df0994a58cece03a6c09fa7092" in f.read_text(encoding="utf-8")]
-check(len(_boards) == 7, f"найдено 7 префабов плат (нашлось {len(_boards)})")
+check(len(_boards) == 8, f"найдено 8 префабов плат (нашлось {len(_boards)})")
 _nologo = [f.name for f in _boards if "brandLogo:" not in f.read_text(encoding="utf-8")]
 check(not _nologo, f"у всех плат есть поле логотипа (без него: {_nologo})")
 
@@ -2233,7 +2233,7 @@ check(not _nologo, f"у всех плат есть поле логотипа (б
 # ---------------------------------------------------------------------------
 print("\nПлата MSG black: материал на всех мешах")
 
-_ex1 = (ROOT / "Assets/Resources/components/EXATX1.prefab").read_text(encoding="utf-8")
+_ex1 = (ROOT / "Assets/Resources/components/MSG_ATX_Black.prefab").read_text(encoding="utf-8")
 _MSG_MAT = "310d10b66fa410c44a81de5e56613d1a"   # Assets/Material/Msg_black.mat
 _OLD_MAT = "1829d74e1aad83c468e19ea93472d497"   # Assets/Material/Motherboard.mat
 
@@ -2258,8 +2258,9 @@ for _body in _renderers:
     _m = re.search(r"m_Materials:\n(.*?)\n  m_StaticBatchInfo", _body, re.S)
     if _m:
         _with_mats.append(_m.group(1))
-check(len(_with_mats) == 33,
-      f"у платы 33 меша с материалами (нашлось {len(_with_mats)})")
+# 33 детали платы + 2 радиатора (sheild, sheild1), добавленные Semyalol.
+check(len(_with_mats) == 35,
+      f"у платы 35 мешей с материалами (нашлось {len(_with_mats)})")
 _stale = [b for b in _with_mats if _OLD_MAT in b]
 check(not _stale,
       f"ни один меш не остался на старом материале (осталось: {len(_stale)})")
@@ -2352,8 +2353,8 @@ check("continue;" in _after_missing,
       "не найденный в FBX меш пропускается, а не обнуляется")
 check("sharedMesh = null" not in _tool_src,
       "инструмент никогда не обнуляет меш")
-check("NameMap" in _tool_src,
-      "учтены переименования между префабом и моделью (EXATX1 -> EXATX)")
+check("NameMap" in _tool_src and "MSG_ATX_Black" in _tool_src,
+      "учтены переименования между префабом и моделью (MSG_ATX_* -> EXATX)")
 
 _meta = ROOT / "Assets/Editor/SetupMsgBoardMeshes.cs.meta"
 check(_meta.exists(), "у скрипта есть .meta")
@@ -2397,9 +2398,14 @@ if _msg.exists():
     # обе ветки останутся верными -- поэтому проверяем сам факт диагностики.
     check(isinstance(_bad, list),
           "трансформы платы MSG проверяются автоматически")
-    if _bad:
-        check("Slot" in _names or "UsbSlot" in _names,
-              f"замечен незапечённый масштаб у слотов: {sorted(_names)[:5]}")
+
+    # Semyalol переэкспортировал модель, и масштаб 0.01 у слотов пропал --
+    # именно он ломал RAM и Ports. Следим, чтобы беда не вернулась.
+    _slot_like = {n for n in _names
+                  if n.startswith("Slot") or n.startswith("Pivot")
+                  or n == "UsbSlot"}
+    check(not _slot_like,
+          f"слоты и пивоты с запечённым масштабом (выбиваются: {sorted(_slot_like)})")
 
 
 # ---------------------------------------------------------------------------
@@ -2442,6 +2448,39 @@ _logo_go_blk = re.search(
     _pcos_txt, re.S)
 check(re.search(r"m_IsActive: 1", _logo_go_blk.group(1)) is not None,
       "объект логотипа активен, видимостью управляет компонент")
+
+
+# ---------------------------------------------------------------------------
+print("\nЗагрузка не зависит от косметики")
+
+# СИМПТОМ: логотип показан, "Press power button" висит, консоль чистая, все
+# платы. Так выглядит сорванный Invoke: если ApplyBrand бросит исключение,
+# строка с Invoke НИКОГДА не выполнится, переход в ОС не будет назначен, и
+# экран BIOS останется навсегда. Поэтому загрузка планируется ПЕРВОЙ.
+_bios3 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/Bios.cs")
+    .read_text(encoding="utf-8"))
+_bs = _bios3.split("protected override void BootSystem()")[1].split("\n\t\t}")[0]
+
+check("Invoke(" in _bs and "ApplyBrand()" in _bs,
+      "BootSystem и планирует загрузку, и применяет бренд")
+check(_bs.index("Invoke(") < _bs.index("ApplyBrand()"),
+      "загрузка ставится в очередь ДО косметики")
+check("try" in _bs and "catch" in _bs,
+      "сбой брендирования не роняет загрузку BIOS")
+
+_os3 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/OperatingSystem.cs")
+    .read_text(encoding="utf-8"))
+_boot3 = _os3.split("private IEnumerator Boot()")[1].split("yield return null;")[0]
+check("try" in _boot3 and "ApplyBrand();" in _boot3,
+      "в PCOS бренд применяется под защитой: исключение обрывает корутину")
+
+# Опорные точки: без них зависание невозможно локализовать по консоли.
+check("BIOS: переход к загрузке системы" in _bios3,
+      "есть отметка о срабатывании Invoke")
+check("загрузочных записей не найдено" in _bios3,
+      "видно, когда BIOS уходит в настройки из-за пустого диска")
 
 
 unchanged = all(

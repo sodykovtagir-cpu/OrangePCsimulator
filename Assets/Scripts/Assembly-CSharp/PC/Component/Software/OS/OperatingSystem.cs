@@ -214,7 +214,17 @@ namespace PC.Component.Software.OS
             if (user != null) user.SetActive(false);
             if (loading != null) loading.SetActive(true);
 
-            ApplyBrand();
+            // Косметика не имеет права останавливать загрузку: исключение
+            // внутри корутины обрывает её целиком, и система зависает на
+            // экране запуска с чистой консолью.
+            try
+            {
+                ApplyBrand();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("PCOS: не удалось применить логотип платы: " + e);
+            }
 
             // Wait for canvas/iconParent to be fully initialized before creating icons.
             // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).
