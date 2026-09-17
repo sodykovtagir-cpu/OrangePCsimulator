@@ -1703,9 +1703,35 @@ check("raycastTarget = false" in _art_src,
 check("gpu.Damaged) continue" in _art_src,
       "мёртвая карта не рисует артефакты — она вообще не даёт сигнала")
 
-# Артефакты только на экране загрузки: после старта системы рабочий стол чист.
-check(re.search(r"if \(!\(board\.System is Bios\)\) return 0f;", _art_src) is not None,
-      "артефакты показываются только пока работает BIOS")
+# Артефакты должны быть видны ВЕЗДЕ, а не только на загрузке.
+check("is Bios" not in _art_src,
+      "эффект не ограничен экраном BIOS")
+
+# ПРИЧИНА, по которой полос не было видно в первой версии: и загрузка системы
+# (Display.ApplyScreen), и окна, и меню «Пуск» зовут SetAsLastSibling, вставая
+# последними среди потомков — то есть поверх всего, что добавлено раньше.
+# Поэтому эффекту нужен собственный Canvas с перекрытием сортировки.
+check("overrideSorting = true" in _art_src,
+      "у слоя артефактов своя сортировка")
+_so = re.search(r"ArtifactSortingOrder = (\d+)", _art_src)
+check(_so is not None, "порядок сортировки слоя задан")
+if _so:
+    check(int(_so.group(1)) >= 1000,
+          f"слой артефактов заведомо выше окон и рабочего стола ({_so.group(1)})")
+check(re.search(r"sortingOrder = ArtifactSortingOrder", _art_src) is not None,
+      "порядок действительно применяется к Canvas слоя")
+check(re.search(r"typeof\(Canvas\)", _art_src) is not None,
+      "слой артефактов — отдельный Canvas, а не просто объект")
+
+# Warp обязан двигать САМ экран, иначе он возит прозрачный слой и толку ноль.
+# Срез строго по телу метода: "\n\t}" — закрывающая скобка на уровне класса.
+# Резать по следующему комментарию нельзя, комментария может не оказаться, и
+# тогда в срез попадёт соседний метод.
+_warp = _art_src.split("private void DrawWarp(")[1].split("\n\t}")[0]
+check("ScreenRoot()" in _warp,
+      "искажение двигает картинку экрана, а не слой артефактов")
+check("Parent()" not in _warp,
+      "искажение не трогает слой артефактов")
 
 # Виды сбоя. Однообразные полосы выглядели ненатурально — нужно несколько
 # разных исходов, включая «всё обошлось» и синий экран.
@@ -1744,9 +1770,9 @@ check(re.search(r"Glitch\.BlueScreen", _art_src) is not None
 # Эффект обязан убирать за собой: сдвинутый канвас нельзя оставить сдвинутым.
 check("ResetVisuals" in _art_src,
       "экран возвращается в исходное состояние")
-check(re.search(r"parent\.anchoredPosition = Vector2\.zero;", _art_src) is not None
-      and re.search(r"parent\.localScale = Vector3\.one;", _art_src) is not None,
-      "смещение и масштаб канваса сбрасываются, иначе картинка останется кривой")
+check(re.search(r"screen\.anchoredPosition = Vector2\.zero;", _art_src) is not None
+      and re.search(r"screen\.localScale = Vector3\.one;", _art_src) is not None,
+      "смещение и масштаб ЭКРАНА сбрасываются, иначе картинка останется кривой")
 
 # Эффект не должен сам стать причиной лагов: он обновляется по таймеру.
 check("refreshInterval" in _art_src and "Time.unscaledTime" in _art_src,

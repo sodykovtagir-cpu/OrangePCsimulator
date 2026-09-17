@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using PC.Component;
-using PC.Component.Software.OS;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,15 +8,17 @@ using UnityEngine.UI;
 using Display = PC.Component.Display;
 
 /// <summary>
-/// Артефакты повреждённой видеокарты на экране загрузки.
+/// Артефакты повреждённой видеокарты поверх всего экрана.
 /// </summary>
 /// <remarks>
-/// Показываются только пока работает BIOS, то есть на экране загрузки системы.
-/// Так это и выглядит на настоящем железе: сбоящая карта чаще всего выдаёт себя
-/// именно на первых секундах, когда система ещё не поднялась. Заодно это не
-/// мешает играть — рабочий стол остаётся чистым.
+/// Эффект живёт в СОБСТВЕННОМ Canvas с высоким sortingOrder, а не просто среди
+/// детей канваса экрана. Это принципиально: и загрузка системы
+/// (Display.ApplyScreen), и окна приложений, и меню «Пуск» зовут
+/// SetAsLastSibling, то есть встают последними в списке потомков — и накрывают
+/// собой всё, что было добавлено раньше. Именно поэтому в первой версии полосы
+/// были не видны: они оказывались под рабочим столом.
 ///
-/// Сбой выбирается случайно на каждую загрузку, а не рисуется постоянно:
+/// Сбой выбирается случайно на каждый запуск компьютера, а не рисуется постоянно:
 /// повреждённая карта ведёт себя непредсказуемо. Иногда всё проходит нормально,
 /// иногда картинку ведёт, иногда компьютер падает в синий экран. Чем сильнее
 /// разбита карта, тем реже везёт.
@@ -57,7 +58,17 @@ public class GpuArtifacts : MonoBehaviour
 
 	private readonly List<Image> stripes = new List<Image>();
 
+	/// <summary>
+	/// Порядок сортировки слоя артефактов.
+	/// </summary>
+	/// <remarks>
+	/// Заведомо выше всего, что рисует система на экране: артефакты идут от
+	/// железа, их не может перекрыть ни одно окно.
+	/// </remarks>
+	private const int ArtifactSortingOrder = 32000;
+
 	private Display display;
+	private RectTransform layer;
 	private Image overlay;
 	private Text overlayText;
 
@@ -92,10 +103,6 @@ public class GpuArtifacts : MonoBehaviour
 
 		var board = display.ConnectedBoard;
 		if (board == null) return 0f;
-
-		// Только экран загрузки. Как только BIOS передал управление системе,
-		// артефакты пропадают и рабочий стол виден нормально.
-		if (!(board.System is Bios)) return 0f;
 
 		var cards = board.GetHardwares(HardwareType.GPU);
 		if (cards == null) return 0f;
@@ -245,22 +252,25 @@ public class GpuArtifacts : MonoBehaviour
 	/// </remarks>
 	private void DrawWarp(float strength)
 	{
-		var parent = Parent();
-		if (parent == null) return;
+		// Двигаем САМ экран, а не слой артефактов: слой прозрачный, смещать
+		// его бессмысленно. Так «плывёт» настоящая картинка вместе с окнами и
+		// текстом, и ничего не нужно перерисовывать.
+		var screen = ScreenRoot();
+		if (screen == null) return;
 
 		float amp = 6f + 30f * strength;
-		parent.anchoredPosition = new Vector2(
+		screen.anchoredPosition = new Vector2(
 			Random.Range(-amp, amp), Random.Range(-amp * 0.5f, amp * 0.5f));
 
 		// Изредка кадр ещё и подрезает по вертикали — как срыв синхронизации.
 		if (Random.value < 0.25f * strength)
 		{
 			float squash = Random.Range(0.85f, 1f);
-			parent.localScale = new Vector3(1f, squash, 1f);
+			screen.localScale = new Vector3(1f, squash, 1f);
 		}
 		else
 		{
-			parent.localScale = Vector3.one;
+			screen.localScale = Vector3.one;
 		}
 	}
 
@@ -301,7 +311,40 @@ public class GpuArtifacts : MonoBehaviour
 
 	// ================= служебное =================
 
+	/// <summary>
+	/// Слой, на котором рисуются артефакты.
+	/// </summary>
+	/// <remarks>
+	/// Создаётся один раз как отдельный Canvas поверх экрана. Своё
+	/// перекрытие (overrideSorting) с большим sortingOrder гарантирует, что
+	/// эффект окажется выше любых окон и рабочего стола, сколько бы раз те ни
+	/// звали SetAsLastSibling.
+	/// </remarks>
 	private RectTransform Parent()
+	{
+		if (layer != null) return layer;
+
+		var host = container != null ? container : transform as RectTransform;
+		if (host == null) return null;
+
+		var go = new GameObject("GPU Artifacts", typeof(RectTransform), typeof(Canvas));
+		var rt = go.GetComponent<RectTransform>();
+		rt.SetParent(host, false);
+		rt.anchorMin = Vector2.zero;
+		rt.anchorMax = Vector2.one;
+		rt.offsetMin = Vector2.zero;
+		rt.offsetMax = Vector2.zero;
+
+		var c = go.GetComponent<Canvas>();
+		c.overrideSorting = true;
+		c.sortingOrder = ArtifactSortingOrder;
+
+		layer = rt;
+		return layer;
+	}
+
+	/// <summary>Сам экран монитора — то, что видит игрок.</summary>
+	private RectTransform ScreenRoot()
 	{
 		return container != null ? container : transform as RectTransform;
 	}
@@ -309,11 +352,14 @@ public class GpuArtifacts : MonoBehaviour
 	/// <summary>Вернуть экран в исходное состояние перед новым видом сбоя.</summary>
 	private void ResetVisuals()
 	{
-		var parent = Parent();
-		if (parent != null)
+		// Сбрасывать нужно ЭКРАН, который двигал Warp. Если этого не сделать,
+		// картинка останется перекошенной уже после того, как эффект прошёл, и
+		// это будет выглядеть поломкой игры, а не видеокарты.
+		var screen = ScreenRoot();
+		if (screen != null)
 		{
-			parent.anchoredPosition = Vector2.zero;
-			parent.localScale = Vector3.one;
+			screen.anchoredPosition = Vector2.zero;
+			screen.localScale = Vector3.one;
 		}
 
 		HideStripes();
