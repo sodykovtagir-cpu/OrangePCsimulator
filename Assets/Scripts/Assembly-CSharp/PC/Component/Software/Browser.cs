@@ -118,8 +118,8 @@ namespace PC.Component.Software
         /// Открыть сайт. Наследники могут вмешаться в этот момент.
         /// </summary>
         /// <remarks>
-        /// Сделано virtual ради Ondex: тот же браузер, но на каждом переходе
-        /// рискующий притащить вирус.
+        /// Точка расширения оставлена virtual: наследник может подменить
+        /// поведение перехода, не трогая сам браузер.
         /// </remarks>
         protected virtual void OpenSite(WebsiteItem site)
         {

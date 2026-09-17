@@ -77,6 +77,10 @@ namespace PC.Component.Software
 
         private Storage selectedStorage;
 
+        // Индекс выбранного диска. Хранить сам объект мало: операции файлов
+        // принимают именно номер диска в списке AllStorage.
+        private int selectedStorageIndex;
+
         private List<FileBlock> fileBlocks = new List<FileBlock>();
 
         private string extension;
@@ -84,6 +88,14 @@ namespace PC.Component.Software
         private string currentFolder = "";
 
         public string CurrentFolder => currentFolder ?? "";
+
+        /// <summary>Диск, открытый в этом окне проводника.</summary>
+        /// <remarks>
+        /// Нужен контекстному меню: между открытием меню и нажатием пункта
+        /// игрок может переключить диск в другом окне, и полагаться на общее
+        /// «текущее» значение нельзя.
+        /// </remarks>
+        public int CurrentStorageIndex => selectedStorageIndex;
 
         private readonly string[] systemFolders = new string[] { "System" };
 
@@ -235,6 +247,13 @@ namespace PC.Component.Software
             if (index < 0 || index >= os.AllStorage.Count) return;
 
             selectedStorage = os.AllStorage[index];
+            selectedStorageIndex = index;
+
+            // Система обязана знать, какой диск открыт: иначе создание папки,
+            // вставка и прочие операции уйдут на системный диск, как было
+            // раньше -- индекс там был прибит нулём.
+            os.SetActiveStorage(index);
+
             currentFolder = "";
             UpdatePathText();
             RefreshItem();
@@ -592,6 +611,11 @@ namespace PC.Component.Software
             var os = system;
             if (os != null)
             {
+                // Окно закрылось -- возвращаем работу на системный диск:
+                // рабочий стол живёт именно там, и создание ярлыка после
+                // закрытия проводника не должно уходить на чужой диск.
+                os.SetActiveStorage(0);
+
                 os.ReleaseResource();
                 base.Close();
             }
