@@ -129,11 +129,17 @@ namespace PC.Component.Software
 			var p = player;
 			if (p == null) return;
 			p.url = url;
+
+			// Видео — тяжёлая нагрузка на видеокарту, и повреждённая карта
+			// может на нём отвалиться совсем, уронив компьютер.
+			var board = system != null ? system.Board : null;
+			if (board != null && board.StressGraphics()) return;
+
 			p.Play();
 			hasVideo = true;
 			if (output != null)
 			{
-				output.color = Color.white;
+				output.color = ArtifactTint(board);
 				output.texture = render;
 			}
 			if (warning != null) warning.SetActive(false);
@@ -171,6 +177,42 @@ namespace PC.Component.Software
 			var scale = (maxSize.x / maxSize.y <= w / h) ? w / maxSize.x : h / maxSize.y;
 			var size = new Vector2(w / scale, h / scale + 40f);
 			SetDefaultSize(size);
+		}
+
+		/// <summary>
+		/// Как повреждённая видеокарта портит картинку видео.
+		/// </summary>
+		/// <remarks>
+		/// Аппаратное декодирование ломается раньше всего остального, поэтому
+		/// видео страдает заметнее интерфейса. Возможны два исхода: кадр не
+		/// декодируется вовсе (картинка чёрная, звук идёт) или декодируется с
+		/// мусором — цвета уплывают, как при переполнении буфера.
+		/// </remarks>
+		private Color ArtifactTint(Motherboard board)
+		{
+			if (board == null) return Color.white;
+
+			var cards = board.GetHardwares(HardwareType.GPU);
+			if (cards == null) return Color.white;
+
+			float worst = 0f;
+			for (int i = 0; i < cards.Count; i++)
+			{
+				var gpu = cards[i] as GPU;
+				if (gpu == null || gpu.Damaged) continue;
+				if (gpu.ArtifactStrength > worst) worst = gpu.ArtifactStrength;
+			}
+
+			if (worst <= 0f) return Color.white;
+			if (UnityEngine.Random.value > worst) return Color.white;
+
+			// Кадр не декодировался вообще: чёрный экран при живом звуке.
+			if (UnityEngine.Random.value < 0.35f) return Color.black;
+
+			// Декодировался, но с мусором: канал уплыл.
+			return UnityEngine.Random.value < 0.5f
+				? new Color(1f, 0.35f, 0.35f)
+				: new Color(0.35f, 0.6f, 1f);
 		}
 
 		private static string FormatTime(double seconds)

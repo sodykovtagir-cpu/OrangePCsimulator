@@ -99,6 +99,22 @@ namespace PC.Component
 
 			if (requiredW <= totalSupplyW)
 			{
+				// Повреждённая видеокарта иногда просто не даёт стартовать.
+				// Проверяется на каждую попытку: следующее нажатие кнопки
+				// вполне может пройти удачно.
+				if (GraphicsBlocksBoot())
+				{
+					if (Source != null && beepSound != null)
+					{
+						Source.PlayOneShot(beepSound);
+						Source.PlayOneShot(beepSound);
+					}
+
+					return "<color=red>"
+						+ Localization.GetText("Graphics Card Failure!")
+						+ "</color>";
+				}
+
 				BootSystem();
 				return message;
 			}
@@ -117,6 +133,53 @@ namespace PC.Component
 				+ " ("
 				+ requiredW.ToString()
 				+ "W)</color>";
+		}
+
+		/// <summary>
+		/// Мешает ли какая-нибудь из видеокарт включению.
+		/// </summary>
+		/// <remarks>
+		/// Достаточно одной сбоящей карты: компьютер не стартует, если хоть
+		/// одна из них в этот раз не отозвалась.
+		/// </remarks>
+		private bool GraphicsBlocksBoot()
+		{
+			var cards = GetHardwares(HardwareType.GPU);
+			if (cards == null) return false;
+
+			for (int i = 0; i < cards.Count; i++)
+			{
+				var gpu = cards[i] as GPU;
+				if (gpu != null && gpu.BlocksBoot()) return true;
+			}
+
+			return false;
+		}
+
+		/// <summary>
+		/// Нагрузить видеокарты и уронить компьютер, если они не выдержат.
+		/// </summary>
+		/// <remarks>
+		/// Зовётся из тяжёлых приложений: теста производительности, майнера,
+		/// видео. Возвращает true, если компьютер упал.
+		/// </remarks>
+		public bool StressGraphics()
+		{
+			if (!running) return false;
+
+			var cards = GetHardwares(HardwareType.GPU);
+			if (cards == null) return false;
+
+			for (int i = 0; i < cards.Count; i++)
+			{
+				var gpu = cards[i] as GPU;
+				if (gpu == null || !gpu.FailsUnderLoad()) continue;
+
+				ForceDown();
+				return true;
+			}
+
+			return false;
 		}
 
 		public void Explode()

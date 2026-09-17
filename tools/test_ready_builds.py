@@ -1322,10 +1322,68 @@ print("\nПроизводительность: экраны мониторов")
 
 
 def _strip_comments(text):
-    """Убрать комментарии, чтобы не ловить паттерны в собственных пояснениях."""
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return "\n".join(ln for ln in text.splitlines()
-                     if not ln.strip().startswith("//"))
+    """Убрать комментарии, чтобы не ловить паттерны в собственных пояснениях.
+
+    ЛОВУШКА: regex-вырезание /*...*/ съедает половину файла, если в коде есть
+    строковый литерал с такой последовательностью. Реальный случай --
+    NativeGallery.GetVideoFromGallery(callback, "Select a video", "video/*"):
+    подстрока "/*" внутри кавычек открывала "комментарий", который закрывался
+    много строк спустя, и проверки по Video.cs молча падали, хотя код был
+    правильный. Поэтому разбираем посимвольно, честно учитывая литералы.
+    """
+    out = []
+    i, n = 0, len(text)
+    state = None  # None | line | block | str | char | verb
+    while i < n:
+        c = text[i]
+        nxt = text[i + 1] if i + 1 < n else ""
+        if state is None:
+            if c == "/" and nxt == "/":
+                state = "line"; i += 2; continue
+            if c == "/" and nxt == "*":
+                state = "block"; i += 2; continue
+            if c == "@" and nxt == '"':
+                state = "verb"; out.append(c); out.append(nxt); i += 2; continue
+            if c == '"':
+                state = "str"
+            elif c == "'":
+                state = "char"
+            out.append(c); i += 1; continue
+        if state == "line":
+            if c == "\n":
+                state = None; out.append(c)
+            i += 1; continue
+        if state == "block":
+            if c == "*" and nxt == "/":
+                state = None; i += 2; continue
+            if c == "\n":
+                out.append(c)
+            i += 1; continue
+        if state == "str":
+            if c == "\\":
+                out.append(c)
+                if i + 1 < n:
+                    out.append(text[i + 1])
+                i += 2; continue
+            if c == '"':
+                state = None
+            out.append(c); i += 1; continue
+        if state == "verb":
+            if c == '"' and nxt == '"':
+                out.append(c); out.append(nxt); i += 2; continue
+            if c == '"':
+                state = None
+            out.append(c); i += 1; continue
+        if state == "char":
+            if c == "\\":
+                out.append(c)
+                if i + 1 < n:
+                    out.append(text[i + 1])
+                i += 2; continue
+            if c == "'":
+                state = None
+            out.append(c); i += 1; continue
+    return "".join(out)
 
 
 _dm_path = ROOT / "Assets/Scripts/Assembly-CSharp/DisplayManager.cs"
@@ -1955,6 +2013,157 @@ check(not _weak, f"во всех префабах порог поднят (сл�
 _nocd = [f.name for f in _with_gpu
          if "damageCooldown:" not in f.read_text(encoding="utf-8")]
 check(not _nocd, f"во всех префабах задана защита от серии ударов (без неё: {_nocd})")
+
+
+# ---------------------------------------------------------------------------
+print("\nАртефакты приступами и новые виды сбоя")
+
+# Постоянный шум читается как сломанная игра, а редкие вспышки -- как сломанное
+# железо. Эффект обязан идти эпизодами с паузами.
+check("inEpisode" in _art_src, "артефакты идут приступами, а не постоянно")
+check("episodeUntil" in _art_src, "у приступа есть момент окончания")
+check("NextGapLength" in _art_src and "NextEpisodeLength" in _art_src,
+      "длительность приступа и паузы считаются отдельно")
+
+_lu_body = _art_src.split("private void LateUpdate()")[1].split("\n\tprivate")[0]
+check("inEpisode = !inEpisode" in _lu_body,
+      "приступ и пауза сменяют друг друга")
+check("current = PickGlitch(strength)" in _lu_body,
+      "каждый приступ разыгрывает вид сбоя заново")
+
+# Пауза обязана СОКРАЩАТЬСЯ с ростом повреждения, а приступ -- удлиняться.
+_gap = _art_src.split("private float NextGapLength(")[1].split("\n\t}")[0]
+_epi = _art_src.split("private float NextEpisodeLength(")[1].split("\n\t}")[0]
+_gm = re.search(r"Mathf\.Lerp\(([\d.]+)f, ([\d.]+)f, strength\)", _gap)
+check(_gm is not None and float(_gm.group(2)) < float(_gm.group(1)),
+      "пауза между приступами короче у сильно разбитой карты")
+_em = re.search(r"Mathf\.Lerp\(([\d.]+)f, ([\d.]+)f, strength\)", _epi)
+check(_em is not None and float(_em.group(2)) > float(_em.group(1)),
+      "приступ длиннее у сильно разбитой карты")
+
+for _name in ["ThinStripes", "DeadBlocks", "Rolling", "SignalLoss",
+              "BufferOverflow"]:
+    check(f"{_name} =" in _art_src or f"{_name} = " in _art_src,
+          f"есть вид сбоя {_name}")
+
+_redraw2 = _art_src.split("private void Redraw(")[1].split("\n\t}")[0]
+for _name in ["ThinStripes", "Rolling", "SignalLoss", "BufferOverflow"]:
+    check(f"case Glitch.{_name}:" in _redraw2 and f"Draw{_name}(" in _redraw2,
+          f"{_name} действительно рисуется, а не только объявлен")
+    check(f"return Glitch.{_name};" in _art_src,
+          f"{_name} может выпасть при розыгрыше")
+
+# Выпавшие блоки памяти -- особый случай: они НЕ перерисовываются, иначе их
+# нельзя было бы стереть окном.
+check("blocksPlaced" in _art_src, "блоки памяти рисуются один раз и стоят")
+check("if (!blocksPlaced) DrawDeadBlocks(strength)" in _lu_body,
+      "блоки не перерисовываются каждый кадр")
+check("public void WipeBlocksAt(" in _art_src,
+      "блоки можно стереть, проведя сверху окном")
+
+_wipe = _art_src.split("public void WipeBlocksAt(")[1].split("\n\t}")[0]
+check("Overlaps" in _wipe and "enabled = false" in _wipe,
+      "стирается только то, что реально попало под окно")
+
+_wd = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/WindowDrag.cs")
+    .read_text(encoding="utf-8"))
+# Проверять просто наличие слова нельзя: оно осталось бы в самом методе
+# WipeArtifacts, даже если вызов из OnDrag убрать. Нужен вызов именно из
+# обработчика перетаскивания.
+_ondrag = _wd.split("public void OnDrag(")[1].split("\n    }")[0]
+check("WipeArtifacts(" in _ondrag,
+      "перетаскивание окна стирает блоки (вызов есть в OnDrag)")
+check("WipeBlocksAt" in _wd, "окно зовёт стирание блоков у эффекта")
+check("artifactsSearched" in _wd,
+      "поиск эффекта кешируется, в том числе отрицательный результат")
+
+# ---------------------------------------------------------------------------
+print("\nОтказы видеокарты: загрузка и нагрузка")
+
+check("public bool BlocksBoot()" in _gpu_src,
+      "повреждённая карта может не дать компьютеру включиться")
+_bb = _gpu_src.split("public bool BlocksBoot()")[1].split("\n\t\t}")[0]
+check("if (Damaged) return false;" in _bb,
+      "мёртвая карта не участвует: для неё есть обычная поломка")
+check("Random.value" in _bb and "ArtifactStrength" in _bb,
+      "отказ разыгрывается заново и зависит от степени повреждения")
+
+check("public bool FailsUnderLoad()" in _gpu_src,
+      "карта может отвалиться под нагрузкой")
+_ful = _gpu_src.split("public bool FailsUnderLoad()")[1].split("\n\t\t}")[0]
+check("AddArtifactLevel(1)" in _ful,
+      "отвал под нагрузкой добивает карту на ступень")
+
+_mb_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Motherboard.cs")
+    .read_text(encoding="utf-8"))
+check("GraphicsBlocksBoot()" in _mb_src, "плата спрашивает карты при включении")
+_boot = _mb_src.split("public string Boot()")[1].split("\n\t\tpublic")[0]
+check("GraphicsBlocksBoot()" in _boot and
+      _boot.index("GraphicsBlocksBoot()") < _boot.index("BootSystem()"),
+      "проверка карты идёт ДО фактического запуска системы")
+check("Graphics Card Failure!" in _boot, "игроку сообщают причину отказа")
+
+check("public bool StressGraphics()" in _mb_src, "есть проверка под нагрузкой")
+_sg = _mb_src.split("public bool StressGraphics()")[1].split("\n\t\tpublic")[0]
+check("ForceDown()" in _sg, "не выдержавшая карта роняет компьютер")
+
+_bm = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Benchmark.cs")
+    .read_text(encoding="utf-8"))
+check("StressGraphics()" in _bm, "тест производительности нагружает карту")
+
+_vid = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Video.cs")
+    .read_text(encoding="utf-8"))
+check("StressGraphics()" in _vid, "видео нагружает карту")
+check("ArtifactTint(" in _vid, "видео может рисоваться с артефактами")
+_tint = _vid.split("private Color ArtifactTint(")[1].split("\n\t\tprivate")[0]
+check("Color.black" in _tint, "кадр может не декодироваться вовсе")
+
+# Строка отказа обязана быть в локализации, иначе игрок увидит ключ.
+_tr = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+_tr_lines = _tr.splitlines()
+_hdr = _tr_lines[0].split("\t")
+_ru = _hdr.index("RU")
+_row = [l for l in _tr_lines if l.startswith("Graphics Card Failure!")]
+check(len(_row) == 1, "строка отказа видеокарты есть в переводах")
+check(len(_row[0].split("\t")) == len(_hdr),
+      "строка отказа не ломает число колонок")
+check(bool(_row[0].split("\t")[_ru].strip()),
+      "у строки отказа есть русский перевод")
+
+# ---------------------------------------------------------------------------
+print("\nПодключение монитора к компьютеру")
+
+_rc = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/Raycast.cs").read_text(encoding="utf-8"))
+
+# БАГ: триггер приближения перехватывал клик, и ветка configuration не
+# выполнялась вовсе -- она стояла в else после IReceiverDown.
+check("HandleConfiguration(" in _rc, "режим подключения вынесен отдельно")
+_shoot = _rc.split("public void ShootRaycast(")[1]
+_i_conf = _shoot.index("if (configuration)")
+_i_recv = _shoot.index("IReceiverDown")
+check(_i_conf < _i_recv,
+      "режим подключения проверяется РАНЬШЕ триггера приближения")
+
+_hc = _rc.split("private bool HandleConfiguration(")[1].split("\n\t}")[0]
+check("GetComponentInParent<PC.Component.Display>()" in _hc,
+      "монитор ищется вверх по иерархии, а не на объекте под лучом")
+check("CompareTag" not in _hc,
+      "выбор монитора больше не зависит от тега на объекте под лучом")
+
+check("private Motherboard FindMotherboard(" in _rc,
+      "поиск платы вынесен отдельно")
+_fm = _rc.split("private Motherboard FindMotherboard(")[1].split("\n\t}")[0]
+check("GetComponentInParent<Motherboard>()" in _fm,
+      "плату можно выбрать нажатием на неё саму")
+check("GetComponentInParent<PC.Component.Case>()" in _fm,
+      "плату можно выбрать нажатием на корпус")
+check("Hardware as Motherboard" in _fm,
+      "у корпуса берётся именно вставленная плата")
 
 
 unchanged = all(

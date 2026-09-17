@@ -41,7 +41,32 @@ public class GpuArtifacts : MonoBehaviour
 		ColorShift = 3,
 
 		/// <summary>Синий экран: загрузка сорвалась.</summary>
-		BlueScreen = 4
+		BlueScreen = 4,
+
+		/// <summary>Частые узкие белые полосы — «расчёска» по всему экрану.</summary>
+		ThinStripes = 5,
+
+		/// <summary>
+		/// Чёрные квадраты: выпавшие блоки видеопамяти.
+		/// </summary>
+		/// <remarks>
+		/// Ведут себя не как остальные виды: они НЕ перерисовываются каждый
+		/// раз, а стоят на месте, и их можно «стереть», проведя сверху окном.
+		/// Так ведёт себя застрявший кадровый буфер — область не обновляется,
+		/// пока поверх неё что-нибудь не перерисуют.
+		/// </remarks>
+		DeadBlocks = 6,
+
+		/// <summary>Кадр уезжает вверх-вниз, как при плохом сигнале.</summary>
+		Rolling = 7,
+
+		/// <summary>Сигнала нет вовсе: экран гаснет.</summary>
+		SignalLoss = 8,
+
+		/// <summary>
+		/// Переполнение буфера: мусор из невыгруженных кусков кадра.
+		/// </summary>
+		BufferOverflow = 9
 	}
 
 	[SerializeField]
@@ -72,9 +97,27 @@ public class GpuArtifacts : MonoBehaviour
 	private Image overlay;
 	private Text overlayText;
 
+	[SerializeField]
+	[Tooltip("Сколько секунд длится приступ артефактов, минимум и максимум.")]
+	private Vector2 episodeLength = new Vector2(0.6f, 4f);
+
+	[SerializeField]
+	[Tooltip("Сколько секунд между приступами, минимум и максимум.")]
+	private Vector2 episodeGap = new Vector2(3f, 25f);
+
 	private float nextRefresh;
 	private Glitch current;
 	private bool decided;
+
+	/// <summary>Идёт ли приступ прямо сейчас.</summary>
+	private bool inEpisode;
+
+	/// <summary>Время, когда текущий приступ или пауза закончится.</summary>
+	private float episodeUntil;
+
+	private readonly List<Image> blocks = new List<Image>();
+	private bool blocksPlaced;
+	private float rollOffset;
 
 	private void Awake()
 	{
@@ -142,10 +185,40 @@ public class GpuArtifacts : MonoBehaviour
 
 		// Синий экран — самый тяжёлый исход, поэтому он заметно вероятнее у
 		// сильно разбитой карты и почти не встречается у слегка задетой.
-		if (roll < 0.15f * strength) return Glitch.BlueScreen;
-		if (roll < 0.45f) return Glitch.Stripes;
-		if (roll < 0.75f) return Glitch.Warp;
-		return Glitch.ColorShift;
+		if (roll < 0.10f * strength) return Glitch.BlueScreen;
+		if (roll < 0.18f * strength) return Glitch.SignalLoss;
+
+		// Остальные виды равновероятны: это просто разные способы сломаться.
+		switch (Random.Range(0, 7))
+		{
+			case 0: return Glitch.Stripes;
+			case 1: return Glitch.ThinStripes;
+			case 2: return Glitch.Warp;
+			case 3: return Glitch.Rolling;
+			case 4: return Glitch.ColorShift;
+			case 5: return Glitch.DeadBlocks;
+			default: return Glitch.BufferOverflow;
+		}
+	}
+
+	/// <summary>
+	/// Насколько долго карта держится между приступами.
+	/// </summary>
+	/// <remarks>
+	/// Слегка задетая карта сбоит редкими короткими вспышками, разбитая —
+	/// почти непрерывно. Поэтому пауза сокращается, а приступ удлиняется с
+	/// ростом повреждения.
+	/// </remarks>
+	private float NextGapLength(float strength)
+	{
+		float gap = Random.Range(episodeGap.x, episodeGap.y);
+		return gap * Mathf.Lerp(1f, 0.15f, strength);
+	}
+
+	private float NextEpisodeLength(float strength)
+	{
+		float len = Random.Range(episodeLength.x, episodeLength.y);
+		return len * Mathf.Lerp(0.5f, 1.6f, strength);
 	}
 
 	private void LateUpdate()
@@ -161,20 +234,55 @@ public class GpuArtifacts : MonoBehaviour
 			return;
 		}
 
+		float now = Time.unscaledTime;
+
+		// Артефакты идут ПРИСТУПАМИ, а не постоянным фоном. Живая сбоящая
+		// карта ведёт себя именно так: секунду сыпет мусором, потом minute
+		// работает как ни в чём не бывало. Постоянный шум читается как
+		// сломанная игра, а редкие вспышки — как сломанное железо.
 		if (!decided)
 		{
 			decided = true;
-			current = PickGlitch(strength);
+			inEpisode = false;
+			episodeUntil = now + NextGapLength(strength);
+			current = Glitch.None;
 			ResetVisuals();
 		}
 
-		if (current == Glitch.None)
+		if (now >= episodeUntil)
+		{
+			inEpisode = !inEpisode;
+
+			if (inEpisode)
+			{
+				// Каждый приступ — заново разыгранный вид сбоя. Одна и та же
+				// карта может то полосить, то ронять сигнал.
+				current = PickGlitch(strength);
+				episodeUntil = now + NextEpisodeLength(strength);
+				ResetVisuals();
+			}
+			else
+			{
+				episodeUntil = now + NextGapLength(strength);
+				current = Glitch.None;
+				ResetVisuals();
+			}
+		}
+
+		if (!inEpisode || current == Glitch.None)
 		{
 			HideAll();
 			return;
 		}
 
-		float now = Time.unscaledTime;
+		// Выпавшие блоки памяти рисуются ОДИН раз и дальше стоят на месте:
+		// в этом весь смысл — их можно стереть, проведя сверху окном.
+		if (current == Glitch.DeadBlocks)
+		{
+			if (!blocksPlaced) DrawDeadBlocks(strength);
+			return;
+		}
+
 		if (now < nextRefresh) return;
 		nextRefresh = now + refreshInterval;
 
@@ -212,6 +320,18 @@ public class GpuArtifacts : MonoBehaviour
 				break;
 			case Glitch.BlueScreen:
 				DrawBlueScreen();
+				break;
+			case Glitch.ThinStripes:
+				DrawThinStripes(strength);
+				break;
+			case Glitch.Rolling:
+				DrawRolling(strength);
+				break;
+			case Glitch.SignalLoss:
+				DrawSignalLoss();
+				break;
+			case Glitch.BufferOverflow:
+				DrawBufferOverflow(strength);
 				break;
 		}
 	}
@@ -325,6 +445,215 @@ public class GpuArtifacts : MonoBehaviour
 		}
 	}
 
+	/// <summary>Частые узкие белые полосы по всему экрану.</summary>
+	/// <remarks>
+	/// Отличается от Stripes не только цветом: полос вдвое больше, они тонкие,
+	/// во всю ширину и стоят почти ровными рядами. Так выглядит сбой развёртки,
+	/// а не выпавшая память.
+	/// </remarks>
+	private void DrawThinStripes(float strength)
+	{
+		var parent = Parent();
+		if (parent == null) return;
+
+		int want = Mathf.Max(2, Mathf.RoundToInt(maxStripes * 2f * strength));
+		EnsureStripes(want, parent);
+
+		var size = parent.rect.size;
+		float step = size.y / Mathf.Max(1, want);
+
+		for (int i = 0; i < stripes.Count; i++)
+		{
+			var stripe = stripes[i];
+			if (stripe == null) continue;
+
+			if (i >= want)
+			{
+				stripe.enabled = false;
+				continue;
+			}
+
+			stripe.enabled = true;
+
+			var rt = stripe.rectTransform;
+			rt.sizeDelta = new Vector2(size.x, Random.Range(1f, 2.5f));
+			rt.anchoredPosition = new Vector2(
+				0f,
+				-size.y * 0.5f + step * i + Random.Range(-step * 0.2f, step * 0.2f));
+
+			float v = Random.Range(0.75f, 1f);
+			stripe.color = new Color(v, v, v, Mathf.Lerp(0.4f, 0.95f, strength));
+		}
+	}
+
+	/// <summary>
+	/// Чёрные квадраты: выпавшие блоки видеопамяти.
+	/// </summary>
+	/// <remarks>
+	/// Рисуются один раз и остаются на месте. Стираются, когда сверху проводят
+	/// окном: этим занимается WipeBlocksAt, который зовёт перетаскивание окна.
+	/// </remarks>
+	private void DrawDeadBlocks(float strength)
+	{
+		var parent = Parent();
+		if (parent == null) return;
+
+		int want = Mathf.Max(1, Mathf.RoundToInt(10f * strength));
+		EnsureBlocks(want, parent);
+
+		var size = parent.rect.size;
+
+		for (int i = 0; i < blocks.Count; i++)
+		{
+			var block = blocks[i];
+			if (block == null) continue;
+
+			if (i >= want)
+			{
+				block.enabled = false;
+				continue;
+			}
+
+			block.enabled = true;
+
+			float side = Random.Range(size.y * 0.06f, size.y * 0.22f);
+			var rt = block.rectTransform;
+			rt.sizeDelta = new Vector2(side, side);
+			rt.anchoredPosition = new Vector2(
+				Random.Range(-size.x * 0.5f, size.x * 0.5f),
+				Random.Range(-size.y * 0.5f, size.y * 0.5f));
+
+			block.color = Color.black;
+		}
+
+		blocksPlaced = true;
+	}
+
+	/// <summary>
+	/// Стереть выпавшие блоки под указанной точкой экрана.
+	/// </summary>
+	/// <remarks>
+	/// Зовётся, когда игрок таскает окно: перерисованная область «чинится»,
+	/// ровно как застрявший кадровый буфер. Координата — в пространстве слоя
+	/// артефактов.
+	/// </remarks>
+	public void WipeBlocksAt(Vector2 worldPoint, Vector2 wipeSize)
+	{
+		if (!blocksPlaced) return;
+
+		var parent = Parent();
+		if (parent == null) return;
+
+		Vector2 local;
+		if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+			parent, worldPoint, null, out local)) return;
+
+		var wipe = new Rect(
+			local.x - wipeSize.x * 0.5f, local.y - wipeSize.y * 0.5f,
+			wipeSize.x, wipeSize.y);
+
+		for (int i = 0; i < blocks.Count; i++)
+		{
+			var block = blocks[i];
+			if (block == null || !block.enabled) continue;
+
+			var rt = block.rectTransform;
+			var pos = rt.anchoredPosition;
+			var half = rt.sizeDelta * 0.5f;
+			var box = new Rect(pos.x - half.x, pos.y - half.y,
+				rt.sizeDelta.x, rt.sizeDelta.y);
+
+			if (wipe.Overlaps(box)) block.enabled = false;
+		}
+	}
+
+	/// <summary>Кадр уезжает вверх-вниз, как при плохом сигнале.</summary>
+	/// <remarks>
+	/// Отличие от Warp: смещение не случайное, а ползущее в одну сторону с
+	/// заворотом — картинка именно «прокручивается», а не дрожит.
+	/// </remarks>
+	private void DrawRolling(float strength)
+	{
+		var screen = ScreenRoot();
+		if (screen == null) return;
+
+		var parent = Parent();
+		float height = parent != null ? parent.rect.size.y : 300f;
+
+		rollOffset += (20f + 160f * strength) * refreshInterval;
+		if (rollOffset > height) rollOffset -= height;
+
+		screen.anchoredPosition = new Vector2(0f, rollOffset - height * 0.5f);
+		screen.localScale = Vector3.one;
+	}
+
+	/// <summary>Сигнал пропал: экран гаснет совсем.</summary>
+	private void DrawSignalLoss()
+	{
+		var img = EnsureOverlay();
+		if (img == null) return;
+
+		HideStripes();
+
+		img.enabled = true;
+		img.color = Color.black;
+
+		if (overlayText != null) overlayText.enabled = false;
+	}
+
+	/// <summary>
+	/// Переполнение буфера: куски кадра не выгружаются и налезают друг на друга.
+	/// </summary>
+	/// <remarks>
+	/// Рисуется крупными прямоугольниками неопрятных цветов, часть из которых
+	/// повторяет соседние — как невыгруженные фрагменты предыдущих кадров.
+	/// </remarks>
+	private void DrawBufferOverflow(float strength)
+	{
+		var parent = Parent();
+		if (parent == null) return;
+
+		int want = Mathf.Max(2, Mathf.RoundToInt(6f + 10f * strength));
+		EnsureStripes(want, parent);
+
+		var size = parent.rect.size;
+		Color last = Color.magenta;
+
+		for (int i = 0; i < stripes.Count; i++)
+		{
+			var stripe = stripes[i];
+			if (stripe == null) continue;
+
+			if (i >= want)
+			{
+				stripe.enabled = false;
+				continue;
+			}
+
+			stripe.enabled = true;
+
+			var rt = stripe.rectTransform;
+			rt.sizeDelta = new Vector2(
+				Random.Range(size.x * 0.15f, size.x * 0.6f),
+				Random.Range(size.y * 0.08f, size.y * 0.35f));
+			rt.anchoredPosition = new Vector2(
+				Random.Range(-size.x * 0.5f, size.x * 0.5f),
+				Random.Range(-size.y * 0.5f, size.y * 0.5f));
+
+			// Часть блоков повторяет предыдущий цвет: это и создаёт ощущение
+			// залипшего, невыгруженного куска кадра.
+			if (Random.value < 0.4f)
+			{
+				stripe.color = last;
+				continue;
+			}
+
+			last = new Color(Random.value, Random.value, Random.value,
+				Mathf.Lerp(0.3f, 0.75f, strength));
+			stripe.color = last;
+		}
+	}
+
 	// ================= служебное =================
 
 	/// <summary>
@@ -429,8 +758,40 @@ public class GpuArtifacts : MonoBehaviour
 		}
 
 		HideStripes();
+		HideBlocks();
+		rollOffset = 0f;
 		if (overlay != null) overlay.enabled = false;
 		if (overlayText != null) overlayText.enabled = false;
+	}
+
+	private void HideBlocks()
+	{
+		// Сбрасываем и флаг: следующий приступ выпавшей памяти должен
+		// разложить блоки заново, а не воскресить уже стёртые игроком.
+		blocksPlaced = false;
+
+		for (int i = 0; i < blocks.Count; i++)
+		{
+			if (blocks[i] != null && blocks[i].enabled) blocks[i].enabled = false;
+		}
+	}
+
+	private void EnsureBlocks(int want, RectTransform parent)
+	{
+		while (blocks.Count < want)
+		{
+			var go = NewUiObject("Artifact Block", parent,
+				typeof(RectTransform), typeof(Image));
+			var rt = go.GetComponent<RectTransform>();
+			rt.SetParent(parent, false);
+			rt.anchorMin = new Vector2(0.5f, 0.5f);
+			rt.anchorMax = new Vector2(0.5f, 0.5f);
+			rt.pivot = new Vector2(0.5f, 0.5f);
+
+			var img = go.GetComponent<Image>();
+			img.raycastTarget = false;
+			blocks.Add(img);
+		}
 	}
 
 	private void HideAll()

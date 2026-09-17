@@ -40,6 +40,16 @@ namespace PC.Component
 		[Tooltip("Звук повреждения карты.")]
 		private AudioClip damageSound;
 
+		[SerializeField]
+		[Tooltip("Шанс, что повреждённая карта не даст компьютеру включиться.")]
+		[Range(0f, 1f)]
+		private float bootFailureChance = 0.35f;
+
+		[SerializeField]
+		[Tooltip("Шанс, что карта отвалится под нагрузкой (тест, майнинг, видео).")]
+		[Range(0f, 1f)]
+		private float loadFailureChance = 0.4f;
+
 		private AudioSource source;
 
 		/// <summary>
@@ -67,6 +77,24 @@ namespace PC.Component
 				if (ArtifactLevel <= 0) return 0f;
 				return Mathf.Clamp01((float)ArtifactLevel / MaxArtifactLevel);
 			}
+		}
+
+		/// <summary>
+		/// Не даст ли карта включить компьютер на этот раз.
+		/// </summary>
+		/// <remarks>
+		/// Разыгрывается заново на КАЖДУЮ попытку запуска: в этом вся суть
+		/// умирающей карты. Один раз компьютер не стартует, игрок жмёт кнопку
+		/// снова — и он включается как ни в чём не бывало. Постоянный отказ
+		/// читался бы как «карта сломана совсем», а для этого уже есть
+		/// Damaged.
+		/// </remarks>
+		public bool BlocksBoot()
+		{
+			if (Damaged) return false;
+			if (ArtifactLevel <= 0) return false;
+
+			return Random.value < bootFailureChance * ArtifactStrength;
 		}
 
 		protected override void Start()
@@ -110,6 +138,28 @@ namespace PC.Component
 
 			// Дошли до предела — карта больше не работает.
 			if (ArtifactLevel >= MaxArtifactLevel) Damage();
+		}
+
+		/// <summary>
+		/// Проверить карту под нагрузкой: тест, майнинг, видео.
+		/// </summary>
+		/// <remarks>
+		/// Возвращает true, если карта не выдержала. Нагрузка — это именно то,
+		/// на чём сыпется повреждённая карта: в простое она может держаться
+		/// сколько угодно, а на тесте отваливается сразу.
+		///
+		/// Отвал НЕ означает смерть: карта добавляет ступень повреждения и
+		/// роняет компьютер, но остаётся рабочей, пока ступени не кончатся.
+		/// </remarks>
+		public bool FailsUnderLoad()
+		{
+			if (Damaged) return false;
+			if (ArtifactLevel <= 0) return false;
+
+			if (Random.value >= loadFailureChance * ArtifactStrength) return false;
+
+			AddArtifactLevel(1);
+			return true;
 		}
 
 		public override void ToData(JObject jObject)
