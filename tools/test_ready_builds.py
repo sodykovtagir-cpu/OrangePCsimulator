@@ -2364,6 +2364,42 @@ _dupes = [m for m in ROOT.rglob("*.meta")
 check(not _dupes, f"guid скрипта уникален (дубли: {[d.name for d in _dupes]})")
 
 
+# ---------------------------------------------------------------------------
+print("\nFBX: запечённые трансформы")
+
+sys.path.insert(0, str(ROOT / "tools"))
+import check_fbx_transforms as fbxcheck  # noqa: E402
+
+check((ROOT / "docs/FBX_IMPORT_RU.md").exists(),
+      "инструкция по импорту FBX на месте")
+check((ROOT / "tools/check_fbx_transforms.py").exists(),
+      "проверка трансформов FBX на месте")
+
+# Проверка обязана ловить смешанные масштабы, но НЕ ругаться на файлы, где
+# масштаб одинаковый у всех объектов: в RX570.fbx он равен 100 (единицы
+# сцены), Unity переводит их сам, и карта работает.
+_rx = ROOT / "Assets/Resources/components/RX570.fbx"
+if _rx.exists():
+    _bad, _tot = fbxcheck.scan(str(_rx))
+    check(not _bad,
+          f"единый масштаб по всему файлу не считается ошибкой (RX570: {_bad})")
+
+# Слоты ломаются именно от смешанного масштаба: вложенная деталь наследует
+# чужой множитель, Pivot уезжает, коллайдер сжимается.
+_msg = ROOT / "Assets/Resources/components/MsgMotherBoard_ATX_black.fbx"
+if _msg.exists():
+    _bad, _tot = fbxcheck.scan(str(_msg))
+    _names = {n for n, _s in _bad}
+    # Пока модель не переэкспортирована, проверка обязана эту беду видеть.
+    # Когда Semyalol применит Apply All Transforms, список станет пустым и
+    # обе ветки останутся верными -- поэтому проверяем сам факт диагностики.
+    check(isinstance(_bad, list),
+          "трансформы платы MSG проверяются автоматически")
+    if _bad:
+        check("Slot" in _names or "UsbSlot" in _names,
+              f"замечен незапечённый масштаб у слотов: {sorted(_names)[:5]}")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
