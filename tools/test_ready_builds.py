@@ -2641,6 +2641,54 @@ check("SetActiveStorage(storage)" in _sub,
       "пункт «Создать» переключает диск перед созданием")
 
 
+# ---------------------------------------------------------------------------
+print("\nЗагрузка сохранения: предметы из подпапок")
+
+# БАГ: загрузчик искал предмет строго как Components/<spawnId>, поэтому любой
+# префаб из подпапки не находился. В логе -- «Prefab of ... not found!» и
+# «N items failed to load», а на деле молча пропадали ящики готовых сборок:
+# они лежат в Components/ready.
+_sm = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+
+check("FindItemPrefab(" in _sm, "поиск префаба вынесен отдельно")
+_load = _sm.split("foreach (var it in cdat.itemData)")[1][:400]
+check("FindItemPrefab(it.spawnId)" in _load,
+      "загрузка предметов идёт через общий поиск")
+check('$"Components/{it.spawnId}"' not in _load,
+      "прямой путь без подпапок больше не используется")
+
+_find = _sm.split("private static GameObject FindItemPrefab(")[1].split("\n    }")[0]
+check("itemFolders" in _find, "известные подпапки перебираются")
+check("LoadAll" in _find,
+      "есть запасной поиск по всей папке для неизвестных подпапок")
+check("prefabCache" in _find, "результат кешируется, перебор не на каждый предмет")
+check("prefabCache[spawnId] = found" in _find,
+      "кешируется и отрицательный результат")
+
+# Все сохраняемые предметы обязаны находиться загрузчиком.
+_root_prefabs = {f.stem for f in (ROOT / "Assets/Resources/components").glob("*.prefab")}
+_sub_prefabs = list((ROOT / "Assets/Resources/components").glob("*/*.prefab"))
+_saveable_sub = []
+for _f in _sub_prefabs:
+    _m = re.search(r"spawnId: (.+)", _f.read_text(encoding="utf-8", errors="replace"))
+    if _m and _m.group(1).strip():
+        _saveable_sub.append((_f.stem, _m.group(1).strip()))
+
+# Такие предметы существуют (ящики готовых сборок) -- значит поддержка подпапок
+# обязана быть, иначе сохранение их теряет.
+check(len(_saveable_sub) > 0,
+      f"есть сохраняемые предметы в подпапках ({len(_saveable_sub)} шт.)")
+
+_folders = {f.parent.name for f in _sub_prefabs}
+_listed = re.search(r"itemFolders = \{(.*?)\}", _sm, re.S)
+check(_listed is not None, "список подпапок задан")
+if _listed:
+    for _folder in _folders:
+        check(f'"{_folder}/"' in _listed.group(1) or "LoadAll" in _find,
+              f"подпапка {_folder} находится загрузчиком")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
