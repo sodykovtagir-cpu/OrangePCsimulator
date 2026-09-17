@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: ReadyPC_Dream_White
+  m_Name: MSG_ATX_Black
   m_EditorClassIdentifier: 
-  itemName: '{Dream PC} ({White})'
-  price: 15325
-  bitcoin: 0
-  sprite: {fileID: 21300000, guid: 57366effb45f43c4e94535733298b9ff, type: 3}
-  spawn: {fileID: 638406582065898177, guid: 6a99415a36b30b5b74614927d4ff52ad, type: 3}
+  itemName: MSG ATX (Black)
+  price: 520
+  bitcoin: 6
+  sprite: {fileID: 21300000, guid: b8697cfa7c5faa944a825b61d9026736, type: 3}
+  spawn: {fileID: 1569340072111286, guid: 4a64bdb88397c7646a3877ae9db846f8, type: 3}
   large: 1
   translateDescription: 1
-  description: 'Dream PC Description'
+  description: 

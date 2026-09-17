@@ -289,18 +289,26 @@ def aquarium_pc(case: str) -> List[PartRef]:
 
 
 def dream_pc(case: str) -> List[PartRef]:
-    """Полный фарш: EXATX, 512 ГБ RGB-памяти, RTX 5090 и Titan V."""
+    """Полный фарш: плата MSG, 512 ГБ RGB-памяти, RTX 5090 и RTX 4080 Ti.
+
+    Плата взята MSG_ATX_Black, а не EXATX: набор слотов у них совпадает
+    один в один (CPU 1, кулер 1, GPU 2, RAM 8, M.2 2, USB 1), поэтому сборка
+    та же, но флагманский компьютер получает флагманскую плату с брендом на
+    экране загрузки. Для белого корпуса подставляется белая плата -- см.
+    board ниже.
+    """
+    board = "MSG_ATX_White" if "White" in case else "MSG_ATX_Black"
     parts = [
-        p("EXATX", "Motherboard"),
-        p("CPU RMD Ryzen 9 7950X", "CPU", host="EXATX"),
-        p("WaterCooler", "Cooler", host="EXATX"),
+        p(board, "Motherboard"),
+        p("CPU RMD Ryzen 9 7950X", "CPU", host=board),
+        p("WaterCooler", "Cooler", host=board),
     ]
-    parts += [p("RAM 64GB(RGB)", "RAM", host="EXATX") for _ in range(8)]
+    parts += [p("RAM 64GB(RGB)", "RAM", host=board) for _ in range(8)]
     parts += [
-        p("RTX5090", "GPU", host="EXATX"),
-        p("RTX4080Ti", "GPU", host="EXATX"),
-        p("SSD_M.2 1TB", "Drive", host="EXATX"),
-        p("SSD_M.2 1TB", "Drive", host="EXATX"),
+        p("RTX5090", "GPU", host=board),
+        p("RTX4080Ti", "GPU", host=board),
+        p("SSD_M.2 1TB", "Drive", host=board),
+        p("SSD_M.2 1TB", "Drive", host=board),
         # Корпусные слоты Supply принимают только match=0, то есть до
         # 1.1 кВт: PSU 2kW (match=1) ставится лишь в рамы майнеров.
         p("PSU 1.1kW", "Supply"),

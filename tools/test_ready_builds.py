@@ -2546,6 +2546,49 @@ check(_startup_name != "Startup",
       "логотип обязан скрываться отдельно")
 
 
+# ---------------------------------------------------------------------------
+print("\nПК мечты на плате MSG")
+
+_MSG_BLACK_PREFAB = "4a64bdb88397c7646a3877ae9db846f8"
+_MSG_WHITE_PREFAB = "247cb5d98fc608a41809b66adf448d9d"
+_EXATX_PREFAB = "c5280c08bb5d6134e84569e137d4869e"
+
+for _suffix, _want, _other in (
+        ("Black", _MSG_BLACK_PREFAB, _MSG_WHITE_PREFAB),
+        ("White", _MSG_WHITE_PREFAB, _MSG_BLACK_PREFAB)):
+    _dream = (ROOT / f"Assets/Resources/components/ready/ReadyPC_Dream_{_suffix}.prefab")
+    _txt = _dream.read_text(encoding="utf-8")
+    check(_txt.count(_want) == 1,
+          f"Dream {_suffix}: стоит плата MSG нужного цвета")
+    # Цвет платы обязан совпадать с цветом сборки, иначе внутри белого
+    # корпуса окажется чёрная плата.
+    check(_other not in _txt,
+          f"Dream {_suffix}: плата другого цвета не попала в сборку")
+    check(_EXATX_PREFAB not in _txt,
+          f"Dream {_suffix}: старая плата EXATX заменена")
+
+# Платы обязаны продаваться отдельно: без ShopItem генератор считает их
+# цену нулевой, и готовая сборка выходит дешевле своих деталей.
+_shop = (ROOT / "Assets/MonoBehaviour/Shop.asset").read_text(encoding="utf-8")
+for _name in ("MSG_ATX_Black", "MSG_ATX_White"):
+    _item = ROOT / f"Assets/MonoBehaviour/{_name}.asset"
+    check(_item.exists(), f"{_name}: есть карточка в магазине")
+    _meta = ROOT / f"Assets/MonoBehaviour/{_name}.asset.meta"
+    check(_meta.exists(), f"{_name}: у карточки есть .meta")
+    _g = re.search(r"guid: (\w+)", _meta.read_text(encoding="utf-8")).group(1)
+    check(f"guid: {_g}" in _shop, f"{_name}: карточка добавлена на страницу Shop")
+    _src = _item.read_text(encoding="utf-8")
+    _price = int(re.search(r"price: (\d+)", _src).group(1))
+    check(_price > 0, f"{_name}: цена задана ({_price})")
+
+# Описание в магазине не должно врать про начинку.
+_tr2 = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+_desc = [l for l in _tr2.splitlines() if l.startswith("Dream PC Description")]
+check(len(_desc) == 1, "описание ПК мечты на месте")
+check("EXATX" not in _desc[0], "в описании больше не упоминается EXATX")
+check("MSG" in _desc[0], "в описании указана плата MSG")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

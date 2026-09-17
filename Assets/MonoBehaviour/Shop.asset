@@ -105,6 +105,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: cdba4516448b5164fa7e9315cc05aa55, type: 2}
     - {fileID: 11400000, guid: 1f54e0368c9273246aedd94cff996a3c, type: 2}
     - {fileID: 11400000, guid: 50add003af1603a48a6f53914617f39c, type: 2}
+    - {fileID: 11400000, guid: 3cb585507272a788da4b73e9b55c03e6, type: 2}
+    - {fileID: 11400000, guid: ca13932357fd4108e70929baed762b43, type: 2}
   - pageName: Monitor
     item:
     - {fileID: 11400000, guid: d995c4bad809dcd42a704d02bbc59c91, type: 2}
