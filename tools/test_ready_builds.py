@@ -2223,9 +2223,54 @@ check(re.search(r"\n  brandLogo: \{fileID: [1-9]\d*\}", _bios_pf) is not None,
 
 _boards = [f for f in sorted((ROOT / "Assets/Resources/components").glob("*.prefab"))
            if "guid: e9b819df0994a58cece03a6c09fa7092" in f.read_text(encoding="utf-8")]
-check(len(_boards) == 6, f"найдено 6 префабов плат (нашлось {len(_boards)})")
+check(len(_boards) == 7, f"найдено 7 префабов плат (нашлось {len(_boards)})")
 _nologo = [f.name for f in _boards if "brandLogo:" not in f.read_text(encoding="utf-8")]
 check(not _nologo, f"у всех плат есть поле логотипа (без него: {_nologo})")
+
+
+# ---------------------------------------------------------------------------
+print("\nПлата MSG black: материал на всех мешах")
+
+_ex1 = (ROOT / "Assets/Resources/components/EXATX1.prefab").read_text(encoding="utf-8")
+_MSG_MAT = "310d10b66fa410c44a81de5e56613d1a"   # Assets/Material/Msg_black.mat
+_OLD_MAT = "1829d74e1aad83c468e19ea93472d497"   # Assets/Material/Motherboard.mat
+
+check((ROOT / "Assets/Material/Msg_black.mat").exists(),
+      "материал Msg_black на месте")
+check((ROOT / "Assets/Texture2D/MotherBoard_Msg_black.png").exists(),
+      "текстура платы на месте")
+
+# Материал должен вести на НОВУЮ текстуру, иначе смысла в нём нет.
+_mat = (ROOT / "Assets/Material/Msg_black.mat").read_text(encoding="utf-8")
+_tex_meta = (ROOT / "Assets/Texture2D/MotherBoard_Msg_black.png.meta").read_text(encoding="utf-8")
+_tex_guid = re.search(r"guid: (\w+)", _tex_meta).group(1)
+check(f"guid: {_tex_guid}" in _mat.split("_MainTex:")[1][:200],
+      "материал Msg_black использует новую текстуру платы")
+
+# Главное требование: НИ ОДИН меш не должен остаться со старым материалом,
+# иначе плата будет пятнистой -- часть деталей в старой раскраске.
+_renderers = re.findall(
+    r"--- !u!23 &\d+\nMeshRenderer:(.*?)(?=\n--- |\Z)", _ex1, re.S)
+_with_mats = []
+for _body in _renderers:
+    _m = re.search(r"m_Materials:\n(.*?)\n  m_StaticBatchInfo", _body, re.S)
+    if _m:
+        _with_mats.append(_m.group(1))
+check(len(_with_mats) == 33,
+      f"у платы 33 меша с материалами (нашлось {len(_with_mats)})")
+_stale = [b for b in _with_mats if _OLD_MAT in b]
+check(not _stale,
+      f"ни один меш не остался на старом материале (осталось: {len(_stale)})")
+_missing = [b for b in _with_mats if _MSG_MAT not in b]
+check(not _missing,
+      f"на всех мешах стоит Msg_black (без него: {len(_missing)})")
+
+# Соседняя плата EXATX не должна пострадать: у неё свой облик.
+_ex0 = (ROOT / "Assets/Resources/components/EXATX.prefab").read_text(encoding="utf-8")
+check(_MSG_MAT not in _ex0,
+      "старая плата EXATX не задета чужим материалом")
+
+check("brandName: MSG" in _ex1, "у платы MSG задан свой бренд")
 
 
 unchanged = all(
