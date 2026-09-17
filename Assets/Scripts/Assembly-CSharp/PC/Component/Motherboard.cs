@@ -34,6 +34,28 @@ namespace PC.Component
 		[SerializeField]
 		private Bios biosPrefab;
 
+		[SerializeField]
+		[Header("Брендирование")]
+		[Tooltip("Логотип производителя платы. Показывается на экране загрузки вместо надписи.")]
+		private Texture brandLogo;
+
+		[SerializeField]
+		[Tooltip("Название производителя. Подпись под логотипом; если логотипа нет — вместо него.")]
+		private string brandName;
+
+		/// <summary>
+		/// Логотип производителя платы, заданный в префабе.
+		/// </summary>
+		/// <remarks>
+		/// Может быть пустым: тогда экран загрузки покажет обычную надпись.
+		/// Именно поэтому логотип живёт на плате, а не в префабе системы —
+		/// системa одна на все компьютеры, а плат много и у каждой свой бренд.
+		/// </remarks>
+		public Texture BrandLogo => brandLogo;
+
+		/// <summary>Название производителя платы, заданное в префабе.</summary>
+		public string BrandName => brandName;
+
 		public External external;
 
 		[HideInInspector]

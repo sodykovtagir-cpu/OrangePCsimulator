@@ -633,6 +633,8 @@ MonoBehaviour:
   utility: {fileID: 1594120087207342}
   selectionPrefab: {fileID: 114310206374928888, guid: 4d5198ecb37bbc84fb741ce4fe960b3c, type: 2}
   selectionParent: {fileID: 224672193803872668}
+  brandLogo: {fileID: 114596744020297612}
+  manufacturerValues: {fileID: 114878175645059793}
 --- !u!224 &224050193630541823
 RectTransform:
   m_ObjectHideFlags: 0

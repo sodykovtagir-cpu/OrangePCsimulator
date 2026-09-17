@@ -61,6 +61,10 @@ namespace PC.Component.Software.OS
         [SerializeField] private RawImage userPicture;
         [SerializeField] private InputField passwordInput;
         [SerializeField] private Text userText;
+        [Tooltip("Куда выводить логотип платы на экране загрузки.")]
+        [SerializeField] private RawImage brandLogo;
+        [Tooltip("Надпись экрана загрузки. Скрывается, если у платы задан логотип.")]
+        [SerializeField] private Text startupLabel;
         [SerializeField] private UnityEngine.Animator passwordAnimator;
 
         [Header("Desktop")]
@@ -152,6 +156,44 @@ namespace PC.Component.Software.OS
             }
         }
 
+        /// <summary>
+        /// Показать на экране загрузки логотип той платы, что стоит в компьютере.
+        /// </summary>
+        /// <remarks>
+        /// Логотип берётся из префаба платы, а не из префаба системы: система
+        /// одна на все компьютеры, а плат много и у каждой свой бренд. Чтобы
+        /// сменить логотип, достаточно указать текстуру в префабе платы —
+        /// трогать код или экран загрузки не нужно.
+        ///
+        /// Если логотип не задан, остаётся обычная надпись: плата без бренда
+        /// не должна показывать пустоту.
+        /// </remarks>
+        private void ApplyBrand()
+        {
+            var board = Board;
+            var logo = board != null ? board.BrandLogo : null;
+            var brand = board != null ? board.BrandName : null;
+
+            if (brandLogo != null)
+            {
+                brandLogo.texture = logo;
+                brandLogo.gameObject.SetActive(logo != null);
+            }
+
+            if (startupLabel == null) return;
+
+            // Есть логотип — надпись не нужна. Есть только название бренда —
+            // показываем его вместо стандартной строки.
+            if (logo != null)
+            {
+                startupLabel.gameObject.SetActive(false);
+                return;
+            }
+
+            startupLabel.gameObject.SetActive(true);
+            if (!string.IsNullOrEmpty(brand)) startupLabel.text = brand;
+        }
+
         private IEnumerator Boot()
         {
             busy = true;
@@ -160,6 +202,8 @@ namespace PC.Component.Software.OS
             if (startup != null) startup.SetActive(true);
             if (user != null) user.SetActive(false);
             if (loading != null) loading.SetActive(true);
+
+            ApplyBrand();
 
             // Wait for canvas/iconParent to be fully initialized before creating icons.
             // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).

@@ -511,6 +511,8 @@ MonoBehaviour:
   wattage: 0
   beepSound: {fileID: 8300000, guid: 2415cadaa090c0c4d8e41052e6d3ccf7, type: 3}
   biosPrefab: {fileID: 114550599699461205, guid: 82b9938093d288f45ab04c14f449d203, type: 2}
+  brandLogo: {fileID: 2800000, guid: e81b58572a772574ca24da3647587cb0, type: 3}
+  brandName: Bell
   external:
     CPU:
     - {fileID: 114476053841446106}

@@ -2166,6 +2166,68 @@ check("Hardware as Motherboard" in _fm,
       "у корпуса берётся именно вставленная плата")
 
 
+# ---------------------------------------------------------------------------
+print("\nЛоготип материнской платы на экране загрузки")
+
+_mb2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Motherboard.cs")
+    .read_text(encoding="utf-8"))
+
+# Логотип обязан жить на ПЛАТЕ, а не в префабе системы: система одна на все
+# компьютеры, а плат много и у каждой свой бренд.
+check("private Texture brandLogo;" in _mb2,
+      "у платы есть поле логотипа, задаваемое в префабе")
+check("public Texture BrandLogo" in _mb2, "логотип доступен снаружи")
+check("public string BrandName" in _mb2, "название бренда доступно снаружи")
+# Между [SerializeField] и самим полем стоят ещё Header/Tooltip, поэтому
+# смотрим весь блок атрибутов, а не последние N символов.
+_decl = _mb2.split("private Texture brandLogo;")[0]
+check("[SerializeField]" in _decl.rsplit("private ", 1)[-1] or
+      "[SerializeField]" in _decl[-220:],
+      "логотип виден в инспекторе префаба")
+
+_os2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/OperatingSystem.cs")
+    .read_text(encoding="utf-8"))
+check("private void ApplyBrand()" in _os2, "система подставляет логотип платы")
+_boot2 = _os2.split("private IEnumerator Boot()")[1].split("yield return null;")[0]
+check("ApplyBrand();" in _boot2, "логотип применяется при загрузке системы")
+
+_ab = _os2.split("private void ApplyBrand()")[1].split("\n        }")[0]
+check("board.BrandLogo" in _ab, "логотип берётся именно у платы")
+check("startupLabel.gameObject.SetActive(false)" in _ab,
+      "надпись скрывается, когда логотип задан")
+# Плата без логотипа не должна показывать пустоту.
+check("SetActive(logo != null)" in _ab,
+      "без логотипа остаётся обычная надпись")
+
+_bios2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/Bios.cs")
+    .read_text(encoding="utf-8"))
+check("private void ApplyBrand()" in _bios2, "BIOS тоже берёт логотип у платы")
+_bb2 = _bios2.split("protected override void BootSystem()")[1].split("\n\t\t}")[0]
+check("ApplyBrand();" in _bb2, "BIOS применяет логотип при старте")
+
+# Проводка в префабах: без неё поля останутся пустыми и эффекта не будет.
+_pcos = (ROOT / "Assets/GameObject/PCOS.prefab").read_text(encoding="utf-8")
+check("m_Name: BrandLogo" in _pcos, "в PCOS есть объект под логотип")
+# fileID: 0 означает «ничего не назначено» -- поле как будто есть, а связи нет.
+check(re.search(r"\n  brandLogo: \{fileID: [1-9]\d*\}", _pcos) is not None,
+      "поле логотипа в PCOS связано с реальным объектом, а не пустое")
+check(re.search(r"\n  startupLabel: \{fileID: [1-9]\d*\}", _pcos) is not None,
+      "надпись загрузки в PCOS связана с реальным объектом")
+
+_bios_pf = (ROOT / "Assets/GameObject/BIOS.prefab").read_text(encoding="utf-8")
+check(re.search(r"\n  brandLogo: \{fileID: [1-9]\d*\}", _bios_pf) is not None,
+      "логотип BIOS связан с реальным объектом Logo")
+
+_boards = [f for f in sorted((ROOT / "Assets/Resources/components").glob("*.prefab"))
+           if "guid: e9b819df0994a58cece03a6c09fa7092" in f.read_text(encoding="utf-8")]
+check(len(_boards) == 6, f"найдено 6 префабов плат (нашлось {len(_boards)})")
+_nologo = [f.name for f in _boards if "brandLogo:" not in f.read_text(encoding="utf-8")]
+check(not _nologo, f"у всех плат есть поле логотипа (без него: {_nologo})")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
