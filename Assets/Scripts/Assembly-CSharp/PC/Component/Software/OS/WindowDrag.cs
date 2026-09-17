@@ -18,6 +18,12 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
     private Camera uiCamera;
     private Vector2 pointerOffset;
 
+    // Эффект артефактов монитора: окно стирает выпавшие блоки видеопамяти.
+    // Ищется один раз и кешируется — в том числе отрицательный результат,
+    // чтобы не дёргать поиск на каждом кадре перетаскивания.
+    private GpuArtifacts artifacts;
+    private bool artifactsSearched;
+
     private static readonly Vector3[] handleCorners = new Vector3[4];
     private static readonly Vector3[] windowCorners = new Vector3[4];
 
@@ -69,6 +75,35 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
         // Сначала ставим окно под курсор, затем жёстко удерживаем ЗАГОЛОВОК внутри.
         window.anchoredPosition = localPointerPos - pointerOffset;
         ClampInside();
+
+        WipeArtifacts(eventData.position);
+    }
+
+    /// <summary>
+    /// Стереть выпавшие блоки видеопамяти под окном.
+    /// </summary>
+    /// <remarks>
+    /// Чёрные квадраты от сбойной видеокарты — это застрявший кадровый буфер:
+    /// область не обновляется, пока поверх неё что-нибудь не перерисуют.
+    /// Проведённое окно как раз заставляет систему перерисовать этот участок,
+    /// поэтому квадраты под ним исчезают.
+    ///
+    /// Эффект живёт на мониторе, а окно про монитор ничего не знает, поэтому
+    /// ищем компонент вверх по иерархии от канваса экрана.
+    /// </remarks>
+    private void WipeArtifacts(Vector2 screenPoint)
+    {
+        if (artifacts == null)
+        {
+            if (artifactsSearched) return;
+            artifactsSearched = true;
+
+            var root = canvas != null ? canvas.transform : transform;
+            artifacts = root.GetComponentInParent<GpuArtifacts>();
+            if (artifacts == null) return;
+        }
+
+        artifacts.WipeBlocksAt(screenPoint, window.rect.size);
     }
 
     /// <summary>

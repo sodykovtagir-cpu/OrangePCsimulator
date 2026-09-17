@@ -257,34 +257,23 @@ public class Raycast : MonoBehaviour
             if (!string.IsNullOrEmpty(value) && detailText) detailText.text = value;
         }
 
-        if (hit.collider && hit.collider.TryGetComponent<IReceiverDown>(out var recv))
-            recv.Hit();
-        else if (configuration)
+        // Режим подключения имеет приоритет над обычными нажатиями.
+        //
+        // БАГ, который это чинит: у монитора есть дочерний объект Trigger с
+        // компонентом Receiver и триггерным коллайдером — им включается
+        // приближение экрана. Он активен, пока компьютер работает, и висит
+        // перед экраном. Клик попадал в него, срабатывала ветка
+        // IReceiverDown.Hit(), а ветка configuration до монитора не доходила
+        // вовсе: она стоит в else. Игрок жал на монитор, и ничего не
+        // происходило. Обходной путь — выйти из режима, взять монитор в руки и
+        // отпустить: это сдвигало его, и луч начинал попадать мимо триггера.
+        if (configuration)
         {
-            if (!selectedMonitor)
-            {
-                var t = hit.transform;
-                if (t && t.CompareTag("Monitor"))
-                {
-                    selectedMonitor = t.GetComponent<PC.Component.Display>();
-                    ConfigurationStateChanged?.Invoke(false);
-                }
-            }
-            else
-            {
-                var col = hit.collider;
-                if (!col) return;
-
-                Motherboard mb =
-                    col.GetComponent<Motherboard>() ??
-                    col.GetComponentInParent<Motherboard>();
-
-                if (mb)
-                {
-                    mb.ConnectMonitor(selectedMonitor);
-                    ConfigurationStateChanged?.Invoke(true);
-                }
-            }
+            if (HandleConfiguration(hit)) return;
+        }
+        else if (hit.collider && hit.collider.TryGetComponent<IReceiverDown>(out var recv))
+        {
+            recv.Hit();
         }
 
         if (!showHint) return;
@@ -303,6 +292,65 @@ public class Raycast : MonoBehaviour
                     slot.ShowHint(true);
             }
         }
+    }
+
+    /// <summary>
+    /// Шаг режима подключения: сперва выбираем монитор, затем — компьютер.
+    /// </summary>
+    /// <remarks>
+    /// Искать компоненты нужно ВВЕРХ по иерархии, а не на том объекте, в
+    /// который попал луч. И монитор, и системный блок — составные префабы:
+    /// луч почти всегда попадает в дочерний объект (корпус экрана, стекло,
+    /// триггер приближения, стенку корпуса), а скрипт висит на корне.
+    /// Проверка тега на самом hit.transform по той же причине не работала.
+    /// </remarks>
+    private bool HandleConfiguration(RaycastHit hit)
+    {
+        var t = hit.transform;
+        if (!t) return false;
+
+        if (!selectedMonitor)
+        {
+            var display = t.GetComponentInParent<PC.Component.Display>();
+            if (!display) return false;
+
+            selectedMonitor = display;
+            ConfigurationStateChanged?.Invoke(false);
+            return true;
+        }
+
+        var mb = FindMotherboard(t);
+        if (!mb) return false;
+
+        mb.ConnectMonitor(selectedMonitor);
+        ConfigurationStateChanged?.Invoke(true);
+        return true;
+    }
+
+    /// <summary>
+    /// Найти материнскую плату по тому, во что ткнул игрок.
+    /// </summary>
+    /// <remarks>
+    /// Плату можно выбрать тремя способами, и все три обязаны работать:
+    /// нажать на саму плату, нажать на плату внутри открытого корпуса и
+    /// нажать на корпус снаружи. Последний случай — основной: закрытый
+    /// системный блок вообще не даёт попасть лучом по плате, а игрок
+    /// естественно жмёт на корпус.
+    /// </remarks>
+    private Motherboard FindMotherboard(Transform t)
+    {
+        var mb = t.GetComponentInParent<Motherboard>();
+        if (mb) return mb;
+
+        var pcCase = t.GetComponentInParent<PC.Component.Case>();
+        if (!pcCase) return null;
+
+        // Корпус сам платой не является: он лишь держит слот, в который она
+        // вставлена. Пустой корпус подключать не к чему.
+        var slot = pcCase.Motherboard;
+        if (slot == null) return null;
+
+        return slot.Hardware as Motherboard;
     }
 
     private IEnumerator DragObject()

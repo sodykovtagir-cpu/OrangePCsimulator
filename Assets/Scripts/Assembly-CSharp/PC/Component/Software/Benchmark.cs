@@ -50,6 +50,12 @@ namespace PC.Component.Software
 
 			yield return new WaitForSeconds(2f);
 
+			// Тест производительности — это как раз та нагрузка, на которой
+			// сыпется повреждённая видеокарта. Если она не выдержала,
+			// компьютер падает прямо посреди теста, и досчитывать нечего.
+			var board = system != null ? system.Board : null;
+			if (board != null && board.StressGraphics()) yield break;
+
 			int score = 0;
 			float range = 5000f;
 			var scores = new int[4];
