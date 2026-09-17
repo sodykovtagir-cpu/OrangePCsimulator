@@ -1656,7 +1656,9 @@ check(_with_gpu == len(_cards),
 # при одновременном using PC.Component + using UnityEngine простое имя Display
 # неоднозначно (CS0104). Один такой промах роняет ВСЮ сборку Assembly-CSharp,
 # после чего Unity считает пропавшими скрипты на всех префабах сразу.
-_ambiguous = ["Display", "Monitor", "Camera", "Random", "Object", "Debug"]
+# Список ограничен именами, которые РЕАЛЬНО есть в UnityEngine: иначе проверка
+# ругается на любой тип проекта (Bios и подобные), у которого двойника нет.
+_ambiguous = ["Display", "Camera", "Random", "Object", "Debug", "Light", "Animator"]
 _my_scripts = [
     "Assets/Scripts/Assembly-CSharp/GpuArtifacts.cs",
     "Assets/Scripts/Assembly-CSharp/GameClock.cs",
@@ -1701,9 +1703,52 @@ check("raycastTarget = false" in _art_src,
 check("gpu.Damaged) continue" in _art_src,
       "мёртвая карта не рисует артефакты — она вообще не даёт сигнала")
 
+# Артефакты только на экране загрузки: после старта системы рабочий стол чист.
+check(re.search(r"if \(!\(board\.System is Bios\)\) return 0f;", _art_src) is not None,
+      "артефакты показываются только пока работает BIOS")
+
+# Виды сбоя. Однообразные полосы выглядели ненатурально — нужно несколько
+# разных исходов, включая «всё обошлось» и синий экран.
+for _g in ["None", "Stripes", "Warp", "ColorShift", "BlueScreen"]:
+    check(re.search(rf"\b{_g}\b", _art_src) is not None,
+          f"есть вид поведения карты: {_g}")
+# Мало объявить вид сбоя — он должен и выпадать, и рисоваться. Проверяем обе
+# стороны: ветку в switch и то, что PickGlitch вообще может его вернуть.
+_redraw = _art_src.split("private void Redraw(")[1].split("\n\t// =")[0]
+for _g, _fn in [("Stripes", "DrawStripes"), ("Warp", "DrawWarp"),
+                ("ColorShift", "DrawColorShift"), ("BlueScreen", "DrawBlueScreen")]:
+    check(re.search(rf"case Glitch\.{_g}:\s*\n\s*{_fn}\(", _redraw) is not None,
+          f"вид сбоя {_g} разбирается в Redraw и рисуется через {_fn}")
+    check(re.search(rf"return Glitch\.{_g};", _art_src) is not None,
+          f"вид сбоя {_g} может выпасть при розыгрыше")
+check(re.search(r"private void DrawBlueScreen\(\)", _art_src) is not None,
+      "синий экран реализован отдельным методом")
+
+# Вид сбоя выбирается ОДИН раз за загрузку. Если решать каждый кадр, виды
+# замелькают вперемешку и это будет выглядеть мусором, а не поломкой.
+check("private bool decided" in _art_src,
+      "решение о сбое запоминается на всю загрузку")
+check(re.search(r"if \(!decided\)", _art_src) is not None,
+      "сбой разыгрывается только когда решение ещё не принято")
+check(re.search(r"decided = false;", _art_src) is not None,
+      "после загрузки решение сбрасывается, следующий запуск разыграет заново")
+
+# Шанс, что всё обойдётся, обязан зависеть от степени повреждения.
+check(re.search(r"if \(Random\.value > strength\) return Glitch\.None;", _art_src)
+      is not None,
+      "слегка задетая карта часто стартует нормально")
+check(re.search(r"Glitch\.BlueScreen", _art_src) is not None
+      and "strength" in _art_src.split("Glitch.BlueScreen")[0][-120:],
+      "синий экран вероятнее у сильно разбитой карты")
+
+# Эффект обязан убирать за собой: сдвинутый канвас нельзя оставить сдвинутым.
+check("ResetVisuals" in _art_src,
+      "экран возвращается в исходное состояние")
+check(re.search(r"parent\.anchoredPosition = Vector2\.zero;", _art_src) is not None
+      and re.search(r"parent\.localScale = Vector3\.one;", _art_src) is not None,
+      "смещение и масштаб канваса сбрасываются, иначе картинка останется кривой")
+
 # Эффект не должен сам стать причиной лагов: он обновляется по таймеру.
-# Наличия слова refreshInterval мало: важен сам ранний выход из LateUpdate.
-# Без него эффект перерисовывался бы каждый кадр и сам стал бы причиной лагов.
 check("refreshInterval" in _art_src and "Time.unscaledTime" in _art_src,
       "артефакты перерисовываются по таймеру, а не каждый кадр")
 check(re.search(r"if \(now < nextRefresh\) return;", _art_src) is not None,

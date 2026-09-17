@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using PC.Component;
+using PC.Component.Software.OS;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,24 +9,42 @@ using UnityEngine.UI;
 using Display = PC.Component.Display;
 
 /// <summary>
-/// Рисует артефакты повреждённой видеокарты поверх экрана монитора.
+/// Артефакты повреждённой видеокарты на экране загрузки.
 /// </summary>
 /// <remarks>
-/// Вешается на монитор рядом с Display. Раз в несколько кадров спрашивает у
-/// подключённой материнской платы, есть ли среди её видеокарт повреждённые, и
-/// выводит поверх картинки цветные полосы — тем чаще и заметнее, чем сильнее
-/// разбита карта.
+/// Показываются только пока работает BIOS, то есть на экране загрузки системы.
+/// Так это и выглядит на настоящем железе: сбоящая карта чаще всего выдаёт себя
+/// именно на первых секундах, когда система ещё не поднялась. Заодно это не
+/// мешает играть — рабочий стол остаётся чистым.
 ///
-/// Полосы рисуются обычными Image в отдельном Canvas поверх рабочего стола, а
-/// не шейдером: шейдер пришлось бы гонять на каждый пиксель экрана каждый
-/// кадр, а это ровно та нагрузка, от которой мы только что избавлялись. Здесь
-/// же несколько прямоугольников, которые к тому же переставляются не каждый
-/// кадр.
+/// Сбой выбирается случайно на каждую загрузку, а не рисуется постоянно:
+/// повреждённая карта ведёт себя непредсказуемо. Иногда всё проходит нормально,
+/// иногда картинку ведёт, иногда компьютер падает в синий экран. Чем сильнее
+/// разбита карта, тем реже везёт.
 /// </remarks>
 public class GpuArtifacts : MonoBehaviour
 {
+	/// <summary>Что происходит с картинкой на этой загрузке.</summary>
+	private enum Glitch
+	{
+		/// <summary>Повезло: изображение чистое.</summary>
+		None = 0,
+
+		/// <summary>Рваные цветные полосы.</summary>
+		Stripes = 1,
+
+		/// <summary>Картинку ведёт: смещение и дрожание.</summary>
+		Warp = 2,
+
+		/// <summary>Цвета уплыли в один канал.</summary>
+		ColorShift = 3,
+
+		/// <summary>Синий экран: загрузка сорвалась.</summary>
+		BlueScreen = 4
+	}
+
 	[SerializeField]
-	[Tooltip("Куда класть полосы. Обычно канвас экрана монитора.")]
+	[Tooltip("Куда класть эффекты. Обычно канвас экрана монитора.")]
 	private RectTransform container;
 
 	[SerializeField]
@@ -33,13 +52,18 @@ public class GpuArtifacts : MonoBehaviour
 	private int maxStripes = 14;
 
 	[SerializeField]
-	[Tooltip("Как часто переставлять полосы, в секундах.")]
+	[Tooltip("Как часто обновлять эффект, в секундах.")]
 	private float refreshInterval = 0.12f;
 
 	private readonly List<Image> stripes = new List<Image>();
 
 	private Display display;
+	private Image overlay;
+	private Text overlayText;
+
 	private float nextRefresh;
+	private Glitch current;
+	private bool decided;
 
 	private void Awake()
 	{
@@ -69,6 +93,10 @@ public class GpuArtifacts : MonoBehaviour
 		var board = display.ConnectedBoard;
 		if (board == null) return 0f;
 
+		// Только экран загрузки. Как только BIOS передал управление системе,
+		// артефакты пропадают и рабочий стол виден нормально.
+		if (!(board.System is Bios)) return 0f;
+
 		var cards = board.GetHardwares(HardwareType.GPU);
 		if (cards == null) return 0f;
 
@@ -88,11 +116,52 @@ public class GpuArtifacts : MonoBehaviour
 		return worst;
 	}
 
+	/// <summary>
+	/// Выбрать, как поведёт себя карта на этой загрузке.
+	/// </summary>
+	/// <remarks>
+	/// Решение принимается ОДИН раз за загрузку, а не каждый кадр: иначе виды
+	/// сбоя мелькали бы вперемешку, и это выглядело бы как мусор, а не как
+	/// неисправное железо.
+	///
+	/// Шанс, что всё обойдётся, падает с ростом повреждения: слегка задетая
+	/// карта чаще стартует нормально, добитая — почти никогда.
+	/// </remarks>
+	private Glitch PickGlitch(float strength)
+	{
+		if (Random.value > strength) return Glitch.None;
+
+		float roll = Random.value;
+
+		// Синий экран — самый тяжёлый исход, поэтому он заметно вероятнее у
+		// сильно разбитой карты и почти не встречается у слегка задетой.
+		if (roll < 0.15f * strength) return Glitch.BlueScreen;
+		if (roll < 0.45f) return Glitch.Stripes;
+		if (roll < 0.75f) return Glitch.Warp;
+		return Glitch.ColorShift;
+	}
+
 	private void LateUpdate()
 	{
 		float strength = CurrentStrength();
 
 		if (strength <= 0f)
+		{
+			// Загрузка кончилась или карта цела — убираем всё и забываем
+			// решение, чтобы следующий запуск разыграл сбой заново.
+			HideAll();
+			decided = false;
+			return;
+		}
+
+		if (!decided)
+		{
+			decided = true;
+			current = PickGlitch(strength);
+			ResetVisuals();
+		}
+
+		if (current == Glitch.None)
 		{
 			HideAll();
 			return;
@@ -105,17 +174,31 @@ public class GpuArtifacts : MonoBehaviour
 		Redraw(strength);
 	}
 
-	private void HideAll()
+	private void Redraw(float strength)
 	{
-		for (int i = 0; i < stripes.Count; i++)
+		switch (current)
 		{
-			if (stripes[i] != null && stripes[i].enabled) stripes[i].enabled = false;
+			case Glitch.Stripes:
+				DrawStripes(strength);
+				break;
+			case Glitch.Warp:
+				DrawWarp(strength);
+				break;
+			case Glitch.ColorShift:
+				DrawColorShift(strength);
+				break;
+			case Glitch.BlueScreen:
+				DrawBlueScreen();
+				break;
 		}
 	}
 
-	private void Redraw(float strength)
+	// ================= виды сбоя =================
+
+	/// <summary>Рваные цветные полосы поперёк экрана.</summary>
+	private void DrawStripes(float strength)
 	{
-		var parent = container != null ? container : transform as RectTransform;
+		var parent = Parent();
 		if (parent == null) return;
 
 		int want = Mathf.Max(1, Mathf.RoundToInt(maxStripes * strength));
@@ -136,16 +219,14 @@ public class GpuArtifacts : MonoBehaviour
 
 			stripe.enabled = true;
 
-			// Высота полосы и её цвет случайны — так это и выглядит на живой
-			// сбоящей карте: рваные горизонтальные линии разного оттенка.
 			float h = Random.Range(2f, 6f + 18f * strength);
-			float y = Random.Range(-size.y * 0.5f, size.y * 0.5f);
 			float w = Random.Range(size.x * 0.25f, size.x);
 
 			var rt = stripe.rectTransform;
 			rt.sizeDelta = new Vector2(w, h);
 			rt.anchoredPosition = new Vector2(
-				Random.Range(-size.x * 0.5f, size.x * 0.5f), y);
+				Random.Range(-size.x * 0.5f, size.x * 0.5f),
+				Random.Range(-size.y * 0.5f, size.y * 0.5f));
 
 			var color = Random.value < 0.5f
 				? new Color(Random.value, Random.value, Random.value)
@@ -153,6 +234,143 @@ public class GpuArtifacts : MonoBehaviour
 			color.a = Mathf.Lerp(0.35f, 0.9f, strength);
 			stripe.color = color;
 		}
+	}
+
+	/// <summary>
+	/// Картинку ведёт: изображение дрожит и смещается.
+	/// </summary>
+	/// <remarks>
+	/// Двигается сам канвас загрузки, а не копия: так «плывёт» реальная
+	/// картинка, включая текст BIOS, и не нужно ничего перерисовывать.
+	/// </remarks>
+	private void DrawWarp(float strength)
+	{
+		var parent = Parent();
+		if (parent == null) return;
+
+		float amp = 6f + 30f * strength;
+		parent.anchoredPosition = new Vector2(
+			Random.Range(-amp, amp), Random.Range(-amp * 0.5f, amp * 0.5f));
+
+		// Изредка кадр ещё и подрезает по вертикали — как срыв синхронизации.
+		if (Random.value < 0.25f * strength)
+		{
+			float squash = Random.Range(0.85f, 1f);
+			parent.localScale = new Vector3(1f, squash, 1f);
+		}
+		else
+		{
+			parent.localScale = Vector3.one;
+		}
+	}
+
+	/// <summary>Цвета уплыли: экран заливает одним каналом.</summary>
+	private void DrawColorShift(float strength)
+	{
+		var img = EnsureOverlay();
+		if (img == null) return;
+
+		img.enabled = true;
+
+		var tint = Random.value < 0.5f
+			? new Color(1f, 0f, Random.Range(0.4f, 1f))
+			: new Color(0f, Random.Range(0.4f, 1f), 1f);
+		tint.a = Mathf.Lerp(0.15f, 0.5f, strength);
+		img.color = tint;
+
+		if (overlayText != null) overlayText.enabled = false;
+	}
+
+	/// <summary>Синий экран: загрузка сорвалась.</summary>
+	private void DrawBlueScreen()
+	{
+		var img = EnsureOverlay();
+		if (img == null) return;
+
+		HideStripes();
+
+		img.enabled = true;
+		img.color = new Color(0f, 0.15f, 0.6f, 1f);
+
+		if (overlayText != null)
+		{
+			overlayText.enabled = true;
+			overlayText.text = "VIDEO_DRIVER_FAILURE";
+		}
+	}
+
+	// ================= служебное =================
+
+	private RectTransform Parent()
+	{
+		return container != null ? container : transform as RectTransform;
+	}
+
+	/// <summary>Вернуть экран в исходное состояние перед новым видом сбоя.</summary>
+	private void ResetVisuals()
+	{
+		var parent = Parent();
+		if (parent != null)
+		{
+			parent.anchoredPosition = Vector2.zero;
+			parent.localScale = Vector3.one;
+		}
+
+		HideStripes();
+		if (overlay != null) overlay.enabled = false;
+		if (overlayText != null) overlayText.enabled = false;
+	}
+
+	private void HideAll()
+	{
+		ResetVisuals();
+	}
+
+	private void HideStripes()
+	{
+		for (int i = 0; i < stripes.Count; i++)
+		{
+			if (stripes[i] != null && stripes[i].enabled) stripes[i].enabled = false;
+		}
+	}
+
+	private Image EnsureOverlay()
+	{
+		if (overlay != null) return overlay;
+
+		var parent = Parent();
+		if (parent == null) return null;
+
+		var go = new GameObject("Artifact Overlay", typeof(RectTransform), typeof(Image));
+		var rt = go.GetComponent<RectTransform>();
+		rt.SetParent(parent, false);
+		rt.anchorMin = Vector2.zero;
+		rt.anchorMax = Vector2.one;
+		rt.offsetMin = Vector2.zero;
+		rt.offsetMax = Vector2.zero;
+
+		overlay = go.GetComponent<Image>();
+		overlay.raycastTarget = false;
+		overlay.enabled = false;
+
+		// Текст для синего экрана лежит внутри заливки.
+		var textGo = new GameObject("Artifact Text", typeof(RectTransform), typeof(Text));
+		var trt = textGo.GetComponent<RectTransform>();
+		trt.SetParent(rt, false);
+		trt.anchorMin = Vector2.zero;
+		trt.anchorMax = Vector2.one;
+		trt.offsetMin = Vector2.zero;
+		trt.offsetMax = Vector2.zero;
+
+		overlayText = textGo.GetComponent<Text>();
+		overlayText.alignment = TextAnchor.MiddleCenter;
+		overlayText.color = Color.white;
+		overlayText.raycastTarget = false;
+		overlayText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+		overlayText.fontSize = 28;
+		overlayText.enabled = false;
+
+		return overlay;
 	}
 
 	private void EnsureStripes(int want, RectTransform parent)
@@ -169,7 +387,7 @@ public class GpuArtifacts : MonoBehaviour
 			var img = go.GetComponent<Image>();
 
 			// Полосы не должны перехватывать нажатия: игрок обязан попадать
-			// по кнопкам рабочего стола сквозь них.
+			// по кнопкам экрана сквозь них.
 			img.raycastTarget = false;
 
 			stripes.Add(img);
