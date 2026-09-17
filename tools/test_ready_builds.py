@@ -1711,6 +1711,17 @@ check("is Bios" not in _art_src,
 # (Display.ApplyScreen), и окна, и меню «Пуск» зовут SetAsLastSibling, вставая
 # последними среди потомков — то есть поверх всего, что добавлено раньше.
 # Поэтому эффекту нужен собственный Canvas с перекрытием сортировки.
+# КРИТИЧНО: камера экрана снимает только слой UI, а new GameObject создаёт
+# объект на слое Default. Из-за этого артефакты существовали, но были не видны
+# вообще — камера их просто не рендерила. Объекты обязаны наследовать слой.
+check("NewUiObject" in _art_src,
+      "объекты артефактов создаются через помощник, задающий слой")
+check(re.search(r"go\.layer = parent\.gameObject\.layer", _art_src) is not None,
+      "созданный объект наследует слой родителя (иначе камера его не увидит)")
+_raw_new = re.findall(r"new GameObject\(", _art_src)
+check(len(_raw_new) == 1,
+      f"прямых new GameObject не осталось, кроме помощника (нашлось {len(_raw_new)})")
+
 check("overrideSorting = true" in _art_src,
       "у слоя артефактов своя сортировка")
 _so = re.search(r"ArtifactSortingOrder = (\d+)", _art_src)
@@ -1859,6 +1870,33 @@ _ond_prefab_guid = re.search(
     (ROOT / "Assets/Resources/apps/Ondex.prefab.meta").read_text(encoding="utf-8")
 ).group(1)
 check(_ond_prefab_guid in _dl, "Ondex есть в App Downloader")
+
+
+# ---------------------------------------------------------------------------
+print("\nВертикальная синхронизация экрана монитора")
+
+_pacer2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/DisplayCameraPacer.cs")
+    .read_text(encoding="utf-8"))
+
+# Редкая перерисовка экономит кадры, но момент обновления не совпадает с кадром
+# игры, и картинка на мониторе рвётся. Режим vsync рисует ровно раз в кадр.
+check("vSync" in _pacer2, "у экрана есть режим вертикальной синхронизации")
+check(re.search(r"private bool vSync = true;", _pacer2) is not None,
+      "синхронизация включена по умолчанию")
+
+_lu2 = _pacer2.split("private void LateUpdate()")[1]
+check(re.search(r"if \(vSync\)\s*\{\s*target\.Render\(\);\s*return;", _lu2)
+      is not None,
+      "при включённой синхронизации кадр рисуется сразу и без таймера")
+
+# Синхронизация обязана идти именно в LateUpdate: там вся логика кадра уже
+# отработала, и на экран попадает окончательная картинка.
+check("LateUpdate" in _pacer2, "рендер выполняется в конце кадра")
+
+# Ветка с таймером должна остаться для случая, когда синхронизацию выключили.
+check("redrawsPerSecond" in _lu2 and "nextRedraw" in _lu2,
+      "без синхронизации по-прежнему работает ограничение частоты")
 
 
 unchanged = all(

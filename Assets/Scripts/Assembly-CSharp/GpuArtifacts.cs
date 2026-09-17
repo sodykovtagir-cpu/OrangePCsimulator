@@ -312,6 +312,24 @@ public class GpuArtifacts : MonoBehaviour
 	// ================= служебное =================
 
 	/// <summary>
+	/// Создать объект интерфейса на том же слое, что и родитель.
+	/// </summary>
+	/// <remarks>
+	/// КРИТИЧНО. Камера экрана монитора снимает только слой UI
+	/// (DisplayManager: cullingMask = LayerMask.GetMask("UI")), а new GameObject
+	/// создаёт объект на слое Default. Такой объект физически существует,
+	/// занимает место в иерархии, но камерой не снимается — и артефактов не
+	/// видно вообще, хотя код исправно работает.
+	/// </remarks>
+	private static GameObject NewUiObject(string name, RectTransform parent,
+		params System.Type[] components)
+	{
+		var go = new GameObject(name, components);
+		if (parent != null) go.layer = parent.gameObject.layer;
+		return go;
+	}
+
+	/// <summary>
 	/// Слой, на котором рисуются артефакты.
 	/// </summary>
 	/// <remarks>
@@ -327,7 +345,7 @@ public class GpuArtifacts : MonoBehaviour
 		var host = container != null ? container : transform as RectTransform;
 		if (host == null) return null;
 
-		var go = new GameObject("GPU Artifacts", typeof(RectTransform), typeof(Canvas));
+		var go = NewUiObject("GPU Artifacts", host, typeof(RectTransform), typeof(Canvas));
 		var rt = go.GetComponent<RectTransform>();
 		rt.SetParent(host, false);
 		rt.anchorMin = Vector2.zero;
@@ -387,7 +405,7 @@ public class GpuArtifacts : MonoBehaviour
 		var parent = Parent();
 		if (parent == null) return null;
 
-		var go = new GameObject("Artifact Overlay", typeof(RectTransform), typeof(Image));
+		var go = NewUiObject("Artifact Overlay", parent, typeof(RectTransform), typeof(Image));
 		var rt = go.GetComponent<RectTransform>();
 		rt.SetParent(parent, false);
 		rt.anchorMin = Vector2.zero;
@@ -400,7 +418,7 @@ public class GpuArtifacts : MonoBehaviour
 		overlay.enabled = false;
 
 		// Текст для синего экрана лежит внутри заливки.
-		var textGo = new GameObject("Artifact Text", typeof(RectTransform), typeof(Text));
+		var textGo = NewUiObject("Artifact Text", rt, typeof(RectTransform), typeof(Text));
 		var trt = textGo.GetComponent<RectTransform>();
 		trt.SetParent(rt, false);
 		trt.anchorMin = Vector2.zero;
@@ -423,7 +441,7 @@ public class GpuArtifacts : MonoBehaviour
 	{
 		while (stripes.Count < want)
 		{
-			var go = new GameObject("Artifact", typeof(RectTransform), typeof(Image));
+			var go = NewUiObject("Artifact", parent, typeof(RectTransform), typeof(Image));
 			var rt = go.GetComponent<RectTransform>();
 			rt.SetParent(parent, false);
 			rt.anchorMin = new Vector2(0.5f, 0.5f);
