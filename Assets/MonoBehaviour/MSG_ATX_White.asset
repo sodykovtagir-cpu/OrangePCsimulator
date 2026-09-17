@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemName: MSG ATX (White)
   price: 520
-  bitcoin: 6
-  sprite: {fileID: 21300000, guid: b8697cfa7c5faa944a825b61d9026736, type: 3}
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: decdc4c288cfbec4e9314b4d3279470b, type: 3}
   spawn: {fileID: 1569340072111286, guid: 247cb5d98fc608a41809b66adf448d9d, type: 3}
   large: 1
   translateDescription: 1
