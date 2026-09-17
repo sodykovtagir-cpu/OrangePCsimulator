@@ -1652,6 +1652,47 @@ check(_with_gpu == len(_cards),
       f"скрипт GPU стоит на всех базовых видеокартах ({_with_gpu}/{len(_cards)})")
 
 # Эффект на экране.
+# ЛОВУШКА: в UnityEngine есть свой Display (физический экран устройства), и
+# при одновременном using PC.Component + using UnityEngine простое имя Display
+# неоднозначно (CS0104). Один такой промах роняет ВСЮ сборку Assembly-CSharp,
+# после чего Unity считает пропавшими скрипты на всех префабах сразу.
+_ambiguous = ["Display", "Monitor", "Camera", "Random", "Object", "Debug"]
+_my_scripts = [
+    "Assets/Scripts/Assembly-CSharp/GpuArtifacts.cs",
+    "Assets/Scripts/Assembly-CSharp/GameClock.cs",
+    "Assets/Scripts/Assembly-CSharp/DisplayCameraPacer.cs",
+    "Assets/Scripts/Assembly-CSharp/DisplayManager.cs",
+    "Assets/Scripts/Assembly-CSharp/PC/Component/GPU.cs",
+    "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs",
+]
+
+# Какие типы объявлены в пространстве PC.Component.
+_pc_types = set()
+for _root, _dirs, _files in os.walk(ROOT / "Assets/Scripts/Assembly-CSharp/PC"):
+    for _f in _files:
+        if not _f.endswith(".cs"):
+            continue
+        _t = Path(_root, _f).read_text(encoding="utf-8", errors="ignore")
+        for _m in re.finditer(r"\b(?:class|struct|interface|enum)\s+(\w+)", _t):
+            _pc_types.add(_m.group(1))
+
+for _rel in _my_scripts:
+    _p = ROOT / _rel
+    if not _p.exists():
+        continue
+    _t = _p.read_text(encoding="utf-8")
+    if "using PC.Component;" not in _t or "using UnityEngine;" not in _t:
+        continue
+    _body = _strip_comments(_t)
+    _bad = [
+        _n for _n in _ambiguous
+        if _n in _pc_types
+        and re.search(rf"\b{_n}\b", _body)
+        and f"using {_n} =" not in _t
+    ]
+    check(not _bad,
+          f"{Path(_rel).name}: неоднозначные имена разрешены явно (мешают: {_bad})")
+
 _art_path = ROOT / "Assets/Scripts/Assembly-CSharp/GpuArtifacts.cs"
 check(_art_path.exists(), "есть эффект артефактов на экране")
 _art_src = _strip_comments(_art_path.read_text(encoding="utf-8"))

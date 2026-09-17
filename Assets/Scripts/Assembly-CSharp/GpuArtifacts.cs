@@ -3,6 +3,10 @@ using PC.Component;
 using UnityEngine;
 using UnityEngine.UI;
 
+// В UnityEngine есть свой класс Display (физический экран устройства), поэтому
+// простое имя Display неоднозначно. Явно указываем, что речь о мониторе игры.
+using Display = PC.Component.Display;
+
 /// <summary>
 /// Рисует артефакты повреждённой видеокарты поверх экрана монитора.
 /// </summary>
