@@ -65,6 +65,10 @@ namespace PC.Component.Software.OS
         [SerializeField] private RawImage brandLogo;
         [Tooltip("Надпись экрана загрузки. Скрывается, если у платы задан логотип.")]
         [SerializeField] private Text startupLabel;
+
+        // Исходный прямоугольник под логотип, взятый из префаба. Нужен, чтобы
+        // повторные подгонки считались от него, а не от уже сжатой картинки.
+        private Vector2 logoBox;
         [SerializeField] private UnityEngine.Animator passwordAnimator;
 
         [Header("Desktop")]
@@ -181,6 +185,8 @@ namespace PC.Component.Software.OS
                 // чужие элементы экрана загрузки.
                 brandLogo.texture = logo;
                 brandLogo.enabled = logo != null;
+
+                if (logo != null) FitLogo(brandLogo, logo);
             }
 
             if (startupLabel == null) return;
@@ -203,6 +209,37 @@ namespace PC.Component.Software.OS
 
             startupLabel.enabled = true;
             if (!string.IsNullOrEmpty(brand)) startupLabel.text = brand;
+        }
+
+        /// <summary>
+        /// Вписать логотип в отведённое место, не искажая пропорции.
+        /// </summary>
+        /// <remarks>
+        /// У RawImage размер задан прямоугольником префаба (300x120), и
+        /// картинка растягивается под него как есть. Логотипы у плат разной
+        /// формы: узкая полоса, квадрат, вертикальный значок -- любой из них
+        /// в фиксированной рамке плющится.
+        ///
+        /// Поэтому считаем масштаб по меньшей из сторон: картинка целиком
+        /// помещается в рамку, сохраняя соотношение сторон. Рамка при этом
+        /// остаётся прежней -- меняется только размер самой картинки.
+        /// </remarks>
+        private void FitLogo(RawImage image, Texture logo)
+        {
+            var rt = image.rectTransform;
+            if (rt == null) return;
+
+            float tw = logo.width;
+            float th = logo.height;
+            if (tw <= 0f || th <= 0f) return;
+
+            // Рамка, в которую вписываем. Берём её из префаба один раз:
+            // после первой подгонки sizeDelta уже изменён, и повторный вызов
+            // считал бы от подогнанного размера, постепенно ужимая картинку.
+            if (logoBox.x <= 0f || logoBox.y <= 0f) logoBox = rt.sizeDelta;
+
+            float box = Mathf.Min(logoBox.x / tw, logoBox.y / th);
+            rt.sizeDelta = new Vector2(tw * box, th * box);
         }
 
         private IEnumerator Boot()
@@ -262,6 +299,15 @@ namespace PC.Component.Software.OS
             if (wait > 0f) yield return new UnityEngine.WaitForSeconds(wait);
 
             if (startup != null) startup.SetActive(false);
+
+            // Логотип платы принадлежит этапу запуска. Дальше идёт вход в
+            // учётную запись -- аватар, имя и кружок ожидания, -- и логотип
+            // там лишний. Скрываем именно компонент: объект BrandLogo лежит
+            // рядом с User внутри общего контейнера Startup, поэтому полем
+            // startup он не выключается.
+            if (brandLogo != null) brandLogo.enabled = false;
+            if (startupLabel != null) startupLabel.enabled = false;
+
             if (user != null) user.SetActive(true);
 
             var fm = FileManager;
