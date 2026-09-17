@@ -1714,6 +1714,23 @@ check("is Bios" not in _art_src,
 # КРИТИЧНО: камера экрана снимает только слой UI, а new GameObject создаёт
 # объект на слое Default. Из-за этого артефакты существовали, но были не видны
 # вообще — камера их просто не рендерила. Объекты обязаны наследовать слой.
+# Нажатие на монитор (Display.ZoomIn) переводит канвас в ScreenSpaceOverlay.
+# Unity такому канвасу каждый кадр сама переписывает позицию и размер, а ZoomOut
+# ещё и принудительно сбрасывает localPosition/localScale/sizeDelta. Двигать сам
+# канвас нельзя — искажение затрётся именно в приближении.
+_screenroot = _art_src.split("private RectTransform ScreenRoot()")[1].split("\n\t}")[0]
+check("childCount" in _screenroot and "GetChild" in _screenroot,
+      "искажение двигает содержимое экрана, а не сам канвас (переживает зум)")
+check(re.search(r"child == layer\) continue", _screenroot) is not None,
+      "слой артефактов не выбирается как картинка экрана")
+
+# Зум перекладывает иерархию, окна зовут SetAsLastSibling при каждом касании.
+_redraw_body = _art_src.split("private void Redraw(")[1].split("\n\t}")[0]
+check("SetAsLastSibling" in _redraw_body,
+      "слой артефактов подтверждает место наверху при каждой перерисовке")
+check("sortingOrder = ArtifactSortingOrder" in _redraw_body,
+      "порядок сортировки восстанавливается после смены режима канваса")
+
 check("NewUiObject" in _art_src,
       "объекты артефактов создаются через помощник, задающий слой")
 check(re.search(r"go\.layer = parent\.gameObject\.layer", _art_src) is not None,
@@ -1897,6 +1914,47 @@ check("LateUpdate" in _pacer2, "рендер выполняется в конц�
 # Ветка с таймером должна остаться для случая, когда синхронизацию выключили.
 check("redrawsPerSecond" in _lu2 and "nextRedraw" in _lu2,
       "без синхронизации по-прежнему работает ограничение частоты")
+
+
+# ---------------------------------------------------------------------------
+print("\nПрочность видеокарт")
+
+_gpu_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/GPU.cs")
+    .read_text(encoding="utf-8"))
+
+# Независимые пороги: сверяться с той же константой, что и код, бессмысленно.
+_m = re.search(r"MaxArtifactLevel = (\d+)", _gpu_src)
+check(_m is not None and int(_m.group(1)) >= 4,
+      f"карта переживает не меньше 4 ступеней повреждения (найдено {_m.group(1)})")
+
+_mi = re.search(r"damageImpulse = (\d+(?:\.\d+)?)f", _gpu_src)
+check(_mi is not None and float(_mi.group(1)) >= 25,
+      f"порог удара заметно выше прежних 12 (найдено {_mi.group(1)})")
+
+# Падение — это серия столкновений: пол, отскок, стол. Без защиты карта
+# проходила все ступени за одно падение и погибала мгновенно.
+_oce = _gpu_src.split("private void OnCollisionEnter(")[1].split("\n\t\t}")[0]
+check("nextDamageTime" in _oce,
+      "повторные удары одного падения не считаются заново")
+check(_oce.index("nextDamageTime") < _oce.index("AddArtifactLevel"),
+      "защита от серии ударов стоит ДО начисления повреждения")
+check("damageCooldown" in _gpu_src, "длительность защиты настраивается")
+
+_prefabs = sorted((ROOT / "Assets/Resources/components").glob("*.prefab"))
+_with_gpu = [f for f in _prefabs if "damageImpulse:" in f.read_text(encoding="utf-8")]
+check(len(_with_gpu) == 14,
+      f"скрипт видеокарты стоит на 14 базовых префабах (нашлось {len(_with_gpu)})")
+
+_weak = [f.name for f in _with_gpu
+         if re.search(r"damageImpulse: (\d+(?:\.\d+)?)", f.read_text(encoding="utf-8"))
+         and float(re.search(r"damageImpulse: (\d+(?:\.\d+)?)",
+                             f.read_text(encoding="utf-8")).group(1)) < 25]
+check(not _weak, f"во всех префабах порог поднят (слабые: {_weak})")
+
+_nocd = [f.name for f in _with_gpu
+         if "damageCooldown:" not in f.read_text(encoding="utf-8")]
+check(not _nocd, f"во всех префабах задана защита от серии ударов (без неё: {_nocd})")
 
 
 unchanged = all(

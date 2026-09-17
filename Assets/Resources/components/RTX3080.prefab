@@ -131,7 +131,8 @@ MonoBehaviour:
   info: RTX3080
   match: 0
   slotOffset: {x: -0.08461428, y: 0, z: 0}
-  damageImpulse: 12
+  damageImpulse: 30
+  damageCooldown: 0.5
   damageSound: {fileID: 0}
   glue: 0
   capacity: 0

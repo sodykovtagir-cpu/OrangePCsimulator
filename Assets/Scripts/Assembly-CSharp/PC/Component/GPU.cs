@@ -24,11 +24,17 @@ namespace PC.Component
 		/// Ноль — карта целая. На последней ступени она перестаёт работать
 		/// совсем, как любое сломанное железо.
 		/// </remarks>
-		public const int MaxArtifactLevel = 3;
+		public const int MaxArtifactLevel = 4;
 
 		[SerializeField]
 		[Tooltip("Сила удара, начиная с которой карта получает повреждение.")]
-		private float damageImpulse = 12f;
+		private float damageImpulse = 30f;
+
+		[SerializeField]
+		[Tooltip("Сколько секунд после удара карта не получает новых повреждений.")]
+		private float damageCooldown = 0.5f;
+
+		private float nextDamageTime;
 
 		[SerializeField]
 		[Tooltip("Звук повреждения карты.")]
@@ -78,6 +84,14 @@ namespace PC.Component
 			if (collision.gameObject.CompareTag("Pillow")) return;
 
 			if (collision.impulse.magnitude <= damageImpulse) return;
+
+			// Одно падение — одно повреждение. Упавшая карта бьётся о пол,
+			// отскакивает, задевает стол и соседние предметы: это несколько
+			// OnCollisionEnter подряд, и без защиты карта проходила все
+			// ступени за одно падение, то есть погибала мгновенно.
+			float now = Time.unscaledTime;
+			if (now < nextDamageTime) return;
+			nextDamageTime = now + damageCooldown;
 
 			AddArtifactLevel(1);
 		}

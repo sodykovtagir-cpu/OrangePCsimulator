@@ -161,7 +161,8 @@ MonoBehaviour:
   info: RX570
   match: 0
   slotOffset: {x: 0.1, y: -0.15, z: -0.13}
-  damageImpulse: 12
+  damageImpulse: 30
+  damageCooldown: 0.5
   damageSound: {fileID: 0}
   glue: 0
   capacity: 0

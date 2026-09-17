@@ -150,7 +150,8 @@ MonoBehaviour:
   info: GT440
   match: 0
   slotOffset: {x: 0.6166125, y: -0.09616092, z: 0.0003786683}
-  damageImpulse: 12
+  damageImpulse: 30
+  damageCooldown: 0.5
   damageSound: {fileID: 0}
   glue: 0
   capacity: 0

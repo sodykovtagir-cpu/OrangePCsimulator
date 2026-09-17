@@ -183,6 +183,22 @@ public class GpuArtifacts : MonoBehaviour
 
 	private void Redraw(float strength)
 	{
+		// Зум перекладывает канвас и меняет режим отрисовки, окна при каждом
+		// касании зовут SetAsLastSibling. Подтверждаем своё место каждый раз:
+		// операции дешёвые, а иначе слой рано или поздно окажется погребён.
+		var top = Parent();
+		if (top != null)
+		{
+			top.SetAsLastSibling();
+
+			var c = top.GetComponent<Canvas>();
+			if (c != null)
+			{
+				c.overrideSorting = true;
+				c.sortingOrder = ArtifactSortingOrder;
+			}
+		}
+
 		switch (current)
 		{
 			case Glitch.Stripes:
@@ -362,9 +378,41 @@ public class GpuArtifacts : MonoBehaviour
 	}
 
 	/// <summary>Сам экран монитора — то, что видит игрок.</summary>
+	/// <summary>
+	/// Картинка экрана — то, что должно «плыть» при искажении.
+	/// </summary>
+	/// <remarks>
+	/// КРИТИЧНО: это ДОЧЕРНИЙ объект канваса, а не сам канвас. При нажатии на
+	/// монитор Display.ZoomIn переводит канвас в ScreenSpaceOverlay, а Unity у
+	/// такого канваса каждый кадр сама переписывает позицию и размер
+	/// RectTransform — экран обязан совпадать с экраном устройства. Любое наше
+	/// смещение молча затиралось бы в тот же кадр, и искажение пропадало
+	/// именно в приближении. Вдобавок ZoomOut принудительно сбрасывает
+	/// localPosition, localScale и sizeDelta канваса, то есть мы бы ещё и
+	/// дрались с зумом за одни и те же поля.
+	///
+	/// Содержимое экрана ApplyScreen кладёт внутрь канваса отдельным
+	/// RectTransform — вот его и двигаем. Он одинаково свободен и в мировом
+	/// режиме, и в приближении.
+	/// </remarks>
 	private RectTransform ScreenRoot()
 	{
-		return container != null ? container : transform as RectTransform;
+		if (container == null) return transform as RectTransform;
+
+		for (int i = 0; i < container.childCount; i++)
+		{
+			var child = container.GetChild(i) as RectTransform;
+			if (child == null) continue;
+
+			// Свой же слой двигать нельзя: он прозрачный, и на нём рисуются
+			// полосы, которые обязаны оставаться на месте.
+			if (layer != null && child == layer) continue;
+			if (!child.gameObject.activeInHierarchy) continue;
+
+			return child;
+		}
+
+		return container;
 	}
 
 	/// <summary>Вернуть экран в исходное состояние перед новым видом сбоя.</summary>
