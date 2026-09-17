@@ -2483,6 +2483,69 @@ check("загрузочных записей не найдено" in _bios3,
       "видно, когда BIOS уходит в настройки из-за пустого диска")
 
 
+# ---------------------------------------------------------------------------
+print("\nЛоготип: пропорции и скрытие на входе")
+
+_os4 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/OperatingSystem.cs")
+    .read_text(encoding="utf-8"))
+_bios4 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/Bios.cs")
+    .read_text(encoding="utf-8"))
+
+# RawImage растягивает картинку под прямоугольник префаба. Логотипы у плат
+# разной формы, поэтому в фиксированной рамке они плющатся.
+for _name, _src in (("PCOS", _os4), ("BIOS", _bios4)):
+    # Наличия метода мало: он может быть объявлен и никогда не вызван.
+    # Проверяем именно ВЫЗОВ внутри ApplyBrand, где назначается текстура.
+    _ab4 = _src.split("private void ApplyBrand()")[1]
+    _ab4 = _ab4.split("\n\t\t}")[0].split("\n        }")[0]
+    check("FitLogo(brandLogo" in _ab4,
+          f"{_name}: FitLogo вызывается при назначении логотипа")
+    check("FitLogo(" in _src, f"{_name}: логотип вписывается в рамку")
+    _fit = _src.split("FitLogo(RawImage image, Texture logo)")[1]
+    _fit = _fit.split("\n\t\t}")[0].split("\n        }")[0]
+    check("Mathf.Min(" in _fit,
+          f"{_name}: масштаб по меньшей стороне -- картинка влезает целиком")
+    check("logo.width" in _fit and "logo.height" in _fit,
+          f"{_name}: учитываются реальные размеры текстуры")
+    # Повторный вызов не должен считать от уже сжатого размера.
+    check("logoBox" in _fit,
+          f"{_name}: исходная рамка запоминается, подгонка не накапливается")
+    check("private Vector2 logoBox;" in _src,
+          f"{_name}: есть поле под исходную рамку")
+
+# Проверка самой формулы на реальной текстуре: квадратный логотип 512x512
+# в рамке 550x180 обязан остаться квадратным.
+_w, _h, _bw, _bh = 512.0, 512.0, 550.0, 180.0
+_k = min(_bw / _w, _bh / _h)
+check(abs((_w * _k) / (_h * _k) - _w / _h) < 1e-6,
+      "формула вписывания сохраняет соотношение сторон")
+check(_w * _k <= _bw + 0.5 and _h * _k <= _bh + 0.5,
+      "вписанный логотип не вылезает за рамку")
+
+# Логотип платы принадлежит этапу запуска: на экране входа (аватар, имя,
+# кружок ожидания) его быть не должно.
+_boot4 = _os4.split("private IEnumerator Boot()")[1]
+_switch = _boot4.split("if (user != null) user.SetActive(true);")[0]
+check("brandLogo.enabled = false" in _switch,
+      "логотип скрывается при переходе к экрану пользователя")
+check("startupLabel.enabled = false" in _switch,
+      "надпись запуска тоже убирается перед входом")
+
+# BrandLogo лежит внутри Startup рядом с User, поэтому полем startup он не
+# выключается -- скрывать нужно явно.
+_pcos4 = (ROOT / "Assets/GameObject/PCOS.prefab").read_text(encoding="utf-8")
+_startup_field = re.search(r"\n  startup: \{fileID: (\d+)\}", _pcos4).group(1)
+_startup_go = re.search(
+    r"--- !u!1 &" + _startup_field + r"\nGameObject:(.*?)(?=\n--- |\Z)",
+    _pcos4, re.S)
+_startup_name = re.search(r"m_Name: (.*)", _startup_go.group(1)).group(1).strip()
+check(_startup_name != "Startup",
+      f"поле startup ведёт не на контейнер (это {_startup_name}) -- "
+      "логотип обязан скрываться отдельно")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

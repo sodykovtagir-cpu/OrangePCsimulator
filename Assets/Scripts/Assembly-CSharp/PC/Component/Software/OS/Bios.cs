@@ -50,6 +50,9 @@ namespace PC.Component.Software.OS
 
 		private bool enterBios;
 
+		// Исходная рамка под логотип из префаба.
+		private Vector2 logoBox;
+
 		private int selectedStorage;
 
 		private List<BootPosition> bootTypes;
@@ -99,7 +102,11 @@ namespace PC.Component.Software.OS
 			if (board == null) return;
 
 			var logo = board.BrandLogo;
-			if (brandLogo != null && logo != null) brandLogo.texture = logo;
+			if (brandLogo != null && logo != null)
+			{
+				brandLogo.texture = logo;
+				FitLogo(brandLogo, logo);
+			}
 
 			// Заодно правим строку производителя: показывать «Bell» для платы
 			// другого бренда — та же ошибка, что и с логотипом.
@@ -113,6 +120,32 @@ namespace PC.Component.Software.OS
 					manufacturerValues.text = string.Join("\n", lines);
 				}
 			}
+		}
+
+		/// <summary>
+		/// Вписать логотип в рамку префаба, не искажая пропорции.
+		/// </summary>
+		/// <remarks>
+		/// Рамка тут 550x180, а логотипы у плат разной формы. Без подгонки
+		/// картинка растягивается под прямоугольник и плющится. Считаем
+		/// масштаб по меньшей стороне -- логотип помещается целиком и
+		/// сохраняет пропорции.
+		/// </remarks>
+		private void FitLogo(RawImage image, Texture logo)
+		{
+			var rt = image.rectTransform;
+			if (rt == null) return;
+
+			float tw = logo.width;
+			float th = logo.height;
+			if (tw <= 0f || th <= 0f) return;
+
+			// Исходную рамку запоминаем один раз: иначе повторный вызов
+			// считал бы от уже подогнанного размера и ужимал картинку.
+			if (logoBox.x <= 0f || logoBox.y <= 0f) logoBox = rt.sizeDelta;
+
+			float k = Mathf.Min(logoBox.x / tw, logoBox.y / th);
+			rt.sizeDelta = new Vector2(tw * k, th * k);
 		}
 
 		private void BootOperatingSystem()
