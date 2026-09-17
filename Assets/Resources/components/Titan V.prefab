@@ -143,13 +143,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 1969907941431608}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
+  m_Script: {fileID: 11500000, guid: 6b368085b52be715cb72426808291f0b, type: 3}
   m_Name:
   m_EditorClassIdentifier:
   spawnId: Titan V
   info: Titan V
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
+  damageImpulse: 12
+  damageSound: {fileID: 0}
   glue: 0
   capacity: 0
   score: 5800

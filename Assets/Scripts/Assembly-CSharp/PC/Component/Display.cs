@@ -27,6 +27,16 @@ namespace PC.Component
 
 		private Motherboard currentBoard;
 
+		/// <summary>
+		/// Плата, картинку которой показывает этот монитор.
+		/// </summary>
+		/// <remarks>
+		/// Нужна эффекту артефактов, чтобы узнать, через какие видеокарты идёт
+		/// изображение. Только на чтение: подключением по-прежнему заведуют
+		/// ConnectBoard и DisconnectBoard.
+		/// </remarks>
+		public Motherboard ConnectedBoard { get { return currentBoard; } }
+
 		private RectTransform rect;
 
 		private Vector2 defaultDelta;
@@ -51,6 +61,11 @@ namespace PC.Component
 			rect = canvas.GetComponent<RectTransform>();
 
 			defaultDelta = rect.sizeDelta;
+
+			// Эффект артефактов повреждённой видеокарты. Навешивается из кода,
+			// чтобы не добавлять компонент вручную в каждый префаб монитора:
+			// их тринадцать, и любой новый монитор получит эффект сам.
+			if (GetComponent<GpuArtifacts>() == null) gameObject.AddComponent<GpuArtifacts>();
 
 			PowerChanged += RefreshScreen;
 

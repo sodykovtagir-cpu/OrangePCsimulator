@@ -114,7 +114,14 @@ namespace PC.Component.Software
 
         // ================= OPEN SITE =================
 
-        private void OpenSite(WebsiteItem site)
+        /// <summary>
+        /// Открыть сайт. Наследники могут вмешаться в этот момент.
+        /// </summary>
+        /// <remarks>
+        /// Сделано virtual ради Ondex: тот же браузер, но на каждом переходе
+        /// рискующий притащить вирус.
+        /// </remarks>
+        protected virtual void OpenSite(WebsiteItem site)
         {
             ClearPage();
 
