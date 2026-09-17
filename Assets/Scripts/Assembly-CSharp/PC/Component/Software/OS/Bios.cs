@@ -40,6 +40,14 @@ namespace PC.Component.Software.OS
 		[SerializeField]
 		private Transform selectionParent;
 
+		[SerializeField]
+		[Tooltip("Логотип на стартовом экране BIOS. Заменяется логотипом платы.")]
+		private RawImage brandLogo;
+
+		[SerializeField]
+		[Tooltip("Строка «Manufacturer Name» в разделе Information.")]
+		private Text manufacturerValues;
+
 		private bool enterBios;
 
 		private int selectedStorage;
@@ -52,8 +60,39 @@ namespace PC.Component.Software.OS
 
 		protected override void BootSystem()
 		{
+			ApplyBrand();
 			Invoke("BootOperatingSystem", 2f);
         }
+
+		/// <summary>
+		/// Подставить логотип платы вместо зашитого в префаб BIOS.
+		/// </summary>
+		/// <remarks>
+		/// В префабе BIOS логотип был прибит гвоздями к одной текстуре, хотя
+		/// BIOS принадлежит конкретной плате. Берём его из префаба платы, а
+		/// свой оставляем как запасной: плата без бренда покажет стандартный.
+		/// </remarks>
+		private void ApplyBrand()
+		{
+			var board = Board;
+			if (board == null) return;
+
+			var logo = board.BrandLogo;
+			if (brandLogo != null && logo != null) brandLogo.texture = logo;
+
+			// Заодно правим строку производителя: показывать «Bell» для платы
+			// другого бренда — та же ошибка, что и с логотипом.
+			var brand = board.BrandName;
+			if (manufacturerValues != null && !string.IsNullOrEmpty(brand))
+			{
+				var lines = manufacturerValues.text.Split('\n');
+				if (lines.Length > 0)
+				{
+					lines[lines.Length - 1] = brand;
+					manufacturerValues.text = string.Join("\n", lines);
+				}
+			}
+		}
 
 		private void BootOperatingSystem()
 		{
