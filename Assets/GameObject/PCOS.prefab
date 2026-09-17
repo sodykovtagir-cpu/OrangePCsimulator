@@ -8344,6 +8344,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 224253519305616500}
+  - component: {fileID: 222253519305616502}
   - component: {fileID: 114253519305616501}
   m_Layer: 5
   m_Name: BrandLogo
@@ -8398,3 +8399,11 @@ MonoBehaviour:
     y: 0
     width: 1
     height: 1
+--- !u!222 &222253519305616502
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354420233855800}
+  m_CullTransparentMesh: 1

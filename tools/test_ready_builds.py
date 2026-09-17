@@ -2273,6 +2273,97 @@ check(_MSG_MAT not in _ex0,
 check("brandName: MSG" in _ex1, "у платы MSG задан свой бренд")
 
 
+# ---------------------------------------------------------------------------
+print("\nU I-графика: обязательный CanvasRenderer")
+
+# БАГ, который это ловит: BIOS зависал после логотипа. Добавленный объект
+# BrandLogo имел RectTransform и RawImage, но НЕ имел CanvasRenderer. Любой
+# Graphic (Image/RawImage/Text) без него рисоваться не может: Unity сыпет
+# ошибками при включении объекта, и загрузка встаёт намертво. В редакторе такой
+# компонент добавляется сам, а при правке префаба текстом -- нет.
+_UI_GRAPHIC_GUIDS = {
+    "1344c3c82d62a2a41a3576d8abb8e3ea",   # RawImage
+    "fe87c0e1cc204ed48ad3b37840f39efc",   # Image
+    "5f7201a12d95ffc409449d95f23cf332",   # Text
+}
+
+def _graphics_without_renderer(path):
+    text = path.read_text(encoding="utf-8")
+    # fileID компонента -> тип блока
+    kinds = {}
+    for mm in re.finditer(r"--- !u!(\d+) &(\d+)", text):
+        kinds[mm.group(2)] = mm.group(1)
+
+    broken = []
+    for mm in re.finditer(r"--- !u!1 &(\d+)\nGameObject:(.*?)(?=\n--- |\Z)",
+                          text, re.S):
+        body = mm.group(2)
+        comps = re.findall(r"component: \{fileID: (\d+)\}", body)
+        has_graphic = False
+        for cid in comps:
+            if kinds.get(cid) != "114":
+                continue
+            blk = re.search(r"--- !u!114 &" + cid + r"\nMonoBehaviour:(.*?)(?=\n--- |\Z)",
+                            text, re.S)
+            if not blk:
+                continue
+            g = re.search(r"m_Script: \{fileID: -?\d+, guid: (\w+)", blk.group(1))
+            if g and g.group(1) in _UI_GRAPHIC_GUIDS:
+                has_graphic = True
+        if not has_graphic:
+            continue
+        if not any(kinds.get(c) == "222" for c in comps):
+            name = re.search(r"m_Name: (.*)", body)
+            broken.append(name.group(1).strip() if name else "?")
+    return broken
+
+for _pf in ["Assets/GameObject/PCOS.prefab", "Assets/GameObject/BIOS.prefab"]:
+    _bad = _graphics_without_renderer(ROOT / _pf)
+    check(not _bad,
+          f"{_pf.split('/')[-1]}: у всей UI-графики есть CanvasRenderer "
+          f"(без него: {_bad})")
+
+
+# ---------------------------------------------------------------------------
+print("\nИнструмент: меши платы MSG из FBX")
+
+_tool = ROOT / "Assets/Editor/SetupMsgBoardMeshes.cs"
+check(_tool.exists(), "editor-скрипт назначения мешей на месте")
+_tool_src = _strip_comments(_tool.read_text(encoding="utf-8"))
+
+# fileID подобъектов FBX назначает сам Unity при импорте, снаружи их не
+# вычислить -- поэтому меши берутся через AssetDatabase, а не подставляются
+# в текст префаба.
+check("LoadAllAssetsAtPath" in _tool_src,
+      "меши берутся у редактора, а не подставляются вручную")
+check("PrefabUtility.LoadPrefabContents" in _tool_src and
+      "PrefabUtility.SaveAsPrefabAsset" in _tool_src,
+      "префаб правится через PrefabUtility, а не текстом")
+check("[MenuItem(" in _tool_src, "инструмент вызывается из меню редактора")
+
+# Если имя меша не нашлось, рвать связь нельзя: деталь пропадёт со сцены.
+_apply = _tool_src.split("public static void Apply()")[1]
+# Резать по "}" нельзя: рядом строка с интерполяцией $"{goName} ...",
+# и срез обрывается на её скобке. Берём фиксированное окно после счётчика.
+_after_missing = _apply.split("missing++")[1][:300]
+check("continue;" in _after_missing,
+      "не найденный в FBX меш пропускается, а не обнуляется")
+check("sharedMesh = null" not in _tool_src,
+      "инструмент никогда не обнуляет меш")
+check("NameMap" in _tool_src,
+      "учтены переименования между префабом и моделью (EXATX1 -> EXATX)")
+
+_meta = ROOT / "Assets/Editor/SetupMsgBoardMeshes.cs.meta"
+check(_meta.exists(), "у скрипта есть .meta")
+check("MonoImporter:" in _meta.read_text(encoding="utf-8"),
+      "в .meta скрипта именно MonoImporter")
+
+_guid = re.search(r"guid: (\w+)", _meta.read_text(encoding="utf-8")).group(1)
+_dupes = [m for m in ROOT.rglob("*.meta")
+          if m != _meta and f"guid: {_guid}" in m.read_text(encoding="utf-8", errors="replace")]
+check(not _dupes, f"guid скрипта уникален (дубли: {[d.name for d in _dupes]})")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
