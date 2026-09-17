@@ -2195,10 +2195,12 @@ check("ApplyBrand();" in _boot2, "логотип применяется при �
 
 _ab = _os2.split("private void ApplyBrand()")[1].split("\n        }")[0]
 check("board.BrandLogo" in _ab, "логотип берётся именно у платы")
-check("startupLabel.gameObject.SetActive(false)" in _ab,
+# Гасится КОМПОНЕНТ, а не GameObject: startup и startupLabel в PCOS
+# указывают на один объект, и SetActive(false) вешал всю загрузку.
+check("startupLabel.enabled = false" in _ab,
       "надпись скрывается, когда логотип задан")
 # Плата без логотипа не должна показывать пустоту.
-check("SetActive(logo != null)" in _ab,
+check("brandLogo.enabled = logo != null" in _ab,
       "без логотипа остаётся обычная надпись")
 
 _bios2 = _strip_comments(
@@ -2362,6 +2364,84 @@ _guid = re.search(r"guid: (\w+)", _meta.read_text(encoding="utf-8")).group(1)
 _dupes = [m for m in ROOT.rglob("*.meta")
           if m != _meta and f"guid: {_guid}" in m.read_text(encoding="utf-8", errors="replace")]
 check(not _dupes, f"guid скрипта уникален (дубли: {[d.name for d in _dupes]})")
+
+
+# ---------------------------------------------------------------------------
+print("\nFBX: запечённые трансформы")
+
+sys.path.insert(0, str(ROOT / "tools"))
+import check_fbx_transforms as fbxcheck  # noqa: E402
+
+check((ROOT / "docs/FBX_IMPORT_RU.md").exists(),
+      "инструкция по импорту FBX на месте")
+check((ROOT / "tools/check_fbx_transforms.py").exists(),
+      "проверка трансформов FBX на месте")
+
+# Проверка обязана ловить смешанные масштабы, но НЕ ругаться на файлы, где
+# масштаб одинаковый у всех объектов: в RX570.fbx он равен 100 (единицы
+# сцены), Unity переводит их сам, и карта работает.
+_rx = ROOT / "Assets/Resources/components/RX570.fbx"
+if _rx.exists():
+    _bad, _tot = fbxcheck.scan(str(_rx))
+    check(not _bad,
+          f"единый масштаб по всему файлу не считается ошибкой (RX570: {_bad})")
+
+# Слоты ломаются именно от смешанного масштаба: вложенная деталь наследует
+# чужой множитель, Pivot уезжает, коллайдер сжимается.
+_msg = ROOT / "Assets/Resources/components/MsgMotherBoard_ATX_black.fbx"
+if _msg.exists():
+    _bad, _tot = fbxcheck.scan(str(_msg))
+    _names = {n for n, _s in _bad}
+    # Пока модель не переэкспортирована, проверка обязана эту беду видеть.
+    # Когда Semyalol применит Apply All Transforms, список станет пустым и
+    # обе ветки останутся верными -- поэтому проверяем сам факт диагностики.
+    check(isinstance(_bad, list),
+          "трансформы платы MSG проверяются автоматически")
+    if _bad:
+        check("Slot" in _names or "UsbSlot" in _names,
+              f"замечен незапечённый масштаб у слотов: {sorted(_names)[:5]}")
+
+
+# ---------------------------------------------------------------------------
+print("\nЭкран загрузки: гасим компонент, а не объект")
+
+# БАГ: система зависала сразу после логотипа. В PCOS поле startup указывает
+# НЕ на контейнер "Startup", а на тот же объект "Text", что и startupLabel.
+# SetActive(false) гасил весь экран загрузки: логотип успевал показаться, а
+# дальше дочерние объекты выключенного родителя переставали работать.
+_pcos_txt = (ROOT / "Assets/GameObject/PCOS.prefab").read_text(encoding="utf-8")
+
+_startup_go = re.search(r"\n  startup: \{fileID: (\d+)\}", _pcos_txt).group(1)
+_label_comp = re.search(r"\n  startupLabel: \{fileID: (\d+)\}", _pcos_txt).group(1)
+_label_blk = re.search(
+    r"--- !u!114 &" + _label_comp + r"\nMonoBehaviour:(.*?)(?=\n--- |\Z)",
+    _pcos_txt, re.S)
+_label_go = re.search(r"m_GameObject: \{fileID: (\d+)\}", _label_blk.group(1)).group(1)
+
+_shared = _startup_go == _label_go
+_ab2 = _os2.split("private void ApplyBrand()")[1].split("\n        }")[0]
+
+# Пока эти поля делят один объект, выключать GameObject нельзя категорически.
+if _shared:
+    check("startupLabel.gameObject.SetActive" not in _ab2,
+          "надпись гасится компонентом: startup и startupLabel -- один объект")
+check("startupLabel.enabled = false" in _ab2,
+      "надпись выключается через enabled, а не через SetActive")
+check("brandLogo.gameObject.SetActive" not in _ab2,
+      "логотип тоже переключается компонентом, а не объектом")
+check("brandLogo.enabled" in _ab2, "логотип управляется через enabled")
+
+# Если объект логотипа оставить выключенным, компонент уже ничего не покажет.
+_logo_comp = re.search(r"\n  brandLogo: \{fileID: (\d+)\}", _pcos_txt).group(1)
+_logo_blk = re.search(
+    r"--- !u!114 &" + _logo_comp + r"\nMonoBehaviour:(.*?)(?=\n--- |\Z)",
+    _pcos_txt, re.S)
+_logo_go = re.search(r"m_GameObject: \{fileID: (\d+)\}", _logo_blk.group(1)).group(1)
+_logo_go_blk = re.search(
+    r"--- !u!1 &" + _logo_go + r"\nGameObject:(.*?)(?=\n--- |\Z)",
+    _pcos_txt, re.S)
+check(re.search(r"m_IsActive: 1", _logo_go_blk.group(1)) is not None,
+      "объект логотипа активен, видимостью управляет компонент")
 
 
 unchanged = all(

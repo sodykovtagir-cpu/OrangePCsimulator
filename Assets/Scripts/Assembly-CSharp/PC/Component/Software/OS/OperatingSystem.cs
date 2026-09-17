@@ -176,21 +176,32 @@ namespace PC.Component.Software.OS
 
             if (brandLogo != null)
             {
+                // Тоже гасим компонент, а не объект: поля префаба могут
+                // делить один GameObject, и выключение объекта задевает
+                // чужие элементы экрана загрузки.
                 brandLogo.texture = logo;
-                brandLogo.gameObject.SetActive(logo != null);
+                brandLogo.enabled = logo != null;
             }
 
             if (startupLabel == null) return;
 
-            // Есть логотип — надпись не нужна. Есть только название бренда —
-            // показываем его вместо стандартной строки.
+            // КРИТИЧНО: гасим сам компонент Text, а НЕ его GameObject.
+            //
+            // В PCOS поле startup указывает не на контейнер "Startup", а на
+            // тот же объект "Text", что и startupLabel. Выключение объекта
+            // гасило весь экран загрузки вместе с ним: логотип успевал
+            // показаться, а дальше система замирала -- дочерние объекты
+            // выключенного родителя не работают, и загрузка не продолжалась.
+            //
+            // Отключение компонента убирает только надпись и ничего больше не
+            // задевает, даже если объект делят несколько полей.
             if (logo != null)
             {
-                startupLabel.gameObject.SetActive(false);
+                startupLabel.enabled = false;
                 return;
             }
 
-            startupLabel.gameObject.SetActive(true);
+            startupLabel.enabled = true;
             if (!string.IsNullOrEmpty(brand)) startupLabel.text = brand;
         }
 
