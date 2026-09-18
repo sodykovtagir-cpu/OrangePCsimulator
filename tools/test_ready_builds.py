@@ -1723,7 +1723,6 @@ _my_scripts = [
     "Assets/Scripts/Assembly-CSharp/DisplayCameraPacer.cs",
     "Assets/Scripts/Assembly-CSharp/DisplayManager.cs",
     "Assets/Scripts/Assembly-CSharp/PC/Component/GPU.cs",
-    "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs",
 ]
 
 # Какие типы объявлены в пространстве PC.Component.
@@ -1895,56 +1894,37 @@ if _art_row:
           "русский перевод состояния на месте")
 
 # ---------------------------------------------------------------------------
-print("\nOndex Browser")
+print("\nOndex удалён")
 
-_ond_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs"
-check(_ond_path.exists(), "есть скрипт Ondex")
-_ond_src = _strip_comments(_ond_path.read_text(encoding="utf-8"))
-check((_ond_path.parent / "Ondex.cs.meta").exists(), "у Ondex есть .meta")
+# Ondex убран по решению Semyalol: перед релизом браузер будет переделан
+# заново, и мёртвый код тащить незачем. Проверка следит, чтобы он не вернулся
+# случайно -- один раз его уже воскресили, восстанавливая пропавшую ссылку.
+_ond_gone = [
+    "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs",
+    "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Ondex.cs.meta",
+    "Assets/Resources/apps/Ondex.prefab",
+    "Assets/Resources/apps/Ondex.prefab.meta",
+]
+for _rel in _ond_gone:
+    check(not (ROOT / _rel).exists(), f"{_rel.split('/')[-1]} удалён")
 
-check("class Ondex : Browser" in _ond_src,
-      "Ondex — отдельный браузер на базе обычного")
-check("protected override void OpenSite" in _ond_src,
-      "заражение происходит при переходе на сайт")
+# Висячая ссылка в Downloader -- это «Missing Prefab» в списке приложений.
+_dl = (ROOT / "Assets/Resources/apps/Downloader.prefab").read_text(
+    encoding="utf-8", errors="ignore")
+check("d241f9eef99c413db8d91882f5219878" not in _dl,
+      "в App Downloader не осталось ссылки на удалённый Ondex")
 
-# Базовый Browser должен разрешать переопределение.
+_tr_ond = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+check("Ondex" not in _tr_ond, "строка перевода Ondex убрана")
+
+# Точка расширения в браузере остаётся: она не мешает и пригодится новому
+# браузеру, но сама по себе на Ondex больше не завязана.
 _br_src = _strip_comments(
     (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/Browser.cs")
     .read_text(encoding="utf-8"))
 check("protected virtual void OpenSite" in _br_src,
-      "OpenSite в базовом браузере переопределяемый")
-
-# Шанс заражения высокий, но не стопроцентный: иначе приложением не пользуются.
-_ch = re.search(r"infectionChance = ([\d.]+)f", _ond_src)
-check(_ch is not None, "шанс заражения задан")
-if _ch:
-    _c = float(_ch.group(1))
-    check(_c >= 0.3, f"шанс заметный, шутка работает ({_c})")
-    check(_c < 1.0, f"шанс не стопроцентный ({_c})")
-
-check("if (infected) return" in _ond_src,
-      "уже заражённая система повторно не заражается")
-
-# Префаб приложения.
-_ond_prefab = ROOT / "Assets/Resources/apps/Ondex.prefab"
-check(_ond_prefab.exists(), "есть префаб Ondex")
-_op = _ond_prefab.read_text(encoding="utf-8", errors="ignore")
-_ond_guid = re.search(r"guid: ([a-f0-9]+)",
-                      (_ond_path.parent / "Ondex.cs.meta").read_text(encoding="utf-8")).group(1)
-check(_ond_guid in _op, "префаб использует скрипт Ondex, а не Browser")
-check("appName: Ondex" in _op,
-      "приложение называется Ondex, а не унаследованным Browser")
-check(re.search(r"virusPrefab: \{fileID: \d+, guid: [a-f0-9]+", _op) is not None,
-      "вирус подключён к префабу, иначе заражать нечем")
-
-# Приложение должно быть доступно игроку.
-_dl = (ROOT / "Assets/Resources/apps/Downloader.prefab").read_text(
-    encoding="utf-8", errors="ignore")
-_ond_prefab_guid = re.search(
-    r"guid: ([a-f0-9]+)",
-    (ROOT / "Assets/Resources/apps/Ondex.prefab.meta").read_text(encoding="utf-8")
-).group(1)
-check(_ond_prefab_guid in _dl, "Ondex есть в App Downloader")
+      "OpenSite остался переопределяемым для будущего браузера")
+check("Ondex" not in _br_src, "в Browser.cs нет упоминаний Ondex")
 
 
 # ---------------------------------------------------------------------------
@@ -2587,6 +2567,126 @@ _desc = [l for l in _tr2.splitlines() if l.startswith("Dream PC Description")]
 check(len(_desc) == 1, "описание ПК мечты на месте")
 check("EXATX" not in _desc[0], "в описании больше не упоминается EXATX")
 check("MSG" in _desc[0], "в описании указана плата MSG")
+
+
+# ---------------------------------------------------------------------------
+print("\nФайлы создаются на выбранном диске")
+
+# БАГ: индекс диска был прибит нулём (системный), поэтому папка, созданная
+# через контекстное меню на втором диске, появлялась на системном.
+_os5 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/OperatingSystem.cs")
+    .read_text(encoding="utf-8"))
+
+check("public int ActiveStorage" in _os5, "есть понятие активного диска")
+check("public void SetActiveStorage(" in _os5,
+      "активный диск можно задать снаружи")
+
+# Индекс 0 сам по себе не ошибка: установка приложений, обои и служебные
+# метки ЖИВУТ на системном диске, и это правильно. Ошибка -- когда к нулю
+# прибиты пользовательские операции. Проверяем именно их тела.
+for _fn, _label in (("CreateFileAt(", "создание файла"),
+                    ("CreateFolderAt(", "создание папки"),
+                    ("TryWriteFile(", "запись файла из приложений")):
+    _body = _os5.split(_fn)[1].split("\n        }")[0]
+    _bad = re.findall(r"FileManager\.(?:Write|Create)\(0,", _body)
+    check(not _bad, f"{_label}: не прибито к диску 0")
+
+_cfa = _os5.split("public void CreateFileAt(")[1].split("\n        }")[0]
+check("ActiveStorage" in _cfa, "файл создаётся на активном диске")
+_cfo = _os5.split("public void CreateFolderAt(")[1].split("\n        }")[0]
+check("ActiveStorage" in _cfo, "папка создаётся на активном диске")
+
+_paste = _os5.split("public bool PasteClipboard(")[1].split("\n        }")[0]
+check("AllStorage[0]" not in _paste, "вставка не прибита к системному диску")
+check("ActiveStorage" in _paste, "вставка идёт на активный диск")
+
+# Удаление и переименование должны работать с тем диском, где файл ЛЕЖИТ.
+check("private Storage FindStorageOf(" in _os5,
+      "есть поиск диска, на котором реально лежит файл")
+_del = _os5.split("public void DeleteUserFile(")[1].split("\n        }")[0]
+check("FindStorageOf(file)" in _del,
+      "удаление ищет файл на всех дисках, а не только на системном")
+
+# Рабочий стол принадлежит системному диску при любом открытом окне.
+_desk = _os5.split("public void CreateDesktopFile(")[1].split("\n        }")[0]
+check("activeStorage = 0" in _desk,
+      "файл рабочего стола всегда создаётся на системном диске")
+check("finally" in _desk,
+      "активный диск возвращается даже при ошибке")
+
+# Проводник обязан сообщать системе, какой диск открыт.
+_fm5 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/FileManager.cs")
+    .read_text(encoding="utf-8"))
+_sel = _fm5.split("private void SelectStorage(")[1].split("\n        }")[0]
+check("SetActiveStorage(index)" in _sel,
+      "выбор диска в проводнике меняет активный диск")
+check("public int CurrentStorageIndex" in _fm5,
+      "окно проводника сообщает свой диск наружу")
+_close = _fm5.split("public override void Close()")[1].split("\n        }")[0]
+check("SetActiveStorage(0)" in _close,
+      "после закрытия окна работа возвращается на системный диск")
+
+# Контекстное меню должно запоминать диск окна, из которого открыто.
+_menu5 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/DesktopContextMenu.cs")
+    .read_text(encoding="utf-8"))
+check("explorer.CurrentStorageIndex" in _menu5,
+      "меню проводника берёт диск своего окна")
+check("AddCreateSubmenu(menuPanel, \"\", 0)" in _menu5,
+      "меню рабочего стола жёстко привязано к системному диску")
+_sub = _menu5.split("private void AddCreateSubmenu(")[1].split("\n        }")[0]
+check("SetActiveStorage(storage)" in _sub,
+      "пункт «Создать» переключает диск перед созданием")
+
+
+# ---------------------------------------------------------------------------
+print("\nЗагрузка сохранения: предметы из подпапок")
+
+# БАГ: загрузчик искал предмет строго как Components/<spawnId>, поэтому любой
+# префаб из подпапки не находился. В логе -- «Prefab of ... not found!» и
+# «N items failed to load», а на деле молча пропадали ящики готовых сборок:
+# они лежат в Components/ready.
+_sm = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+
+check("FindItemPrefab(" in _sm, "поиск префаба вынесен отдельно")
+_load = _sm.split("foreach (var it in cdat.itemData)")[1][:400]
+check("FindItemPrefab(it.spawnId)" in _load,
+      "загрузка предметов идёт через общий поиск")
+check('$"Components/{it.spawnId}"' not in _load,
+      "прямой путь без подпапок больше не используется")
+
+_find = _sm.split("private static GameObject FindItemPrefab(")[1].split("\n    }")[0]
+check("itemFolders" in _find, "известные подпапки перебираются")
+check("LoadAll" in _find,
+      "есть запасной поиск по всей папке для неизвестных подпапок")
+check("prefabCache" in _find, "результат кешируется, перебор не на каждый предмет")
+check("prefabCache[spawnId] = found" in _find,
+      "кешируется и отрицательный результат")
+
+# Все сохраняемые предметы обязаны находиться загрузчиком.
+_root_prefabs = {f.stem for f in (ROOT / "Assets/Resources/components").glob("*.prefab")}
+_sub_prefabs = list((ROOT / "Assets/Resources/components").glob("*/*.prefab"))
+_saveable_sub = []
+for _f in _sub_prefabs:
+    _m = re.search(r"spawnId: (.+)", _f.read_text(encoding="utf-8", errors="replace"))
+    if _m and _m.group(1).strip():
+        _saveable_sub.append((_f.stem, _m.group(1).strip()))
+
+# Такие предметы существуют (ящики готовых сборок) -- значит поддержка подпапок
+# обязана быть, иначе сохранение их теряет.
+check(len(_saveable_sub) > 0,
+      f"есть сохраняемые предметы в подпапках ({len(_saveable_sub)} шт.)")
+
+_folders = {f.parent.name for f in _sub_prefabs}
+_listed = re.search(r"itemFolders = \{(.*?)\}", _sm, re.S)
+check(_listed is not None, "список подпапок задан")
+if _listed:
+    for _folder in _folders:
+        check(f'"{_folder}/"' in _listed.group(1) or "LoadAll" in _find,
+              f"подпапка {_folder} находится загрузчиком")
 
 
 unchanged = all(

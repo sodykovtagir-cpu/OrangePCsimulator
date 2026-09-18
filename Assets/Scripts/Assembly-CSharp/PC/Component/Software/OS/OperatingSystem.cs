@@ -818,10 +818,16 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        /// <summary>Записать файл: используется Lua-скриптами (os.writeFile).</summary>
+        /// <remarks>
+        /// Пишем на активный диск, а не на системный: если игрок работает во
+        /// втором диске, скрипт должен сохранять туда же, куда сохраняет всё
+        /// остальное.
+        /// </remarks>
         public bool TryWriteFile(string path, string content)
         {
             if (FileManager == null || string.IsNullOrEmpty(path)) return false;
-            var file = FileManager.Write(0, path, content ?? "");
+            var file = FileManager.Write(ActiveStorage, path, content ?? "");
             RefreshDesktopIcon();
             return file != null;
         }
@@ -1675,10 +1681,12 @@ namespace PC.Component.Software.OS
 
         public bool PasteClipboard(string targetFolder)
         {
-            if (!HasClipboard || AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null)
+            if (!HasClipboard || AllStorage == null || AllStorage.Count == 0)
                 return false;
 
-            var storage = AllStorage[0];
+            // Вставляем на тот диск, который сейчас открыт, а не на системный.
+            var storage = AllStorage[ActiveStorage];
+            if (storage == null) return false;
             var src = clipboard.file;
             if (src == null || storage.files == null) return false;
             if (!storage.files.Contains(src) && clipboard.cut)
@@ -1730,10 +1738,12 @@ namespace PC.Component.Software.OS
         public void DeleteUserFile(File file)
         {
             if (file == null || IsProtectedFile(file)) return;
-            if (AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null) return;
+            if (AllStorage == null || AllStorage.Count == 0) return;
 
-            var storage = AllStorage[0];
-            if (storage.files == null) return;
+            // Файл может лежать на любом диске: ищем тот, где он есть на самом
+            // деле. Иначе удаление со второго диска молча не срабатывало.
+            var storage = FindStorageOf(file) ?? AllStorage[ActiveStorage];
+            if (storage == null || storage.files == null) return;
 
             if (file.isFolder)
             {
@@ -1756,7 +1766,7 @@ namespace PC.Component.Software.OS
         public bool RenameUserFile(File file, string newName)
         {
             if (file == null || IsProtectedFile(file) || string.IsNullOrEmpty(newName)) return false;
-            if (AllStorage == null || AllStorage.Count == 0 || AllStorage[0] == null) return false;
+            if (AllStorage == null || AllStorage.Count == 0) return false;
 
             newName = newName.Trim();
             if (string.IsNullOrEmpty(newName)) return false;
@@ -1771,7 +1781,9 @@ namespace PC.Component.Software.OS
             }
 
             string dest = CombinePath(GetFolderPath(file.path), newName);
-            if (dest != file.path && FileManager != null && FileManager.Exists(0, dest))
+            int fileStorage = IndexOfStorage(FindStorageOf(file));
+            if (dest != file.path && FileManager != null &&
+                FileManager.Exists(fileStorage, dest))
                 dest = UniquePath(dest);
             if (dest == file.path) return true;
 
@@ -1785,12 +1797,92 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        /// <summary>
+        /// Диск, на котором сейчас работает игрок.
+        /// </summary>
+        /// <remarks>
+        /// БАГ, который это чинит: операции файлов были прибиты к индексу 0 --
+        /// то есть к системному диску. Открываешь в проводнике второй диск,
+        /// создаёшь там папку через контекстное меню, а она появляется на
+        /// системном. То же было с вставкой, удалением и переименованием.
+        ///
+        /// Рабочий стол всегда принадлежит системному диску, а окно проводника
+        /// -- тому, что в нём открыт. Поэтому проводник сообщает свой диск
+        /// сюда, а после закрытия окна значение сбрасывается обратно на ноль.
+        /// </remarks>
+        private int activeStorage;
+
+        /// <summary>Индекс активного диска с проверкой границ.</summary>
+        public int ActiveStorage
+        {
+            get
+            {
+                var all = AllStorage;
+                if (all == null || activeStorage < 0 || activeStorage >= all.Count)
+                    return 0;
+                return activeStorage;
+            }
+        }
+
+        /// <summary>
+        /// Сообщить, на каком диске сейчас работают.
+        /// </summary>
+        /// <remarks>
+        /// Зовётся проводником при выборе диска и при закрытии окна (тогда
+        /// передаётся 0 -- возвращаемся к системному, которому принадлежит
+        /// рабочий стол).
+        /// </remarks>
+        public void SetActiveStorage(int index)
+        {
+            var all = AllStorage;
+            if (all == null || index < 0 || index >= all.Count)
+            {
+                activeStorage = 0;
+                return;
+            }
+            activeStorage = index;
+        }
+
+        /// <summary>
+        /// Найти диск, на котором реально лежит файл.
+        /// </summary>
+        /// <remarks>
+        /// Удаление и переименование должны работать с тем диском, где файл
+        /// находится, а не с тем, что открыт в окне: иначе операция молча
+        /// проходит мимо и файл остаётся на месте.
+        /// </remarks>
+        private Storage FindStorageOf(File file)
+        {
+            if (file == null) return null;
+
+            var all = AllStorage;
+            if (all == null) return null;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var s = all[i];
+                if (s == null || s.files == null) continue;
+                if (s.files.Contains(file)) return s;
+            }
+
+            return null;
+        }
+
+        private int IndexOfStorage(Storage storage)
+        {
+            var all = AllStorage;
+            if (storage == null || all == null) return ActiveStorage;
+
+            int idx = all.IndexOf(storage);
+            return idx >= 0 ? idx : ActiveStorage;
+        }
+
         public void CreateFileAt(string folder, string name, string content)
         {
             if (FileManager == null || string.IsNullOrEmpty(name)) return;
             string path = UniquePath(CombinePath(folder, name));
             var body = content ?? "";
-            var created = FileManager.Write(0, path, body);
+            var created = FileManager.Write(ActiveStorage, path, body);
             if (created == null)
             {
                 ShowMessageBox(name, Localization.GetText("Could not create the file."));
@@ -1808,7 +1900,7 @@ namespace PC.Component.Software.OS
         {
             if (FileManager == null || string.IsNullOrEmpty(name)) return;
             string path = UniquePath(CombinePath(folder, name));
-            if (!FileManager.Create(0, File.MakeFolder(path)))
+            if (!FileManager.Create(ActiveStorage, File.MakeFolder(path)))
             {
                 ShowMessageBox(name, Localization.GetText("Could not create the folder."));
                 return;
@@ -1818,14 +1910,39 @@ namespace PC.Component.Software.OS
             RefreshRunningFileManagers();
         }
 
+        /// <summary>Создать файл на рабочем столе.</summary>
+        /// <remarks>
+        /// Рабочий стол всегда принадлежит системному диску, каким бы диском
+        /// ни пользовались в проводнике. Поэтому на время операции активный
+        /// диск принудительно переводится на нулевой и возвращается обратно --
+        /// иначе ярлык с рабочего стола уехал бы на открытый в окне диск.
+        /// </remarks>
         public void CreateDesktopFile(string name, string content)
         {
-            CreateFileAt("", name, content);
+            int previous = activeStorage;
+            activeStorage = 0;
+            try
+            {
+                CreateFileAt("", name, content);
+            }
+            finally
+            {
+                activeStorage = previous;
+            }
         }
 
         public void CreateDesktopFolder(string name)
         {
-            CreateFolderAt("", name);
+            int previous = activeStorage;
+            activeStorage = 0;
+            try
+            {
+                CreateFolderAt("", name);
+            }
+            finally
+            {
+                activeStorage = previous;
+            }
         }
 
         public string UniquePath(string path)

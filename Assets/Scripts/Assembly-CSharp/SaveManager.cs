@@ -173,12 +173,11 @@ public class SaveManager : MonoBehaviour
 
             foreach (var it in cdat.itemData)
             {
-                var path = $"Components/{it.spawnId}";
-                var exists = Resources.Load(path);
+                var exists = FindItemPrefab(it.spawnId);
 
                 if (exists)
                 {
-                    var prefab = Instantiate((GameObject)exists);
+                    var prefab = Instantiate(exists);
                     prefab.transform.position = it.pos;
                     prefab.transform.rotation = it.rot;
 
@@ -197,6 +196,9 @@ public class SaveManager : MonoBehaviour
                 }
                 else
                 {
+                    // Предмета нет в сборке: его удалили из игры или это
+                    // сохранение от другой версии. Сообщаем и пропускаем --
+                    // терять из-за одной пропажи всю комнату нельзя.
                     Debug.LogWarning($"Prefab of {it.spawnId} not found!");
                     failCount++;
                 }
@@ -220,6 +222,60 @@ public class SaveManager : MonoBehaviour
             }
         }
         return failCount;
+    }
+
+    /// <summary>
+    /// Кеш найденных префабов: путь ищется один раз на весь запуск.
+    /// </summary>
+    private static readonly Dictionary<string, GameObject> prefabCache =
+        new Dictionary<string, GameObject>();
+
+    /// <summary>Подпапки Resources/Components, где тоже лежат предметы.</summary>
+    /// <remarks>
+    /// Изначально загрузчик искал предмет строго как Components/<id>, и любой
+    /// префаб из подпапки не находился: сохранение молча теряло ящики готовых
+    /// сборок (их двадцать, они лежат в Components/ready). В логе это выглядит
+    /// как «Prefab of ... not found!» и «N items failed to load».
+    /// </remarks>
+    private static readonly string[] itemFolders = { "", "ready/" };
+
+    /// <summary>
+    /// Найти префаб предмета по его spawnId.
+    /// </summary>
+    /// <remarks>
+    /// Сначала пробуем прямой путь -- это самый частый случай и он самый
+    /// быстрый. Если не нашли, проверяем известные подпапки. В последнюю
+    /// очередь ищем по всей папке Components: это дорого, поэтому результат
+    /// кешируется, зато предмет находится, куда бы его ни положили.
+    /// </remarks>
+    private static GameObject FindItemPrefab(string spawnId)
+    {
+        if (string.IsNullOrEmpty(spawnId)) return null;
+
+        if (prefabCache.TryGetValue(spawnId, out var cached)) return cached;
+
+        GameObject found = null;
+
+        for (int i = 0; i < itemFolders.Length && found == null; i++)
+            found = Resources.Load<GameObject>($"Components/{itemFolders[i]}{spawnId}");
+
+        if (found == null)
+        {
+            // Полный перебор как последняя попытка: спасает предметы из
+            // подпапок, о которых этот список ещё не знает.
+            var all = Resources.LoadAll<GameObject>("Components");
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].name == spawnId)
+                {
+                    found = all[i];
+                    break;
+                }
+            }
+        }
+
+        prefabCache[spawnId] = found;
+        return found;
     }
 
     private string CaptureScreenshot()

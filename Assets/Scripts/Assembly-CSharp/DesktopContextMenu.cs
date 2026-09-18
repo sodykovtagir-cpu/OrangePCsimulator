@@ -347,9 +347,15 @@ namespace PC.Component.Software
                 (Localization.GetText("By size"), () => SortIcons(SortMode.Size)),
                 (Localization.GetText("By type"), () => SortIcons(SortMode.Type))
             });
-            AddCreateSubmenu(menuPanel, "");
+            // Рабочий стол всегда лежит на системном диске (0), каким бы
+            // диском ни пользовались в открытых окнах проводника.
+            AddCreateSubmenu(menuPanel, "", 0);
             if (operatingSystem != null && operatingSystem.HasClipboard)
-                AddMenuItem(menuPanel, Localization.GetText("Paste"), () => operatingSystem.PasteClipboard(""));
+                AddMenuItem(menuPanel, Localization.GetText("Paste"), () =>
+                {
+                    operatingSystem.SetActiveStorage(0);
+                    operatingSystem.PasteClipboard("");
+                });
             AddMenuItem(menuPanel, Localization.GetText("Refresh"), RefreshDesktop);
             AddMenuItem(menuPanel, Localization.GetText("Personalization"), OpenPersonalization);
 
@@ -413,20 +419,47 @@ namespace PC.Component.Software
                 return;
 
             string folder = explorer.CurrentFolder ?? "";
-            AddCreateSubmenu(menuPanel, folder);
+
+            // Запоминаем диск ИМЕННО ЭТОГО окна. Между открытием меню и
+            // нажатием пункта игрок может переключить диск в другом окне
+            // проводника, и общее «текущее» значение окажется чужим.
+            int storage = explorer.CurrentStorageIndex;
+
+            AddCreateSubmenu(menuPanel, folder, storage);
             if (operatingSystem != null && operatingSystem.HasClipboard)
-                AddMenuItem(menuPanel, Localization.GetText("Paste"), () => operatingSystem.PasteClipboard(folder));
+                AddMenuItem(menuPanel, Localization.GetText("Paste"), () =>
+                {
+                    operatingSystem.SetActiveStorage(storage);
+                    operatingSystem.PasteClipboard(folder);
+                });
             AddMenuItem(menuPanel, Localization.GetText("Refresh"), () => explorer.RefreshView());
 
             PositionMenu(menuRect, screenPos);
         }
 
-        private void AddCreateSubmenu(GameObject parent, string folder)
+        /// <summary>Подменю «Создать».</summary>
+        /// <param name="storage">
+        /// Диск, на котором создавать. Для рабочего стола это системный диск
+        /// (0), для окна проводника -- тот, что в нём открыт. Раньше индекс
+        /// был прибит нулём в самих операциях, и папка, созданная на втором
+        /// диске, появлялась на системном.
+        /// </param>
+        private void AddCreateSubmenu(GameObject parent, string folder, int storage)
         {
+            System.Action<System.Action> onDrive = action =>
+            {
+                if (operatingSystem == null) return;
+                operatingSystem.SetActiveStorage(storage);
+                action();
+            };
+
             AddMenuItemWithSubmenu(parent, Localization.GetText("Create"), new (string, System.Action)[] {
-                (Localization.GetText("Text document"), () => operatingSystem.CreateFileAt(folder, Localization.GetText("New document") + ".txt", "")),
-                (Localization.GetText("Folder"), () => operatingSystem.CreateFolderAt(folder, Localization.GetText("New Folder"))),
-                (Localization.GetText("Lua file"), () => operatingSystem.CreateFileAt(folder, "script.lua", "-- Lua script\n"))
+                (Localization.GetText("Text document"), () => onDrive(() =>
+                    operatingSystem.CreateFileAt(folder, Localization.GetText("New document") + ".txt", ""))),
+                (Localization.GetText("Folder"), () => onDrive(() =>
+                    operatingSystem.CreateFolderAt(folder, Localization.GetText("New Folder")))),
+                (Localization.GetText("Lua file"), () => onDrive(() =>
+                    operatingSystem.CreateFileAt(folder, "script.lua", "-- Lua script\n")))
             });
         }
 
