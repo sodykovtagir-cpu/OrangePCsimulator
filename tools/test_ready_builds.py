@@ -2873,6 +2873,34 @@ for _key in ("IPS Panel", "IPS Case Panel", "Stats on wallpaper"):
               f"«{_key}»: есть русский перевод")
 
 
+# ---------------------------------------------------------------------------
+print("\nСборка Android: совместимость с устройствами")
+
+# БОЛЬ: релиз 1.8.40 не ставился -- «приложение несовместимо с вашим
+# телефоном». Причина -- AndroidTargetArchitectures: 1, то есть только ARMv7.
+# Все устройства с Android 11 и новее требуют 64-битную сборку, и телефон
+# просто отказывается ставить 32-битный APK.
+_ps = (ROOT / "ProjectSettings/ProjectSettings.asset").read_text(encoding="utf-8")
+
+_arch = re.search(r"AndroidTargetArchitectures: (\d+)", _ps)
+check(_arch is not None, "архитектуры Android заданы")
+
+# Битовая маска: 1 = ARMv7, 2 = ARM64, 4 = x86. Бит ARM64 обязателен.
+_arch_value = int(_arch.group(1)) if _arch else 0
+check(_arch_value & 2 != 0,
+      f"в сборку включён ARM64 (маска {_arch_value}, без него APK не ставится)")
+
+# Mono физически не умеет ARM64: с ним 64-битной сборки не выйдет.
+_backend = re.search(r"scriptingBackend:\s*\n\s*Android: (\d+)", _ps)
+check(_backend is not None and _backend.group(1) == "1",
+      "для Android выбран IL2CPP: Mono не поддерживает ARM64")
+
+# minSdk ниже 21 несовместим с 64-битным кодом и современными зависимостями.
+_min_sdk = re.search(r"AndroidMinSdkVersion: (\d+)", _ps)
+check(_min_sdk is not None and int(_min_sdk.group(1)) >= 21,
+      f"минимальная версия Android не ниже 21 (сейчас {_min_sdk.group(1) if _min_sdk else '?'})")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
