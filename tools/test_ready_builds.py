@@ -2689,6 +2689,54 @@ if _listed:
               f"подпапка {_folder} находится загрузчиком")
 
 
+# ---------------------------------------------------------------------------
+print("\nВсе сохраняемые предметы лежат в Resources")
+
+# БАГ «Prefab of Figure not found!»: у предмета есть spawnId, значит он
+# попадает в сохранение, но сам префаб лежал вне папки Resources. Загрузчик
+# ищет только в Resources/Components -- предмет пропадал при загрузке.
+# Так было с фигуркой (stylalexeyanavalnovo, в магазине «Figure») и Capretfull.
+_ITEM_GUID = "c30496d6ae6d6f907456e10a94e01ec6"   # Item.cs
+
+_loadable = {f.stem for f in (ROOT / "Assets/Resources/components").glob("*.prefab")}
+_loadable |= {f.stem for f in (ROOT / "Assets/Resources/components").glob("*/*.prefab")}
+
+_orphans = []
+for _f in ROOT.rglob("Assets/**/*.prefab"):
+    _posix = _f.as_posix()
+    if "/Resources/" in _posix:
+        continue
+    _txt = _f.read_text(encoding="utf-8", errors="replace")
+    if f"guid: {_ITEM_GUID}" not in _txt:
+        continue
+    for _m in re.finditer(r"spawnId: (.+)", _txt):
+        _sid = _m.group(1).strip().strip('"')
+        if _sid and _sid not in _loadable:
+            _orphans.append((_sid, _f.name))
+
+check(not _orphans,
+      f"нет предметов, которые сохраняются, но не загрузятся: {_orphans[:4]}")
+
+# Конкретно фигурка: она продаётся в магазине, значит обязана переживать
+# перезагрузку игры.
+check((ROOT / "Assets/Resources/components/stylalexeyanavalnovo.prefab").exists(),
+      "префаб фигурки лежит в Resources и загрузится из сохранения")
+
+# Перемещение обязано сохранить guid, иначе ссылка из коробки Box_Figurine
+# превратится в Missing Prefab.
+_fig_meta = (ROOT / "Assets/Resources/components/stylalexeyanavalnovo.prefab.meta")
+_fig_guid = re.search(r"guid: (\w+)", _fig_meta.read_text(encoding="utf-8")).group(1)
+_box = (ROOT / "Assets/GameObject/Box_Figurine.prefab").read_text(encoding="utf-8")
+check(_fig_guid in _box,
+      "коробка Box_Figurine по-прежнему ссылается на фигурку")
+
+# Дубликат guid ломает импорт проекта целиком.
+_dupes = [f.name for f in ROOT.rglob("*.prefab.meta")
+          if f.name != _fig_meta.name
+          and f"guid: {_fig_guid}" in f.read_text(encoding="utf-8", errors="replace")]
+check(not _dupes, f"guid фигурки уникален (дубли: {_dupes})")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
