@@ -808,14 +808,56 @@ namespace PC.Component.Software.OS
             return r;
         }
 
+        /// <summary>Прочитать файл по пути.</summary>
+        /// <remarks>
+        /// Ищем на ВСЕХ дисках, а не только на системном: приложения работают
+        /// с файлами того диска, который открыт у игрока, и жёсткий индекс 0
+        /// приводил к «файл не найден» для второго диска.
+        /// </remarks>
         public bool TryReadFile(string path, out string content)
         {
             content = null;
             if (FileManager == null || string.IsNullOrEmpty(path)) return false;
+
+            var all = AllStorage;
+            int count = all != null ? all.Count : 0;
+
+            // Сначала активный диск -- это почти всегда нужный.
+            int first = ActiveStorage;
             File file;
-            if (!FileManager.TryGetFile(0, path, out file) || file == null) return false;
-            content = file.content ?? "";
-            return true;
+            if (FileManager.TryGetFile(first, path, out file) && file != null)
+            {
+                content = file.content ?? "";
+                return true;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                if (i == first) continue;
+                if (!FileManager.TryGetFile(i, path, out file) || file == null) continue;
+
+                content = file.content ?? "";
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Текстура текущих обоев рабочего стола.
+        /// </summary>
+        /// <remarks>
+        /// Нужна IPS-панелям: по умолчанию они показывают показатели
+        /// компьютера поверх тех же обоев, что стоят в системе. Берём готовый
+        /// спрайт фона, а не читаем файл заново -- так панель покажет ровно то
+        /// же изображение, включая встроенные обои без файла на диске.
+        /// </remarks>
+        public Texture2D GetWallpaperTexture()
+        {
+            if (background == null) return null;
+
+            var sprite = background.Sprite;
+            return sprite != null ? sprite.texture : null;
         }
 
         /// <summary>Записать файл: используется Lua-скриптами (os.writeFile).</summary>

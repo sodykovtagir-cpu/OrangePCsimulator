@@ -2737,6 +2737,142 @@ _dupes = [f.name for f in ROOT.rglob("*.prefab.meta")
 check(not _dupes, f"guid фигурки уникален (дубли: {_dupes})")
 
 
+# ---------------------------------------------------------------------------
+print("\nIPS-панели вместо матричных табло")
+
+_ips_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/IpsDisplay.cs").read_text(encoding="utf-8"))
+
+check("class IpsDisplay : Device" in _ips_src,
+      "панель -- устройство, значит видна в «Моих устройствах»")
+check("public void Attach(" in _ips_src, "панель подключается к плате")
+check("public void UploadMedia(" in _ips_src, "на панель можно загрузить медиа")
+check("public void SetWallpaper(" in _ips_src, "панель умеет брать обои системы")
+
+# Режим по умолчанию: свежекупленная панель должна сразу показывать смысл,
+# а не чёрный прямоугольник.
+_mode_field = re.search(r"private Mode mode = Mode\.(\w+)", _ips_src)
+check(_mode_field is not None and _mode_field.group(1) == "StatsOnWallpaper",
+      "по умолчанию -- показатели поверх обоев PCOS")
+
+# Картинка не должна плющиться: панель и фото почти всегда разной формы.
+_blit = _ips_src.split("private void Blit(")[1].split("\n    }")[0]
+check("Mathf.Min(" in _blit, "картинка вписывается по меньшей стороне")
+
+# Показатели берутся с железа, а не выдуманы.
+_stats = _ips_src.split("private List<string> CollectStats()")[1].split("\n    }")[0]
+for _needle, _label in (("HardwareType.CPU", "процессор"),
+                        ("Temperature", "температура"),
+                        ("HardwareType.RAM", "память"),
+                        ("HardwareType.GPU", "видеокарта")):
+    check(_needle in _stats, f"показатели включают: {_label}")
+check("Capacity" in _stats and "Score" not in _stats,
+      "объём памяти берётся из Capacity, а не из баллов Score")
+
+# Сохранение: панель переживает перезапуск.
+check('jObject["ipsMode"]' in _ips_src, "режим панели сохраняется")
+check('jObject["ipsMedia"]' in _ips_src, "загруженное изображение сохраняется")
+
+# --- шейдер: структура IPS вместо сетки ---
+_shader = (ROOT / "Assets/Shader/IPS_Panel.shader").read_text(encoding="utf-8")
+check("_SubpixelStrength" in _shader, "есть настройка силы субпикселей")
+check("_Backlight" in _shader, "есть подсветка матрицы")
+# Главное отличие от LED-табло: не чёрные щели между пикселями, а RGB-полосы.
+# Без нормировки экран темнеет: маска гасит два канала из трёх. Проверяем
+# саму операцию деления, а не наличие слова -- переменная может остаться
+# в коде, когда расчёт уже сломан.
+check(re.search(r"mask\s*=\s*peak\s*>\s*[\d.]+\s*\?\s*mask\s*/\s*peak", _shader)
+      is not None,
+      "субпиксели нормируются, экран не темнеет от маски")
+check(re.search(r"float\s+peak\s*=\s*max\(", _shader) is not None,
+      "пик маски вычисляется по всем трём каналам")
+
+_shader_meta = ROOT / "Assets/Shader/IPS_Panel.shader.meta"
+check(_shader_meta.exists(), "у шейдера есть .meta")
+check("ShaderImporter" in _shader_meta.read_text(encoding="utf-8"),
+      "в .meta шейдера именно ShaderImporter")
+
+# --- префабы панелей ---
+_mat_guid = re.search(r"guid: (\w+)",
+    (ROOT / "Assets/Material/IPS_Screen.mat.meta").read_text(encoding="utf-8")).group(1)
+_ips_script_guid = re.search(r"guid: (\w+)",
+    (ROOT / "Assets/Scripts/Assembly-CSharp/IpsDisplay.cs.meta").read_text(encoding="utf-8")).group(1)
+
+for _name in ("IpsPanel", "IpsPanel_Case"):
+    _pf = ROOT / f"Assets/Resources/components/{_name}.prefab"
+    check(_pf.exists(), f"{_name}: префаб на месте")
+    _txt = _pf.read_text(encoding="utf-8")
+    check(_ips_script_guid in _txt, f"{_name}: висит скрипт IpsDisplay")
+    check("a9e67b4ac967aad8e2e3667802632303" not in _txt,
+          f"{_name}: старый LedDisplay убран")
+    check(_mat_guid in _txt, f"{_name}: используется материал IPS")
+    check(f"spawnId: {_name}" in _txt, f"{_name}: spawnId совпадает с именем файла")
+
+    # fileID обязаны быть уникальными внутри префаба, иначе Unity его не откроет.
+    _ids = re.findall(r"^--- !u!\d+ &(\d+)", _txt, re.M)
+    check(len(_ids) == len(set(_ids)), f"{_name}: fileID не дублируются")
+
+    # ссылка на экран должна вести на существующий объект
+    _screen = re.search(r"screen: \{fileID: (\d+)\}", _txt)
+    check(_screen is not None and f"&{_screen.group(1)}" in _txt,
+          f"{_name}: поле screen ссылается на реальный рендерер")
+
+# --- магазин: старые табло заменены ---
+_market = (ROOT / "Assets/Resources/apps/Market.prefab").read_text(encoding="utf-8")
+check("ed100d32b6e747dea4d83f4aca3c707c" not in _market,
+      "LedDisplay_2x убран из каталога")
+check("426c4b2dc75940409990869f98afcb82" not in _market,
+      "LedDisplay_4x убран из каталога")
+for _name in ("IpsPanel", "IpsPanel_Case"):
+    _g = re.search(r"guid: (\w+)",
+        (ROOT / f"Assets/MonoBehaviour/{_name}.asset.meta").read_text(encoding="utf-8")).group(1)
+    check(_g in _market, f"{_name}: продаётся в каталоге")
+    _card = (ROOT / f"Assets/MonoBehaviour/{_name}.asset").read_text(encoding="utf-8")
+    _price = int(re.search(r"price: (\d+)", _card).group(1))
+    check(_price > 0, f"{_name}: цена задана ({_price})")
+    # spawn обязан вести на новый префаб, иначе купишь старое табло
+    _pg = re.search(r"guid: (\w+)",
+        (ROOT / f"Assets/Resources/components/{_name}.prefab.meta").read_text(encoding="utf-8")).group(1)
+    check(_pg in _card, f"{_name}: карточка спавнит свой префаб")
+
+# --- приложение управления ---
+_sm_src = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/ScreenManager.cs")
+    .read_text(encoding="utf-8"))
+check("class ScreenManager : App" in _sm_src, "управление панелями -- приложение")
+check("PickDevice(" in _sm_src, "панель выбирается через общий список устройств")
+check("panel.Attach(" in _sm_src, "приложение подключает панель к плате")
+check("GetWallpaperTexture()" in _sm_src, "приложение передаёт обои на панель")
+
+# Форматы: игрок хотел pic, mov, gif и обычные фото.
+for _ext in ("pic", "mov", "gif", "png", "jpg"):
+    check(f'"{_ext}"' in _sm_src, f"поддерживается формат .{_ext}")
+
+# Разбор чужого формата не должен ронять приложение.
+_parse = _sm_src.split("private Texture2D[] ParseContent(")[1].split("\n        }")[0]
+check("try" in _parse and "catch" in _parse,
+      "битый или чужой файл не роняет приложение")
+
+# Чтение файла должно работать на всех дисках, а не только на системном.
+_read = _os5.split("public bool TryReadFile(")[1].split("\n        }")[0] \
+    if "public bool TryReadFile(" in _os5 else ""
+check("ActiveStorage" in _read,
+      "чтение файла учитывает активный диск")
+
+_tr_ips = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+_tr_lines = _tr_ips.splitlines()
+_hdr_ips = _tr_lines[0].split("\t")
+_ru_ips = _hdr_ips.index("RU")
+for _key in ("IPS Panel", "IPS Case Panel", "Stats on wallpaper"):
+    _rows = [l for l in _tr_lines if l.startswith(_key + "\t")]
+    check(len(_rows) == 1, f"перевод «{_key}» добавлен один раз")
+    if _rows:
+        check(len(_rows[0].split("\t")) == len(_hdr_ips),
+              f"«{_key}»: число колонок не сломано")
+        check(bool(_rows[0].split("\t")[_ru_ips].strip()),
+              f"«{_key}»: есть русский перевод")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
