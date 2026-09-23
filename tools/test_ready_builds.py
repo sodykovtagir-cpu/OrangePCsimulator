@@ -2901,6 +2901,70 @@ check(_min_sdk is not None and int(_min_sdk.group(1)) >= 21,
       f"минимальная версия Android не ниже 21 (сейчас {_min_sdk.group(1) if _min_sdk else '?'})")
 
 
+# ---------------------------------------------------------------------------
+print("\nБаги релиза 1.8.40")
+
+# --- 1. Хардкор: компьютер не включался ---
+# Вся ветка запуска висела внутри проверки !hardcore, поэтому Boot() просто
+# не вызывался: игрок жмёт кнопку, и ничего не происходит.
+_mb6 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Motherboard.cs")
+    .read_text(encoding="utf-8"))
+_sw = _mb6.split("public void Switch()")[1].split("\n\t\tpublic")[0]
+
+check("Boot()" in _sw, "кнопка питания запускает систему")
+check(not re.search(r"if\s*\([^)]*!\s*Main\.Instance\.hardcore\s*\)\s*\n\s*Main\.Instance\.FadeText\(Boot\(\)\)", _sw),
+      "запуск не спрятан внутрь проверки хардкора")
+# Boot должен вызываться ДО проверки режима, иначе в хардкоре его нет.
+check(_sw.index("Boot()") < _sw.index("hardcore"),
+      "система стартует раньше, чем решается показывать ли подсказку")
+check("hardcore" in _sw, "в хардкоре подсказка по-прежнему скрыта")
+
+# --- 2. Коробка плодила дубликат предмета ---
+# Коробка сама по себе предмет со spawnId, её содержимое тоже записано в
+# сохранение. Start() спавнил третий экземпляр -- он висел в воздухе внутри
+# коллайдера оригинала.
+_box = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/Box.cs").read_text(encoding="utf-8"))
+check("Restoring" in _box, "коробка знает про режим загрузки")
+check("if (Restoring) return;" in _box,
+      "во время загрузки коробка ничего не спавнит")
+check("opened" in _box, "коробка не выкладывает содержимое дважды")
+
+_sm6 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+check("Box.Restoring = true" in _sm6, "загрузка включает защиту от дубликатов")
+check("Box.Restoring = false" in _sm6, "после загрузки флаг снимается")
+check(_sm6.index("Box.Restoring = true") < _sm6.index("Box.Restoring = false"),
+      "флаг ставится до восстановления предметов и снимается после")
+
+# --- 3. Валидация ника ---
+_acc = (ROOT / "server/account.php").read_text(encoding="utf-8")
+check("function valid_name(" in _acc, "есть проверка ника")
+check("valid_name($name)" in _acc, "проверка вызывается при регистрации")
+_vn = _acc.split("function valid_name(")[1].split("\n}")[0]
+check("preg_match" in _vn, "ник проверяется по набору символов, а не только по длине")
+check("A-Za-z0-9" in _vn, "разрешена латиница и цифры")
+# Кириллица, пробелы и разметка проходить не должны.
+check("\\s" not in _vn.replace("\\s*", ""), "пробелы в нике не разрешены")
+
+# --- 4. Android: планка совместимости ---
+_ps6 = (ROOT / "ProjectSettings/ProjectSettings.asset").read_text(encoding="utf-8")
+
+# targetSdk 0 = Automatic. Из-за него телефон пишет «приложение создано для
+# более старой версии Android», если в редакторе стоит несвежая платформа.
+_tsdk = re.search(r"AndroidTargetSdkVersion: (\d+)", _ps6)
+check(_tsdk is not None and int(_tsdk.group(1)) >= 33,
+      f"целевая версия Android зафиксирована и не ниже 33 "
+      f"(сейчас {_tsdk.group(1) if _tsdk else '?'})")
+
+# Нижняя планка: 23 -- самая низкая, совместимая с ARM64.
+_msdk = re.search(r"AndroidMinSdkVersion: (\d+)", _ps6)
+check(_msdk is not None and 21 <= int(_msdk.group(1)) <= 24,
+      f"минимальная версия Android держится у нижней границы "
+      f"(сейчас {_msdk.group(1) if _msdk else '?'})")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

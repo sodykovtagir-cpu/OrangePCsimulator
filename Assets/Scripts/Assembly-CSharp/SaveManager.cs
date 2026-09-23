@@ -162,6 +162,12 @@ public class SaveManager : MonoBehaviour
 
         if (cdat.itemData != null && cdat.itemData.Length > 0)
         {
+            // Коробки в сохранении лежат как обычные предметы, и их содержимое
+            // тоже записано отдельно. Пока восстанавливаем, запрещаем коробкам
+            // выкладывать копию: иначе появится дубликат, который вклинится в
+            // коллайдер оригинала и повиснет в воздухе.
+            Box.Restoring = true;
+
             // ====== ФИКС: удаляем все стартовые предметы перед загрузкой ======
             var existingItems = FindObjectsOfType<Item>();
             foreach (var existing in existingItems)
@@ -204,6 +210,9 @@ public class SaveManager : MonoBehaviour
                 }
             }
         }
+
+        // Все предметы созданы -- дальше коробки работают как обычно.
+        Box.Restoring = false;
 
         foreach (var (savers, data) in scObj)
         {

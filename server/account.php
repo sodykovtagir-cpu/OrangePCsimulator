@@ -84,6 +84,23 @@ function gen_code() {
 function gen_token() {
     return bin2hex(random_bytes(32));
 }
+/**
+ * Проверка игрового ника.
+ *
+ * Раньше проверялась только длина, поэтому проходило что угодно: кириллица,
+ * пробелы, эмодзи, HTML-теги. В списке аккаунтов появились ники вроде
+ * «как сломать», а имя из одних точек или разметки ломает вёрстку админки.
+ *
+ * Разрешаем латиницу, цифры, подчёркивание и дефис. Ник обязан начинаться с
+ * буквы или цифры -- иначе можно зарегистрировать «___» и затеряться в списке.
+ */
+function valid_name($n) {
+    if (!is_string($n)) return false;
+    $len = mb_strlen($n, 'UTF-8');
+    if ($len < 3 || $len > 20) return false;
+    return (bool)preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]*$/', $n);
+}
+
 function valid_email($e) {
     return (bool)filter_var($e, FILTER_VALIDATE_EMAIL);
 }
@@ -221,7 +238,7 @@ if ($action === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $pass  = isset($_POST['password']) ? $_POST['password'] : '';
     $client = clean(isset($_POST['client']) ? $_POST['client'] : '', 64);
 
-    if (mb_strlen($name) < 3 || mb_strlen($name) > 20) json_out(['ok' => false, 'error' => 'bad name'], 400);
+    if (!valid_name($name)) json_out(['ok' => false, 'error' => 'bad name'], 400);
     if (!valid_email($email)) json_out(['ok' => false, 'error' => 'bad email'], 400);
     if (strlen($pass) < 6) json_out(['ok' => false, 'error' => 'bad password'], 400);
 
