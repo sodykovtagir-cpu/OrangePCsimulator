@@ -94,8 +94,21 @@ namespace PC.Component
 				System.PowerClicked();
 				return;
 			}
-			if (Main.Instance && !Main.Instance.hardcore)
-				Main.Instance.FadeText(Boot());
+
+			// БАГ, который это чинит: в хардкоре компьютер не включался вовсе.
+			// Раньше вся ветка запуска висела внутри проверки !hardcore,
+			// поэтому Boot() просто не вызывался -- игрок жал кнопку, и
+			// ничего не происходило.
+			//
+			// Хардкор отличается тем, что игре НЕ положено подсказывать: ни
+			// причины отказа, ни надписи о нехватке железа. Сам запуск при
+			// этом обязан работать. Поэтому Boot() зовём всегда, а подсказку
+			// показываем только в обычном режиме.
+			var message = Boot();
+
+			var main = Main.Instance;
+			if (main != null && !main.hardcore)
+				main.FadeText(message);
         }
 
 		public string Boot()
