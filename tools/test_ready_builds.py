@@ -2965,6 +2965,58 @@ check(_msdk is not None and 21 <= int(_msdk.group(1)) <= 24,
       f"(сейчас {_msdk.group(1) if _msdk else '?'})")
 
 
+# ---------------------------------------------------------------------------
+print("\nСамолечение сохранений и диагностика запуска")
+
+_sm7 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+
+# Запрет спавна из коробки не лечит УЖЕ испорченные сейвы: лишний предмет
+# записан в файл и воскресает при каждой загрузке. Отсеиваем при чтении.
+check("IsDuplicate(" in _sm7, "дубликаты предметов отсеиваются при загрузке")
+_dup = _sm7.split("private static bool IsDuplicate(")[1].split("\n    }")[0]
+check("spawnId" in _dup, "дубликат ищется по типу предмета")
+check("sqrMagnitude" in _dup, "и по расстоянию, а не только по имени")
+
+# Порог обязан быть маленьким: два одинаковых монитора, честно поставленных
+# рядом, должны остаться оба.
+_radius = re.search(r"DuplicateRadius = ([\d.]+)f", _sm7)
+check(_radius is not None and float(_radius.group(1)) <= 0.2,
+      f"порог совпадения маленький ({_radius.group(1) if _radius else '?'}), "
+      "честно поставленные рядом предметы не склеиваются")
+
+_load = _sm7.split("foreach (var it in cdat.itemData)")[1][:600]
+check("IsDuplicate(placed, it)" in _load, "проверка стоит в цикле загрузки")
+check("placed.Add(" in _load, "восстановленные предметы запоминаются")
+
+# --- диагностика: в хардкоре подсказки нет, но причина должна быть видна ---
+_case7 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Case.cs").read_text(encoding="utf-8"))
+_sw7 = _case7.split("public void Switch()")[1].split("\n\t\tpublic")[0]
+check("Debug.Log" in _sw7,
+      "корпус пишет в консоль, почему запуск не состоялся")
+check(_sw7.index("Debug.Log") < _sw7.index("hardcore"),
+      "запись в консоль идёт ДО проверки режима, то есть и в хардкоре тоже")
+
+_mb7 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Motherboard.cs").read_text(encoding="utf-8"))
+_boot7 = _mb7.split("public string Boot()")[1].split("\n\t\tpublic")[0]
+check("Debug.Log" in _boot7, "плата сообщает в консоль о неполной комплектации")
+
+# --- валидация ника: шаблон обязан резать кириллицу и пробелы ---
+_acc7 = (ROOT / "server/account.php").read_text(encoding="utf-8")
+_pat = re.search(r"preg_match\('/\^(.+?)\$/'", _acc7)
+check(_pat is not None, "шаблон ника найден")
+if _pat:
+    import re as _re
+    _rx = _re.compile("^" + _pat.group(1).replace("\\", "\\") + "$")
+    for _name, _want in (("Goose", True), ("7myalol", True),
+                         ("как сломать", False), ("my nick", False),
+                         ("Вася", False), ("<script>", False)):
+        check(bool(_rx.match(_name)) == _want,
+              f"ник {_name!r}: {'принимается' if _want else 'отклоняется'}")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

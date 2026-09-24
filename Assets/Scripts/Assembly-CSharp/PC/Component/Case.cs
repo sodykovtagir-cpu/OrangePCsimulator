@@ -87,6 +87,12 @@ namespace PC.Component
 
 			if (!motherboard.Ready)
 			{
+				// В консоль пишем всегда, в том числе в хардкоре: подсказка на
+				// экране там запрещена, но разработчик должен видеть причину.
+				// Именно этот случай выглядит как «жму кнопку, ничего не
+				// происходит».
+				Debug.Log("Case: плата не готова (motherboard.Ready == false), запуск отменён");
+
 				var main = Main.Instance;
 				if (main && !main.hardcore)
 				{

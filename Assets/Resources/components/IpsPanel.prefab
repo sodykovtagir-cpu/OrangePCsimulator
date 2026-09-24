@@ -12,9 +12,9 @@ GameObject:
   - component: {fileID: 6865017396480055}
   - component: {fileID: 5064692901779017}
   - component: {fileID: 248388032662840}
+  - component: {fileID: 2950545618305046}
   - component: {fileID: 6221664122688929}
   - component: {fileID: 6830737049285490}
-  - component: {fileID: 5328812240239811635}
   m_Layer: 0
   m_Name: IpsPanel
   m_TagString: Untagged
@@ -32,7 +32,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 0.35}
+  m_LocalScale: {x: 1.0, y: 1.0, z: 0.35}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4500391066396851}
@@ -115,6 +115,27 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!65 &2950545618305046
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1630761569918992}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.897, y: 1.017, z: 0.18}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &6221664122688929
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -152,27 +173,6 @@ MonoBehaviour:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
---- !u!65 &5328812240239811635
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1630761569918992}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.8972799, y: 1.01728, z: 0.5309936}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1877146901479904
 GameObject:
   m_ObjectHideFlags: 0

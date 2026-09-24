@@ -139,6 +139,7 @@ public class SaveManager : MonoBehaviour
 
 
         int failCount = 0;
+        int duplicates = 0;
 
         if (string.IsNullOrEmpty(Loader.Content))
         {
@@ -177,12 +178,27 @@ public class SaveManager : MonoBehaviour
             }
             // =================================================================
 
+            // Сохранения, сделанные до фикса коробок, уже содержат дубликаты:
+            // лишний предмет попал в файл и теперь воскресает при каждой
+            // загрузке. Запрет спавна из коробки такие записи не лечит, их
+            // нужно отсеять здесь -- иначе игрок навсегда остался бы с
+            // призраком, который висит в воздухе внутри чужого коллайдера.
+            var placed = new List<Tuple<string, Vector3>>();
+
             foreach (var it in cdat.itemData)
             {
+                if (IsDuplicate(placed, it))
+                {
+                    duplicates++;
+                    continue;
+                }
+
                 var exists = FindItemPrefab(it.spawnId);
 
                 if (exists)
                 {
+                    placed.Add(Tuple.Create(it.spawnId, (Vector3)it.pos));
+
                     var prefab = Instantiate(exists);
                     prefab.transform.position = it.pos;
                     prefab.transform.rotation = it.rot;
@@ -214,6 +230,9 @@ public class SaveManager : MonoBehaviour
         // Все предметы созданы -- дальше коробки работают как обычно.
         Box.Restoring = false;
 
+        if (duplicates > 0)
+            Debug.Log($"Сохранение: отброшено дубликатов предметов: {duplicates}");
+
         foreach (var (savers, data) in scObj)
         {
             if (savers == null) continue;
@@ -231,6 +250,39 @@ public class SaveManager : MonoBehaviour
             }
         }
         return failCount;
+    }
+
+    /// <summary>
+    /// Насколько близко должны стоять два одинаковых предмета, чтобы считать
+    /// их одним и тем же.
+    /// </summary>
+    /// <remarks>
+    /// Дубликат из коробки появляется ровно там же, где оригинал, поэтому
+    /// расстояние копеечное. Порог намеренно маленький: два одинаковых
+    /// монитора, честно поставленных игроком рядом, должны остаться оба.
+    /// </remarks>
+    private const float DuplicateRadius = 0.05f;
+
+    /// <summary>
+    /// Уже восстанавливали такой же предмет в этой же точке?
+    /// </summary>
+    private static bool IsDuplicate(List<Tuple<string, Vector3>> placed, ItemData it)
+    {
+        if (placed == null || it == null || string.IsNullOrEmpty(it.spawnId))
+            return false;
+
+        Vector3 pos = it.pos;
+
+        for (int i = 0; i < placed.Count; i++)
+        {
+            if (placed[i].Item1 != it.spawnId) continue;
+            if ((placed[i].Item2 - pos).sqrMagnitude > DuplicateRadius * DuplicateRadius)
+                continue;
+
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

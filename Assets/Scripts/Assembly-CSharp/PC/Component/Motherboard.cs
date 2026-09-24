@@ -114,7 +114,15 @@ namespace PC.Component
 		public string Boot()
 		{
 			if (!Done(out var message))
+			{
+				// Сообщение на экране в хардкоре не показывается -- это правило
+				// режима. Но в консоль пишем всегда, иначе «не включается» не
+				// отличить от «не хватает детали».
+				Debug.Log("Boot отменён, комплектация неполная: "
+					+ message.Replace("\n", " ").Replace("<color=red>", "")
+						.Replace("<color=Orange>", "").Replace("</color>", ""));
 				return message;
+			}
 
 			var hardwares = GetAllHardwares(false);
 			var supplies  = GetHardwares(HardwareType.Supply);
