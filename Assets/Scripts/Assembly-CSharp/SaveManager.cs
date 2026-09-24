@@ -253,6 +253,29 @@ public class SaveManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Отсеять всё, что не является игровым предметом.
+    /// </summary>
+    /// <remarks>
+    /// КРИТИЧНО. Пути Resources НЕ учитывают регистр, а в папке Components
+    /// рядом с префабами лежат исходные модели: PortableMonitor.prefab и
+    /// portablemonitor.fbx, FlatMonitor.prefab и FlatMonitor.fbx,
+    /// RX570.prefab и RX570.fbx. Поэтому Resources.Load("Components/
+    /// PortableMonitor") мог вернуть FBX -- голую модель без скриптов,
+    /// Rigidbody и коллайдеров.
+    ///
+    /// В игре это выглядело так: после перезахода монитор превращался в
+    /// неподвижную модельку с именем в нижнем регистре, висящую в воздухе,
+    /// -- её нельзя было ни взять, ни включить. Настоящий предмет всегда
+    /// несёт компонент Item (или его наследника: Monitor, Hardware, GPU),
+    /// у импортированной модели его нет. По нему и различаем.
+    /// </remarks>
+    private static GameObject AsItem(GameObject candidate)
+    {
+        if (candidate == null) return null;
+        return candidate.GetComponent<Item>() != null ? candidate : null;
+    }
+
+    /// <summary>
     /// Насколько близко должны стоять два одинаковых предмета, чтобы считать
     /// их одним и тем же.
     /// </summary>
@@ -318,18 +341,35 @@ public class SaveManager : MonoBehaviour
         GameObject found = null;
 
         for (int i = 0; i < itemFolders.Length && found == null; i++)
-            found = Resources.Load<GameObject>($"Components/{itemFolders[i]}{spawnId}");
+            found = AsItem(Resources.Load<GameObject>(
+                $"Components/{itemFolders[i]}{spawnId}"));
 
         if (found == null)
         {
             // Полный перебор как последняя попытка: спасает предметы из
-            // подпапок, о которых этот список ещё не знает.
+            // подпапок, о которых этот список ещё не знает, и случаи, когда
+            // прямой путь увёл к голой модели.
             var all = Resources.LoadAll<GameObject>("Components");
-            for (int i = 0; i < all.Length; i++)
+
+            // Сначала точное совпадение имени, затем без учёта регистра:
+            // имя предмета в сохранении пишется так же, как называется его
+            // префаб, но у модели рядом имя может отличаться регистром.
+            for (int pass = 0; pass < 2 && found == null; pass++)
             {
-                if (all[i] != null && all[i].name == spawnId)
+                for (int i = 0; i < all.Length; i++)
                 {
-                    found = all[i];
+                    var candidate = all[i];
+                    if (candidate == null) continue;
+
+                    bool match = pass == 0
+                        ? candidate.name == spawnId
+                        : string.Equals(candidate.name, spawnId,
+                            System.StringComparison.OrdinalIgnoreCase);
+
+                    if (!match) continue;
+                    if (AsItem(candidate) == null) continue;
+
+                    found = candidate;
                     break;
                 }
             }

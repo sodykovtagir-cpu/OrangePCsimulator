@@ -3017,6 +3017,63 @@ if _pat:
               f"ник {_name!r}: {'принимается' if _want else 'отклоняется'}")
 
 
+# ---------------------------------------------------------------------------
+print("\nЗагрузка предмета не должна цеплять голую модель")
+
+# НАСТОЯЩАЯ причина «монитор висит без коллизии», найденная Semyalol по
+# скриншоту: объект назывался portablemonitor(Clone) и нёс только MeshFilter
+# с MeshRenderer. Пути Resources не учитывают регистр, а рядом с
+# PortableMonitor.prefab лежал portablemonitor.fbx -- Resources.Load отдавал
+# импортированную модель: без скриптов, Rigidbody и коллайдеров.
+_sm8 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+
+check("AsItem(" in _sm8, "загрузчик отсеивает не-предметы")
+_as_item = _sm8.split("private static GameObject AsItem(")[1].split("\n    }")[0]
+check("GetComponent<Item>()" in _as_item,
+      "предмет опознаётся по компоненту Item, а не по имени файла")
+
+_find = _sm8.split("private static GameObject FindItemPrefab(")[1].split("\n    }")[0]
+check("AsItem(Resources.Load<GameObject>(" in _find,
+      "прямая загрузка по пути тоже проверяется на Item")
+check("AsItem(candidate) == null) continue" in _find,
+      "перебор пропускает кандидатов без Item")
+check("OrdinalIgnoreCase" in _find,
+      "есть запасной поиск без учёта регистра")
+
+# Вторая линия обороны: самих коллизий имён в Resources быть не должно.
+# Всё, что лежит в Resources, ещё и попадает в сборку целиком -- исходные
+# модели там не нужны.
+_res = ROOT / "Assets/Resources/components"
+_by_name = {}
+for _f in _res.iterdir():
+    if _f.name.endswith(".meta") or _f.is_dir():
+        continue
+    _by_name.setdefault(_f.stem.lower(), []).append(_f.name)
+
+_collisions = {k: v for k, v in _by_name.items()
+               if len(v) > 1 and any(n.lower().endswith(".fbx") for n in v)}
+check(not _collisions,
+      f"в Resources нет моделей, спорящих именем с префабом: {_collisions}")
+
+# Остальные FBX в Resources не трогаем: они не спорят именем ни с одним
+# префабом, а перенос чужих файлов ради чистоты -- лишний риск. Опасны
+# именно совпадения имён, их и стережёт проверка выше.
+check(not any(f.stem.lower() in {p.stem.lower() for p in _res.glob("*.prefab")}
+              for f in _res.glob("*.fbx")),
+      "ни одна модель в Resources не повторяет имя префаба")
+
+# Перенос обязан сохранить guid, иначе префабы потеряют меши.
+for _name, _guid in (("portablemonitor", "588f0344cd5768f4f80b63746db7f7bc"),
+                     ("FlatMonitor", "a903e9775af499b4e88b16db736db954"),
+                     ("RX570", "3e794335eb7cece4980de66a852fb612")):
+    _meta = ROOT / f"Assets/Models/{_name}.fbx.meta"
+    check(_meta.exists(), f"{_name}.fbx перенесён в Assets/Models")
+    if _meta.exists():
+        check(f"guid: {_guid}" in _meta.read_text(encoding="utf-8"),
+              f"{_name}.fbx сохранил guid, ссылки на меши целы")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
