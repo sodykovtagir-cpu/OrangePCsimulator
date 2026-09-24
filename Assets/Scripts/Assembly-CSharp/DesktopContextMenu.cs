@@ -159,6 +159,34 @@ namespace PC.Component.Software
             return PointerHitsThisOs(screenPos);
         }
 
+        /// <summary>
+        /// Игрок сейчас действительно работает за этим компьютером.
+        /// </summary>
+        /// <remarks>
+        /// БАГ, который это чинит: меню рабочего стола открывалось само,
+        /// когда игрок ходил по комнате или крутил камеру рядом с монитором.
+        /// Экран стоящего в комнате монитора -- обычная поверхность мира, и
+        /// палец над ней ничем не отличался от пальца на рабочем столе:
+        /// удержание засчитывалось как долгое нажатие. На большом телевизоре
+        /// площадь экрана больше, поэтому там это ловилось почти всегда.
+        ///
+        /// Меню имеет смысл только когда экран приближен: тогда игрок и
+        /// правда управляет системой, а не проходит мимо.
+        /// </remarks>
+        private bool IsScreenFocused()
+        {
+            var os = operatingSystem;
+            if (os == null) return false;
+
+            var board = os.Board;
+            var monitor = board != null ? board.monitor : null;
+
+            // Монитора нет -- рабочий стол попросту негде показать.
+            if (monitor == null) return false;
+
+            return monitor.IsZoomed;
+        }
+
         private bool PointerHitsThisOs(Vector2 screenPos)
         {
             var results = RaycastAt(screenPos);
@@ -287,7 +315,7 @@ namespace PC.Component.Software
 
             if (Input.GetMouseButtonDown(1))
             {
-                if (PointerHitsThisOs(Input.mousePosition))
+                if (IsScreenFocused() && PointerHitsThisOs(Input.mousePosition))
                     OpenContextAt(Input.mousePosition);
                 return;
             }
@@ -315,7 +343,8 @@ namespace PC.Component.Software
                 return;
 
             EnsureRefs();
-            if (canvas == null || !PointerHitsThisOs(eventData.position) || !CanOpenMenuAt(eventData.position)) return;
+            if (canvas == null || !IsScreenFocused()) return;
+            if (!PointerHitsThisOs(eventData.position) || !CanOpenMenuAt(eventData.position)) return;
             pointerDownTime = Time.unscaledTime;
             pointerDownPos = eventData.position;
             activePointerId = eventData.pointerId;
