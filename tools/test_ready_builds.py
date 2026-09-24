@@ -3074,6 +3074,41 @@ for _name, _guid in (("portablemonitor", "588f0344cd5768f4f80b63746db7f7bc"),
               f"{_name}.fbx сохранил guid, ссылки на меши целы")
 
 
+# ---------------------------------------------------------------------------
+print("\nКонтекстное меню не открывается само у монитора")
+
+# БАГ: меню рабочего стола выскакивало, когда игрок просто ходил рядом с
+# монитором или крутил камеру. Экран стоящего в комнате монитора -- обычная
+# поверхность мира, и палец над ней засчитывался как долгое нажатие по
+# рабочему столу. На большом телевизоре площадь больше, поэтому там ловилось
+# почти всегда.
+_disp9 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Display.cs")
+    .read_text(encoding="utf-8"))
+check("public bool IsZoomed" in _disp9,
+      "у монитора есть публичный признак приближения")
+
+_dcm = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/DesktopContextMenu.cs")
+    .read_text(encoding="utf-8"))
+check("private bool IsScreenFocused()" in _dcm,
+      "меню умеет проверять, работает ли игрок за этим ПК")
+
+_focus = _dcm.split("private bool IsScreenFocused()")[1].split("\n        }")[0]
+check("IsZoomed" in _focus, "признак берётся у монитора системы")
+check("monitor == null) return false" in _focus,
+      "без монитора меню не открывается")
+
+# Оба входа обязаны быть закрыты: и долгое нажатие пальцем, и правый клик.
+_down = _dcm.split("public void OnPointerDown(")[1].split("\n        }")[0]
+check("IsScreenFocused()" in _down,
+      "долгое нажатие не начинается, пока экран не приближен")
+
+_upd = _dcm.split("private void Update()")[1].split("\n        }")[0]
+check("IsScreenFocused() && PointerHitsThisOs" in _upd,
+      "правый клик мышью тоже требует приближённого экрана")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
