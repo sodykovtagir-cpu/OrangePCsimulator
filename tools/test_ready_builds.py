@@ -3109,6 +3109,55 @@ check("IsScreenFocused() && PointerHitsThisOs" in _upd,
       "правый клик мышью тоже требует приближённого экрана")
 
 
+# ---------------------------------------------------------------------------
+print("\nГрафика на телефонах: 40 кадров")
+
+_gb = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/GraphicsBootstrap.cs")
+    .read_text(encoding="utf-8"))
+
+# ГЛАВНОЕ: без RTX сглаживание должно быть выключено полностью. Здесь стояло
+# 4x -- MSAA на мобильном GPU кратно увеличивает трафик к памяти. В оригинале
+# (OrangePCRebirth) в этой ветке ноль.
+_aa = re.search(r"QualitySettings\.antiAliasing = enabled \? (\d+) : (\d+);", _gb)
+check(_aa is not None, "сглаживание задаётся одной строкой с развилкой по RTX")
+if _aa:
+    check(int(_aa.group(2)) == 0,
+          f"без RTX сглаживание выключено (было {_aa.group(2)})")
+    check(int(_aa.group(1)) >= 4, "в RTX-режиме сглаживание остаётся")
+
+# Пост-эффекты не должны работать вхолостую: живой OnRenderImage заставляет
+# рисовать камеру в промежуточную текстуру вместо прямой отрисовки на экран.
+_setup = _gb.split("private static void SetupCamera(")[1].split("\n\tpublic")[0]
+check("anyEffect" in _setup, "считается, включён ли хоть один эффект")
+check("if (fx != null) fx.enabled = false" in _setup,
+      "без эффектов компонент пост-обработки выключается")
+check("cam.allowHDR = anyEffect" in _setup,
+      "HDR включается только под пост-обработку")
+# Выключение обязано происходить ДО добавления компонента, иначе он всё равно
+# появится на камере.
+check(_setup.index("fx.enabled = false") < _setup.index("AddComponent<SimpleScreenFx>"),
+      "компонент не добавляется, когда эффекты не нужны")
+
+# Отражения в реальном времени: на телефоне сцена перерисовывается несколько
+# раз за кадр.
+check("ReflectionsDefault" in _gb, "у отражений есть значение по умолчанию")
+_refl = _gb.split("public static int ReflectionsDefault")[1].split("\n\tprivate")[0]
+check("UNITY_ANDROID" in _refl and "return 0" in _refl,
+      "на телефонах отражения по умолчанию выключены")
+check("return 1" in _refl, "на компьютере остаются включёнными")
+
+# Тумблер в настройках обязан показывать то же самое, иначе игрок увидит
+# включённую галку при выключенных отражениях.
+_rs = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/ResolutionSetting.cs")
+    .read_text(encoding="utf-8"))
+check("GraphicsBootstrap.ReflectionsDefault" in _rs,
+      "настройки берут то же значение по умолчанию, что и графика")
+check('BindToggle(reflectionsToggle, "Reflections", 1,' not in _rs,
+      "жёсткая единица в тумблере отражений убрана")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
