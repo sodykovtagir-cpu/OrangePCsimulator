@@ -61,7 +61,10 @@ public class ResolutionSetting : MonoBehaviour
 	{
 		AutoFindControls();
 		BindToggle(rtxToggle, "RTXMode", 0, SetRTXMode);
-		BindToggle(reflectionsToggle, "Reflections", 1, SetReflections);
+		// Значение по умолчанию берём у GraphicsBootstrap: на телефонах
+		// отражения выключены, и тумблер обязан показывать то же самое.
+		BindToggle(reflectionsToggle, "Reflections",
+			GraphicsBootstrap.ReflectionsDefault, SetReflections);
 		BindToggle(fullscreenToggle, "Fullscreen", 1, SetFullscreen);
 		BindToggle(motionBlurToggle, "PP_MotionBlur", 0, SetMotionBlur);
 		BindToggle(bloomToggle, "PP_Bloom", 0, SetBloom);

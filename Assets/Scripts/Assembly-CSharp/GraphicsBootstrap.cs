@@ -65,9 +65,19 @@ public static class GraphicsBootstrap
 	public static void ApplyRTX()
 	{
 		bool enabled = PlayerPrefs.GetInt("RTXMode", 0) == 1;
-		// MSAA (в т.ч. 8x в RTX-режиме) конфликтует с OnRenderImage-эффектами,
-		// поэтому SimpleScreenFx отрабатывает на уже зарезолвленном кадре.
-		QualitySettings.antiAliasing = enabled ? 8 : 4;
+
+		// БЕЗ RTX СГЛАЖИВАНИЕ ВЫКЛЮЧЕНО ПОЛНОСТЬЮ.
+		//
+		// Здесь стояло 4x, и это оказалось главной причиной низких кадров на
+		// телефонах. MSAA на мобильном GPU стоит дорого вдвойне: он кратно
+		// увеличивает трафик к памяти, а любой полноэкранный эффект заставляет
+		// ещё и резолвить мультисэмплированный буфер лишним проходом.
+		//
+		// В оригинале (OrangePCRebirth, GraphicBootstrap.ApplyRTX) в этой ветке
+		// стоит ноль -- сверено построчно, остальные значения совпадают.
+		// Восемь остаётся только в RTX-режиме, который включают осознанно и на
+		// сильном железе.
+		QualitySettings.antiAliasing = enabled ? 8 : 0;
 		if (enabled)
 		{
 			QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
@@ -89,15 +99,42 @@ public static class GraphicsBootstrap
 		}
 	}
 
+	/// <summary>
+	/// Включены ли отражения в реальном времени.
+	/// </summary>
+	/// <remarks>
+	/// По умолчанию на телефонах выключены. Зеркальные зонды перерисовывают
+	/// кубическую карту окружения, то есть сцена рисуется ещё несколько раз за
+	/// кадр -- на мобильном GPU это одна из самых дорогих вещей вообще.
+	/// Игрок по-прежнему может включить их в настройках: сохранённый выбор
+	/// имеет приоритет, значение по умолчанию действует только до него.
+	/// </remarks>
+	public static int ReflectionsDefault
+	{
+		get
+		{
+#if UNITY_ANDROID || UNITY_IOS
+			return 0;
+#else
+			return 1;
+#endif
+		}
+	}
+
+	private static bool ReflectionsEnabled()
+	{
+		return PlayerPrefs.GetInt("Reflections", ReflectionsDefault) == 1;
+	}
+
 	public static void ApplyReflectionsQuality()
 	{
-		bool enabled = PlayerPrefs.GetInt("Reflections", 1) == 1;
+		bool enabled = ReflectionsEnabled();
 		QualitySettings.realtimeReflectionProbes = enabled;
 	}
 
 	public static void ApplyReflectionsToScene()
 	{
-		bool enabled = PlayerPrefs.GetInt("Reflections", 1) == 1;
+		bool enabled = ReflectionsEnabled();
 		var probes = Object.FindObjectsOfType<ReflectionProbe>();
 		for (int i = 0; i < probes.Length; i++)
 			if (probes[i] != null) probes[i].enabled = enabled;
@@ -124,20 +161,52 @@ public static class GraphicsBootstrap
 		// мониторов из DisplayManager): пост-эффекты там не нужны — это портит
 		// картинку на мониторах и жжёт производительность лишними blit-проходами.
 		if (cam.targetTexture != null) return;
-		cam.allowHDR = true;
+
+		bool bloom = PlayerPrefs.GetInt("PP_Bloom", 0) == 1;
+		bool vignette = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
+		bool grain = PlayerPrefs.GetInt("PP_Grain", PlayerPrefs.GetInt("PP_Chromatic", 0)) == 1;
+		bool motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
+		bool ao = PlayerPrefs.GetInt("PP_AO", 0) == 1;
+
+		bool anyEffect = bloom || vignette || grain || motionBlur || ao;
+
+		// HDR нужен только под пост-обработку: без неё расширенный диапазон
+		// некуда применять, а кадровый буфер становится вдвое толще. На
+		// телефоне это чистый расход пропускной способности.
+		cam.allowHDR = anyEffect;
 		cam.allowMSAA = true;
-		if (PlayerPrefs.GetInt("PP_AO", 0) == 1)
-			cam.depthTextureMode |= DepthTextureMode.Depth;
+
+		cam.depthTextureMode = ao
+			? cam.depthTextureMode | DepthTextureMode.Depth
+			: cam.depthTextureMode & ~DepthTextureMode.Depth;
 
 		var fx = cam.GetComponent<SimpleScreenFx>();
+
+		// КЛЮЧЕВОЕ ДЛЯ ТЕЛЕФОНОВ: если ни один эффект не включён, компонент
+		// обязан быть выключен, а не просто "ничего не делать".
+		//
+		// Сам факт живого OnRenderImage заставляет Unity рисовать камеру в
+		// промежуточную текстуру вместо прямой отрисовки на экран, а затем
+		// копировать её обратно. Мобильные GPU считают кадр плитками и такой
+		// разрыв конвейера переносят особенно плохо -- вся сцена лишний раз
+		// уезжает в память и читается назад. Раньше внутри стоял
+		// Graphics.Blit(src, dest) "на всякий случай": формально безобидный,
+		// по факту полноэкранный проход каждый кадр при полностью выключенных
+		// эффектах.
+		if (!anyEffect)
+		{
+			if (fx != null) fx.enabled = false;
+			return;
+		}
+
 		if (fx == null)
 			fx = cam.gameObject.AddComponent<SimpleScreenFx>();
 
-		fx.bloom = PlayerPrefs.GetInt("PP_Bloom", 0) == 1;
-		fx.vignette = PlayerPrefs.GetInt("PP_Vignette", 0) == 1;
-		fx.grain = PlayerPrefs.GetInt("PP_Grain", PlayerPrefs.GetInt("PP_Chromatic", 0)) == 1;
-		fx.motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
-		fx.ao = PlayerPrefs.GetInt("PP_AO", 0) == 1;
+		fx.bloom = bloom;
+		fx.vignette = vignette;
+		fx.grain = grain;
+		fx.motionBlur = motionBlur;
+		fx.ao = ao;
 		fx.enabled = true;
 	}
 
