@@ -21,6 +21,12 @@ public static class GraphicsBootstrap
 
 	private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 	{
+		// Предел кадров обязательно восстанавливаем на каждой сцене.
+		// Application.targetFrameRate -- глобальная переменная, и любой
+		// скрипт в новой сцене может её перебить: именно так настройка
+		// «сбрасывалась» после перезахода в игру.
+		ApplyFPS();
+
 		ApplyReflectionsToScene();
 		ApplyPostProcess();
 	}
@@ -140,10 +146,44 @@ public static class GraphicsBootstrap
 			if (probes[i] != null) probes[i].enabled = enabled;
 	}
 
+	/// <summary>
+	/// Сколько кадров показывать, пока игрок ничего не выбрал.
+	/// </summary>
+	/// <remarks>
+	/// Берём настоящую частоту экрана. Раньше у каждого места был свой ответ:
+	/// здесь 60, в FpsSetting 30 или 60, в слайдере настроек 60 -- и при первом
+	/// запуске выигрывал тот, кто отработал последним. На экране 120 Гц игра
+	/// упиралась в чужое число вместо родной развёртки.
+	///
+	/// Ноль и мусор от драйвера отбрасываем: Screen.currentResolution.refreshRate
+	/// на части устройств возвращает 0, а иногда завышенное значение.
+	/// </remarks>
+	public static int TargetFpsDefault
+	{
+		get
+		{
+			int hz = 0;
+			try { hz = Screen.currentResolution.refreshRate; } catch { }
+
+			if (hz < 30) hz = 60;
+			return Mathf.Clamp(hz, 30, 240);
+		}
+	}
+
+	/// <summary>Сохранённый предел кадров, либо частота экрана.</summary>
+	public static int TargetFps
+	{
+		get
+		{
+			int fallback = TargetFpsDefault;
+			int fps = PlayerPrefs.GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", fallback));
+			return Mathf.Clamp(fps, 30, 240);
+		}
+	}
+
 	public static void ApplyFPS()
 	{
-		int fps = PlayerPrefs.GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", 60));
-		Application.targetFrameRate = fps;
+		Application.targetFrameRate = TargetFps;
 		QualitySettings.vSyncCount = 0;
 	}
 

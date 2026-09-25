@@ -249,16 +249,15 @@ public class ResolutionSetting : MonoBehaviour
 	{
 		if (fpsSlider == null) return;
 
-		int maxHz = Screen.currentResolution.refreshRate;
-		if (maxHz < 30) maxHz = 60;
-		int maxFps = Mathf.Clamp(maxHz, 30, 240);
+		// Потолок слайдера и значение по умолчанию -- родная частота экрана.
+		// Считает её GraphicsBootstrap, чтобы во всей игре был один ответ.
+		int maxFps = GraphicsBootstrap.TargetFpsDefault;
 
 		fpsSlider.minValue = 30;
 		fpsSlider.maxValue = maxFps;
 		fpsSlider.wholeNumbers = true;
 
-		int saved = PlayerPrefs.GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", 60));
-		saved = Mathf.Clamp(saved, 30, maxFps);
+		int saved = Mathf.Clamp(GraphicsBootstrap.TargetFps, 30, maxFps);
 		fpsSlider.SetValueWithoutNotify(saved);
 		if (fpsLabel != null) fpsLabel.text = saved + " FPS";
 

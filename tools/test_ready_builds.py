@@ -3158,6 +3158,53 @@ check('BindToggle(reflectionsToggle, "Reflections", 1,' not in _rs,
       "жёсткая единица в тумблере отражений убрана")
 
 
+# ---------------------------------------------------------------------------
+print("\nПредел кадров: частота экрана и стойкость к перезаходу")
+
+_gb2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/GraphicsBootstrap.cs")
+    .read_text(encoding="utf-8"))
+
+# Значение по умолчанию должно браться у экрана, а не быть числом из воздуха.
+check("public static int TargetFpsDefault" in _gb2,
+      "есть единое значение по умолчанию для предела кадров")
+_def = _gb2.split("public static int TargetFpsDefault")[1].split("\n\t/// <summary>")[0]
+check("refreshRate" in _def, "по умолчанию берётся частота экрана")
+check("Mathf.Clamp(hz, 30, 240)" in _def,
+      "частота ограничена разумным коридором")
+check("if (hz < 30) hz = 60" in _def,
+      "нулевая частота от драйвера подменяется на 60")
+
+check("public static int TargetFps" in _gb2, "есть единое чтение настройки")
+
+# ГЛАВНОЕ для «сбрасывается после перезахода»: targetFrameRate -- глобальная
+# переменная, её может перебить любой скрипт новой сцены.
+_scene = _gb2.split("private static void OnSceneLoaded(")[1].split("\n\tpublic")[0]
+check("ApplyFPS()" in _scene,
+      "предел кадров восстанавливается на каждой загруженной сцене")
+
+_apply = _gb2.split("public static void ApplyFPS()")[1].split("\n\t}")[0]
+check("TargetFps" in _apply, "применение берёт значение из общего источника")
+
+# Ни одно место не должно иметь собственного числа по умолчанию.
+_rs2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/ResolutionSetting.cs")
+    .read_text(encoding="utf-8"))
+check("GraphicsBootstrap.TargetFpsDefault" in _rs2,
+      "слайдер берёт потолок у общего источника")
+check('GetInt("TargetFps", PlayerPrefs.GetInt("TargetFPS", 60))' not in _rs2,
+      "в слайдере нет своей шестидесятки")
+
+_fs2 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/FpsSetting.cs").read_text(encoding="utf-8"))
+check("GraphicsBootstrap.TargetFpsDefault" in _fs2,
+      "экран выбора кадров берёт то же значение по умолчанию")
+check('PlayerPrefs.GetInt("TargetFps", 30)' not in _fs2,
+      "исчезла тридцатка, перебивавшая выбор игрока")
+check('GetInt("TargetFps", 60)' not in _fs2,
+      "и своя шестидесятка тоже")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()
