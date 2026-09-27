@@ -353,8 +353,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.4978108, y: 0.076959044, z: 0.5212727}
-  m_Center: {x: -0.71248746, y: -0.1383818, z: 0.017915457}
+  m_Size: {x: 1.4978108, y: 0.018699467, z: 0.5212727}
+  m_Center: {x: -0.71248746, y: -0.109252006, z: 0.017915457}
 --- !u!114 &8715901606105476296
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -385,8 +385,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1184230592842331857}
   - component: {fileID: 4972365208078631158}
+  - component: {fileID: 1184230592842331857}
   - component: {fileID: 3623068569028676541}
   - component: {fileID: 4412044446602338818}
   - component: {fileID: 6589553363512649903}
@@ -420,12 +420,30 @@ Transform:
   m_Children:
   - {fileID: 9021147553812010044}
   - {fileID: 8827401165339077421}
+  - {fileID: 8347591246171065397}
   - {fileID: 4091717292125567740}
   - {fileID: 7077043483634404837}
   - {fileID: 2353243575833841114}
   - {fileID: 6697911921554475203}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1184230592842331857
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3232047612826269505}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9ac6a8d7bed4727b4bff6931b5f78a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  parts:
+  - prefab: {fileID: 370881068924084091, guid: 4979296fd0481634d823ce6b8b638457, type: 3}
+    slotTarget: Cover
+  delay: 0.5
+  delivered: 
 --- !u!33 &3623068569028676541
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -503,6 +521,8 @@ MonoBehaviour:
   - type: 0
     hardware: {fileID: 7745120399228817334}
   - type: 3
+    hardware: {fileID: 5561099388774220110}
+  - type: 4
     hardware: {fileID: 5561099388774220110}
   integrated: 1
   integratedWattage: 12
@@ -676,7 +696,7 @@ AudioSource:
   SpatializePostEffects: 0
   Priority: 128
   DopplerLevel: 1
-  MinDistance: 1
+  MinDistance: 3.6349277
   MaxDistance: 500
   Pan2D: 0
   rolloffMode: 0
@@ -768,6 +788,110 @@ MonoBehaviour:
   volumeMultiplier: 0.02
   impactSound: {fileID: 8300000, guid: 70d7f3acc2c386a4a9045abd00f7fcfe, type: 3}
   particle: {fileID: 0}
+--- !u!1 &3312099874561120533
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8827401165339077421}
+  - component: {fileID: 5561099388774220110}
+  m_Layer: 0
+  m_Name: BuiltInRAM
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8827401165339077421
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3312099874561120533}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4972365208078631158}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5561099388774220110
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3312099874561120533}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnId: x32 RAM
+  info: x32 RAM
+  match: 0
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+  capacity: 8000
+  score: 4000
+  wattage: 2
+--- !u!1 &3334959436081324108
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8347591246171065397}
+  - component: {fileID: 2429416741390742877}
+  m_Layer: 0
+  m_Name: BuiltInSSD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8347591246171065397
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3334959436081324108}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4972365208078631158}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2429416741390742877
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3334959436081324108}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnId: x32 SSD
+  info: x32 SSD
+  match: 0
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+  capacity: 32000
+  score: 5500
+  wattage: 2
 --- !u!1 &4102573702936842500
 GameObject:
   m_ObjectHideFlags: 0
@@ -799,6 +923,68 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2353243575833841114}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4428175963021145120
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9021147553812010044}
+  - component: {fileID: 7745120399228817334}
+  m_Layer: 0
+  m_Name: BuiltInSoC
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9021147553812010044
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4428175963021145120}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4972365208078631158}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7745120399228817334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4428175963021145120}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89245f8fb2fd3b8aedbfa546bef6c1fa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnId: x32 SoC
+  info: x32 SoC
+  match: 0
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+  capacity: 0
+  score: 1500
+  wattage: 10
+  layer:
+    serializedVersion: 2
+    m_Bits: 0
+  burnedColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+  defaultFrequency: 2
+  frequency: 2
+  heat: 2.5
+  temperature: 20
+  burnTemp: 150
+  particle: {fileID: 0}
 --- !u!1 &4801742592381183897
 GameObject:
   m_ObjectHideFlags: 0
@@ -996,130 +1182,3 @@ Transform:
   - {fileID: 1931415927372458291}
   m_Father: {fileID: 4972365208078631158}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &4428175963021145120
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 9021147553812010044}
-  m_Layer: 0
-  m_Name: BuiltInSoC
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &9021147553812010044
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4428175963021145120}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4972365208078631158}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7745120399228817334
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4428175963021145120}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 89245f8fb2fd3b8aedbfa546bef6c1fa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnId: x32 SoC
-  info: x32 SoC
-  match: 0
-  slotOffset: {x: 0, y: 0, z: 0}
-  glue: 0
-  capacity: 0
-  score: 1500
-  wattage: 10
-  layer: {m_Bits: 0}
-  burnedColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
-  defaultFrequency: 2
-  frequency: 2
-  heat: 2.5
-  temperature: 20
-  burnTemp: 150
-  particle: {fileID: 0}
---- !u!1 &3312099874561120533
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8827401165339077421}
-  m_Layer: 0
-  m_Name: BuiltInRAM
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8827401165339077421
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3312099874561120533}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4972365208078631158}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &5561099388774220110
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3312099874561120533}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnId: x32 RAM
-  info: x32 RAM
-  match: 0
-  slotOffset: {x: 0, y: 0, z: 0}
-  glue: 0
-  capacity: 8000
-  score: 4000
-  wattage: 2
---- !u!114 &1184230592842331857
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3232047612826269505}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9ac6a8d7bed4727b4bff6931b5f78a7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  parts:
-  - prefab: {fileID: 370881068924084091, guid: 4979296fd0481634d823ce6b8b638457, type: 2}
-    slotTarget: Cover
-  delay: 0.5
-  delivered: []
