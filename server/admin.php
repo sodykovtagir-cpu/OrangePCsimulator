@@ -150,21 +150,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         elseif ($act === 'ban') {
-            $type = isset($_POST['btype']) ? ($_POST['btype'] === 'ip' ? 'ip' : 'author') : 'author';
-            $value = clean(isset($_POST['value']) ? $_POST['value'] : '', 64);
+            $type   = isset($_POST['btype']) && $_POST['btype'] === 'ip' ? 'ip' : 'author';
+            $value  = clean(isset($_POST['value']) ? $_POST['value'] : '', 64);
             $reason = clean(isset($_POST['reason']) ? $_POST['reason'] : '', 120);
+            $days   = isset($_POST['days']) ? (int)$_POST['days'] : 0;
+            $author = clean(isset($_POST['author']) ? $_POST['author'] : '', 64);
+            $wipe   = !empty($_POST['wipe']);
+
             if ($value === '') { $msg = 'Укажите значение для бана'; $msgType = 'err'; }
             else {
                 $bans = load_json(BAN_FILE);
                 $valueLower = strtolower($value); $dup = false;
                 foreach ($bans as $b) {
-                    if ($b['type'] === $type && strtolower($b['value']) === $valueLower) { $dup = true; break; }
+                    if (($b['type'] ?? 'author') === $type && strtolower($b['value']) === $valueLower) { $dup = true; break; }
                 }
                 if ($dup) { $msg = 'Такой бан уже есть'; $msgType = 'err'; }
                 else {
-                    $bans[] = ['type' => $type, 'value' => $value, 'reason' => $reason, 'at' => gmdate('Y-m-d H:i:s')];
+                    // Ноль дней — навсегда. until пустой значит бессрочно.
+                    $until = $days > 0 ? gmdate('Y-m-d H:i:s', time() + $days * 86400) : '';
+
+                    $bans[] = [
+                        'type'   => $type,
+                        'value'  => $value,
+                        'reason' => $reason,
+                        'at'     => gmdate('Y-m-d H:i:s'),
+                        'until'  => $until,
+                    ];
                     save_json(BAN_FILE, $bans);
+
                     $msg = ($type === 'ip' ? 'IP' : 'Автор') . " забанен: $value";
+                    $msg .= $days > 0 ? " (на $days дн.)" : ' (навсегда)';
+
+                    /* Заодно подчищаем работы нарушителя: смысла оставлять
+                       спам в мастерской нет, а руками потом не найдёшь.
+                       При бане по IP ник приходит отдельным полем. */
+                    if ($wipe) {
+                        $who = strtolower($type === 'author' ? $value : $author);
+                        if ($who !== '') {
+                            $items = load_json(INDEX_FILE);
+                            $kept = []; $n = 0;
+                            foreach ($items as $it) {
+                                if (strtolower(trim((string)($it['author'] ?? ''))) === $who) {
+                                    @unlink(UPLOADS_DIR . '/' . basename($it['filename'] ?? ''));
+                                    if (!empty($it['cover'])) @unlink(UPLOADS_DIR . '/' . basename($it['cover']));
+                                    $n++;
+                                } else $kept[] = $it;
+                            }
+                            if ($n) { save_json(INDEX_FILE, $kept); $msg .= ", удалено сейвов: $n"; }
+                        }
+                    }
                 }
             }
         }
@@ -282,6 +316,33 @@ usort($top, function ($a, $b) { return (int)($b['downloads'] ?? 0) <=> (int)($a[
 $top = array_slice($top, 0, 5);
 $maxDl = $top ? max(1, (int)($top[0]['downloads'] ?? 1)) : 1;
 
+/** Действующий бан для ника или адреса — чтобы отметить его в списке. */
+function active_ban($bans, $name, $ip) {
+    $name = strtolower(trim((string)$name));
+    $ip = trim((string)$ip);
+    $now = time();
+    foreach ($bans as $b) {
+        if (empty($b['value'])) continue;
+        if (!empty($b['until'])) {
+            $end = strtotime($b['until']);
+            if ($end && $end < $now) continue;
+        }
+        $t = $b['type'] ?? 'author';
+        if ($t === 'author' && strtolower(trim((string)$b['value'])) === $name) return $b;
+        if ($t === 'ip' && $ip !== '' && trim((string)$b['value']) === $ip) return $b;
+    }
+    return null;
+}
+
+/** Короткий текст срока для таблицы. */
+function ban_left($b) {
+    if (empty($b['until'])) return 'навсегда';
+    $end = strtotime($b['until']);
+    if (!$end) return 'навсегда';
+    $days = (int)ceil(($end - time()) / 86400);
+    return $days > 1 ? "ещё $days дн." : 'меньше суток';
+}
+
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'dashboard';
 $defaultPass = empty($cfg['changed']);
 ?>
@@ -292,152 +353,154 @@ $defaultPass = empty($cfg['changed']);
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orange PC — админка</title>
 <style>
+  /* Единый вид с сайтом: та же система PCOS — синий рабочий стол и белые окна. */
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
-    --bg:#11141a; --panel:#1b1f27; --panel2:#222732; --line:#2e3540;
-    --text:#e9edf2; --dim:#94a0ae; --orange:#ff8800; --orange2:#ffb347;
-    --green:#3ecf6e; --red:#ff5c5c; --blue:#4fa3ff;
+    --blue:#1c6bb8; --blue2:#2e86d8; --line:#c9d4e0; --text:#15202b;
+    --dim:#66788a; --orange:#ff8800; --green:#2fa360; --red:#d93b3b;
   }
+  html,body{min-height:100%}
   body{
-    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);
-    min-height:100vh;
-    background-image:radial-gradient(900px 500px at 80% -10%,rgba(255,136,0,.10),transparent 60%),
-                     radial-gradient(700px 400px at 0% 100%,rgba(79,163,255,.08),transparent 60%);
+    font-family:"Segoe UI",Tahoma,system-ui,sans-serif;color:var(--text);
+    background:linear-gradient(170deg,#0f5fa8 0%,#1b7ac4 45%,#4aa6e8 100%) fixed;
   }
-  a{color:var(--orange2);text-decoration:none}
+  a{color:var(--blue);text-decoration:none}
   a:hover{text-decoration:underline}
 
-  /* ---------- шапка ---------- */
+  /* ---------- панель сверху, как заголовок окна ---------- */
   header{
-    position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
-    padding:13px 20px;background:rgba(17,20,26,.9);backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:13px;
+    padding:11px 18px;background:#fff;border-bottom:1px solid var(--line);
+    box-shadow:0 2px 14px rgba(0,0,0,.18);
   }
   .logo{
-    width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none;
-    background:linear-gradient(145deg,var(--orange),#cc6a00);color:#1a1204;font-weight:800;font-size:15px;
-    box-shadow:0 5px 16px rgba(255,136,0,.32);
+    width:38px;height:38px;border-radius:7px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(145deg,var(--orange),#cc6a00);color:#fff;font-weight:800;font-size:14px;
   }
-  header h1{font-size:16px;font-weight:600;line-height:1.2}
+  header h1{font-size:16px;font-weight:600;line-height:1.15}
   header h1 small{display:block;font-size:11.5px;color:var(--dim);font-weight:400}
   .spacer{flex:1}
-  .badge{font-size:11.5px;padding:4px 10px;border-radius:20px;background:rgba(62,207,110,.15);
-         color:var(--green);border:1px solid rgba(62,207,110,.3)}
+  .badge{font-size:11.5px;padding:4px 11px;border-radius:4px;background:#e8f5ec;color:var(--green);border:1px solid #bfe3cd}
 
-  .wrap{max-width:1180px;margin:0 auto;padding:20px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px}
 
   /* ---------- вкладки ---------- */
-  nav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
+  nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
   nav a{
-    padding:9px 16px;border-radius:9px;background:var(--panel);border:1px solid var(--line);
-    color:var(--text);font-size:13.5px;text-decoration:none;position:relative;
-    transition:transform .14s ease,background .14s,border-color .14s;
+    padding:9px 16px;border-radius:6px 6px 0 0;background:rgba(255,255,255,.75);
+    color:var(--text);font-size:13.5px;border:1px solid transparent;border-bottom:none;
+    transition:background .14s,transform .14s;
   }
-  nav a:hover{background:var(--panel2);transform:translateY(-1px);text-decoration:none}
-  nav a.on{
-    background:linear-gradient(145deg,var(--orange),#cc6a00);color:#1a1204;font-weight:600;
-    border-color:transparent;box-shadow:0 5px 16px rgba(255,136,0,.3);
-  }
-  nav a .n{
-    display:inline-block;margin-left:7px;padding:1px 7px;border-radius:10px;font-size:11px;
-    background:rgba(255,255,255,.12);
-  }
-  nav a.on .n{background:rgba(0,0,0,.18)}
+  nav a:hover{background:#fff;transform:translateY(-1px);text-decoration:none}
+  nav a.on{background:#fff;font-weight:600;box-shadow:0 -2px 10px rgba(0,0,0,.12)}
+  nav a .n{display:inline-block;margin-left:7px;padding:1px 7px;border-radius:9px;font-size:11px;background:#e4ecf4;color:var(--dim)}
+  nav a.on .n{background:var(--blue);color:#fff}
 
-  /* ---------- карточки ---------- */
+  /* ---------- карточки-окна ---------- */
   .card{
-    background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px;
-    margin-bottom:16px;animation:rise .32s ease both;
+    background:#fff;border:1px solid var(--line);border-radius:6px;padding:17px;margin-bottom:15px;
+    box-shadow:0 8px 26px rgba(0,0,0,.16);animation:rise .3s ease both;
   }
-  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  .card h2{font-size:15px;margin-bottom:4px}
+  @keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+  .card h2{font-size:16px;margin-bottom:3px;color:#11324e}
   .card .sub{color:var(--dim);font-size:13px;margin-bottom:14px;line-height:1.5}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:11px;margin-bottom:15px}
   .stat{
-    background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px;
-    animation:rise .32s ease both;transition:transform .16s,border-color .16s;
+    background:#fff;border:1px solid var(--line);border-radius:6px;padding:15px;
+    box-shadow:0 6px 20px rgba(0,0,0,.14);animation:rise .3s ease both;transition:transform .16s;
   }
-  .stat:hover{transform:translateY(-3px);border-color:rgba(255,136,0,.45)}
-  .stat b{display:block;font-size:26px;font-weight:600;line-height:1.1;margin-bottom:3px}
+  .stat:hover{transform:translateY(-3px)}
+  .stat b{display:block;font-size:25px;font-weight:600;line-height:1.1;margin-bottom:2px;color:#11324e}
   .stat span{color:var(--dim);font-size:12.5px}
-  .stat.o b{color:var(--orange2)} .stat.g b{color:var(--green)} .stat.b b{color:var(--blue)}
+  .stat.o b{color:var(--orange)} .stat.g b{color:var(--green)} .stat.b b{color:var(--blue)}
 
   .bars{display:grid;gap:9px}
   .bar .t{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
   .bar .t span:last-child{color:var(--dim)}
-  .bar .track{height:7px;border-radius:5px;background:var(--panel2);overflow:hidden}
-  .bar .fill{
-    height:100%;border-radius:5px;background:linear-gradient(90deg,var(--orange),var(--orange2));
-    animation:grow .7s cubic-bezier(.2,.8,.3,1) both;
-  }
+  .bar .track{height:8px;border-radius:4px;background:#e8eef4;overflow:hidden}
+  .bar .fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),var(--blue2));animation:grow .7s cubic-bezier(.2,.8,.3,1) both}
   @keyframes grow{from{width:0}}
 
   /* ---------- таблицы ---------- */
   table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th{text-align:left;color:var(--dim);font-weight:500;font-size:12px;text-transform:uppercase;
-     letter-spacing:.4px;padding:0 10px 9px;border-bottom:1px solid var(--line)}
-  td{padding:11px 10px;border-bottom:1px solid #232a34;vertical-align:middle}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:11.5px;text-transform:uppercase;
+     letter-spacing:.4px;padding:0 9px 9px;border-bottom:2px solid #e3eaf1}
+  td{padding:10px 9px;border-bottom:1px solid #eef2f6;vertical-align:middle}
   tbody tr{transition:background .13s}
-  tbody tr:hover{background:rgba(255,255,255,.035)}
-  .cover{width:54px;height:36px;border-radius:5px;background:#262c36 center/cover no-repeat;flex:none}
+  tbody tr:hover{background:#f4f9ff}
+  tbody tr.banned{background:#fff2f2}
+  tbody tr.banned:hover{background:#ffe9e9}
+  .cover{width:54px;height:36px;border-radius:4px;background:#dfe7ef center/cover no-repeat;flex:none}
   .muted{color:var(--dim);font-size:12px}
   .nick{font-weight:600}
   .nick.adm{color:var(--red)}
+  .chip{display:inline-block;padding:3px 9px;border-radius:4px;font-size:11.5px;background:#eef2f6;color:var(--dim)}
+  .chip.green{background:#e8f5ec;color:var(--green)}
+  .chip.red{background:#fde8e8;color:var(--red);font-weight:600}
 
   input,textarea,select{
-    width:100%;padding:10px 12px;border-radius:9px;background:#141820;border:1px solid var(--line);
+    width:100%;padding:9px 11px;border-radius:4px;background:#fff;border:1px solid var(--line);
     color:var(--text);font-size:13.5px;font-family:inherit;transition:border-color .14s,box-shadow .14s;
   }
-  input:focus,textarea:focus,select:focus{
-    outline:none;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,136,0,.14);
-  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(46,134,216,.16)}
   label{display:block;font-size:12.5px;color:var(--dim);margin:0 0 5px}
   .field{margin-bottom:12px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
   .btn{
-    display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;border:1px solid var(--line);
-    background:var(--panel2);color:var(--text);font-size:13.5px;cursor:pointer;font-family:inherit;
-    transition:transform .13s,background .13s,border-color .13s;
+    display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:4px;
+    border:1px solid var(--line);background:#eceff3;color:var(--text);font-size:13.5px;cursor:pointer;
+    font-family:inherit;transition:transform .12s,background .12s,border-color .12s;
   }
-  .btn:hover{background:#2b323d;transform:translateY(-1px)}
-  .btn:active{transform:translateY(0)}
-  .btn.primary{background:linear-gradient(145deg,var(--orange),#cc6a00);color:#1a1204;border-color:transparent;font-weight:600}
-  .btn.danger{background:rgba(255,92,92,.14);color:var(--red);border-color:rgba(255,92,92,.35)}
-  .btn.danger:hover{background:rgba(255,92,92,.24)}
-  .btn.ok{background:rgba(62,207,110,.14);color:var(--green);border-color:rgba(62,207,110,.35)}
-  .btn.sm{padding:6px 11px;font-size:12.5px}
+  .btn:hover{background:#e0e5ea;transform:translateY(-1px)}
+  .btn:active{transform:none}
+  .btn.primary{background:linear-gradient(180deg,var(--blue2),var(--blue));color:#fff;border-color:transparent;font-weight:600}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.danger{background:#fdeaea;color:var(--red);border-color:#f0c2c2}
+  .btn.danger:hover{background:#fbdada}
+  .btn.ok{background:#e9f6ee;color:var(--green);border-color:#bfe3cd}
+  .btn.sm{padding:5px 10px;font-size:12.5px}
+
+  /* ---------- окно бана ---------- */
+  .modal{
+    position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+    background:rgba(8,26,45,.55);padding:16px;
+  }
+  .modal.open{display:flex;animation:fade .18s ease both}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modalBox{
+    background:#fff;border-radius:6px;padding:20px;width:400px;max-width:100%;
+    box-shadow:0 26px 60px rgba(0,0,0,.4);animation:pop .22s cubic-bezier(.2,.9,.3,1) both;
+  }
+  @keyframes pop{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+  .modalBox h2{font-size:17px;margin-bottom:15px;color:#11324e}
 
   /* ---------- уведомление ---------- */
   .toast{
-    position:fixed;right:20px;bottom:20px;z-index:100;max-width:380px;
-    padding:13px 17px;border-radius:11px;font-size:13.5px;line-height:1.45;
-    background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.5);
-    animation:toastIn .32s cubic-bezier(.2,.9,.3,1) both;
+    position:fixed;right:18px;bottom:18px;z-index:300;max-width:370px;padding:13px 16px;border-radius:5px;
+    font-size:13.5px;line-height:1.45;background:#fff;border:1px solid var(--line);
+    box-shadow:0 14px 40px rgba(0,0,0,.3);animation:toastIn .3s cubic-bezier(.2,.9,.3,1) both;
   }
-  .toast.ok{border-left:3px solid var(--green)}
-  .toast.err{border-left:3px solid var(--red)}
-  @keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .toast.ok{border-left:4px solid var(--green)}
+  .toast.err{border-left:4px solid var(--red)}
+  @keyframes toastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
-  .warn{
-    padding:12px 15px;border-radius:10px;font-size:13px;line-height:1.5;margin-bottom:16px;
-    background:rgba(255,136,0,.1);border:1px solid rgba(255,136,0,.3);color:var(--orange2);
-  }
-  .empty{text-align:center;color:var(--dim);padding:34px 10px;font-size:13.5px}
+  .warn{padding:11px 14px;border-radius:5px;font-size:13px;line-height:1.5;margin-bottom:15px;
+        background:#fff6e8;border:1px solid #f2d9ae;color:#8a5a12}
+  .empty{text-align:center;color:var(--dim);padding:32px 10px;font-size:13.5px}
 
-  /* ---------- вход ---------- */
-  .login{max-width:360px;margin:9vh auto;animation:rise .4s ease both}
-  .login .logo{width:54px;height:54px;font-size:20px;margin:0 auto 16px;border-radius:14px}
-  .login h1{text-align:center;font-size:19px;margin-bottom:5px}
-  .login p{text-align:center;color:var(--dim);font-size:13px;margin-bottom:20px}
+  .login{max-width:350px;margin:10vh auto;animation:rise .35s ease both}
+  .login .logo{width:54px;height:54px;font-size:19px;margin:0 auto 15px;border-radius:12px}
+  .login h1{text-align:center;font-size:19px;margin-bottom:4px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35)}
+  .login p{text-align:center;color:rgba(255,255,255,.85);font-size:13px;margin-bottom:18px}
 
-  .tools{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:13px}
   .tools input[type=search]{flex:1;min-width:190px}
   .hide{display:none!important}
   @media (max-width:640px){
     .row2{grid-template-columns:1fr}
-    .wrap{padding:14px}
+    .wrap{padding:12px}
     td,th{padding-left:6px;padding-right:6px}
   }
 </style>
@@ -604,35 +667,59 @@ $defaultPass = empty($cfg['changed']);
 
     <?php elseif ($tab === 'accounts'): ?>
       <div class="card">
-        <h2>Аккаунты и администраторы</h2>
-        <div class="sub">Роль получает подтверждённый аккаунт. Красный ник — администратор: игра берёт это с сервера при входе.</div>
-        <div class="tools"><input type="search" placeholder="Поиск по нику или почте…" oninput="filt('accRow',this.value)"></div>
+        <h2>Игроки</h2>
+        <div class="sub">Красный ник — администратор в игре. Забаненные подсвечены: такой не войдёт в аккаунт и увидит причину.</div>
+        <div class="tools"><input type="search" placeholder="Поиск по нику, почте или адресу…" oninput="filt('accRow',this.value)"></div>
         <table>
-          <thead><tr><th>ID</th><th>Ник</th><th>Почта</th><th>Подтверждён</th><th>Роль</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>Ник</th><th>Почта</th><th>Адрес</th><th>Статус</th><th>Роль</th><th style="width:230px">Действия</th></tr></thead>
           <tbody>
           <?php foreach ($users as $u):
-            $uid = (int)($u['id'] ?? 0);
+            $uid  = (int)($u['id'] ?? 0);
+            $nick = (string)($u['name'] ?? '');
+            $uip  = (string)($u['last_ip'] ?? '');
             $isAdm = in_array($uid, $adminIds, true);
             $ver = !empty($u['verified']);
+            $ban = active_ban($bans, $nick, $uip);
           ?>
-            <tr class="accRow" data-s="<?php echo h(mb_strtolower(($u['name'] ?? '') . ' ' . ($u['email'] ?? ''))); ?>">
+            <tr class="accRow<?php echo $ban ? ' banned' : ''; ?>"
+                data-s="<?php echo h(mb_strtolower($nick . ' ' . ($u['email'] ?? '') . ' ' . $uip)); ?>">
               <td class="muted"><?php echo $uid; ?></td>
-              <td><span class="nick <?php echo $isAdm ? 'adm' : ''; ?>"><?php echo h($u['name'] ?? '—'); ?></span></td>
+              <td><span class="nick <?php echo $isAdm ? 'adm' : ''; ?>"><?php echo h($nick ?: '—'); ?></span></td>
               <td class="muted"><?php echo h($u['email'] ?? '—'); ?></td>
-              <td><?php echo $ver ? '<span style="color:var(--green)">да</span>' : '<span class="muted">нет</span>'; ?></td>
-              <td><?php echo $isAdm ? 'Администратор' : 'Игрок'; ?></td>
+              <td class="muted"><?php echo $uip !== '' ? h($uip) : '<span title="появится после входа в игру">—</span>'; ?></td>
               <td>
-                <?php if (!$ver): ?>
-                  <span class="muted">сначала почта</span>
+                <?php if ($ban): ?>
+                  <span class="chip red">бан · <?php echo h(ban_left($ban)); ?></span>
+                  <?php if (!empty($ban['reason'])): ?>
+                    <div class="muted"><?php echo h($ban['reason']); ?></div>
+                  <?php endif; ?>
+                <?php elseif (!$ver): ?>
+                  <span class="chip">почта не подтверждена</span>
                 <?php else: ?>
+                  <span class="chip green">активен</span>
+                <?php endif; ?>
+              </td>
+              <td><?php echo $isAdm ? 'Админ' : 'Игрок'; ?></td>
+              <td style="white-space:nowrap">
+                <?php if ($ver && !$isAdm): ?>
+                  <button type="button" class="btn sm danger"
+                    onclick="banDlg('author','<?php echo h(addslashes($nick)); ?>','<?php echo h(addslashes($nick)); ?>')">Бан</button>
+                  <?php if ($uip !== ''): ?>
+                    <button type="button" class="btn sm danger"
+                      onclick="banDlg('ip','<?php echo h(addslashes($uip)); ?>','<?php echo h(addslashes($nick)); ?>')">Бан по IP</button>
+                  <?php endif; ?>
+                <?php elseif ($isAdm): ?>
+                  <span class="muted">админ</span>
+                <?php else: ?>
+                  <span class="muted">сначала почта</span>
+                <?php endif; ?>
+                <?php if ($ver): ?>
                   <form method="post" style="display:inline">
                     <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="act" value="game_admin_set">
                     <input type="hidden" name="user_id" value="<?php echo $uid; ?>">
                     <input type="hidden" name="enabled" value="<?php echo $isAdm ? '0' : '1'; ?>">
-                    <button class="btn sm <?php echo $isAdm ? 'danger' : 'ok'; ?>">
-                      <?php echo $isAdm ? 'Снять админа' : 'Назначить админом'; ?>
-                    </button>
+                    <button class="btn sm <?php echo $isAdm ? '' : 'ok'; ?>"><?php echo $isAdm ? 'Снять админа' : 'Админ'; ?></button>
                   </form>
                 <?php endif; ?>
               </td>
@@ -641,6 +728,39 @@ $defaultPass = empty($cfg['changed']);
           </tbody>
         </table>
         <?php if (!$users): ?><div class="empty">Аккаунтов пока нет</div><?php endif; ?>
+      </div>
+
+      <!-- Окно бана: срок и причина спрашиваем здесь, чтобы не плодить
+           формы в каждой строке таблицы. -->
+      <div class="modal" id="banModal">
+        <div class="modalBox">
+          <h2 id="banTitle">Бан</h2>
+          <form method="post">
+            <input type="hidden" name="csrf" value="<?php echo $csrf; ?>">
+            <input type="hidden" name="act" value="ban">
+            <input type="hidden" name="btype" id="banType">
+            <input type="hidden" name="value" id="banValue">
+            <input type="hidden" name="author" id="banAuthor">
+            <div class="field"><label>Причина — её увидит игрок</label>
+              <input name="reason" placeholder="спам в мастерской"></div>
+            <div class="field"><label>Срок</label>
+              <select name="days">
+                <option value="0">Навсегда</option>
+                <option value="1">1 день</option>
+                <option value="3">3 дня</option>
+                <option value="7">7 дней</option>
+                <option value="30">30 дней</option>
+                <option value="90">90 дней</option>
+              </select></div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer">
+              <input type="checkbox" name="wipe" value="1" checked style="width:auto">
+              <span>Удалить все сейвы этого автора</span></label>
+            <div style="display:flex;gap:9px;justify-content:flex-end">
+              <button type="button" class="btn" onclick="closeBan()">Отмена</button>
+              <button class="btn danger">Забанить</button>
+            </div>
+          </form>
+        </div>
       </div>
 
     <?php elseif ($tab === 'banned'): ?>
@@ -798,6 +918,18 @@ $defaultPass = empty($cfg['changed']);
       document.getElementById('renTitle').value = t;
       document.getElementById('renForm').submit();
     }
+    /* Окно бана: заполняем скрытые поля и показываем форму. */
+    function banDlg(type, value, author){
+      document.getElementById('banType').value = type;
+      document.getElementById('banValue').value = value;
+      document.getElementById('banAuthor').value = author;
+      document.getElementById('banTitle').textContent =
+        type === 'ip' ? 'Бан по адресу ' + value : 'Бан игрока ' + value;
+      document.getElementById('banModal').classList.add('open');
+    }
+    function closeBan(){ document.getElementById('banModal').classList.remove('open'); }
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeBan(); });
+
     function del(id){
       if(!confirm('Удалить сейв #' + id + '? Файл и обложка тоже исчезнут.')) return;
       document.getElementById('delId').value = id;

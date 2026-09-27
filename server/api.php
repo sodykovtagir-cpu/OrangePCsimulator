@@ -28,14 +28,65 @@ function save_bans($bans) {
     global $BAN_FILE;
     file_put_contents($BAN_FILE, json_encode($bans, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
 }
-function is_banned($author, $ip) {
+/**
+ * Найти действующий бан. Возвращает саму запись или null.
+ *
+ * Раньше функция отвечала просто «да/нет», и игрок видел сухое «banned»,
+ * не понимая, за что и надолго ли. Теперь отдаём запись целиком: из неё
+ * собирается человеческое сообщение.
+ *
+ * Просроченные баны не считаются: поле until пустое — бан навсегда.
+ */
+function find_ban($author, $ip) {
     $author = strtolower(trim((string)$author));
+    $ip = trim((string)$ip);
+    $now = time();
+
     foreach (load_bans() as $b) {
         if (empty($b['value'])) continue;
-        if ($b['type'] === 'author' && strtolower(trim((string)$b['value'])) === $author) return true;
-        if ($b['type'] === 'ip' && trim((string)$b['value']) === trim((string)$ip)) return true;
+
+        if (!empty($b['until'])) {
+            $end = strtotime($b['until']);
+            if ($end && $end < $now) continue;   // срок вышел
+        }
+
+        $type = isset($b['type']) ? $b['type'] : 'author';
+        if ($type === 'author' && strtolower(trim((string)$b['value'])) === $author) return $b;
+        if ($type === 'ip' && trim((string)$b['value']) === $ip) return $b;
     }
-    return false;
+    return null;
+}
+
+/** Совместимость со старым кодом. */
+function is_banned($author, $ip) {
+    return find_ban($author, $ip) !== null;
+}
+
+/**
+ * Текст для игрока.
+ *
+ * Игра показывает содержимое поля error как есть, без перевода, поэтому
+ * пишем сразу по-русски и с причиной — иначе на экране остаётся «banned».
+ */
+function ban_message($b) {
+    $msg = 'Вы забанены в мастерской';
+
+    $reason = isset($b['reason']) ? trim((string)$b['reason']) : '';
+    if ($reason !== '') $msg .= ': ' . $reason;
+
+    if (!empty($b['until'])) {
+        $end = strtotime($b['until']);
+        if ($end) {
+            $left = $end - time();
+            $days = (int)ceil($left / 86400);
+            $msg .= $days > 1
+                ? '. Осталось дней: ' . $days
+                : '. Разбан: ' . date('d.m.Y H:i', $end);
+        }
+    } else {
+        $msg .= '. Бан навсегда';
+    }
+    return $msg;
 }
 
 $INDEX = UPLOADS_DIR . '/index.json';
@@ -194,7 +245,8 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $author = clean(isset($user['name']) ? $user['name'] : 'Player', 40);
     $desc = clean(isset($_POST['description']) ? $_POST['description'] : '', 280);
 
-    if (is_banned($author, $ip)) json_out(['ok' => false, 'error' => 'banned'], 403);
+    $ban = find_ban($author, $ip);
+    if ($ban) json_out(['ok' => false, 'error' => ban_message($ban), 'banned' => true], 403);
 
     $name = 's' . time() . '_' . bin2hex(random_bytes(3)) . '.opc';
     $dest = UPLOADS_DIR . '/' . $name;
@@ -241,8 +293,8 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $items[$i]['author'] = $items[$i]['owner_name'] !== '' ? $items[$i]['owner_name'] : $items[$i]['author'];
     }
     $newAuthor = $items[$i]['author'];
-    if (is_banned($newAuthor, isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0'))
-        json_out(['ok' => false, 'error' => 'banned'], 403);
+    $ban = find_ban($newAuthor, isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '0');
+    if ($ban) json_out(['ok' => false, 'error' => ban_message($ban), 'banned' => true], 403);
     if (isset($_POST['title'])) $items[$i]['title'] = clean($_POST['title'], 80);
     if (isset($_POST['description'])) $items[$i]['description'] = clean($_POST['description'], 280);
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
