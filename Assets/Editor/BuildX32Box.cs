@@ -183,6 +183,36 @@ namespace PC.Tools
             SetPrivate(coverSlot, "insertPos", coverInsert.transform);
             SetPrivate(coverSlot, "setParent", true);
 
+            // --- разъём USB -------------------------------------------------
+            // Без него систему не установить: PCOS ставится с загрузочной
+            // флешки, а вставлять её будет некуда.
+            var usbGo = new GameObject("UsbSlot");
+            usbGo.transform.SetParent(go.transform, false);
+            var uc = usbGo.AddComponent<BoxCollider>();
+            uc.isTrigger = true;
+            if (body != null)
+            {
+                uc.center = new Vector3(body.bounds.min.x, body.bounds.center.y, body.bounds.center.z);
+                uc.size = new Vector3(body.bounds.size.x * .25f, body.bounds.size.y * .5f, body.bounds.size.z * .5f);
+            }
+
+            var usbInsert = new GameObject("InsertPos");
+            usbInsert.transform.SetParent(usbGo.transform, false);
+            usbInsert.transform.localPosition = uc.center;
+
+            var usb = usbGo.AddComponent<HardwareSlot>();
+            usb.target = "USB";
+            SetMatches(usb, 0);
+            SetPrivate(usb, "insertPos", usbInsert.transform);
+            SetPrivate(usb, "setParent", true);
+
+            // --- регистрация слотов в плате ---------------------------------
+            // КРИТИЧНО: плата ищет железо только в списках external. Слот,
+            // не попавший туда, для неё не существует: BIOS не найдёт
+            // накопитель, а система не увидит флешку.
+            LinkSlots(mb, "external.drive", drive);
+            LinkSlots(mb, "external.usb", usb);
+
             // --- кнопка питания --------------------------------------------
             var btnGo = new GameObject("PowerButton");
             btnGo.transform.SetParent(go.transform, false);
@@ -248,6 +278,25 @@ namespace PC.Tools
                     Debug.LogWarning($"Тип не поддержан для {field}");
                     return;
             }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// Положить слоты в список, по которому плата ищет железо.
+        /// </summary>
+        /// <remarks>
+        /// Motherboard.Awake вызывает AddExternal(external), и дальше всё
+        /// железо ищется только там. Слот, не попавший в список, плата не
+        /// видит вовсе — компьютер ведёт себя так, будто отсек пустой.
+        /// </remarks>
+        private static void LinkSlots(Object board, string path, params HardwareSlot[] slots)
+        {
+            var so = new SerializedObject(board);
+            var arr = so.FindProperty(path);
+            if (arr == null) { Debug.LogWarning("Нет поля " + path); return; }
+            arr.arraySize = slots.Length;
+            for (int i = 0; i < slots.Length; i++)
+                arr.GetArrayElementAtIndex(i).objectReferenceValue = slots[i];
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
