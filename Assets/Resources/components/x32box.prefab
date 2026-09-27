@@ -398,6 +398,7 @@ GameObject:
   - component: {fileID: 4405180083915905970}
   - component: {fileID: 1998779788850716954}
   - component: {fileID: 931757084328858460}
+  - component: {fileID: 8657710287145495345}
   m_Layer: 0
   m_Name: x32box
   m_TagString: Untagged
@@ -788,6 +789,23 @@ MonoBehaviour:
   volumeMultiplier: 0.02
   impactSound: {fileID: 8300000, guid: 70d7f3acc2c386a4a9045abd00f7fcfe, type: 3}
   particle: {fileID: 0}
+--- !u!114 &8657710287145495345
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3232047612826269505}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9ac6a8d7bed4727b4bff6931b5f78a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  parts:
+  - prefab: {fileID: 370881068924084091, guid: 4979296fd0481634d823ce6b8b638457, type: 3}
+    slotTarget: Cover
+  delay: 0.1
+  delivered: 
 --- !u!1 &3312099874561120533
 GameObject:
   m_ObjectHideFlags: 0
