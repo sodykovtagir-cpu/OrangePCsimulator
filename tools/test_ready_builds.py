@@ -3270,6 +3270,18 @@ check('type = HardwareType.CPU' in _src9, "в плате распаян проц
 check('type = HardwareType.RAM' in _src9, "в плате распаяна память")
 check("LinkBuiltIn(mb," in _src9, "распаянные детали регистрируются в плате")
 
+# Порядок железа: система берёт программы с нулевого накопителя
+# (AllStorage[0]), поэтому распаянная память обязана идти раньше слота.
+# Иначе со вставленным M.2 системным диском становится он, а установленные
+# на встроенной памяти программы пропадают.
+check(_gw9.index("AddBuiltIn(type, result);") < _gw9.index("var slots = GetSlots(type);"),
+      "распаянная начинка идёт в списке железа первой")
+
+# Содержимое распаянного накопителя нельзя сохранить обычным циклом: у него
+# нет Item'а, он часть префаба корпуса. Плата сохраняет его сама.
+check('jObject["builtInDisks"]' in _mb9 and "BuiltInDisksFromData" in _mb9,
+      "содержимое встроенной памяти сохраняется вместе с корпусом")
+
 # Кулера у SoC нет: с обычным heat процессор сгорел бы за пару минут игры.
 _heat9 = re.search(r'SetPrivate\(cpu, "heat", ([\d.]+)f\)', _src9)
 check(_heat9 is not None and float(_heat9.group(1)) <= 5.0,
@@ -3336,6 +3348,31 @@ if (ROOT / _BOX9).exists():
     check("BuiltInSoC" in _txt9b and "BuiltInRAM" in _txt9b,
           "в корпусе есть распаянные процессор и память")
     check("builtIn:" in _txt9b, "распаянная начинка прописана в плате")
+
+    # Распаянная память: система ищет накопители как Storage
+    # (ComputerSystem.Init делает приведение к Storage), поэтому встроенная
+    # память обязана быть Storage, а не просто Hardware: иначе она не
+    # попадает ни в AllStorage, ни в «Информацию».
+    _stor9 = re.findall(r"--- !u!114 &(\d+)\nMonoBehaviour:\n(.*?)(?=\n--- )",
+                        _txt9b, re.S)
+    _ssd9 = [fid for fid, block in _stor9
+             if "guid: 1ca4d3b39160636c3cbe3a2a6fff99e9" in block]
+    check(len(_ssd9) == 1, "распаянная память — Storage, а не Hardware")
+
+    # Отсек платы должен указывать именно на неё. Ссылка на компонент
+    # памяти делала встроенный диск несуществующим.
+    if _ssd9:
+        check(f"- type: 4\n    hardware: {{fileID: {_ssd9[0]}}}" in _txt9b,
+              "в плате встроенный накопитель прописан как Drive")
+
+        _ssd_block = [b for f, b in _stor9 if f == _ssd9[0]][0]
+        check("content: pcos" in _ssd_block,
+              "на встроенной памяти стоит система (System/boot.bin = pcos)")
+        _cap9 = re.search(r"capacity: (\d+)", _ssd_block)
+        _used9 = sum(int(x) for x in re.findall(r"size: (\d+)", _ssd_block))
+        check(_cap9 is not None and _used9 < int(_cap9.group(1)),
+              f"система помещается во встроенную память ({_used9} из "
+              f"{_cap9.group(1) if _cap9 else '?'} МБ)")
     _b9 = re.search(r"builtIn:\n((?:\s+- type: \d+\n\s+hardware: \{[^}]+\}\n)+)", _txt9b)
     _refs9 = re.findall(r"hardware: \{fileID: (\d+)\}", _b9.group(1)) if _b9 else []
     check(len(_refs9) >= 2 and all(f"&{r}" in _txt9b for r in _refs9),

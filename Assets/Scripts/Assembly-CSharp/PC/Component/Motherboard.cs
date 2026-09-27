@@ -664,6 +664,16 @@ namespace PC.Component
 		{
 			var result = new List<Hardware>();
 
+			// Распаянная начинка идёт первой. Для мини-ПК порядок решает:
+			// система берёт программы с нулевого накопителя
+			// (AllStorage[0] в OperatingSystem.LoadFilesFromDisk и в
+			// ComputerSystem.Init), а сменный M.2 обязан остаться
+			// дополнительным диском. Распаянный накопитель, добавленный
+			// после слота, отдавал бы нулевой номер вставленному M.2 --
+			// и встроенная память пропадала бы из системы вместе с
+			// установленными на ней программами.
+			AddBuiltIn(type, result);
+
 			var slots = GetSlots(type);
 			if (slots != null)
 			{
@@ -674,12 +684,63 @@ namespace PC.Component
 				}
 			}
 
-			// Распаянная начинка лежит не в слоте, а прямо на плате, но для
-			// системы она такое же железо: без неё мини-ПК остался бы без
-			// процессора и памяти.
-			AddBuiltIn(type, result);
-
 			return result;
+		}
+
+		/// <summary>
+		/// Распаянные накопители платы.
+		/// </summary>
+		/// <remarks>
+		/// У распаянной памяти нет компонента Item: она часть префаба
+		/// корпуса, а не вещь в комнате. Обычный цикл сохранения такие
+		/// детали не видит, поэтому содержимое встроенного диска
+		/// (система и файлы игрока) плата сохраняет сама.
+		/// </remarks>
+		private List<Storage> BuiltInStorages()
+		{
+			var list = new List<Storage>();
+			if (builtIn == null) return list;
+
+			for (int i = 0; i < builtIn.Length; i++)
+			{
+				var b = builtIn[i];
+				if (b == null) continue;
+				if (b.type != HardwareType.Drive) continue;
+
+				var disk = b.hardware as Storage;
+				if (disk != null && !list.Contains(disk)) list.Add(disk);
+			}
+
+			return list;
+		}
+
+		private JArray BuiltInDisksToData()
+		{
+			var arr = new JArray();
+			var disks = BuiltInStorages();
+
+			for (int i = 0; i < disks.Count; i++)
+			{
+				var data = new JObject();
+				disks[i].ToData(data);
+				arr.Add(data);
+			}
+
+			return arr;
+		}
+
+		private void BuiltInDisksFromData(JArray arr)
+		{
+			if (arr == null) return;
+
+			var disks = BuiltInStorages();
+			for (int i = 0; i < arr.Count && i < disks.Count; i++)
+			{
+				var data = arr[i] as JObject;
+				if (data == null) continue;
+
+				disks[i].FromData(data);
+			}
 		}
 
 		/// <summary>
@@ -835,6 +896,10 @@ namespace PC.Component
 			jObject["monitorId"] = monitorId;
 			jObject["bios"] = JToken.FromObject(BiosSettings);
 
+			// Распаянные накопители: на них живёт система, и файлы игрока
+			// тоже. Отдельной записью их не сохранить -- Item'а у них нет.
+			jObject["builtInDisks"] = BuiltInDisksToData();
+
 			base.ToData(jObject);
 		}
 
@@ -848,6 +913,11 @@ namespace PC.Component
 			{
 				BiosSettings = biosTok.ToObject<Bios.BiosSettings>();
 			}
+
+			// Содержимое распаянных накопителей: система и файлы игрока.
+			// Восстанавливаем до обычной загрузки, чтобы Bios уже видел
+			// System/boot.bin на встроенной памяти.
+			BuiltInDisksFromData(jObject["builtInDisks"] as JArray);
 
 			if (id != 0)
 			{

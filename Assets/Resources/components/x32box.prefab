@@ -523,7 +523,7 @@ MonoBehaviour:
   - type: 3
     hardware: {fileID: 5561099388774220110}
   - type: 4
-    hardware: {fileID: 5561099388774220110}
+    hardware: {fileID: 2429416741390742877}
   integrated: 1
   integratedWattage: 12
   brandLogo: {fileID: 2800000, guid: ccfaefc0bddc9e348bd5b1c4ecc9c881, type: 3}
@@ -881,17 +881,32 @@ MonoBehaviour:
   m_GameObject: {fileID: 3334959436081324108}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
+  m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spawnId: x32 SSD
-  info: x32 SSD
+  spawnId: x32 eMMC
+  info: x32 eMMC
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 32000
   score: 5500
   wattage: 2
+  health: 100
+  breakable: 0
+  explode: {fileID: 0}
+  uptime: 0
+  storageName: x32 eMMC
+  password: 
+  files:
+  - path: System/boot.bin
+    content: pcos
+    hidden: 1
+    size: 24000
+  - path: App Downloader.exe
+    content: 
+    hidden: 0
+    size: 432
 --- !u!1 &4102573702936842500
 GameObject:
   m_ObjectHideFlags: 0
