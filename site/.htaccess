@@ -1,0 +1,13 @@
+# Главная страница — наш сайт. Без этой строки хостинг отдал бы index.php,
+# и в корне открывалась бы старая заглушка.
+DirectoryIndex index.html index.php
+
+# Релизы отдаём как файлы для скачивания, а не пытаемся показать в браузере.
+<FilesMatch "\.(exe|apk|zip)$">
+    ForceType application/octet-stream
+    Header set Content-Disposition attachment
+</FilesMatch>
+
+# Некоторые хостинги не знают про apk и отдают его как текст.
+AddType application/vnd.android.package-archive .apk
+AddType application/octet-stream .exe
