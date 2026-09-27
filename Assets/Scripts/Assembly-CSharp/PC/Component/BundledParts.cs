@@ -66,8 +66,17 @@ namespace PC.Component
 		[SerializeField]
 		private List<int> delivered = new List<int>();
 
+		// Индексы комплектных деталей, уже выданных этим экземпляром корпуса.
+		// Id у Item назначается только в Start, поэтому одним списком delivered
+		// нельзя надёжно определить, что крышка уже была создана.
+		private readonly HashSet<int> issuedParts = new HashSet<int>();
+		private bool restored;
+
 		private IEnumerator Start()
 		{
+			// В старых собранных вручную префабах бывает два BundledParts.
+			// Только первый имеет право выдавать предметы.
+			if (GetComponents<BundledParts>()[0] != this) yield break;
 			if (delay > 0f) yield return new WaitForSeconds(delay);
 			Deliver();
 		}
@@ -77,11 +86,12 @@ namespace PC.Component
 		{
 			if (parts == null) return;
 
+			if (GetComponents<BundledParts>()[0] != this) return;
 			for (int i = 0; i < parts.Length; i++)
-				Deliver(parts[i]);
+				Deliver(parts[i], i);
 		}
 
-		private void Deliver(Part part)
+		private void Deliver(Part part, int index)
 		{
 			if (part == null || part.prefab == null) return;
 
@@ -105,6 +115,7 @@ namespace PC.Component
 			var existing = FindDelivered(sample, slot);
 			if (existing != null)
 			{
+				issuedParts.Add(index);
 				Remember(existing);
 
 				// Деталь лежит ровно на своём месте — значит её только что
@@ -118,7 +129,11 @@ namespace PC.Component
 			// потерял, утопил или продал. Второй раз корпус не выдаёт —
 			// иначе снятая деталь снова размножалась бы при загрузке.
 			// Потерянную крышку игрок купит запасной в магазине.
-			if (delivered != null && delivered.Count > 0) return;
+			// Любой восстановленный из сейва корпус уже выдавал комплект.
+			// Даже старый сейв с пустым delivered НЕ даёт разрешения выдать
+			// новую крышку: снятая может лежать далеко или быть продана.
+			if (restored || issuedParts.Contains(index)) return;
+			issuedParts.Add(index);
 
 			var obj = Instantiate(part.prefab);
 			var item = obj != null ? obj.GetComponent<Item>() : null;
@@ -240,7 +255,10 @@ namespace PC.Component
 
 		private void Remember(Item item)
 		{
-			if (item == null || item.Id == 0) return;
+			if (item == null) return;
+			if (item.Id == 0 && Main.Instance != null)
+				item.Id = Main.Instance.GetNewId(item);
+			if (item.Id == 0) return;
 			if (delivered == null) delivered = new List<int>();
 			if (delivered.Contains(item.Id)) return;
 
@@ -265,6 +283,9 @@ namespace PC.Component
 		{
 			if (jObject == null) return;
 
+			// Даже старый сейв с пустым bundled — это уже существующий
+			// корпус, повторную выдачу делать нельзя.
+			restored = true;
 			delivered = new List<int>();
 
 			var arr = jObject["bundled"] as JArray;

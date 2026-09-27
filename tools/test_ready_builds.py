@@ -3295,8 +3295,14 @@ if _bp9.exists():
           "при загрузке корпус узнаёт свою деталь по Id")
     check("IsChildOf(transform)" in _src_bp9,
           "деталь, вложенная в корпус, второй раз не выдаётся")
-    check("delivered.Count > 0" in _src_bp9,
-          "потерянную деталь корпус заново не выдаёт — иначе это размножение")
+    check("if (restored || issuedParts.Contains(index)) return;" in _src_bp9,
+          "корпус из сейва не выдаёт крышку даже при пустом delivered")
+    check("item.Id = Main.Instance.GetNewId(item)" in _src_bp9,
+          "комплектная крышка получает Id до записи в delivered")
+    check("GetComponents<BundledParts>()[0] != this" in _src_bp9,
+          "дублирующий BundledParts не выдаёт вторую крышку")
+    check("restored = true;" in _src_bp9,
+          "FromData помечает старые сейвы как уже выдавшие комплект")
 
 # Детали, вложенные в префаб, нельзя писать в сохранение отдельной записью:
 # корпус воссоздаётся вместе с ними, и рядом появляется та же деталь из своей
@@ -3325,6 +3331,8 @@ if (ROOT / _BOX9).exists():
           "крышка не вложена в префаб корпуса — иначе она размножается")
     check("b9ac6a8d7bed4727b4bff6931b5f78a7" in _txt9b and "slotTarget: Cover" in _txt9b,
           "корпус выдаёт крышку как комплектную деталь")
+    check(_txt9b.count("guid: b9ac6a8d7bed4727b4bff6931b5f78a7") == 1,
+          "на x32box ровно один BundledParts (иначе две крышки)")
     check("BuiltInSoC" in _txt9b and "BuiltInRAM" in _txt9b,
           "в корпусе есть распаянные процессор и память")
     check("builtIn:" in _txt9b, "распаянная начинка прописана в плате")
