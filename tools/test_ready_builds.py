@@ -3205,6 +3205,76 @@ check('GetInt("TargetFps", 60)' not in _fs2,
       "и своя шестидесятка тоже")
 
 
+# ---------------------------------------------------------------------------
+print("\nМини-ПК x32box")
+
+_mb9 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Motherboard.cs")
+    .read_text(encoding="utf-8"))
+
+# Плата приставки: процессор, память и питание распаяны, слотов под них нет.
+check("private bool integrated;" in _mb9, "у платы есть режим распаянной начинки")
+_done9 = _mb9.split("private bool Done(out string info)")[1].split("\n\t\t}")[0]
+check("if (integrated) return true;" in _done9,
+      "распаянная плата не требует процессора, памяти и блока питания")
+check(_done9.index("integrated") < _done9.index("HardwareType.CPU"),
+      "проверка стоит до поиска деталей в слотах")
+
+_boot9 = _mb9.split("public string Boot()")[1].split("\n\t\tpublic")[0]
+check("integratedWattage" in _boot9,
+      "начинка мини-ПК учитывается в потреблении")
+
+# Модель разобрана редактором: fileID подобъектов FBX снаружи не вычислить.
+_tool9 = ROOT / "Assets/Editor/BuildX32Box.cs"
+check(_tool9.exists(), "есть сборщик префабов x32box")
+_src9 = _strip_comments(_tool9.read_text(encoding="utf-8"))
+check("LoadAllAssetsAtPath" in _src9, "меши берутся у редактора, а не по выдуманным номерам")
+check("[MenuItem(" in _src9, "сборщик вызывается из меню")
+
+# Слот принимает M.2: у слота поле matches -- массив, а не одно число.
+check("SetMatches(" in _src9, "форматы слота задаются массивом matches")
+check('drive.target = "Drive"' in _src9, "отсек принимает накопители")
+check('coverSlot.target = "Cover"' in _src9, "крышка снимается как обычная крышка корпуса")
+
+# Кнопка питания у мини-ПК жмёт плату напрямую: корпуса-обёртки нет.
+check("AddPersistentListener(ev, mb.Switch)" in _src9,
+      "кнопка питания включает встроенную плату")
+
+# Карточки магазина: без привязки к префабу игрок купит пустоту.
+check("LinkShopItem(" in _src9, "карточки связываются с префабами")
+
+for _name, _price in (("x32box", 620), ("x32box_Cover", 40)):
+    _card = ROOT / f"Assets/MonoBehaviour/{_name}.asset"
+    check(_card.exists(), f"{_name}: карточка магазина создана")
+    if _card.exists():
+        _txt = _card.read_text(encoding="utf-8")
+        _p = re.search(r"price: (\d+)", _txt)
+        check(_p is not None and int(_p.group(1)) == _price,
+              f"{_name}: цена {_price}")
+    _meta = ROOT / f"Assets/MonoBehaviour/{_name}.asset.meta"
+    check(_meta.exists(), f"{_name}: у карточки есть .meta")
+    _g = re.search(r"guid: (\w+)", _meta.read_text(encoding="utf-8")).group(1)
+    _market = (ROOT / "Assets/Resources/apps/Market.prefab").read_text(encoding="utf-8")
+    check(_g in _market, f"{_name}: продаётся в каталоге")
+
+# Модель на месте и с запечёнными трансформами.
+_fbx9 = ROOT / "Assets/Resources/components/x32box.fbx"
+check(_fbx9.exists(), "модель x32box.fbx в проекте")
+if _fbx9.exists():
+    _bad9, _tot9 = fbxcheck.scan(str(_fbx9))
+    check(not _bad9, f"у модели x32box запечённые масштабы (выбиваются: {_bad9})")
+
+_tr9 = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
+_hdr9 = _tr9.splitlines()[0].split("\t")
+_ru9 = _hdr9.index("RU")
+for _key in ("x32box", "x32box Cover"):
+    _rows = [l for l in _tr9.splitlines() if l.startswith(_key + "\t")]
+    check(len(_rows) == 1, f"перевод «{_key}» добавлен один раз")
+    if _rows:
+        check(len(_rows[0].split("\t")) == len(_hdr9), f"«{_key}»: колонки не сломаны")
+        check(bool(_rows[0].split("\t")[_ru9].strip()), f"«{_key}»: есть русский перевод")
+
+
 unchanged = all(
     (Path(p).read_text(encoding="utf-8") if Path(p).exists() else None) == v
     for p, v in before.items()

@@ -35,6 +35,19 @@ namespace PC.Component
 		private Bios biosPrefab;
 
 		[SerializeField]
+		[Header("Мини-ПК")]
+		[Tooltip("Процессор, память и питание распаяны на плате. " +
+			"Для приставок и мини-ПК, которые нельзя разобрать.")]
+		private bool integrated;
+
+		[SerializeField]
+		[Tooltip("Сколько ватт потребляет распаянная начинка.")]
+		private float integratedWattage = 25f;
+
+		/// <summary>Плата с распаянной начинкой: ставить в неё нечего.</summary>
+		public bool Integrated => integrated;
+
+		[SerializeField]
 		[Header("Брендирование")]
 		[Tooltip("Логотип производителя платы. Показывается на экране загрузки вместо надписи.")]
 		private Texture brandLogo;
@@ -139,6 +152,14 @@ namespace PC.Component
 
 			float requiredW = GetWattage(hardwares);
 			Debug.Log("Wattage: " + requiredW);
+
+			// Мини-ПК питается от своего адаптера, а не от блока в корпусе.
+			// Его начинка учитывается в потреблении, но искать БП не нужно.
+			if (integrated)
+			{
+				requiredW += integratedWattage;
+				totalSupplyW = requiredW;
+			}
 
 			if (requiredW <= totalSupplyW)
 			{
@@ -360,6 +381,11 @@ namespace PC.Component
 		private bool Done(out string info)
 		{
 			info = "";
+
+			// У мини-ПК процессор, память и питание распаяны: искать их в
+			// слотах бессмысленно, слотов под них попросту нет. Такая плата
+			// готова к работе сразу, проверять нечего.
+			if (integrated) return true;
 
 			var processors = GetHardwares(HardwareType.CPU);
 			int cpuCount = processors != null ? processors.Count : 0;

@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: Retro Case (ATX) (White)
-  m_EditorClassIdentifier: 
-  itemName: '{Retro Case} (ATX)'
-  price: 50
-  bitcoin: 5
-  sprite: {fileID: 21300000, guid: 00626d6e5b7b76e45af45a310b970bde, type: 3}
-  spawn: {fileID: 1317529137250169, guid: 202510ed92b950a45b54435af75dcf29, type: 3}
-  large: 1
+  m_Name: x32box_Cover
+  m_EditorClassIdentifier:
+  itemName: '{x32box Cover}'
+  price: 40
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 313cf685ef5fd8847b3d25af0002e591, type: 2}
+  spawn: {fileID: 0}
+  large: 0
   translateDescription: 1
-  description: 
+  description: Decoration

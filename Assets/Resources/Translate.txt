@@ -512,3 +512,5 @@ Could not read the file.	Could not read the file.																	Не удал�
 Select an IPS panel.	Select an IPS panel.																	Выберите IPS-панель.				Оберіть IPS-панель.																				
 Sent to the panel.	Sent to the panel.																	Отправлено на панель.				Надіслано на панель.																				
 Opened file	Opened file																	Открытый файл				Відкритий файл																				
+x32box	x32box Mini PC																	x32box — мини-ПК				x32box — міні-ПК																				
+x32box Cover	x32box M.2 Cover																	Крышка отсека M.2				Кришка відсіку M.2																				

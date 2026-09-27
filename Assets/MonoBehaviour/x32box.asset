@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: Mouse1
-  m_EditorClassIdentifier: 
-  itemName: '{Gaming Mouse}'
-  price: 80
-  bitcoin: 5
-  sprite: {fileID: 21300000, guid: fb3d3ff8738890848bb421c08669568f, type: 3}
-  spawn: {fileID: 1424786408908402, guid: f920029a3f0ae3640aa689c2d5c439d0, type: 3}
+  m_Name: x32box
+  m_EditorClassIdentifier:
+  itemName: '{x32box}'
+  price: 620
+  bitcoin: 7
+  sprite: {fileID: 21300000, guid: 313cf685ef5fd8847b3d25af0002e591, type: 2}
+  spawn: {fileID: 0}
   large: 0
   translateDescription: 1
-  description: 
+  description: Decoration
