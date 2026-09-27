@@ -148,6 +148,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   spawnId: x32box_Cover
   info: '{x32box Cover}'
-  match: 1
+  match: 2
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0

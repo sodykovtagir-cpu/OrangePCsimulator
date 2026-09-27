@@ -2205,7 +2205,9 @@ check(re.search(r"\n  brandLogo: \{fileID: [1-9]\d*\}", _bios_pf) is not None,
 
 _boards = [f for f in sorted((ROOT / "Assets/Resources/components").glob("*.prefab"))
            if "guid: e9b819df0994a58cece03a6c09fa7092" in f.read_text(encoding="utf-8")]
-check(len(_boards) == 8, f"найдено 8 префабов плат (нашлось {len(_boards)})")
+# Девятая плата -- мини-ПК x32box: он тоже несёт Motherboard, просто
+# с распаянной начинкой вместо слотов.
+check(len(_boards) == 9, f"найдено 9 префабов плат (нашлось {len(_boards)})")
 _nologo = [f.name for f in _boards if "brandLogo:" not in f.read_text(encoding="utf-8")]
 check(not _nologo, f"у всех плат есть поле логотипа (без него: {_nologo})")
 
@@ -3252,8 +3254,109 @@ check('LinkSlots(mb, "external.usb", usb)' in _src9,
 # Без USB систему не установить: PCOS ставится с загрузочной флешки.
 check('usb.target = "USB"' in _src9, "у мини-ПК есть разъём под флешку")
 
+# Распаянная начинка: слотов под процессор и память нет, но система ищет
+# железо через GetHardwares -- значит детали должны быть настоящими и
+# зарегистрированными в плате, иначе в «Информации» будет пусто, а тест
+# производительности посчитает ноль.
+check("class BuiltIn" in _mb9, "у платы есть тип для распаянной детали")
+_gw9 = _mb9.split("public List<Hardware> GetHardwares(HardwareType type)")[1].split("\n\t\t}")[0]
+check("AddBuiltIn(" in _gw9, "распаянная начинка попадает в поиск железа")
+_bg9 = _mb9.split("private void BootSystem()")[1].split("\n\t\t}")[0]
+check("SwitchBuiltIn(true)" in _bg9, "начинка включается вместе с платой")
+_po9 = _mb9.split("public void PowerOff(bool restart = false)")[1].split("\n\t\t}")[0]
+check("SwitchBuiltIn(false)" in _po9, "начинка выключается вместе с платой")
+
+check('type = HardwareType.CPU' in _src9, "в плате распаян процессор")
+check('type = HardwareType.RAM' in _src9, "в плате распаяна память")
+check("LinkBuiltIn(mb," in _src9, "распаянные детали регистрируются в плате")
+
+# Кулера у SoC нет: с обычным heat процессор сгорел бы за пару минут игры.
+_heat9 = re.search(r'SetPrivate\(cpu, "heat", ([\d.]+)f\)', _src9)
+check(_heat9 is not None and float(_heat9.group(1)) <= 5.0,
+      "нагрев SoC рассчитан на пассивное охлаждение")
+
+# --- комплектная крышка ---------------------------------------------------
+# Вложенная в префаб крышка вырастает заново при каждом появлении корпуса, и
+# снятая крышка размножается: одна из префаба, вторая из сохранения. Поэтому
+# корпус выдаёт её отдельным предметом, а не носит в себе.
+check("LinkBundled(bundled, coverPrefab, \"Cover\")" in _src9,
+      "крышка прописана корпусу как комплектная деталь")
+
+_bp9 = ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/BundledParts.cs"
+check(_bp9.exists(), "есть выдача комплектных деталей")
+if _bp9.exists():
+    _src_bp9 = _strip_comments(_bp9.read_text(encoding="utf-8"))
+    check("class BundledParts : MonoBehaviour, ISave" in _src_bp9,
+          "комплект участвует в сохранении")
+    check("slot.TryAttach(" in _src_bp9,
+          "комплектная деталь встаёт в отсек тем же путём, что у игрока")
+    check('jObject["bundled"]' in _src_bp9, "выданные детали запоминаются по Id")
+    check("Main.Instance" in _src_bp9 and "GetItemById(" in _src_bp9,
+          "при загрузке корпус узнаёт свою деталь по Id")
+    check("IsChildOf(transform)" in _src_bp9,
+          "деталь, вложенная в корпус, второй раз не выдаётся")
+    check("delivered.Count > 0" in _src_bp9,
+          "потерянную деталь корпус заново не выдаёт — иначе это размножение")
+
+# Детали, вложенные в префаб, нельзя писать в сохранение отдельной записью:
+# корпус воссоздаётся вместе с ними, и рядом появляется та же деталь из своей
+# записи. Признак ручной установки -- Connector, его ставит только слот.
+_sv9 = _strip_comments(
+    (ROOT / "Assets/Scripts/Assembly-CSharp/SaveManager.cs").read_text(encoding="utf-8"))
+check("private static bool IsEmbedded(Item item)" in _sv9,
+      "сохранение умеет отличать вложенную деталь от вещи в комнате")
+check("GetComponent<Connector>() != null" in _sv9,
+      "признак установленной детали -- Connector, а не дочерность")
+_sd9 = _sv9.split("public bool SaveData()")[1].split("public int LoadData()")[0]
+check("IsEmbedded(item)" in _sd9, "вложенные детали не пишутся отдельной записью")
+
+# --- сами префабы ----------------------------------------------------------
+# Собранные префабы лежат в репозитории, поэтому проверяем не только сборщик,
+# но и то, что из него вышло: крышка не вложена в корпус (иначе она бы
+# размножалась), начинка зарегистрирована, карточки магазина ведут к корням.
+_BOX9 = "Assets/Resources/components/x32box.prefab"
+_COVER9 = "Assets/Resources/components/x32box_Cover.prefab"
+for _p9 in (_BOX9, _COVER9):
+    check((ROOT / _p9).exists(), f"{_p9.split('/')[-1]} собран")
+if (ROOT / _BOX9).exists():
+    _txt9b = (ROOT / _BOX9).read_text(encoding="utf-8")
+    check("spawnId: x32box_Cover" not in _txt9b
+          and "spawnId: m2coverx32box" not in _txt9b,
+          "крышка не вложена в префаб корпуса — иначе она размножается")
+    check("b9ac6a8d7bed4727b4bff6931b5f78a7" in _txt9b and "slotTarget: Cover" in _txt9b,
+          "корпус выдаёт крышку как комплектную деталь")
+    check("BuiltInSoC" in _txt9b and "BuiltInRAM" in _txt9b,
+          "в корпусе есть распаянные процессор и память")
+    check("builtIn:" in _txt9b, "распаянная начинка прописана в плате")
+    _b9 = re.search(r"builtIn:\n((?:\s+- type: \d+\n\s+hardware: \{[^}]+\}\n)+)", _txt9b)
+    _refs9 = re.findall(r"hardware: \{fileID: (\d+)\}", _b9.group(1)) if _b9 else []
+    check(len(_refs9) >= 2 and all(f"&{r}" in _txt9b for r in _refs9),
+          "обе распаянные детали существуют в префабе")
+    check("integratedWattage: 12" in _txt9b,
+          "потребление платы без распаянных деталей")
+
+    # Форматы детали и отсека должны совпадать, иначе Slot.TryAttach вернёт
+    # false и комплектная крышка просто ляжет рядом с корпусом. В массиве
+    # matches байты пишутся шестнадцатеричной строкой, а сам match -- число.
+    _slot_m = re.search(r"target: Cover\n  matches: (\w*)", _txt9b)
+    _cover_txt9 = (ROOT / _COVER9).read_text(encoding="utf-8")
+    _cover_m = re.search(r"\n  match: (\d+)\n", _cover_txt9)
+    _hex = _slot_m.group(1) if _slot_m else ""
+    _accepted = [int(_hex[i:i + 2], 16) for i in range(0, len(_hex), 2)]
+    check(_cover_m is not None and int(_cover_m.group(1)) in _accepted,
+          f"крышка подходит к отсеку корпуса (match {_cover_m.group(1) if _cover_m else '?'}"
+          f" против {_accepted})")
+
 # Карточки магазина: без привязки к префабу игрок купит пустоту.
 check("LinkShopItem(" in _src9, "карточки связываются с префабами")
+for _name in ("x32box", "x32box_Cover"):
+    _card9 = (ROOT / f"Assets/MonoBehaviour/{_name}.asset").read_text(encoding="utf-8")
+    _spawn9 = re.search(r"spawn: \{fileID: (\d+), guid: (\w+)", _card9)
+    _guid9, _root9 = prefab_spawn_ref(
+        f"Assets/Resources/components/{_name}.prefab", str(ROOT))
+    check(_spawn9 is not None and _spawn9.group(1) == str(_root9)
+          and _spawn9.group(2) == _guid9,
+          f"{_name}: карточка ссылается на корень своего префаба")
 
 for _name, _price in (("x32box", 620), ("x32box_Cover", 40)):
     _card = ROOT / f"Assets/MonoBehaviour/{_name}.asset"
@@ -3270,7 +3373,7 @@ for _name, _price in (("x32box", 620), ("x32box_Cover", 40)):
     check(_g in _market, f"{_name}: продаётся в каталоге")
 
 # Модель на месте и с запечёнными трансформами.
-_fbx9 = ROOT / "Assets/Resources/components/x32box.fbx"
+_fbx9 = ROOT / "Assets/Models/x32box.fbx"
 check(_fbx9.exists(), "модель x32box.fbx в проекте")
 if _fbx9.exists():
     _bad9, _tot9 = fbxcheck.scan(str(_fbx9))
@@ -3279,6 +3382,23 @@ if _fbx9.exists():
 _tr9 = (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8")
 _hdr9 = _tr9.splitlines()[0].split("\t")
 _ru9 = _hdr9.index("RU")
+
+# Описание мини-ПК в магазине: «Decoration» описывало бы украшение, а не
+# компьютер со встроенной начинкой и отсеком M.2.
+for _name, _word in (("x32box", "M.2"), ("x32box_Cover", "M.2")):
+    _card9 = (ROOT / f"Assets/MonoBehaviour/{_name}.asset").read_text(encoding="utf-8")
+    _d9 = re.search(r"^  description: (.+)$", _card9, re.M)
+    check(_d9 is not None and "Decoration" not in _d9.group(1),
+          f"{_name}: в карточке осмысленное описание")
+    if _d9 is not None:
+        _key9 = _d9.group(1).strip()
+        _rows9 = [l for l in _tr9.splitlines() if l.startswith(_key9 + "\t")]
+        check(len(_rows9) == 1 and _word in _key9,
+              f"{_name}: описание переводится (ключ «{_key9[:32]}...»)")
+        check(bool(_rows9) and len(_rows9[0].split("\t")) == len(_hdr9)
+              and bool(_rows9[0].split("\t")[_ru9].strip()),
+              f"{_name}: у описания есть русский перевод")
+
 for _key in ("x32box", "x32box Cover"):
     _rows = [l for l in _tr9.splitlines() if l.startswith(_key + "\t")]
     check(len(_rows) == 1, f"перевод «{_key}» добавлен один раз")

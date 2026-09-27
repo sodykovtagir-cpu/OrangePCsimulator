@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 620
   bitcoin: 7
   sprite: {fileID: 21300000, guid: 313cf685ef5fd8847b3d25af0002e591, type: 2}
-  spawn: {fileID: 0}
+  spawn: {fileID: 3232047612826269505, guid: 392081fea287525498ad2cee2cc3fb9e, type: 2}
   large: 0
   translateDescription: 1
-  description: Decoration
+  description: Mini PC with built-in processor and 8 GB of RAM. M.2 storage slot and a USB port for installing PCOS.

@@ -514,3 +514,6 @@ Sent to the panel.	Sent to the panel.																	Отправлено на 
 Opened file	Opened file																	Открытый файл				Відкритий файл																				
 x32box	x32box Mini PC																	x32box — мини-ПК				x32box — міні-ПК																				
 x32box Cover	x32box M.2 Cover																	Крышка отсека M.2				Кришка відсіку M.2																				
+Mini PC with built-in processor and 8 GB of RAM. M.2 storage slot and a USB port for installing PCOS.	Mini PC with built-in processor and 8 GB of RAM. M.2 storage slot and a USB port for installing PCOS.																	Мини-ПК со встроенным процессором и 8 ГБ памяти. Отсек M.2 под накопитель и разъём USB для установки системы.				Міні-ПК із вбудованим процесором і 8 ГБ пам'яті. Відсік M.2 під накопичувач і роз'єм USB для встановлення системи.																				
+Spare lid for the M.2 bay of the x32box mini PC.	Spare lid for the M.2 bay of the x32box mini PC.																	Запасная крышка отсека M.2 для мини-ПК x32box.				Запасна кришка відсіку M.2 для міні-ПК x32box.																				
+Mini PC	Mini PC																	Мини-ПК				Міні-ПК																				

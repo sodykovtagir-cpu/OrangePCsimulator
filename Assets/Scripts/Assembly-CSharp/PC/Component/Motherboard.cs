@@ -28,11 +28,39 @@ namespace PC.Component
 			public HardwareSlot[] usb;
 		}
 
+		/// <summary>
+		/// Деталь, впаянная в плату.
+		/// </summary>
+		/// <remarks>
+		/// Слота под неё нет: игрок её не достанет и не заменит. Но системе
+		/// она нужна ровно так же, как обычная — иначе мини-ПК не увидел бы
+		/// ни процессора, ни памяти, и в «Информации» было бы пусто, а тест
+		/// производительности посчитал бы ноль.
+		///
+		/// Сама деталь — обычный Hardware на дочернем объекте платы, без
+		/// меша, коллайдера и физики: снаружи её не должно быть видно.
+		/// </remarks>
+		[Serializable]
+		public class BuiltIn
+		{
+			[Tooltip("Тип железа: CPU, RAM, Drive...")]
+			public HardwareType type;
+
+			[Tooltip("Сама деталь. Живёт на дочернем объекте платы")]
+			public Hardware hardware;
+		}
+
 		[SerializeField]
 		private AudioClip beepSound;
 
 		[SerializeField]
 		private Bios biosPrefab;
+
+		[SerializeField]
+		[Header("Распаянная начинка")]
+		[Tooltip("Процессор, память и прочее, что впаяно в плату. " +
+			"Игрок их не ставит и не снимает, но система обязана их видеть.")]
+		private BuiltIn[] builtIn;
 
 		[SerializeField]
 		[Header("Мини-ПК")]
@@ -277,6 +305,9 @@ namespace PC.Component
 		{
 			running = true;
 
+			// Распаянная начинка включается вместе с платой.
+			SwitchBuiltIn(true);
+
 			var allSlots = GetAllSlots();
 			foreach (var obj in allSlots)
 			{
@@ -349,6 +380,7 @@ namespace PC.Component
         {
 			running = false;
 			Switch(false, false);
+			SwitchBuiltIn(false);
 
 			var allSlots = GetAllSlots();
 			if (allSlots != null)
@@ -633,15 +665,61 @@ namespace PC.Component
 			var result = new List<Hardware>();
 
 			var slots = GetSlots(type);
-			if (slots == null) return result;
-
-			foreach (var slot in slots)
+			if (slots != null)
 			{
-				if (slot?.Hardware != null)
-					result.Add(slot.Hardware);
+				foreach (var slot in slots)
+				{
+					if (slot?.Hardware != null)
+						result.Add(slot.Hardware);
+				}
 			}
 
+			// Распаянная начинка лежит не в слоте, а прямо на плате, но для
+			// системы она такое же железо: без неё мини-ПК остался бы без
+			// процессора и памяти.
+			AddBuiltIn(type, result);
+
 			return result;
+		}
+
+		/// <summary>
+		/// Добавить к найденному железу распаянные детали этого типа.
+		/// </summary>
+		private void AddBuiltIn(HardwareType type, List<Hardware> result)
+		{
+			if (builtIn == null || result == null) return;
+
+			for (int i = 0; i < builtIn.Length; i++)
+			{
+				var b = builtIn[i];
+				if (b == null || b.hardware == null) continue;
+				if (b.type != type) continue;
+				if (result.Contains(b.hardware)) continue;
+
+				result.Add(b.hardware);
+			}
+		}
+
+		/// <summary>
+		/// Включить или выключить распаянную начинку вместе с платой.
+		/// </summary>
+		/// <remarks>
+		/// Слоты включают своё железо сами (BootSystem обходит их списком),
+		/// а у распаянных деталей слота нет — о них плата заботится сама.
+		/// Без этого процессор и память остались бы выключенными: они бы
+		/// числились в системе, но не работали.
+		/// </remarks>
+		private void SwitchBuiltIn(bool on)
+		{
+			if (builtIn == null) return;
+
+			for (int i = 0; i < builtIn.Length; i++)
+			{
+				var b = builtIn[i];
+				if (b == null || b.hardware == null) continue;
+
+				b.hardware.Switch(on, false);
+			}
 		}
 
 		public List<HardwareSlot> GetSlots(HardwareType type)

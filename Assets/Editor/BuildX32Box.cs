@@ -6,7 +6,7 @@ using PC.Component;
 namespace PC.Tools
 {
     /// <summary>
-    /// Собрать мини-ПК x32box из модели x32box.fbx.
+    /// Собрать мини-ПК x32box из модели x32box.fbx (Assets/Models).
     /// </summary>
     /// <remarks>
     /// ПОЧЕМУ EDITOR-СКРИПТ, А НЕ ФАЙЛ ПРЕФАБА ТЕКСТОМ.
@@ -18,15 +18,18 @@ namespace PC.Tools
     /// монитор). Поэтому меши берём у самого редактора.
     ///
     /// Что получается:
-    ///   x32box.prefab       — корпус с распаянной начинкой, слотом M.2,
-    ///                         слотом крышки и кнопкой питания;
+    ///   x32box.prefab       — корпус с распаянной начинкой (SoC и память
+    ///                         внутри, наружу не выведены), слотом M.2,
+    ///                         слотом крышки, разъёмом USB и кнопкой
+    ///                         питания. Крышка ему не вложена: он выдаёт её
+    ///                         отдельным предметом (BundledParts);
     ///   x32box_Cover.prefab — снимаемая крышка отсека M.2.
     ///
     /// Запуск: меню Tools → x32box → Собрать префабы.
     /// </remarks>
     public static class BuildX32Box
     {
-        private const string Fbx        = "Assets/Resources/components/x32box.fbx";
+        private const string Fbx        = "Assets/Models/x32box.fbx";
         private const string OutBox     = "Assets/Resources/components/x32box.prefab";
         private const string OutCover   = "Assets/Resources/components/x32box_Cover.prefab";
         private const string BiosPrefab = "Assets/GameObject/BIOS.prefab";
@@ -89,8 +92,9 @@ namespace PC.Tools
             var go = new GameObject("x32box_Cover");
             Shape(go, mesh, mat);
 
-            // Тег Cover и match 1 — как у обычных крышек корпуса, иначе слот
-            // её не примет.
+            // Тег Cover и свой формат (match 2), иначе отсек её не примет.
+            // Формат 2 не делят с крышками ATX: чужая крышка в мини-ПК
+            // не встанет, а своя всегда найдётся.
             go.tag = "Cover";
 
             var col = go.AddComponent<BoxCollider>();
@@ -102,7 +106,8 @@ namespace PC.Tools
             var item = go.AddComponent<Item>();
             item.SpawnId = "x32box_Cover";
             SetPrivate(item, "info", "{x32box Cover}");
-            SetPrivate(item, "match", (byte)1);
+            // Формат 2 -- только у крышек x32box: чужая крышка в отсек не влезет.
+            SetPrivate(item, "match", (byte)2);
 
             SaveAs(go, OutCover);
         }
@@ -126,11 +131,41 @@ namespace PC.Tools
             SetPrivate(item, "info", "{x32box}");
 
             // Плата с распаянной начинкой: процессор, память и питание внутри,
-            // наружу выведен только отсек M.2.
+            // наружу выведены только отсек M.2 и разъём USB.
             var mb = go.AddComponent<Motherboard>();
             SetPrivate(mb, "integrated", true);
-            SetPrivate(mb, "integratedWattage", 25f);
+            SetPrivate(mb, "integratedWattage", 12f);
             SetPrivate(mb, "brandName", "x32");
+
+            // --- распаянная начинка ----------------------------------------
+            // Слотов под неё нет, но система ищет железо через GetHardwares,
+            // поэтому это настоящие детали: просто без меша, коллайдера и
+            // физики, чтобы снаружи их не было видно и нельзя было достать.
+            var soc = Inner(go, "BuiltInSoC");
+            var cpu = soc.AddComponent<CPU>();
+            SetPrivate(cpu, "spawnId", "x32 SoC");
+            SetPrivate(cpu, "info", "x32 SoC");
+            SetPrivate(cpu, "score", 1500);
+            SetPrivate(cpu, "wattage", 10f);
+            SetPrivate(cpu, "defaultFrequency", 2f);
+            SetPrivate(cpu, "frequency", 2f);
+            // Пассивное охлаждение: у SoC нет кулера в слоте, поэтому нагрев
+            // выставлен так, чтобы равновесие с воздухом комнаты держалось
+            // около двадцати градусов. С обычным heat процессор сгорел бы.
+            SetPrivate(cpu, "heat", 2.5f);
+            SetPrivate(cpu, "burnTemp", 150f);
+
+            var ram = Inner(go, "BuiltInRAM");
+            var memory = ram.AddComponent<Hardware>();
+            SetPrivate(memory, "spawnId", "x32 RAM");
+            SetPrivate(memory, "info", "x32 RAM");
+            SetPrivate(memory, "capacity", 8000);
+            SetPrivate(memory, "score", 4000);
+            SetPrivate(memory, "wattage", 2f);
+
+            LinkBuiltIn(mb,
+                new Motherboard.BuiltIn { type = HardwareType.CPU, hardware = cpu },
+                new Motherboard.BuiltIn { type = HardwareType.RAM, hardware = memory });
 
             var bios = AssetDatabase.LoadAssetAtPath<GameObject>(BiosPrefab);
             if (bios != null)
@@ -179,7 +214,7 @@ namespace PC.Tools
 
             var coverSlot = coverSlotGo.AddComponent<Slot>();
             coverSlot.target = "Cover";
-            SetMatches(coverSlot, 1);
+            SetMatches(coverSlot, 2);   // тот же формат, что у крышки
             SetPrivate(coverSlot, "insertPos", coverInsert.transform);
             SetPrivate(coverSlot, "setParent", true);
 
@@ -212,6 +247,17 @@ namespace PC.Tools
             // накопитель, а система не увидит флешку.
             LinkSlots(mb, "external.drive", drive);
             LinkSlots(mb, "external.usb", usb);
+
+            // --- комплектная крышка -----------------------------------------
+            // Крышка едет в коробке вместе с мини-ПК: игрок покупает бокс и
+            // получает закрытый отсек M.2. Вложить её в префаб корпуса
+            // нельзя — тогда она вырастает заново при каждом появлении
+            // корпуса, и снятая крышка размножается (одна из префаба, вторая
+            // из сохранения). Корпус выдаёт её как отдельный предмет.
+            var bundled = go.AddComponent<BundledParts>();
+            var coverPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(OutCover);
+            if (coverPrefab != null) LinkBundled(bundled, coverPrefab, "Cover");
+            else Debug.LogWarning("Крышка не найдена, комплект пуст: " + OutCover);
 
             // --- кнопка питания --------------------------------------------
             var btnGo = new GameObject("PowerButton");
@@ -278,6 +324,54 @@ namespace PC.Tools
                     Debug.LogWarning($"Тип не поддержан для {field}");
                     return;
             }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>Пустой дочерний объект: деталь внутри корпуса, снаружи не видна.</summary>
+        private static GameObject Inner(GameObject parent, string name)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent.transform, false);
+            return go;
+        }
+
+        /// <summary>
+        /// Зарегистрировать в плате распаянную начинку.
+        /// </summary>
+        /// <remarks>
+        /// Плата ищет железо двумя путями: по слотам (external) и по своему
+        /// списку builtIn. Впаянные детали слотов не имеют, поэтому без этой
+        /// записи процессор и память для системы не существовали бы: в
+        /// «Информации» было бы пусто, а тест производительности считал бы
+        /// ноль.
+        /// </remarks>
+        private static void LinkBuiltIn(Object board, params Motherboard.BuiltIn[] entries)
+        {
+            var so = new SerializedObject(board);
+            var arr = so.FindProperty("builtIn");
+            if (arr == null) { Debug.LogWarning("В плате нет поля builtIn"); return; }
+
+            arr.arraySize = entries.Length;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var e = arr.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("type").intValue = (int)entries[i].type;
+                e.FindPropertyRelative("hardware").objectReferenceValue = entries[i].hardware;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>Прописать комплектную деталь корпусу.</summary>
+        private static void LinkBundled(BundledParts bundled, GameObject prefab, string slotTarget)
+        {
+            var so = new SerializedObject(bundled);
+            var arr = so.FindProperty("parts");
+            if (arr == null) { Debug.LogWarning("У комплекта нет поля parts"); return; }
+
+            arr.arraySize = 1;
+            var e = arr.GetArrayElementAtIndex(0);
+            e.FindPropertyRelative("prefab").objectReferenceValue = prefab;
+            e.FindPropertyRelative("slotTarget").stringValue = slotTarget;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

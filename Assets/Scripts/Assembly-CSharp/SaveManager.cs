@@ -81,6 +81,14 @@ public class SaveManager : MonoBehaviour
         foreach (var item in FindObjectsOfType<Item>())
         {
             if (item.transform.position.y < -20f) continue;
+
+            // Распаянная начинка и прочие детали, вложенные в префаб
+            // предмета в редакторе, — часть этого предмета, а не отдельная
+            // вещь в комнате. Записать их отдельно значит получить при
+            // загрузке вторую копию: корпус воссоздаётся вместе с вложенной
+            // деталью, и рядом появляется та же деталь из своей записи.
+            if (IsEmbedded(item)) continue;
+
             var data = new JObject();
             foreach (var save in item.GetComponents<ISave>()) save.ToData(data);
             items.Add(new
@@ -250,6 +258,32 @@ public class SaveManager : MonoBehaviour
             }
         }
         return failCount;
+    }
+
+    /// <summary>
+    /// Деталь, вложенная в префаб другого предмета.
+    /// </summary>
+    /// <remarks>
+    /// Сама вложенность ничего не значит: любая деталь, которую игрок
+    /// поставил в слот, тоже становится дочерней — слот переносит её под
+    /// свой insertPos. Признак ручной установки — Connector, который слот
+    /// добавляет детали при подключении. У распаянной начинки и у деталей,
+    /// вложенных в префаб в редакторе, его нет, и хранить их отдельной
+    /// записью нельзя: префаб и так приносит их с собой.
+    /// </remarks>
+    private static bool IsEmbedded(Item item)
+    {
+        if (item == null) return false;
+        if (item.GetComponent<Connector>() != null) return false;
+
+        var parent = item.transform.parent;
+        while (parent != null)
+        {
+            if (parent.GetComponent<Item>() != null) return true;
+            parent = parent.parent;
+        }
+
+        return false;
     }
 
     /// <summary>

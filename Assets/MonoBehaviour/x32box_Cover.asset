@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 40
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 313cf685ef5fd8847b3d25af0002e591, type: 2}
-  spawn: {fileID: 0}
+  spawn: {fileID: 370881068924084091, guid: 4979296fd0481634d823ce6b8b638457, type: 2}
   large: 0
   translateDescription: 1
-  description: Decoration
+  description: Spare lid for the M.2 bay of the x32box mini PC.
