@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orange PC Simulator — PCOS</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:"Segoe UI",Tahoma,system-ui,sans-serif;color:#fff;background:#0b63b0;
+       user-select:none;-webkit-tap-highlight-color:transparent}
+
+  /* ---------- рабочий стол ---------- */
+  #desktop{position:absolute;inset:0 0 56px 0;overflow:hidden;
+           background:url("assets/wallpaper.png") center/cover no-repeat}
+  #icons{position:absolute;top:12px;left:12px;right:12px;display:grid;
+         grid-template-columns:repeat(auto-fill,100px);grid-auto-rows:116px;gap:0;align-content:start}
+  .icon{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 3px;
+        border-radius:3px;cursor:pointer;border:1px solid transparent}
+  .icon:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3)}
+  .icon.sel{background:rgba(255,255,255,.3);border-color:rgba(255,255,255,.55)}
+  .ico{background-image:url("assets/apps.png");background-repeat:no-repeat;flex:none}
+  .icon span{font-size:13px;line-height:1.15;text-align:center;
+             text-shadow:0 1px 3px rgba(0,0,0,.9);word-break:break-word}
+
+  /* ---------- окна: белые, как в игре ---------- */
+  .win{position:absolute;background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;
+       border:1px solid #6f6f6f;box-shadow:0 14px 44px rgba(0,0,0,.5)}
+  .win.min{display:none}
+  .tbar{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;cursor:grab;
+        background:#fff;border-bottom:1px solid #d0d0d0}
+  .tbar b{flex:1;font-size:20px;font-weight:400;color:#111;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis}
+  .wb{width:40px;height:34px;border:none;background:#fff;cursor:pointer;
+      display:grid;place-items:center;flex:none}
+  .wb:hover{background:#eaeaea}
+  .wb i{display:block;font-style:normal}
+  .wb.mi i{width:17px;height:3px;background:#222}
+  .wb.mx i{width:17px;height:17px;border:2px solid #222}
+  .wb.cl{background:#ec1c24}
+  .wb.cl:hover{background:#ff3b42}
+  .wb.cl i{width:19px;height:19px;position:relative}
+  .wb.cl i::before,.wb.cl i::after{content:"";position:absolute;left:0;top:8px;
+    width:19px;height:3px;background:#fff}
+  .wb.cl i::before{transform:rotate(45deg)} .wb.cl i::after{transform:rotate(-45deg)}
+
+    /* окно текстового редактора: мятный заголовок, как в игре */
+  .win.txt .tbar{background:#a9d5d1;border-bottom:1px solid #8bbdb8}
+  .win.txt .tbar b{color:#123}
+  .win.txt .wb{background:transparent}
+  .win.txt .wb:hover{background:rgba(255,255,255,.45)}
+  .win.txt .wb.cl{background:#ec1c24}
+  .wb img{width:26px;height:26px;display:block;pointer-events:none}
+  .txtbody{padding:18px 20px;line-height:1.65;font-size:15px;color:#111}
+  .txtbody h3{font-size:16px;margin:16px 0 7px;color:#111}
+  .txtbody h3:first-child{margin-top:0}
+  .txtbody p{margin-bottom:10px}
+  .txtbody ul{margin:0 0 12px 18px}
+  .txtbody li{margin-bottom:5px}
+  .txtbody .sep{border:none;border-top:1px solid #e0e0e0;margin:16px 0}
+  .toolbar{display:flex;flex-wrap:wrap;gap:7px;padding:9px 12px;background:#fff;
+           border-bottom:1px solid #e0e0e0}
+  .tbtn{padding:9px 14px;background:#d6d6d6;border:1px solid #b5b5b5;color:#111;
+        font-size:15px;cursor:pointer;line-height:1.15}
+  .tbtn:hover{background:#c8c8c8}
+  .tbtn.warn{background:#d9a9a9;border-color:#c08f8f}
+
+  .cnt{padding:14px;overflow:auto;flex:1;user-select:text;background:#fff}
+  h2{font-size:21px;font-weight:600;color:#111;margin-bottom:3px}
+  .dim{color:#555;font-size:14px;line-height:1.5}
+  .hero{display:flex;gap:13px;align-items:center;margin-bottom:15px}
+  .hero .hi{background-image:url("assets/apps.png");background-repeat:no-repeat;flex:none}
+
+  .list{display:grid;gap:8px}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 15px;background:#ededed;
+       border:1px solid #d5d5d5;cursor:pointer}
+  .row:hover{background:#e2eefb;border-color:#8fbce8}
+  .row .t{flex:1}
+  .row .t i{display:block;font-style:normal;font-size:17px;color:#111}
+  .row .t small{color:#666;font-size:12.5px}
+  .row .tag{font-size:12px;padding:4px 10px;background:#fff;border:1px solid #bbb;color:#333}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .card{background:#ededed;border:1px solid #d5d5d5;cursor:pointer}
+  .card:hover{border-color:#8fbce8;background:#e2eefb}
+  .card .cv{height:84px;background:#dfe7ef;display:grid;place-items:center}
+  .card .cv div{background-image:url("assets/apps.png");background-repeat:no-repeat;opacity:.8}
+  .card .bb{padding:9px 10px}
+  .card .bb i{display:block;font-style:normal;font-size:14px;color:#111;margin-bottom:3px}
+  .card .bb small{color:#666;font-size:12px;display:flex;gap:10px}
+
+  .search{width:100%;padding:10px 12px;border:1px solid #c5c5c5;font-size:15px;margin-bottom:11px}
+  .search:focus{outline:none;border-color:#2e86d8}
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  td{padding:9px 0;border-bottom:1px solid #e6e6e6}
+  td:first-child{color:#666;width:46%}
+  .term{background:#0c0c0c;color:#b9f5c8;font-family:Consolas,monospace;font-size:13.5px;
+        line-height:1.7;padding:14px;min-height:100%}
+  .term .p{color:#4fc3f7}
+
+  /* ---------- панель задач ---------- */
+  #tb{position:absolute;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;
+      gap:6px;padding:0 8px;background:#1d4f86;border-top:1px solid rgba(255,255,255,.15);z-index:9999}
+  #startbtn{width:46px;height:46px;flex:none;border:none;cursor:pointer;background:
+      url("assets/start.png") center/34px 34px no-repeat,transparent}
+  #startbtn:hover{background-color:rgba(255,255,255,.18)}
+  #tasks{display:flex;gap:5px;flex:1;overflow:hidden}
+  .task{width:46px;height:46px;background:#f0f0f0;border:1px solid #cfcfcf;cursor:pointer;
+        display:grid;place-items:center;flex:none}
+  .task:hover{background:#fff}
+  .task.on{box-shadow:inset 0 -3px 0 #2e86d8}
+  .task div{background-image:url("assets/apps.png");background-repeat:no-repeat}
+  #clock{font-size:30px;font-weight:300;padding-right:8px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+
+  /* ---------- меню Пуск ---------- */
+  #menu{position:absolute;left:0;bottom:56px;width:396px;max-width:88vw;z-index:9998;display:none;
+        background:rgba(28,28,30,.72);backdrop-filter:blur(3px);padding:8px 0 0}
+  #menu.open{display:block}
+  #mlist{max-height:min(420px,52vh);overflow-y:auto;padding:0 8px}
+  #mlist::-webkit-scrollbar{width:14px}
+  #mlist::-webkit-scrollbar-track{background:rgba(255,255,255,.12)}
+  #mlist::-webkit-scrollbar-thumb{background:#cfcfcf}
+  .mi{display:flex;align-items:center;gap:14px;padding:9px 8px;cursor:pointer}
+  .mi:hover{background:rgba(255,255,255,.18)}
+  .mi div{background-image:url("assets/apps.png");background-repeat:no-repeat;flex:none}
+  .mi span{font-size:23px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  #mfoot{display:flex;justify-content:flex-end;padding:10px 16px 14px}
+  #shut{background:url("assets/apps.png") no-repeat;border:none;cursor:pointer;flex:none}
+  #shut:hover{filter:brightness(1.25)}
+
+  @media (max-width:720px){
+    #icons{grid-template-columns:repeat(auto-fill,82px);grid-auto-rows:100px}
+    .icon span{font-size:11.5px}
+    #clock{font-size:23px}
+    .tbar b{font-size:17px}
+    .mi span{font-size:19px}
+    .win{left:6px!important;top:6px!important;width:calc(100% - 12px)!important;height:calc(100% - 74px)!important}
+  }
+</style>
+</head>
+<body>
+
+<div id="desktop"><div id="icons"></div></div>
+
+<div id="menu">
+  <div id="mlist"></div>
+  <div id="mfoot"><button id="shut" title="Выключить"></button></div>
+</div>
+
+<div id="tb">
+  <button id="startbtn" title="Пуск"></button>
+  <div id="tasks"></div>
+  <div id="clock">--:--</div>
+</div>
+
+<script>
+/* ===== оригинальный атлас: координаты прямо из Assets/Sprite/*.asset =====
+   Unity считает Y снизу, CSS сверху, поэтому top = 512 - (y + h). */
+const AW = 1024, AH = 512;
+const R = {
+  Downloader:[490.0,256.0,119.9,110.9], Market:[0.1,254.1,127.8,112.8],
+  Browser:[378.1,118.1,115.8,115.8],    Folder:[479.1,371.0,119.9,93.9],
+  Info:[734.0,125.0,115.9,105.9],       Terminal:[119.1,371.0,115.8,121.9],
+  Bar:[610.1,128.1,119.8,107.8],        TextEditor:[840.0,0.0,101.9,120.9],
+  Personalize:[254.1,120.1,119.8,115.8],MyDevices:[614.1,368.1,119.9,91.8],
+  Color:[0.1,0.1,123.9,123.9],          Overclock:[854.0,125.1,115.8,104.8],
+  File_pic:[500.0,0.0,107.9,123.9],   File_text:[378.0,238.0,107.9,123.9], File_empty:[367.0,366.0,107.9,123.9],     Shutdown:[0.1,128.1,121.8,121.8],
+  Paint:[724.1,0.1,111.8,115.8],        Animator:[126.1,128.1,119.8,120.9]
+};
+/* Иконка игры — отдельный файл, а не кусок атласа. */
+const SOLO = { GameIcon:'assets/game.jpg' };
+
+function spr(name, box){
+  if(SOLO[name])
+    // Кавычки только одинарные: строка попадает внутрь style="...",
+    // и двойные оборвали бы атрибут — иконка просто не появлялась.
+    return `background-image:url('${SOLO[name]}');background-size:${box}px ${box}px;`
+         + `background-position:0 0;width:${box}px;height:${box}px;`;
+  const r = R[name]; if(!r) return '';
+  const [x,y,w,h] = r, k = box / Math.max(w,h), top = AH - (y + h);
+  return `background-size:${(AW*k).toFixed(1)}px ${(AH*k).toFixed(1)}px;`
+       + `background-position:${(-x*k).toFixed(1)}px ${(-top*k).toFixed(1)}px;`
+       + `width:${(w*k).toFixed(1)}px;height:${(h*k).toFixed(1)}px;`;
+}
+
+/* Мастерская: путь к API относительный, поэтому запрос уходит на тот же
+   домен, где лежит сайт. Так обходятся и CORS, и антибот-проверка
+   хостинга -- браузер игрока её уже прошёл, открыв страницу. */
+/* Абсолютный путь от корня домена: сайт может лежать и в подпапке
+   (сейчас /pcos/), а мастерская всегда в /workshop/. Относительный путь
+   в этом случае искал бы api.php внутри /pcos/ и не находил. */
+const API = '/workshop/api.php';
+
+/* Релизы лежат на сайте, а не в телеграме: его блокируют, и тогда игру
+   негде взять. files.php показывает то, что реально есть в папке files/ --
+   чтобы выложить новую версию, достаточно залить файл по FTP. */
+let RELEASES = [];
+let RELEASES_LIVE = false;
+
+function human(bytes){
+  if(!bytes) return '';
+  const mb = bytes / 1048576;
+  return mb >= 1 ? mb.toFixed(1) + ' МБ' : Math.round(bytes/1024) + ' КБ';
+}
+
+async function loadReleases(){
+  try{
+    const r = await fetch('files.php', {cache:'no-store'});
+    const j = await r.json();
+    if(!j || !j.ok || !Array.isArray(j.items) || j.items.length === 0) return;
+    RELEASES = j.items;
+    RELEASES_LIVE = true;
+    if(wins.download) wins.download.querySelector('.cnt').innerHTML = APPS.download.body();
+  }catch(e){
+    // Файлов ещё нет или скрипт недоступен -- останутся ссылки на телеграм.
+  }
+}
+
+/* Показываем, пока не пришёл ответ, и если мастерская недоступна. */
+let SAVES = [
+  {t:'Комната мечты',    a:'7myalol',     d:342, l:58},
+  {t:'Ферма на 16 карт', a:'Goose',       d:210, l:41},
+  {t:'Ретро-уголок',     a:'Ru_Lemon4ik', d:187, l:33},
+  {t:'Белая сборка MSG', a:'nnkor',       d:156, l:29},
+];
+let SAVES_LIVE = false;
+
+async function loadSaves(){
+  try{
+    const r = await fetch(API + '?action=list', {cache:'no-store'});
+    const j = await r.json();
+    if(!j || !j.ok || !Array.isArray(j.items) || j.items.length === 0) return;
+
+    SAVES = j.items.map(it => ({
+      t: it.title || 'Без названия',
+      a: it.author || 'неизвестно',
+      d: +it.downloads || 0,
+      l: +it.likes || 0,
+      id: it.id,
+      cover: it.cover ? '/workshop/uploads/' + encodeURIComponent(it.cover) : null
+    }));
+    SAVES_LIVE = true;
+
+    // Окно магазина могло быть уже открыто -- перерисуем содержимое.
+    if(wins.market) wins.market.querySelector('.cnt').innerHTML = APPS.market.body();
+  }catch(e){
+    // Молча остаёмся на примерах: сайт обязан открываться и без мастерской.
+  }
+}
+
+/* Названия — как в игре: из Translate.txt, колонка RU. */
+const APPS = {
+  download:{ n:'Скачать мод', i:'Downloader', w:540, h:380, body:()=>`
+    <div class="hero"><div class="hi" style="${spr('Downloader',58)}"></div>
+      <div><h2>Скачать</h2><div class="dim">${RELEASES_LIVE
+        ? 'Версия ' + (RELEASES[0].version || '') + ' · файлы на нашем сервере'
+        : 'Версия 1.8.41'}</div></div></div>
+
+    <div class="list">${RELEASES_LIVE
+      ? RELEASES.map(f=>`
+        <a class="row" href="${f.url}" download style="text-decoration:none;color:inherit">
+          <div class="t"><i>${f.platform}${f.version ? ' · ' + f.version : ''}</i>
+            <small>${f.name} · ${human(f.size)}</small></div>
+          <span class="tag">${f.kind || f.name.split('.').pop().toUpperCase()}</span></a>`).join('')
+      : `
+        <a class="row" href="https://t.me/orangePCsimu/346" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">
+          <div class="t"><i>Windows</i><small>OrangePCSimulator-1.8.41.exe · 35.6 МБ</small></div><span class="tag">EXE</span></a>
+        <a class="row" href="https://t.me/orangePCsimu/347" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">
+          <div class="t"><i>Android</i><small>OrangePCSimulator-1.8.41.apk · 69 МБ</small></div><span class="tag">APK</span></a>`
+    }</div>
+
+    <p class="dim" style="margin-top:14px">${RELEASES_LIVE
+      ? 'Android 6 и новее. Качается напрямую — телеграм не нужен.'
+      : 'Файлы пока в телеграм-канале. Android 6 и новее.'}</p>`},
+
+  market:{ n:'Мастерская', i:'Market', w:640, h:470, body:()=>`
+    <input class="search" placeholder="Поиск по сборкам и авторам…" oninput="filt(this)">
+    <div class="grid">${SAVES.map(s=>`
+      <div class="card" data-s="${(s.t+' '+s.a).toLowerCase()}"
+           ${s.id ? `onclick="location.href='${API}?action=download&id=${s.id}'"` : ''}>
+        <div class="cv" ${s.cover ? `style="background:url('${s.cover}') center/cover no-repeat"` : ''}>
+          ${s.cover ? '' : `<div style="${spr('File_pic',46)}"></div>`}</div>
+        <div class="bb"><i>${s.t}</i><small><span>${s.a}</span><span>↓ ${s.d}</span><span>♥ ${s.l}</span></small></div>
+      </div>`).join('')}</div>
+    <p class="dim" style="margin-top:12px">${SAVES_LIVE
+      ? 'Нажми на сборку, чтобы скачать её файл.'
+      : 'Показаны примеры: мастерская сейчас недоступна.'}</p>`},
+
+  about:{ n:'Информация.txt', i:'GameIcon', txt:true, w:580, h:520, body:()=>`
+    <div class="txtbody">
+      <h3>Orange PC Simulator</h3>
+      <p>Фанатский мод. Делаем его втроём в свободное время, без студии и без денег.</p>
+
+      <p>Собираешь компьютер из деталей: корпус, плата, процессор, память, видеокарта,
+      блок питания. Ставишь систему, жмёшь кнопку — он включается. Внутри полноценная
+      PCOS: файлы, проводник, магазин, paint, редактор кода на Lua.</p>
+
+      <p>Детали живые. Уронил видеокарту — пойдут артефакты: полосы, съехавшая картинка,
+      чёрные квадраты выпавшей памяти. Уронил ещё — сдохнет насовсем. Иногда компьютер
+      просто не включается, а со второго раза заводится.</p>
+
+      <hr class="sep">
+      <h3>Что мы добавили к оригиналу</h3>
+      <ul>
+        <li><b>Готовые сборки</b> — 14 компьютеров и 6 майнеров, приезжают собранными в коробке</li>
+        <li><b>Мастерская</b> — выкладываешь свою комнату, скачиваешь чужие. Сервер писали с нуля</li>
+        <li><b>Поломки видеокарт</b> — девять видов сбоя, идут приступами, а не постоянно</li>
+        <li><b>Платы MSG ATX</b> чёрная и белая, плюс EXATX на восемь планок памяти</li>
+        <li><b>Логотип платы на загрузке</b> вместо надписи «Включение компьютера»</li>
+        <li><b>Видеокарты</b> GT 1031 и RX 570</li>
+        <li><b>Процессоры</b> Xeon E5-2678 и E5-2689</li>
+        <li><b>Память</b> на 64 ГБ</li>
+        <li><b>Корпуса Aquarium ATX</b> со стеклянной крышкой и своими картинками на ней</li>
+        <li><b>Мониторы</b> — напольный, портативный и большой телевизор</li>
+        <li><b>Редактор Lua</b> со справкой — можно писать скрипты прямо в игре</li>
+        <li><b>Игровые часы</b> — сутки идут 24 минуты и сохраняются вместе с прогрессом</li>
+        <li>Веб-камеры в HD, настенное крепление, вращающаяся подставка</li>
+        <li>Аккаунты с подтверждением почты и админка для модерации</li>
+      </ul>
+
+      <hr class="sep">
+      <h3>Где живём</h3>
+      <ul>
+        <li><a href="https://t.me/orangePCsimu" target="_blank" rel="noopener">@orangePCsimu</a> — канал, там обновления и файлы</li>
+        <li><a href="https://t.me/chatorangepcsimu" target="_blank" rel="noopener">@chatorangepcsimu</a> — чат, туда пишут баги</li>
+      </ul>
+
+      <p class="dim" style="margin-top:14px">Windows и Android 6+. Проект некоммерческий.</p>
+    </div>`},
+
+  whatsnew:{ n:'Что нового.txt', i:'File_text', txt:true, w:540, h:450, body:()=>`
+    <div class="txtbody">
+      <h3>1.8.41 — багфикс</h3>
+      <ul>
+        <li>Портативный монитор больше не висит в воздухе после перезахода</li>
+        <li>В хардкоре теперь включаются ПК</li>
+        <li>Ники только английские и без пробелов</li>
+        <li>Минимальный Android — 6</li>
+      </ul>
+
+      <hr class="sep">
+      <h3>1.8.40 — Create &amp; Share</h3>
+      <ul>
+        <li>Материнские платы MSG ATX, чёрная и белая</li>
+        <li>Логотип платы на экране загрузки вместо надписи</li>
+        <li>Готовые сборки в магазине: 12 ПК и 6 майнеров</li>
+        <li>Поломки видеокарт: девять видов сбоя, приступами</li>
+        <li>Часы показывают игровое время, сутки идут 24 минуты</li>
+        <li>Напольный и портативный мониторы, корпуса Aquarium</li>
+        <li>HD в Paint, PrintExpert и ModForge</li>
+      </ul>
+
+      <p class="dim" style="margin-top:12px">Полный список — в канале.</p>
+    </div>`}
+};
+
+const ORDER = ['download','market','about','whatsnew'];
+
+let z = 10, wins = {};
+
+function openApp(id){
+  const a = APPS[id];
+  if(wins[id]){ wins[id].classList.remove('min'); wins[id].style.zIndex = ++z; tasks(); return; }
+
+  const w = document.createElement('div');
+  w.className = 'win' + (a.txt ? ' txt' : '');
+  const W = Math.min(a.w, innerWidth - 24), H = Math.min(a.h, innerHeight - 100);
+  const n = Object.keys(wins).length;
+  w.style.cssText = `width:${W}px;height:${H}px;`
+    + `left:${Math.max(6,(innerWidth-W)/2 + n*26 - 55)}px;`
+    + `top:${Math.max(6,(innerHeight-H)/2 - 42 + n*22)}px;z-index:${++z}`;
+
+  const tools = a.tools ? `<div class="toolbar">${a.tools.map(t=>`<button class="tbtn">${t}</button>`).join('')}</div>` : '';
+
+  /* У текстового редактора слева от системных кнопок стоят «сохранить»
+     и «новый файл» — как в самой игре. Кнопки декоративные: это просто
+     текст, но без них окно не похоже на оригинал. */
+  const extra = a.txt
+    ? `<button class="wb" title="Сохранить"><img src="assets/save.png" alt=""></button>
+       <button class="wb" title="Новый"><span style="${spr('File_empty',24)}display:block"></span></button>`
+    : '';
+
+  w.innerHTML = `<div class="tbar"><b>${a.n}</b>${extra}
+      <button class="wb mi" data-m><i></i></button>
+      <button class="wb mx" data-x><i></i></button>
+      <button class="wb cl" data-c><i></i></button></div>
+    ${tools}<div class="cnt">${a.body()}</div>`;
+  document.getElementById('desktop').appendChild(w);
+  wins[id] = w;
+
+  w.addEventListener('mousedown', ()=> w.style.zIndex = ++z);
+  w.querySelector('[data-c]').onclick = e=>{e.stopPropagation(); w.remove(); delete wins[id]; tasks();};
+  w.querySelector('[data-m]').onclick = e=>{e.stopPropagation(); w.classList.add('min'); tasks();};
+  w.querySelector('[data-x]').onclick = e=>{
+    e.stopPropagation();
+    if(w.dataset.max){ w.style.cssText = w.dataset.max; delete w.dataset.max; }
+    else { w.dataset.max = w.style.cssText;
+      w.style.cssText = `left:0;top:0;width:100%;height:calc(100% - 0px);z-index:${++z}`; }
+  };
+  drag(w, w.querySelector('.tbar'));
+  tasks();
+}
+
+function drag(win, h){
+  let sx,sy,ox,oy,on=false;
+  const dn=e=>{ if(e.target.closest('.wb')) return;
+    const p=e.touches?e.touches[0]:e; on=true; sx=p.clientX; sy=p.clientY;
+    ox=win.offsetLeft; oy=win.offsetTop; win.style.zIndex=++z;
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+    addEventListener('touchmove',mv,{passive:false}); addEventListener('touchend',up); };
+  const mv=e=>{ if(!on)return; if(e.cancelable)e.preventDefault();
+    const p=e.touches?e.touches[0]:e;
+    win.style.left=Math.max(0,Math.min(innerWidth-90, ox+p.clientX-sx))+'px';
+    win.style.top =Math.max(0,Math.min(innerHeight-100,oy+p.clientY-sy))+'px'; };
+  const up=()=>{ on=false; removeEventListener('mousemove',mv); removeEventListener('mouseup',up);
+    removeEventListener('touchmove',mv); removeEventListener('touchend',up); };
+  h.addEventListener('mousedown',dn); h.addEventListener('touchstart',dn,{passive:true});
+}
+
+function tasks(){
+  const bar = document.getElementById('tasks'); bar.innerHTML='';
+  for(const id in wins){
+    const a = APPS[id], b = document.createElement('div');
+    b.className = 'task' + (wins[id].classList.contains('min') ? '' : ' on');
+    b.title = a.n;
+    b.innerHTML = `<div style="${spr(a.i,30)}"></div>`;
+    b.onclick = ()=>{ const w = wins[id];
+      if(w.classList.contains('min')){ w.classList.remove('min'); w.style.zIndex=++z; }
+      else w.classList.add('min');
+      tasks(); };
+    bar.appendChild(b);
+  }
+}
+
+function filt(inp){
+  const q = inp.value.toLowerCase();
+  inp.closest('.cnt').querySelectorAll('.card').forEach(c=>{
+    c.style.display = c.dataset.s.includes(q) ? '' : 'none'; });
+}
+
+/* рабочий стол */
+const box = document.getElementById('icons');
+ORDER.forEach(id=>{
+  const a = APPS[id], d = document.createElement('div');
+  d.className='icon';
+  d.innerHTML = `<div class="ico" style="${spr(a.i,56)}"></div><span>${a.n}</span>`;
+  d.onclick = ()=>{ document.querySelectorAll('.icon').forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); };
+  d.ondblclick = ()=> openApp(id);
+  let last=0;
+  d.addEventListener('touchend', ()=>{ const t=Date.now(); if(t-last<400) openApp(id); last=t; });
+  box.appendChild(d);
+});
+
+/* меню Пуск */
+document.getElementById('mlist').innerHTML = ORDER.map(id=>{
+  const a = APPS[id];
+  return `<div class="mi" onclick="openApp('${id}');menu.classList.remove('open')">
+    <div style="${spr(a.i,34)}"></div><span>${a.n}</span></div>`;
+}).join('');
+document.getElementById('shut').style.cssText = spr('Shutdown',54);
+document.getElementById('shut').onclick = ()=>{
+  document.body.style.transition='opacity .5s'; document.body.style.opacity='0';
+  setTimeout(()=>{ document.body.style.opacity='1'; menu.classList.remove('open'); }, 900);
+};
+
+const menu = document.getElementById('menu');
+document.getElementById('startbtn').onclick = e=>{ e.stopPropagation(); menu.classList.toggle('open'); };
+document.addEventListener('click', ()=> menu.classList.remove('open'));
+menu.addEventListener('click', e=> e.stopPropagation());
+
+function tick(){ const d=new Date();
+  document.getElementById('clock').textContent =
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick,10000);
+setInterval(()=>{ const c=document.getElementById('cur');
+  if(c) c.style.opacity = c.style.opacity==='0'?'1':'0'; },550);
+
+loadSaves();
+loadReleases();
+openApp('download');
+</script>
+</body>
+</html>

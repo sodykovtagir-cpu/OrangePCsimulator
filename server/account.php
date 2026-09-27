@@ -94,6 +94,64 @@ function gen_token() {
  * Разрешаем латиницу, цифры, подчёркивание и дефис. Ник обязан начинаться с
  * буквы или цифры -- иначе можно зарегистрировать «___» и затеряться в списке.
  */
+/** Адрес игрока: нужен, чтобы админ мог забанить по IP. */
+function client_ip() {
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $k) {
+        if (empty($_SERVER[$k])) continue;
+        $v = trim(explode(',', $_SERVER[$k])[0]);
+        if ($v !== '') return $v;
+    }
+    return '';
+}
+
+/**
+ * Действующий бан по нику или адресу.
+ *
+ * Читаем тот же banned.json, что и мастерская: список банов один на всё.
+ * Просроченные записи пропускаем, пустой until означает «навсегда».
+ */
+function find_ban_for($name, $ip) {
+    $f = __DIR__ . '/banned.json';
+    if (!is_file($f)) return null;
+    $bans = json_decode(@file_get_contents($f), true);
+    if (!is_array($bans)) return null;
+
+    $name = strtolower(trim((string)$name));
+    $ip = trim((string)$ip);
+    $now = time();
+
+    foreach ($bans as $b) {
+        if (empty($b['value'])) continue;
+        if (!empty($b['until'])) {
+            $end = strtotime($b['until']);
+            if ($end && $end < $now) continue;
+        }
+        $type = isset($b['type']) ? $b['type'] : 'author';
+        if ($type === 'author' && strtolower(trim((string)$b['value'])) === $name) return $b;
+        if ($type === 'ip' && trim((string)$b['value']) === $ip) return $b;
+    }
+    return null;
+}
+
+/** Сообщение игроку: игра показывает текст ошибки как есть. */
+function ban_text($b) {
+    $msg = 'Аккаунт заблокирован';
+    $reason = isset($b['reason']) ? trim((string)$b['reason']) : '';
+    if ($reason !== '') $msg .= ': ' . $reason;
+
+    if (!empty($b['until'])) {
+        $end = strtotime($b['until']);
+        if ($end) {
+            $days = (int)ceil(($end - time()) / 86400);
+            $msg .= $days > 1 ? '. Осталось дней: ' . $days
+                              : '. Разбан: ' . date('d.m.Y H:i', $end);
+        }
+    } else {
+        $msg .= '. Блокировка навсегда';
+    }
+    return $msg;
+}
+
 function valid_name($n) {
     if (!is_string($n)) return false;
     $len = mb_strlen($n, 'UTF-8');
@@ -265,6 +323,9 @@ if ($action === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'tg_bonus'    => false,
         'created_at'  => isset($users[$i]['created_at']) ? $users[$i]['created_at'] : gmdate('Y-m-d H:i:s'),
         'client'      => $client,
+        // Адрес нужен админке: по нему банят, если ник меняют.
+        'last_ip'     => client_ip(),
+        'last_seen'   => gmdate('Y-m-d H:i:s'),
     ];
     if ($i >= 0) $users[$i] = $record; else $users[] = $record;
     save_users($users);
@@ -309,6 +370,14 @@ if ($action === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $u = &$users[$i];
     if (!password_verify($pass, $u['pass_hash'])) json_out(['ok' => false, 'error' => 'bad password'], 401);
     if (empty($u['verified'])) json_out(['ok' => false, 'error' => 'unverified'], 403);
+
+    // Забаненного внутрь не пускаем и сразу объясняем, за что.
+    $ban = find_ban_for($u['name'], client_ip());
+    if ($ban) json_out(['ok' => false, 'error' => ban_text($ban), 'banned' => true], 403);
+
+    // Запоминаем, откуда и когда заходили: админке это нужно для бана по IP.
+    $u['last_ip'] = client_ip();
+    $u['last_seen'] = gmdate('Y-m-d H:i:s');
 
     $u['token'] = gen_token();
     if ($client !== '') $u['client'] = $client;
