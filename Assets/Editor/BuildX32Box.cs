@@ -128,7 +128,7 @@ namespace PC.Tools
 
             var item = go.AddComponent<Item>();
             item.SpawnId = "x32box";
-            SetPrivate(item, "info", "{x32box}");
+            SetPrivate(item, "info", "{Mini PC}");
 
             // Плата с распаянной начинкой: процессор, память и питание внутри,
             // наружу выведены только отсек M.2 и разъём USB.

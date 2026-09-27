@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: x32box
   m_EditorClassIdentifier:
-  itemName: '{x32box}'
+  itemName: '{Mini PC}'
   price: 620
   bitcoin: 7
   sprite: {fileID: 21300000, guid: 313cf685ef5fd8847b3d25af0002e591, type: 2}
