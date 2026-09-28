@@ -316,8 +316,16 @@ namespace PC.Component.Software
 
         public void Save()
         {
-            var png = ImageConversion.EncodeToPNG(texture);
-            var content = System.Convert.ToBase64String(png);
+            byte[] bytes;
+            if (texture != null && (texture.width > 128 || texture.height > 128))
+            {
+                bytes = ImageConversion.EncodeToJPG(texture, 85);
+            }
+            else
+            {
+                bytes = ImageConversion.EncodeToPNG(texture);
+            }
+            var content = System.Convert.ToBase64String(bytes);
             var os = system;
             if (os == null) return;
             var dlg = os.SaveDialog;

@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: ReadyPC_Dream_Black
+  m_Name: SSD_M.2 2TB
   m_EditorClassIdentifier: 
-  itemName: '{Dream PC} ({Black})'
-  price: 20935
-  bitcoin: 0
-  sprite: {fileID: 21300000, guid: c6bad9cdeaf782f40ad4ea3abba03ae9, type: 3}
-  spawn: {fileID: 2556544496470639101, guid: 8a5cd29ad9879141225d5f79de232e5a, type: 3}
-  large: 1
+  itemName: SSD_M.2 2TB
+  price: 420
+  bitcoin: 5
+  sprite: {fileID: 21300000, guid: d3f7720fcb2fc6144addba0711972719, type: 2}
+  spawn: {fileID: 1884723253486029036, guid: ab5d219fa943b2a90650ed8c28503ab0, type: 2}
+  large: 0
   translateDescription: 1
-  description: 'Dream PC Description'
+  description: 
