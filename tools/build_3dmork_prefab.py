@@ -307,6 +307,9 @@ MonoBehaviour:
   - {{fileID: {cat_ids[3]['val_txt']}}}
   buttonClose: {{fileID: {id_btn_close}}}
   buttonRun: {{fileID: {id_btn_run}}}
+  stagePrefab: {{fileID: 6000000000000001, guid: d6f6d07dffc84a1ba33c9f9032a7a0e1, type: 3}}
+  stageSceneName: 
+  stageSpawnPosition: {{x: 0, y: -2500, z: 0}}
   flybyPhases: []
   waypointsRoot: {{fileID: 0}}
   rotationSmoothing: 5.5

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace PC.Component.Software
@@ -78,13 +79,25 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Button buttonRun;
 
+		[Header("Stage / Room Environment (Отдельная комната / сцена)")]
+		[Tooltip("Префаб отдельной комнаты/сцены бенчмарка. По умолчанию загружается из Resources/3DMork_Stage.")]
+		[SerializeField]
+		private GameObject stagePrefab;
+
+		[Tooltip("Имя отдельной сцены Unity (если вы хотите загружать полноценную сцену аддитивно, например '3DMork_Room').")]
+		[SerializeField]
+		private string stageSceneName = "";
+
+		[Tooltip("Позиция спавна изолированной комнаты в мире (по умолчанию далеко под картой, чтобы не пересекаться с мастерской).")]
+		[SerializeField]
+		private Vector3 stageSpawnPosition = new Vector3(0f, -2500f, 0f);
+
 		[Header("Flyby Configuration (Настройки пролётов)")]
 		[Tooltip("Список настраиваемых фаз пролёта камеры. Можно задать прямо в Инспекторе.")]
 		[SerializeField]
 		private List<FlybyPhase> flybyPhases = new List<FlybyPhase>();
 
-		[Tooltip("Опциональный родительский объект с точками в сцене (например, '3DMork_Waypoints'). " +
-		         "Если в сцене есть дочерние точки, камера полетит по ним последовательно.")]
+		[Tooltip("Опциональный родительский объект с точками в сцене (например, '3DMork_Waypoints').")]
 		[SerializeField]
 		private Transform waypointsRoot;
 
@@ -122,6 +135,8 @@ namespace PC.Component.Software
 		private Camera testCamera;
 		private RenderTexture renderTexture;
 		private Coroutine benchmarkCoroutine;
+		private GameObject currentStageInstance;
+		private bool isAdditiveSceneLoaded;
 
 		protected override void Start()
 		{
@@ -151,6 +166,7 @@ namespace PC.Component.Software
 				benchmarkCoroutine = null;
 			}
 			CleanupCamera();
+			CleanupStage();
 			benchmarkCoroutine = StartCoroutine(BenchmarkRoutine());
 		}
 
@@ -182,12 +198,12 @@ namespace PC.Component.Software
 			return new Vector3(-8f, -2.5f, 7f);
 		}
 
-		private List<FlybySegment> BuildSegments(Vector3 anchor)
+		private List<FlybySegment> BuildSegments(Vector3 anchor, Transform stageWaypointsRoot)
 		{
 			var segments = new List<FlybySegment>();
 
-			// Способ 1: Точки в сцене через waypointsRoot или объект с именем 3DMork_Waypoints
-			Transform sceneRoot = waypointsRoot;
+			// Способ 1: Точки из отдельной комнаты / сцены (stageWaypointsRoot) или waypointsRoot в сцене
+			Transform sceneRoot = stageWaypointsRoot != null ? stageWaypointsRoot : waypointsRoot;
 			if (sceneRoot == null)
 			{
 				var foundObj = GameObject.Find("3DMork_Waypoints") ?? GameObject.Find("3DMork_Flyby") ?? GameObject.Find("FlybyWaypoints");
@@ -204,7 +220,7 @@ namespace PC.Component.Software
 					var wp = pStart.GetComponent<FlybyWaypoint>();
 					string pName = wp != null && !string.IsNullOrEmpty(wp.phaseName)
 						? wp.phaseName
-						: string.Format("Scene {0}: Custom Flyby", i + 1);
+						: string.Format("Scene {0}: Benchmark Flyby", i + 1);
 					float pDuration = wp != null ? wp.duration : 4f;
 					float pLoad = wp != null ? wp.loadMultiplier : 1f;
 
@@ -278,10 +294,9 @@ namespace PC.Component.Software
 			}
 
 			// Способ 3: Автоматический кинематографический облёт мастерской по умолчанию
-			// Сцена 1: Общий диагональный план мастерской
 			segments.Add(new FlybySegment
 			{
-				name = "Scene 1: Workshop Overview",
+				name = "Scene 1: Tech Showcase Flyby",
 				duration = 4f,
 				loadMultiplier = 0.95f,
 				startPos = anchor + new Vector3(-5.2f, 3.2f, -5.5f),
@@ -290,7 +305,6 @@ namespace PC.Component.Software
 				hasLookAt = true
 			});
 
-			// Сцена 2: Низкий пролёт вдоль рабочего стола и ПК
 			segments.Add(new FlybySegment
 			{
 				name = "Scene 2: Hardware & Geometry Test",
@@ -302,7 +316,6 @@ namespace PC.Component.Software
 				hasLookAt = true
 			});
 
-			// Сцена 3: Динамический орбитальный облёт вокруг ПК
 			segments.Add(new FlybySegment
 			{
 				name = "Scene 3: Dynamic Lighting Test",
@@ -343,6 +356,7 @@ namespace PC.Component.Software
 			if (board != null && board.StressGraphics())
 			{
 				CleanupCamera();
+				CleanupStage();
 				yield break;
 			}
 
@@ -403,6 +417,38 @@ namespace PC.Component.Software
 			float ramFactor = Mathf.Clamp(ramCapacity / 8192f, 0.5f, 1.3f);
 			float baseFps = Mathf.Max(9f, (gpuRawScore / 42f) * cpuFactor * ramFactor);
 
+			// Создаём отдельную комнату/сцену для бенчмарка
+			Transform stageWaypoints = null;
+			Vector3 anchor = stageSpawnPosition;
+
+			if (!string.IsNullOrEmpty(stageSceneName))
+			{
+				var loadOp = SceneManager.LoadSceneAsync(stageSceneName, LoadSceneMode.Additive);
+				if (loadOp != null)
+				{
+					while (!loadOp.isDone) yield return null;
+					isAdditiveSceneLoaded = true;
+					var sceneWp = GameObject.Find("3DMork_Waypoints") ?? GameObject.Find("Waypoints");
+					if (sceneWp != null) stageWaypoints = sceneWp.transform;
+					anchor = Vector3.zero;
+				}
+			}
+			else
+			{
+				var prefab = stagePrefab;
+				if (prefab == null) prefab = Resources.Load<GameObject>("3DMork_Stage");
+				if (prefab != null)
+				{
+					currentStageInstance = Instantiate(prefab, stageSpawnPosition, Quaternion.identity);
+					var wpObj = currentStageInstance.transform.Find("Waypoints") ?? currentStageInstance.transform.Find("3DMork_Waypoints");
+					if (wpObj != null) stageWaypoints = wpObj;
+				}
+				else
+				{
+					anchor = GetRoomAnchor();
+				}
+			}
+
 			// Создаём RenderTexture для окна бенчмарка
 			renderTexture = new RenderTexture(960, 540, 24, RenderTextureFormat.ARGB32);
 			renderTexture.name = "3DMork_RT";
@@ -424,17 +470,16 @@ namespace PC.Component.Software
 			testCamera.farClipPlane = 150f;
 			testCamera.fieldOfView = cameraFov;
 			testCamera.clearFlags = CameraClearFlags.Skybox;
-			testCamera.backgroundColor = new Color(0.12f, 0.12f, 0.16f, 1f);
+			testCamera.backgroundColor = new Color(0.10f, 0.10f, 0.14f, 1f);
 			// Включаем геометрию мира и свет, исключаем UI (слой 5), игрока (слой 10) и будку превью (слой 11)
 			testCamera.cullingMask = ~((1 << 5) | (1 << 10) | (1 << 11));
 			testCamera.enabled = false; // Рендерим явно через testCamera.Render()
 
-			Vector3 anchor = GetRoomAnchor();
-			List<FlybySegment> segments = BuildSegments(anchor);
+			List<FlybySegment> segments = BuildSegments(anchor, stageWaypoints);
 
 			float totalDuration = 0f;
 			for (int i = 0; i < segments.Count; i++) totalDuration += segments[i].duration;
-			if (totalDuration <= 0f) totalDuration = 12f;
+			if (totalDuration <= 0f) totalDuration = 16f;
 
 			float elapsed = 0f;
 			bool isFirstFrame = true;
@@ -450,6 +495,7 @@ namespace PC.Component.Software
 					if (board != null && board.StressGraphics())
 					{
 						CleanupCamera();
+						CleanupStage();
 						yield break;
 					}
 
@@ -527,8 +573,9 @@ namespace PC.Component.Software
 				}
 			}
 
-			// Очистка камеры после завершения облёта
+			// Очистка камеры и отдельной сцены/комнаты после завершения облёта
 			CleanupCamera();
+			CleanupStage();
 
 			// Подсчёт очков 3DMork
 			int graphicsScore = Mathf.RoundToInt(gpuRawScore * 3.2f + (ramScore * 0.15f) + UnityEngine.Random.Range(-40, 40));
@@ -648,6 +695,20 @@ namespace PC.Component.Software
 			}
 		}
 
+		private void CleanupStage()
+		{
+			if (currentStageInstance != null)
+			{
+				Destroy(currentStageInstance);
+				currentStageInstance = null;
+			}
+			if (isAdditiveSceneLoaded && !string.IsNullOrEmpty(stageSceneName))
+			{
+				SceneManager.UnloadSceneAsync(stageSceneName);
+				isAdditiveSceneLoaded = false;
+			}
+		}
+
 		public override void OnSystemStop()
 		{
 			base.OnSystemStop();
@@ -657,6 +718,7 @@ namespace PC.Component.Software
 				benchmarkCoroutine = null;
 			}
 			CleanupCamera();
+			CleanupStage();
 		}
 
 		private void OnDestroy()
@@ -667,11 +729,13 @@ namespace PC.Component.Software
 				benchmarkCoroutine = null;
 			}
 			CleanupCamera();
+			CleanupStage();
 		}
 
 		public override void Close()
 		{
 			CleanupCamera();
+			CleanupStage();
 			base.Close();
 		}
 	}
