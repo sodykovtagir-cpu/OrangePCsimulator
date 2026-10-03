@@ -203,8 +203,8 @@ REQUIRED_SINGLE = [
     "leaderboardSelfRank", "leaderboardSelfName", "leaderboardSelfSpec",
     "leaderboardSelfScore", "leaderboardSelfFps", "leaderboardAverage",
     "historyBest", "historyEmpty",
-    "hardwareTitle", "hardwareCpu", "hardwareGpu", "hardwareRam", "hardwareBoard",
-    "viewportImage", "fpsText", "testProgressBar",
+    "hardwareTitle", "hardwareCpu", "hardwareGpu", "hardwareRam", "hardwareDrive",
+    "viewportImage", "fpsText", "resolutionText", "testProgressBar",
     "textTotalScore", "markCircle", "buttonClose", "buttonRun",
 ]
 REQUIRED_ARRAYS = [
@@ -351,11 +351,90 @@ for deleted in ("FooterNote", "SceneInfoText"):
 check("sceneInfoText" in fields and not fields["sceneInfoText"],
       "поле sceneInfoText осталось пустым после удаления подписи")
 
+# ---------------------------------------------------------------------------
+# 7. Очки, лимит кадров и разрешение считаются по реальному железу
+# ---------------------------------------------------------------------------
+spec = importlib.util.spec_from_file_location("dm3_score",
+                                              ROOT / "tools/3dmork_score_model.py")
+score_model = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(score_model)
+
+check("GetFpsCap" in script_text and "Application.targetFrameRate" in script_text,
+      "потолок кадров берётся из настроек игры (Application.targetFrameRate)")
+check("GraphicsBootstrap.TargetFps" in script_text,
+      "потолок кадров подстрахован значением из настроек")
+check("Mathf.Clamp(currentFps, 5f, fpsCap)" in script_text or
+      "Mathf.Clamp(baseFps * seg.loadMultiplier + jitter, 5f, fpsCap)" in script_text,
+      "счётчик FPS теста не превышает потолок из настроек")
+check("new RenderTexture(renderSize.x, renderSize.y" in script_text and
+      "new RenderTexture(960, 540" not in script_text,
+      "разрешение рендера теста подбирается по мощности ПК, а не задано константой")
+check("PickRenderResolution" in script_text,
+      "выбор разрешения вынесен в отдельную функцию")
+
+# эталонная таблица и прогоны считаются одной формулой
+check("ScoresAt(fpsCap)" in script_text and
+      "ComputeScores(gpuScore, cpuScore, ramScore, driveScore, fpsCap)" in script_text,
+      "эталонные машины считаются той же формулой, что и прогоны игрока")
+entries = re.findall(r"new LeaderboardEntry\((.*?)\)", script_text)
+check(entries and all(line.count(",") == 6 for line in entries),
+      "эталонная строка описывает железо, а не готовый результат")
+references = score_model.reference_benchmarks()
+check(all(entry["gpuScore"] <= 27000 and entry["ramScore"] <= 24000
+          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 14450.0
+          for entry in references),
+      "эталонные сборки не превосходят максимум игрового железа")
+for cap in (30.0, 60.0, 144.0, 240.0):
+    totals = [score_model.scores(e["gpuScore"], e["cpuScore"], e["ramScore"],
+                                 e["driveScore"], cap)["total"] for e in references]
+    check(all(a > b for a, b in zip(totals, totals[1:])),
+          "эталонная таблица отсортирована по убыванию счёта (потолок %d)" % cap)
+    check(all(0 < t <= 130000 for t in totals),
+          "счёт эталонных машин правдоподобен (потолок %d)" % cap)
+
+dream = score_model.scores(27000, 14450.0, 24000, 18000, 240.0)
+budget = score_model.scores(3000, 5800.0, 2000, 1200, 240.0)
+check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "Orange Workstation",
+      "первая строка таблицы - эталонная сборка мечты (2 x RTX 5090)")
+check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
+check(8 * budget["total"] < dream["total"],
+      "слабый ПК набирает в разы меньше максимального (%d против %d)"
+      % (budget["total"], dream["total"]))
+check(score_model.scores(27000, 14450.0, 24000, 18000, 60.0)["total"] <
+      dream["total"], "потолок из настроек снижает FPS-составляющую счёта")
+check(score_model.render_resolution(3000, 5800.0, 2000, 60.0) !=
+      score_model.render_resolution(27000, 14450.0, 24000, 60.0),
+      "слабый ПК рендерит тест в меньшем разрешении")
+check("(Clone)" in script_text and 'Replace("(Clone)"' in script_text,
+      "из названий деталей убирается суффикс (Clone)")
+check("HardwareType.Drive" in script_text and "gpuName2" in script_text and
+      "driveName2" in script_text,
+      "сводка по железу перечисляет две видеокарты и два накопителя")
+
+# ---------------------------------------------------------------------------
+# 8. Интерфейс остался читаемым после уменьшения окна
+# ---------------------------------------------------------------------------
+sizes = {}
+for file_id, (class_id, body) in by_id.items():
+    if class_id != 114 or "m_FontData" not in body:
+        continue
+    size = re.search(r"m_FontSize: (\d+)", body)
+    go = re.search(r"m_GameObject: \{fileID: (\d+)\}", body).group(1)
+    if size:
+        sizes[names.get(go, go)] = int(size.group(1))
+tables = [name for name in sizes if re.match(r"(Lb|Hist)(Rank|Name|Cpu|Gpu|Score|Fps|Index|Date)_", name)]
+check(len(tables) >= 50 and min(sizes[name] for name in tables) >= 11,
+      "ячейки таблиц не мельче 11 px (минимум %d)"
+      % min(sizes[name] for name in tables))
+check(sizes.get("FpsText", 0) >= 26, "счётчик FPS крупный (%d px)" % sizes.get("FpsText", 0))
+check(sizes.get("ScoreText", 0) >= 40, "итоговый счёт крупный (%d px)" % sizes.get("ScoreText", 0))
+
 # переводчики строк приложения
 for key in ("3DMork start test", "3DMork hardware cpu", "3DMork average", "3DMork fps"):
     check(key in i18n.STRINGS, f"ключ {key} есть в таблице переводов")
-check(len(i18n.STRINGS) == len(i18n.LANGS) and len(i18n.LANGS) == 42,
-      f"на каждую строку 3DMork есть {len(i18n.LANGS)} переводов")
+check(len(i18n.LANGS) == 42 and
+      all(len(values) == len(i18n.LANGS) for values in i18n.STRINGS.values()),
+      f"на каждую строку 3DMork ({len(i18n.STRINGS)}) есть {len(i18n.LANGS)} переводов")
 
 # ---------------------------------------------------------------------------
 print()

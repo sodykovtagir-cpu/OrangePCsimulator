@@ -131,7 +131,7 @@ namespace PC.Component.Software
 		private Text hardwareRam;
 
 		[SerializeField]
-		private Text hardwareBoard;
+		private Text hardwareDrive;
 
 		[Header("3D Viewport")]
 		[SerializeField]
@@ -139,6 +139,9 @@ namespace PC.Component.Software
 
 		[SerializeField]
 		private Text fpsText;
+
+		[SerializeField]
+		private Text resolutionText;
 
 		[SerializeField]
 		private Text sceneInfoText;
@@ -225,34 +228,170 @@ namespace PC.Component.Software
 			public string pcName;
 			public string cpuName;
 			public string gpuName;
-			public int score;
-			public int fps;
+			public int gpuScore;
+			public float cpuScore;
+			public int ramScore;
+			public int driveScore;
 
-			public LeaderboardEntry(string pc, string cpu, string gpu, int scoreValue, int fpsValue)
+			public LeaderboardEntry(string pc, string cpu, string gpu,
+				int gpu, float cpuRaw, int ram, int drive)
 			{
 				pcName = pc;
 				cpuName = cpu;
 				gpuName = gpu;
-				score = scoreValue;
-				fps = fpsValue;
+				gpuScore = gpu;
+				cpuScore = cpuRaw;
+				ramScore = ram;
+				driveScore = drive;
+			}
+
+			/// <summary>
+			/// Счёт эталонной машины считается той же формулой, что и для игрового ПК,
+			/// поэтому таблица сравнения не может разойтись с реальными прогонами.
+			/// </summary>
+			public BenchmarkScores ScoresAt(float fpsCap)
+			{
+				return ComputeScores(gpuScore, cpuScore, ramScore, driveScore, fpsCap);
 			}
 		}
 
 		/// <summary>
+		/// Референсные максимумы игрового железа (реальные значения из ассетов):
+		/// 2 x RTX 5090, i7-14700K (3.4 ГГц), 2 x 64 ГБ (RGB), 2 x SSD 16 ТБ.
+		/// </summary>
+		private const float RefGpuScore = 27000f;
+		private const float RefCpuScore = 14450f;
+		private const float RefRamScore = 24000f;
+		private const float RefDriveScore = 18000f;
+
+		/// <summary>Потолки категорий: максимум, который набирает эталонная сборка.</summary>
+		private const float GraphicsCeiling = 160000f;
+		private const float PhysicsCeiling = 50000f;
+		private const float MemoryCeiling = 32000f;
+		private const float FpsScoreFactor = 130f;
+		private const float TotalGraphicsWeight = 0.60f;
+		private const float TotalPhysicsWeight = 0.24f;
+		private const float TotalMemoryWeight = 0.10f;
+		private const float TotalFpsWeight = 0.06f;
+
+		/// <summary>Условия эталонного замера - без ограничения настройками игры.</summary>
+		private const float ReferenceFpsCap = 240f;
+
+		/// <summary>Опорное разрешение, для которого считается пропускная способность железа.</summary>
+		private const float ReferencePixels = 1280f * 720f;
+
+		/// <summary>Разрешения рендера теста, от большего к меньшему.</summary>
+		private static readonly Vector2Int[] BenchmarkResolutions =
+		{
+			new Vector2Int(1920, 1080),
+			new Vector2Int(1600, 900),
+			new Vector2Int(1280, 720),
+			new Vector2Int(960, 540),
+			new Vector2Int(640, 360)
+		};
+
+		private struct BenchmarkScores
+		{
+			public int graphics;
+			public int physics;
+			public int memory;
+			public int fps;
+			public int total;
+			public float machineFps;
+			public int achievedFps;
+		}
+
+		/// <summary>
 		/// Эталонные результаты других машин (сортировка по убыванию счёта).
-		/// Нужны для сравнительной таблицы на стартовом экране.
+		/// В таблице хранится реальное железо из ассетов игры, счёт считается
+		/// формулой ComputeScores - той же, что применяется к прогонам игрока.
 		/// </summary>
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
-			new LeaderboardEntry("Orange Workstation", "i9-13900K", "RTX 4090", 18420, 148),
-			new LeaderboardEntry("TITAN X rig", "Ryzen 9 7950X", "RTX 4080", 16980, 131),
-			new LeaderboardEntry("Gaming Beast", "Ryzen 7 7800X3D", "RX 7900 XTX", 15240, 119),
-			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4070 Ti", 12960, 97),
-			new LeaderboardEntry("Creator Mini", "i7-12700H", "RTX 4060", 9130, 74),
-			new LeaderboardEntry("Home Cinema PC", "Ryzen 5 3600", "GTX 1660 SUPER", 6480, 54),
-			new LeaderboardEntry("Office Workstation", "i5-10400", "GTX 1650", 4380, 38),
-			new LeaderboardEntry("Budget King", "i3-12100F", "GTX 1060 6GB", 3115, 27)
+			//                       имя                     процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
+			new LeaderboardEntry("Orange Workstation", "i7-14700K", "2x RTX 5090", 27000, 14450f, 24000, 18000),
+			new LeaderboardEntry("TITAN X rig", "i7-13700K", "RTX 5090 + 4080 Ti", 24500, 13906f, 10000, 17000),
+			new LeaderboardEntry("Gaming Beast", "i9-12900K", "2x RTX 4080", 20000, 12160f, 12000, 16000),
+			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4080 Ti", 11000, 13906f, 9000, 14000),
+			new LeaderboardEntry("Creator Mini", "i7-8700K", "RTX 3080 Ti", 7000, 9620f, 9000, 12000),
+			new LeaderboardEntry("Home Cinema PC", "i5-8400", "RTX 2080 Ti", 5500, 6720f, 6000, 6000),
+			new LeaderboardEntry("Office Workstation", "i3-8300", "GTX 1080 Ti", 4500, 8140f, 3000, 5000),
+			new LeaderboardEntry("Budget King", "Celeron G3920", "GTX 1060", 3000, 5800f, 2000, 1200)
 		};
+
+		/// <summary>Потолок кадров в секунду, выбранный игроком в настройках игры.</summary>
+		private static float GetFpsCap()
+		{
+			int limit = Application.targetFrameRate;
+			if (limit <= 0) limit = GraphicsBootstrap.TargetFps;
+			return Mathf.Clamp(limit, 30, 240);
+		}
+
+		/// <summary>Сколько кадров в секунду выдаёт собранный ПК сам по себе (на 1280x720).</summary>
+		private static float ComputeMachineFps(int gpuScore, float cpuScore, int ramScore)
+		{
+			float gpuPower = Mathf.Clamp01(gpuScore / RefGpuScore);
+			float cpuPower = Mathf.Clamp01(cpuScore / RefCpuScore);
+			float ramPower = Mathf.Clamp01(ramScore / RefRamScore);
+			float throughput = 18f + 780f * gpuPower;
+			return throughput * (0.55f + 0.45f * cpuPower) * (0.70f + 0.30f * ramPower);
+		}
+
+		/// <summary>
+		/// Очки по категориям и общий счёт. Формула общая для прогона игрока
+		/// и для эталонной таблицы, поэтому числа всегда сопоставимы.
+		/// </summary>
+		private static BenchmarkScores ComputeScores(int gpuScore, float cpuScore, int ramScore,
+			int driveScore, float fpsCap)
+		{
+			float gpuPower = Mathf.Clamp01(gpuScore / RefGpuScore);
+			float cpuPower = Mathf.Clamp01(cpuScore / RefCpuScore);
+			float ramPower = Mathf.Clamp01(ramScore / RefRamScore);
+			float drivePower = Mathf.Clamp01(driveScore / RefDriveScore);
+
+			var result = new BenchmarkScores();
+			result.graphics = Mathf.RoundToInt(GraphicsCeiling * Mathf.Pow(gpuPower, 1.10f) * (0.82f + 0.18f * cpuPower));
+			result.physics = Mathf.RoundToInt(PhysicsCeiling * Mathf.Pow(cpuPower, 1.05f) * (0.85f + 0.15f * ramPower));
+			result.memory = Mathf.RoundToInt(MemoryCeiling * Mathf.Pow(ramPower, 1.05f) * (0.85f + 0.15f * drivePower));
+
+			result.machineFps = ComputeMachineFps(gpuScore, cpuScore, ramScore);
+			result.achievedFps = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(result.machineFps, fpsCap)));
+			result.fps = Mathf.RoundToInt(result.achievedFps * FpsScoreFactor);
+			result.total = Mathf.RoundToInt(
+				result.graphics * TotalGraphicsWeight +
+				result.physics * TotalPhysicsWeight +
+				result.memory * TotalMemoryWeight +
+				result.fps * TotalFpsWeight);
+			result.total = Mathf.Max(1, result.total);
+			return result;
+		}
+
+		/// <summary>
+		/// Разрешение рендера теста: самое большое, которое железо тянет
+		/// с потолком кадров из настроек игры.
+		/// </summary>
+		private static Vector2Int PickRenderResolution(float machineFps, float fpsCap)
+		{
+			for (int i = 0; i < BenchmarkResolutions.Length; i++)
+			{
+				var size = BenchmarkResolutions[i];
+				float fps = machineFps * (ReferencePixels / (size.x * (float)size.y));
+				if (fps >= fpsCap) return size;
+			}
+			return BenchmarkResolutions[BenchmarkResolutions.Length - 1];
+		}
+
+		/// <summary>Потолок шкалы категории - эталонный максимум по этой категории.</summary>
+		private static float GetCategoryCeiling(int index)
+		{
+			switch (index)
+			{
+				case 0: return GraphicsCeiling;
+				case 1: return PhysicsCeiling;
+				case 2: return MemoryCeiling;
+				default: return ReferenceFpsCap * FpsScoreFactor;
+			}
+		}
 
 		private struct FlybySegment
 		{
@@ -281,13 +420,18 @@ namespace PC.Component.Software
 			public string boardName;
 			public string cpuName;
 			public string gpuName;
+			public string gpuName2;
+			public string driveName;
+			public string driveName2;
 			public int ramCapacity;
 			public int gpuScore;
 			public int ramScore;
 			public float cpuScore;
+			public int driveScore;
 			public int gpuCount;
 			public int cpuCount;
 			public int ramCount;
+			public int driveCount;
 		}
 
 		private Camera testCamera;
@@ -296,6 +440,7 @@ namespace PC.Component.Software
 		private GameObject currentStageInstance;
 		private bool isAdditiveSceneLoaded;
 		private int liveFps = -1;
+		private string liveResolution = string.Empty;
 		private string currentSceneName = string.Empty;
 
 		protected override void Start()
@@ -339,6 +484,13 @@ namespace PC.Component.Software
 				sceneInfoText.text = string.IsNullOrEmpty(currentSceneName)
 					? Tr("3DMork initialising")
 					: currentSceneName;
+			}
+
+			if (resolutionText != null)
+			{
+				resolutionText.text = string.IsNullOrEmpty(liveResolution)
+					? Format("3DMork resolution", "--")
+					: Format("3DMork resolution", liveResolution);
 			}
 		}
 
@@ -436,7 +588,7 @@ namespace PC.Component.Software
 			if (hardwareGpu != null)
 			{
 				hardwareGpu.text = Format("3DMork hardware gpu", snapshot.gpuCount > 0
-					? snapshot.gpuName
+					? JoinPair(snapshot.gpuName, snapshot.gpuName2)
 					: Tr("3DMork hardware missing"));
 			}
 
@@ -447,11 +599,11 @@ namespace PC.Component.Software
 					: Tr("3DMork hardware missing"));
 			}
 
-			if (hardwareBoard != null)
+			if (hardwareDrive != null)
 			{
-				hardwareBoard.text = Format("3DMork hardware board", snapshot.hasBoard
-					? snapshot.boardName
-					: Tr("3DMork hardware build first"));
+				hardwareDrive.text = Format("3DMork hardware drive", snapshot.driveCount > 0
+					? JoinPair(snapshot.driveName, snapshot.driveName2)
+					: Tr("3DMork hardware missing"));
 			}
 		}
 
@@ -459,17 +611,25 @@ namespace PC.Component.Software
 		{
 			int best = GetBestScore();
 
+			// Эталонные машины считаются по той же формуле и с тем же потолком
+			// кадров, что и прогон игрока, поэтому таблица всегда сопоставима.
+			float fpsCap = GetFpsCap();
+			int sum = 0;
+
 			for (int i = 0; i < LeaderboardRows; i++)
 			{
 				bool hasRow = i < ReferenceBenchmarks.Length;
 				var entry = hasRow ? ReferenceBenchmarks[i] : null;
+				var scores = hasRow ? entry.ScoresAt(fpsCap) : new BenchmarkScores();
 
 				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--", new Color(0.75f, 0.75f, 0.8f));
 				SetCell(leaderboardName, i, hasRow ? entry.pcName : "--", new Color(1f, 1f, 1f));
 				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
-				SetCell(leaderboardScore, i, hasRow ? entry.score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
-				SetCell(leaderboardFps, i, hasRow ? Format("3DMork fps", entry.fps.ToString()) : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--", new Color(1f, 0.72f, 0.2f));
+				SetCell(leaderboardFps, i, hasRow ? scores.achievedFps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
+
+				if (hasRow) sum += scores.total;
 			}
 
 			if (leaderboardSelfRank != null) leaderboardSelfRank.text = "*";
@@ -482,7 +642,7 @@ namespace PC.Component.Software
 			if (leaderboardSelfSpec != null)
 			{
 				string spec = (snapshot.cpuCount > 0 ? snapshot.cpuName : Tr("3DMork no cpu")) + "  /  " +
-							  (snapshot.gpuCount > 0 ? snapshot.gpuName : Tr("3DMork no gpu"));
+							  (snapshot.gpuCount > 0 ? JoinPair(snapshot.gpuName, snapshot.gpuName2) : Tr("3DMork no gpu"));
 				leaderboardSelfSpec.text = spec;
 			}
 
@@ -495,16 +655,14 @@ namespace PC.Component.Software
 			{
 				var history = LoadHistory();
 				int lastFps = history.Count > 0 ? history[0].fps : 0;
-				leaderboardSelfFps.text = lastFps > 0 ? Format("3DMork fps", lastFps.ToString()) : "--";
+				leaderboardSelfFps.text = lastFps > 0 ? lastFps.ToString() : "--";
 			}
 
 			if (leaderboardAverage != null)
 			{
-				int sum = 0;
-				for (int i = 0; i < ReferenceBenchmarks.Length; i++) sum += ReferenceBenchmarks[i].score;
 				int avg = ReferenceBenchmarks.Length > 0 ? sum / ReferenceBenchmarks.Length : 0;
 				leaderboardAverage.text = Format("3DMork average", ReferenceBenchmarks.Length, avg,
-										  best > 0 ? best.ToString() : "--");
+												  best > 0 ? best.ToString() : "--");
 			}
 		}
 
@@ -520,7 +678,7 @@ namespace PC.Component.Software
 				SetCell(historyIndex, i, hasRow ? "#" + number : "--", new Color(0.75f, 0.75f, 0.8f));
 				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--", new Color(0.85f, 0.87f, 0.92f));
 				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
-				SetCell(historyFps, i, hasRow ? Format("3DMork fps", history[i].fps.ToString()) : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
 			}
 
 			if (historyEmpty != null) historyEmpty.gameObject.SetActive(history.Count == 0);
@@ -626,13 +784,29 @@ namespace PC.Component.Software
 			PlayerPrefs.Save();
 		}
 
+		/// <summary>Убирает служебный суффикс Unity "(Clone)" из названия детали.</summary>
+		private static string CleanName(string value)
+		{
+			if (string.IsNullOrEmpty(value)) return string.Empty;
+			string clean = value.Replace("(Clone)", string.Empty).Replace("(clone)", string.Empty).Trim();
+			return clean;
+		}
+
+		/// <summary>Соединяет названия двух деталей в одну строку, например "RTX 5090 + RTX 4080".</summary>
+		private static string JoinPair(string first, string second)
+		{
+			if (string.IsNullOrEmpty(first)) return second ?? string.Empty;
+			if (string.IsNullOrEmpty(second)) return first;
+			return first + " + " + second;
+		}
+
 		private HardwareSnapshot CollectHardware()
 		{
 			var snapshot = new HardwareSnapshot();
 
 			var board = system != null ? system.Board : null;
 			snapshot.hasBoard = board != null;
-			if (board != null) snapshot.boardName = board.gameObject.name;
+			if (board != null) snapshot.boardName = CleanName(board.gameObject.name);
 
 			if (board != null)
 			{
@@ -645,7 +819,9 @@ namespace PC.Component.Software
 						if (g == null || g.Damaged) continue;
 						snapshot.gpuCount++;
 						snapshot.gpuScore += g.Score;
-						snapshot.gpuName = g.gameObject.name;
+						string name = CleanName(g.gameObject.name);
+						if (string.IsNullOrEmpty(snapshot.gpuName)) snapshot.gpuName = name;
+						else if (string.IsNullOrEmpty(snapshot.gpuName2)) snapshot.gpuName2 = name;
 					}
 				}
 
@@ -658,7 +834,7 @@ namespace PC.Component.Software
 						if (cpu == null || cpu.Damaged) continue;
 						snapshot.cpuCount++;
 						snapshot.cpuScore += cpu.frequency * cpu.Score;
-						snapshot.cpuName = cpu.gameObject.name;
+						snapshot.cpuName = CleanName(cpu.gameObject.name);
 					}
 				}
 
@@ -674,12 +850,28 @@ namespace PC.Component.Software
 						snapshot.ramCapacity += r.Capacity;
 					}
 				}
+
+				var drives = board.GetHardwares(HardwareType.Drive);
+				if (drives != null)
+				{
+					for (int i = 0; i < drives.Count; i++)
+					{
+						var d = drives[i];
+						if (d == null || d.Damaged) continue;
+						snapshot.driveCount++;
+						snapshot.driveScore += d.Score;
+						string name = CleanName(d.gameObject.name);
+						if (string.IsNullOrEmpty(snapshot.driveName)) snapshot.driveName = name;
+						else if (string.IsNullOrEmpty(snapshot.driveName2)) snapshot.driveName2 = name;
+					}
+				}
 			}
 
 			if (snapshot.gpuScore == 0) snapshot.gpuScore = 200;
 			if (snapshot.cpuScore <= 0f) snapshot.cpuScore = 2000f;
 			if (snapshot.ramScore == 0) snapshot.ramScore = 1000;
 			if (snapshot.ramCapacity == 0) snapshot.ramCapacity = 2048;
+			if (snapshot.driveScore == 0) snapshot.driveScore = 500;
 
 			return snapshot;
 		}
@@ -874,6 +1066,7 @@ namespace PC.Component.Software
 			if (testPanel != null) testPanel.SetActive(true);
 
 			liveFps = -1;
+			liveResolution = "";
 			currentSceneName = "";
 			RefreshTestTexts();
 			if (testProgressBar != null)
@@ -897,12 +1090,16 @@ namespace PC.Component.Software
 			int gpuRawScore = hardware.gpuScore;
 			float cpuRawScore = hardware.cpuScore;
 			int ramScore = hardware.ramScore;
-			int ramCapacity = hardware.ramCapacity;
+			int driveScore = hardware.driveScore;
 
-			// Расчёт базового FPS для собранного ПК
-			float cpuFactor = Mathf.Clamp(cpuRawScore / 8000f, 0.45f, 1.4f);
-			float ramFactor = Mathf.Clamp(ramCapacity / 8192f, 0.5f, 1.3f);
-			float baseFps = Mathf.Max(9f, (gpuRawScore / 42f) * cpuFactor * ramFactor);
+			// Потолок кадров из настроек игры: тест не может рендерить чаще,
+			// чем игрок выбрал в настройках, даже если железо быстрее.
+			float fpsCap = GetFpsCap();
+			BenchmarkScores plan = ComputeScores(gpuRawScore, cpuRawScore, ramScore, driveScore, fpsCap);
+			float machineFps = plan.machineFps;
+			float baseFps = Mathf.Min(machineFps, fpsCap);
+			Vector2Int renderSize = PickRenderResolution(machineFps, fpsCap);
+			liveResolution = renderSize.x + "x" + renderSize.y;
 
 			// Создаём отдельную комнату/сцену для бенчмарка
 			Transform stageWaypoints = null;
@@ -936,8 +1133,10 @@ namespace PC.Component.Software
 				}
 			}
 
-			// Создаём RenderTexture для окна бенчмарка
-			renderTexture = new RenderTexture(960, 540, 24, RenderTextureFormat.ARGB32);
+			// Создаём RenderTexture для окна бенчмарка.
+			// Разрешение подбирается по мощности железа: чем слабее ПК,
+			// тем меньше кадров он держит и тем ниже разрешение рендера.
+			renderTexture = new RenderTexture(renderSize.x, renderSize.y, 24, RenderTextureFormat.ARGB32);
 			renderTexture.name = "3DMork_RT";
 			renderTexture.filterMode = FilterMode.Bilinear;
 			renderTexture.Create();
@@ -1059,9 +1258,10 @@ namespace PC.Component.Software
 						}
 					}
 
-					// Расчёт FPS, зависящего от виртуального железа
+					// Расчёт FPS, зависящего от виртуального железа,
+					// но не выше потолка, выбранного в настройках игры
 					float jitter = Mathf.Sin(Time.time * 7f) * (baseFps * 0.04f) + UnityEngine.Random.Range(-1.5f, 1.5f);
-					float currentFps = Mathf.Max(5f, baseFps * seg.loadMultiplier + jitter);
+					float currentFps = Mathf.Clamp(baseFps * seg.loadMultiplier + jitter, 5f, fpsCap);
 
 					liveFps = Mathf.RoundToInt(currentFps);
 					RefreshTestTexts();
@@ -1075,20 +1275,12 @@ namespace PC.Component.Software
 			CleanupCamera();
 			CleanupStage();
 
-			// Подсчёт очков 3DMork
-			int graphicsScore = Mathf.RoundToInt(gpuRawScore * 3.2f + (ramScore * 0.15f) + UnityEngine.Random.Range(-40, 40));
-			graphicsScore = Mathf.Max(250, graphicsScore);
-
-			int physicsScore = Mathf.RoundToInt((cpuRawScore / 1000f) * 1450f + (ramCapacity * 0.1f) + UnityEngine.Random.Range(-30, 30));
-			physicsScore = Mathf.Max(300, physicsScore);
-
-			int memoryScore = Mathf.RoundToInt((ramScore * 1.8f) + (ramCapacity * 0.25f) + UnityEngine.Random.Range(-25, 25));
-			memoryScore = Mathf.Max(250, memoryScore);
-
-			int fpsScore = Mathf.RoundToInt(baseFps * 100f);
-
-			int totalScore = Mathf.RoundToInt((graphicsScore * 0.60f) + (physicsScore * 0.25f) + (memoryScore * 0.15f));
-			totalScore = Mathf.Max(200, totalScore);
+			// Подсчёт очков 3DMork по общей формуле (та же, что у эталонных машин)
+			int graphicsScore = plan.graphics;
+			int physicsScore = plan.physics;
+			int memoryScore = plan.memory;
+			int fpsScore = plan.fps;
+			int totalScore = plan.total;
 
 			// Сохраняем прогон в локальную историю этого ПК
 			PushHistory(totalScore, Mathf.RoundToInt(baseFps), graphicsScore, physicsScore, memoryScore);
@@ -1101,7 +1293,6 @@ namespace PC.Component.Software
 			if (markCircle != null) markCircle.fillAmount = 0f;
 
 			var scores = new int[4] { graphicsScore, physicsScore, memoryScore, fpsScore };
-			float maxSliderRange = 10000f;
 
 			if (marks != null)
 			{
@@ -1109,7 +1300,9 @@ namespace PC.Component.Software
 				{
 					if (marks[i] == null) continue;
 					marks[i].value = 0f;
-					marks[i].maxValue = maxSliderRange;
+					// Шкала каждой категории растянута на эталонный максимум,
+					// поэтому полоса всегда читается как доля от лучшей сборки.
+					marks[i].maxValue = GetCategoryCeiling(i);
 					if (text_marks != null && i < text_marks.Length && text_marks[i] != null)
 						text_marks[i].text = "0";
 				}
@@ -1124,14 +1317,7 @@ namespace PC.Component.Software
 				if (slider == null) continue;
 
 				int target = scores[i];
-				if (target > maxSliderRange)
-				{
-					maxSliderRange = target * 1.15f;
-					for (int k = 0; k < marks.Length; k++)
-					{
-						if (marks[k] != null) marks[k].maxValue = maxSliderRange;
-					}
-				}
+				if (slider.maxValue < target) slider.maxValue = target;
 
 				float t = 0f;
 				while (!Mathf.Approximately(slider.value, target))
@@ -1145,7 +1331,7 @@ namespace PC.Component.Software
 					if (text_marks != null && i < text_marks.Length && text_marks[i] != null)
 					{
 						if (i == 3)
-							text_marks[i].text = Format("3DMork fps", (v / 100f).ToString("0.0"));
+							text_marks[i].text = Format("3DMork fps", (v / FpsScoreFactor).ToString("0"));
 						else
 							text_marks[i].text = v.ToString("0");
 					}

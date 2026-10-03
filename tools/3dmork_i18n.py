@@ -597,6 +597,21 @@ add_map("3DMork hardware board", {
     "BRL": "PLACA-MÃE: {0}", "SK": "ZÁKLADNÁ DOSKA: {0}", "SW": "BODI: {0}", "FA": "مادربرد: {0}",
 })
 
+add_map("3DMork hardware drive", {
+    "EN": "STORAGE: {0}", "HU": "TÁROLÓ: {0}", "NL": "OPSLAG: {0}", "ES": "ALMACENAMIENTO: {0}",
+    "RO": "STOCARE: {0}", "PL": "DYSK: {0}", "CS": "ÚLOŽIŠTĚ: {0}", "BS": "POHRANA: {0}",
+    "PT-BR": "ARMAZENAMENTO: {0}", "PT-PT": "ARMAZENAMENTO: {0}", "ET": "MÄLU: {0}",
+    "FR-CA": "STOCKAGE : {0}", "FR-FR": "STOCKAGE : {0}", "KR": "저장장치: {0}",
+    "ZH-CN": "存储：{0}", "ZH-TW": "儲存裝置：{0}", "SR": "MEMORIJA: {0}", "RU": "ХРАНИЛИЩЕ: {0}",
+    "TR": "DEPOLAMA: {0}", "FI": "TALLENNUSTILA: {0}", "BG": "ХРАНИЛИЩЕ: {0}",
+    "UA": "СХОВИЩЕ: {0}", "DE": "SPEICHER: {0}", "CAT": "EMMAGATZEMATGE: {0}",
+    "IT": "ARCHIVIAZIONE: {0}", "JP": "ストレージ：{0}", "LT": "ATMINTIS: {0}",
+    "AR": "التخزين: {0}", "KZ": "СҚАЙМАТ: {0}", "NO": "LAGRING: {0}", "FIL": "STORAGE: {0}",
+    "HIN": "भंडारण: {0}", "TH": "หน่วยจัดเก็บ: {0}", "ID": "PENYIMPAN: {0}", "GE": "საცავი: {0}",
+    "LV": "GLABUZE: {0}", "VN": "BỘ NHỚ: {0}", "GR": "ΑΠΟΘΗΚΕΥΣΗ: {0}", "BRL": "ARMAZENAMENTO: {0}",
+    "SK": "ÚLOŽISKO: {0}", "SW": "HIFADHI: {0}", "FA": "ذخیره‌سازی: {0}",
+})
+
 add_map("3DMork hardware missing", {
     "EN": "not installed", "HU": "nincs telepítve", "NL": "niet geïnstalleerd",
     "ES": "no instalado", "RO": "neinstalat", "PL": "niezainstalowany",
@@ -769,6 +784,21 @@ add_token("3DMork fps", "FPS: {0}", {
     "NO": "FPS: {0}", "FIL": "FPS: {0}", "HIN": "FPS: {0}", "TH": "เฟรมเรต: {0}", "ID": "FPS: {0}",
     "GE": "FPS: {0}", "LV": "FPS: {0}", "VN": "FPS: {0}", "GR": "FPS: {0}", "BRL": "FPS: {0}",
     "SK": "FPS: {0}", "SW": "FPS: {0}", "FA": "فریم بر ثانیه: {0}",
+})
+
+add_map("3DMork resolution", {
+    "EN": "RES: {0}", "HU": "FELBONTÁS: {0}", "NL": "RES: {0}", "ES": "RES: {0}",
+    "RO": "REZ: {0}", "PL": "ROZDZ: {0}", "CS": "ROZLIŠENÍ: {0}", "BS": "REZOLUCIJA: {0}",
+    "PT-BR": "RES: {0}", "PT-PT": "RES: {0}", "ET": "LAHDUS: {0}", "FR-CA": "RÉSOLUTION : {0}",
+    "FR-FR": "RÉSOLUTION : {0}", "KR": "해상도: {0}", "ZH-CN": "分辨率：{0}", "ZH-TW": "解析度：{0}",
+    "SR": "REZOLUCIJA: {0}", "RU": "РАЗР: {0}", "TR": "ÇÖZÜNÜRLÜK: {0}", "FI": "RESOLUUTIO: {0}",
+    "BG": "РАЗРЕШЕНИЕ: {0}", "UA": "РОЗДІЛ: {0}", "DE": "AUFLÖSUNG: {0}", "CAT": "RESOLUCIÓ: {0}",
+    "IT": "RISOLUZIONE: {0}", "JP": "解像度：{0}", "LT": "RAIŠKA: {0}", "AR": "الدقة: {0}",
+    "KZ": "АЙЫНДАМЫЛЫҒЫ: {0}", "NO": "OPPLØSING: {0}", "FIL": "RESOLUSYON: {0}",
+    "HIN": "रिज़ॉल्यूशन: {0}", "TH": "ความละเอียด: {0}", "ID": "RESOLUSI: {0}",
+    "GE": "გარჩევანობა: {0}", "LV": "IZŠĶIRTNE: {0}", "VN": "ĐỘ PHÂN GIẢI: {0}",
+    "GR": "ΑΝΏΛΥΣΗ: {0}", "BRL": "RESOLUÇÃO: {0}", "SK": "ROZLÍŠENIE: {0}", "SW": "UBORA: {0}",
+    "FA": "وضوح: {0}",
 })
 
 add_map("3DMork initialising", {
