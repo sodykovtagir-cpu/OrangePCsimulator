@@ -23,6 +23,9 @@ public class Hook : Item, ISave
 	[SerializeField]
 	private AudioClip releaseSound;
 
+	[SerializeField]
+	private bool removeModeOnly;
+
 	private Rigidbody rb;
 
 	private AudioSource source;
@@ -32,6 +35,12 @@ public class Hook : Item, ISave
 	private float unhookCooldown;
 
 	private bool hooked;
+
+	public bool RemoveModeOnly
+	{
+		get => removeModeOnly;
+		set => removeModeOnly = value;
+	}
 
 	public bool Hooked
 	{
@@ -101,6 +110,17 @@ public class Hook : Item, ISave
 		return false;
 	}
 
+	private void OnCollisionEnter(Collision collision)
+	{
+		if (hooked && !removeModeOnly)
+		{
+			if (collision.transform.CompareTag("Hammer"))
+			{
+				Release();
+			}
+		}
+	}
+
 	private void Fix()
 	{
 		Hooked = true;
@@ -118,7 +138,14 @@ public class Hook : Item, ISave
 	public void ShowTip()
 	{
 		if (!Hooked) return;
-		Main.Instance?.FadeText(Localization.GetText("Click to Remove Component"));
+		if (removeModeOnly)
+		{
+			Main.Instance?.FadeText(Localization.GetText("Click to Remove Component"));
+		}
+		else
+		{
+			Main.Instance?.FadeText(Localization.GetText("Remove with hammer"));
+		}
 	}
 
 	public void OnDrawGizmos()

@@ -243,14 +243,17 @@ public class Raycast : MonoBehaviour
                 spring.connectedBody = hitRb;
                 StartCoroutine("DragObject");
             }
-            else if (hitRb && hitRb.isKinematic && !RemoveMode)
+            else if (hitRb && hitRb.isKinematic)
             {
                 var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
                 if (hook == null && hitRb != null)
                     hook = hitRb.GetComponent<Hook>();
                 if (hook != null && hook.Hooked)
                 {
-                    hook.ShowTip();
+                    if (!RemoveMode || !hook.RemoveModeOnly)
+                    {
+                        hook.ShowTip();
+                    }
                 }
             }
         }
@@ -263,7 +266,7 @@ public class Raycast : MonoBehaviour
             var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
             if (hook == null && hit.rigidbody != null)
                 hook = hit.rigidbody.GetComponent<Hook>();
-            if (hook != null && hook.Hooked)
+            if (hook != null && hook.Hooked && hook.RemoveModeOnly)
             {
                 hook.Release();
             }

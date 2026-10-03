@@ -187,6 +187,7 @@ MonoBehaviour:
   hookDirection: {x: 0, y: -1, z: 0}
   fixSound: {fileID: 8300000, guid: 555240bc0c10acc4eb8797beb14f6b95, type: 3}
   releaseSound: {fileID: 8300000, guid: 3069c7e7b27ae5a478b4bfd71e2dbf23, type: 3}
+  removeModeOnly: 1
 --- !u!1 &1030019346334318026
 GameObject:
   m_ObjectHideFlags: 0
