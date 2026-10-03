@@ -307,13 +307,13 @@ def dream_pc(case: str) -> List[PartRef]:
     parts += [
         p("RTX5090", "GPU", host=board),
         p("RTX4080Ti", "GPU", host=board),
-        p("SSD_M.2 1TB", "Drive", host=board),
-        p("SSD_M.2 1TB", "Drive", host=board),
+        p("SSD_M.2 8TB", "Drive", host=board),
+        p("SSD_M.2 8TB", "Drive", host=board),
         # Корпусные слоты Supply принимают только match=0, то есть до
         # 1.1 кВт: PSU 2kW (match=1) ставится лишь в рамы майнеров.
         p("PSU 1.1kW", "Supply"),
-        p("SSD 2TB", "Drive"),
-        p("SSD 2TB", "Drive"),
+        p("SSD 16TB", "Drive"),
+        p("SSD 16TB", "Drive"),
         p("CaseFan(RGB)", "Fan"),
         p("Aquarium_Cover_ATX(Glass)", "Cover"),
     ]

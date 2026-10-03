@@ -52,13 +52,13 @@ MonoBehaviour:
     order: 0
     slotTarget: Supply
     hostPrefabName: Aquarium_ATX(White)
-  - prefab: {fileID: 1860561877774784, guid: c534afe25d6945d49a64d9a52208ec18, type: 3}
+  - prefab: {fileID: 4652822036319707765, guid: 848681f31b0db9e20050f0f5c817212e, type: 3}
     localPosition: {x: -0.135, y: -1.815, z: 1.714}
     localEuler: {x: 0, y: 270, z: 0}
     order: 1
     slotTarget: Drive
     hostPrefabName: Aquarium_ATX(White)
-  - prefab: {fileID: 1860561877774784, guid: c534afe25d6945d49a64d9a52208ec18, type: 3}
+  - prefab: {fileID: 4652822036319707765, guid: 848681f31b0db9e20050f0f5c817212e, type: 3}
     localPosition: {x: -0.135, y: -1.415, z: 1.714}
     localEuler: {x: 0, y: 270, z: 0}
     order: 2
@@ -154,13 +154,13 @@ MonoBehaviour:
     order: 17
     slotTarget: GPU
     hostPrefabName: MSG_ATX_White
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+  - prefab: {fileID: 6973945611365512524, guid: b6efb7fd56ce127fdf9e63b72da34fbf, type: 3}
     localPosition: {x: -0.64033, y: -0.782, z: -1.08263}
     localEuler: {x: 270, y: 270, z: 0}
     order: 18
     slotTarget: Drive
     hostPrefabName: MSG_ATX_White
-  - prefab: {fileID: 1988662813925757, guid: ba3f0ef334e6d9c49a0ac5059f3a5c86, type: 3}
+  - prefab: {fileID: 6973945611365512524, guid: b6efb7fd56ce127fdf9e63b72da34fbf, type: 3}
     localPosition: {x: -0.64033, y: -0.109, z: -1.08263}
     localEuler: {x: 270, y: 270, z: 0}
     order: 19

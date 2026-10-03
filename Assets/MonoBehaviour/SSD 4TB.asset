@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
-  m_Name: ReadyPC_Dream_Black
+  m_Name: SSD 4TB
   m_EditorClassIdentifier: 
-  itemName: '{Dream PC} ({Black})'
-  price: 20935
-  bitcoin: 0
-  sprite: {fileID: 21300000, guid: c6bad9cdeaf782f40ad4ea3abba03ae9, type: 3}
-  spawn: {fileID: 2556544496470639101, guid: 8a5cd29ad9879141225d5f79de232e5a, type: 3}
-  large: 1
+  itemName: SSD 4TB
+  price: 650
+  bitcoin: 7
+  sprite: {fileID: 21300000, guid: eb3848cd830fc8b45b72b39b22c647d7, type: 2}
+  spawn: {fileID: 2197263113883024668, guid: 92cf76d09c41055e16d4aa1ecf746b2d, type: 2}
+  large: 0
   translateDescription: 1
-  description: 'Dream PC Description'
+  description: 

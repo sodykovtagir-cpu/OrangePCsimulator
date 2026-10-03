@@ -77,7 +77,15 @@ namespace PC.Component.Software
 			tex.ReadPixels(rect, 0, 0);
 			RenderTexture.active = null;
 
-			var data = ImageConversion.EncodeToPNG(tex);
+			byte[] data;
+			if (tex != null && (width > 64 || height > 64))
+			{
+				data = ImageConversion.EncodeToJPG(tex, 85);
+			}
+			else
+			{
+				data = ImageConversion.EncodeToPNG(tex);
+			}
 			var content = System.Convert.ToBase64String(data);
 
 			var os = system;
