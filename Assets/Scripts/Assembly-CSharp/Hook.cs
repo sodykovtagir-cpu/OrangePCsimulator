@@ -101,24 +101,13 @@ public class Hook : Item, ISave
 		return false;
 	}
 
-	private void OnCollisionEnter(Collision collision)
-	{
-		if (hooked)
-		{
-			if (collision.transform.CompareTag("Hammer"))
-			{
-				Release();
-			}
-		}
-	}
-
 	private void Fix()
 	{
 		Hooked = true;
 		if (fixSound != null && source != null) source.PlayOneShot(fixSound);
 	}
 
-	private void Release()
+	public void Release()
 	{
 		Hooked = false;
 		unhookCooldown = 1.0f;
@@ -129,7 +118,7 @@ public class Hook : Item, ISave
 	public void ShowTip()
 	{
 		if (!Hooked) return;
-		Main.Instance?.FadeText(Localization.GetText("Remove with hammer"));
+		Main.Instance?.FadeText(Localization.GetText("Click to Remove Component"));
 	}
 
 	public void OnDrawGizmos()

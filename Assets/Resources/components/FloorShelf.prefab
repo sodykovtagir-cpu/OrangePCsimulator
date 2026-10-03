@@ -180,7 +180,6 @@ MonoBehaviour:
   info: '{FloorShelf}'
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
-  grabCenterOfMass: 1
   glue: 0
   detectInterval: 0.5
   detectDistance: 0.35

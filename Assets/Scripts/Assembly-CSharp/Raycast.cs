@@ -227,16 +227,7 @@ public class Raycast : MonoBehaviour
                 currentDrag = drag;
 
                 var sTr = spring.transform;
-                bool useCom = AutoRotation;
-                if (!useCom)
-                {
-                    if (hit.transform && hit.transform.TryGetComponent<Item>(out var itm) && itm.GrabCenterOfMass)
-                        useCom = true;
-                    else if (hitRb && hitRb.TryGetComponent<Item>(out var rbItm) && rbItm.GrabCenterOfMass)
-                        useCom = true;
-                }
-
-                if (!useCom)
+                if (!AutoRotation)
                 {
                     sTr.position = hit.point;
                     drag.distance = hit.distance;
@@ -252,15 +243,14 @@ public class Raycast : MonoBehaviour
                 spring.connectedBody = hitRb;
                 StartCoroutine("DragObject");
             }
-            else if (hitRb && hitRb.isKinematic)
+            else if (hitRb && hitRb.isKinematic && !RemoveMode)
             {
-                if (hitRb.TryGetComponent<Hook>(out var hook))
+                var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
+                if (hook == null && hitRb != null)
+                    hook = hitRb.GetComponent<Hook>();
+                if (hook != null && hook.Hooked)
                 {
                     hook.ShowTip();
-                }
-                else if (hit.transform && hit.transform.TryGetComponent<Hook>(out var childHook))
-                {
-                    childHook.ShowTip();
                 }
             }
         }
@@ -269,6 +259,14 @@ public class Raycast : MonoBehaviour
         {
             if (hit.transform && hit.transform.TryGetComponent<Connector>(out var conn))
                 conn.Break();
+
+            var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
+            if (hook == null && hit.rigidbody != null)
+                hook = hit.rigidbody.GetComponent<Hook>();
+            if (hook != null && hook.Hooked)
+            {
+                hook.Release();
+            }
         }
 
         if (hit.transform && hit.transform.TryGetComponent<Item>(out var item))
@@ -380,14 +378,7 @@ public class Raycast : MonoBehaviour
         if (rb == null) yield break;
 
         rb.drag = targetDrag;
-        bool isStableItem = false;
-        if (currentDrag != null && currentDrag.target != null)
-        {
-            var itm = currentDrag.target.GetComponentInParent<Item>();
-            if (itm != null && itm.GrabCenterOfMass)
-                isStableItem = true;
-        }
-        rb.angularDrag = isStableItem ? 15f : targetAngularDrag;
+        rb.angularDrag = targetAngularDrag;
 
         if (distanceObj)
             distanceObj.SetActive(true);
