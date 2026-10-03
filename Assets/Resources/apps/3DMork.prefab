@@ -120,6 +120,9 @@ MonoBehaviour:
   - {fileID: 5000000000000182}
   buttonClose: {fileID: 5000000000000196}
   buttonRun: {fileID: 5000000000000187}
+  stagePrefab: {fileID: 6000000000000001, guid: d6f6d07dffc84a1ba33c9f9032a7a0e1, type: 3}
+  stageSceneName: 
+  stageSpawnPosition: {x: 0, y: -2500, z: 0}
   flybyPhases: []
   waypointsRoot: {fileID: 0}
   rotationSmoothing: 5.5
