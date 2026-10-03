@@ -165,7 +165,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}
   - pageName: Ready PC
     item:
-    - {fileID: 11400000, guid: 78348b2c142bcb88381354c04ae3fce7, type: 2}
     - {fileID: 11400000, guid: 37369c251a2077cf14eda7b9cb979509, type: 2}
     - {fileID: 11400000, guid: 141cc59db548bec45f9c140a5e000624, type: 2}
     - {fileID: 11400000, guid: bcddaaf55820715ccdfe7eadc4820ede, type: 2}

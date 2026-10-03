@@ -42,10 +42,95 @@ namespace PC.Component.Software
 	{
 		[Header("Panels")]
 		[SerializeField]
+		private GameObject startPanel;
+
+		[SerializeField]
 		private GameObject testPanel;
 
 		[SerializeField]
 		private GameObject resultsPanel;
+
+		[Header("Start Screen - Buttons")]
+		[SerializeField]
+		private Button buttonStart;
+
+		[SerializeField]
+		private Button buttonStartClose;
+
+		[SerializeField]
+		private Button buttonMenu;
+
+		[Header("Start Screen - Comparison Leaderboard (other PCs)")]
+		[SerializeField]
+		private Text[] leaderboardRank;
+
+		[SerializeField]
+		private Text[] leaderboardName;
+
+		[SerializeField]
+		private Text[] leaderboardCpu;
+
+		[SerializeField]
+		private Text[] leaderboardGpu;
+
+		[SerializeField]
+		private Text[] leaderboardScore;
+
+		[SerializeField]
+		private Text[] leaderboardFps;
+
+		[SerializeField]
+		private Text leaderboardSelfRank;
+
+		[SerializeField]
+		private Text leaderboardSelfName;
+
+		[SerializeField]
+		private Text leaderboardSelfSpec;
+
+		[SerializeField]
+		private Text leaderboardSelfScore;
+
+		[SerializeField]
+		private Text leaderboardSelfFps;
+
+		[SerializeField]
+		private Text leaderboardAverage;
+
+		[Header("Start Screen - Local Test History (this PC)")]
+		[SerializeField]
+		private Text[] historyIndex;
+
+		[SerializeField]
+		private Text[] historyDate;
+
+		[SerializeField]
+		private Text[] historyScore;
+
+		[SerializeField]
+		private Text[] historyFps;
+
+		[SerializeField]
+		private Text historyBest;
+
+		[SerializeField]
+		private Text historyEmpty;
+
+		[Header("Start Screen - Current PC Summary")]
+		[SerializeField]
+		private Text hardwareTitle;
+
+		[SerializeField]
+		private Text hardwareCpu;
+
+		[SerializeField]
+		private Text hardwareGpu;
+
+		[SerializeField]
+		private Text hardwareRam;
+
+		[SerializeField]
+		private Text hardwareBoard;
 
 		[Header("3D Viewport")]
 		[SerializeField]
@@ -111,6 +196,63 @@ namespace PC.Component.Software
 		[SerializeField]
 		private float cameraFov = 65f;
 
+		private const int LeaderboardRows = 8;
+		private const int HistoryRows = 5;
+		private const int MaxHistoryEntries = 12;
+		private const string HistoryPrefsKey = "3DMork_History";
+		private const string BestScorePrefsKey = "3DMork_Score";
+
+		[Serializable]
+		private class HistoryData
+		{
+			public List<HistoryEntry> entries = new List<HistoryEntry>();
+		}
+
+		[Serializable]
+		private class HistoryEntry
+		{
+			public int score;
+			public int fps;
+			public int graphics;
+			public int physics;
+			public int memory;
+			public long unixTime;
+		}
+
+		private class LeaderboardEntry
+		{
+			public string pcName;
+			public string cpuName;
+			public string gpuName;
+			public int score;
+			public int fps;
+
+			public LeaderboardEntry(string pc, string cpu, string gpu, int scoreValue, int fpsValue)
+			{
+				pcName = pc;
+				cpuName = cpu;
+				gpuName = gpu;
+				score = scoreValue;
+				fps = fpsValue;
+			}
+		}
+
+		/// <summary>
+		/// Эталонные результаты других машин (сортировка по убыванию счёта).
+		/// Нужны для сравнительной таблицы на стартовом экране.
+		/// </summary>
+		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
+		{
+			new LeaderboardEntry("Orange Workstation", "i9-13900K", "RTX 4090", 18420, 148),
+			new LeaderboardEntry("TITAN X rig", "Ryzen 9 7950X", "RTX 4080", 16980, 131),
+			new LeaderboardEntry("Gaming Beast", "Ryzen 7 7800X3D", "RX 7900 XTX", 15240, 119),
+			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4070 Ti", 12960, 97),
+			new LeaderboardEntry("Creator Mini", "i7-12700H", "RTX 4060", 9130, 74),
+			new LeaderboardEntry("Home Cinema PC", "Ryzen 5 3600", "GTX 1660 SUPER", 6480, 54),
+			new LeaderboardEntry("Office Workstation", "i5-10400", "GTX 1650", 4380, 38),
+			new LeaderboardEntry("Budget King", "i3-12100F", "GTX 1060 6GB", 3115, 27)
+		};
+
 		private struct FlybySegment
 		{
 			public string name;
@@ -132,6 +274,21 @@ namespace PC.Component.Software
 			public float orbitSweepAngle;
 		}
 
+		private struct HardwareSnapshot
+		{
+			public bool hasBoard;
+			public string boardName;
+			public string cpuName;
+			public string gpuName;
+			public int ramCapacity;
+			public int gpuScore;
+			public int ramScore;
+			public float cpuScore;
+			public int gpuCount;
+			public int cpuCount;
+			public int ramCount;
+		}
+
 		private Camera testCamera;
 		private RenderTexture renderTexture;
 		private Coroutine benchmarkCoroutine;
@@ -142,6 +299,29 @@ namespace PC.Component.Software
 		{
 			base.Start();
 			SetDefaultSize(new Vector2(850f, 520f));
+			WireButtons();
+			ShowStartScreen();
+		}
+
+		private void WireButtons()
+		{
+			if (buttonStart != null)
+			{
+				buttonStart.onClick.RemoveAllListeners();
+				buttonStart.onClick.AddListener(RunBenchmark);
+			}
+
+			if (buttonStartClose != null)
+			{
+				buttonStartClose.onClick.RemoveAllListeners();
+				buttonStartClose.onClick.AddListener(Close);
+			}
+
+			if (buttonMenu != null)
+			{
+				buttonMenu.onClick.RemoveAllListeners();
+				buttonMenu.onClick.AddListener(ShowStartScreen);
+			}
 
 			if (buttonClose != null)
 			{
@@ -154,8 +334,301 @@ namespace PC.Component.Software
 				buttonRun.onClick.RemoveAllListeners();
 				buttonRun.onClick.AddListener(RunBenchmark);
 			}
+		}
 
-			RunBenchmark();
+		/// <summary>
+		/// Показывает стартовый экран: сравнительная таблица других ПК,
+		/// история тестов на этой машине и сводка по текущему железу.
+		/// Вся разметка заранее собрана в префабе, скрипт только заполняет текст.
+		/// </summary>
+		public void ShowStartScreen()
+		{
+			if (benchmarkCoroutine != null)
+			{
+				StopCoroutine(benchmarkCoroutine);
+				benchmarkCoroutine = null;
+			}
+			CleanupCamera();
+			CleanupStage();
+
+			if (resultsPanel != null) resultsPanel.SetActive(false);
+			if (testPanel != null) testPanel.SetActive(false);
+			if (startPanel != null) startPanel.SetActive(true);
+
+			if (buttonStart != null) buttonStart.interactable = true;
+			if (buttonStartClose != null) buttonStartClose.interactable = true;
+
+			var snapshot = CollectHardware();
+			RefreshHardwareSummary(snapshot);
+			RefreshLeaderboard(snapshot);
+			RefreshHistory();
+		}
+
+		private void RefreshHardwareSummary(HardwareSnapshot snapshot)
+		{
+			if (hardwareTitle != null)
+			{
+				hardwareTitle.text = snapshot.hasBoard
+					? "THIS PC - " + snapshot.boardName
+					: "THIS PC - NO MOTHERBOARD";
+			}
+
+			if (hardwareCpu != null)
+			{
+				hardwareCpu.text = snapshot.cpuCount > 0
+					? "CPU: " + snapshot.cpuName
+					: "CPU: not installed";
+			}
+
+			if (hardwareGpu != null)
+			{
+				hardwareGpu.text = snapshot.gpuCount > 0
+					? "GPU: " + snapshot.gpuName
+					: "GPU: not installed";
+			}
+
+			if (hardwareRam != null)
+			{
+				hardwareRam.text = snapshot.ramCount > 0
+					? "RAM: " + FormatRam(snapshot.ramCapacity)
+					: "RAM: not installed";
+			}
+
+			if (hardwareBoard != null)
+			{
+				hardwareBoard.text = snapshot.hasBoard
+					? "BOARD: " + snapshot.boardName
+					: "BOARD: build a PC to run the benchmark";
+			}
+		}
+
+		private void RefreshLeaderboard(HardwareSnapshot snapshot)
+		{
+			int best = GetBestScore();
+
+			for (int i = 0; i < LeaderboardRows; i++)
+			{
+				bool hasRow = i < ReferenceBenchmarks.Length;
+				var entry = hasRow ? ReferenceBenchmarks[i] : null;
+
+				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--", new Color(0.75f, 0.75f, 0.8f));
+				SetCell(leaderboardName, i, hasRow ? entry.pcName : "--", new Color(1f, 1f, 1f));
+				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
+				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
+				SetCell(leaderboardScore, i, hasRow ? entry.score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
+				SetCell(leaderboardFps, i, hasRow ? entry.fps.ToString() + " fps" : "--", new Color(0.55f, 0.9f, 0.6f));
+			}
+
+			if (leaderboardSelfRank != null) leaderboardSelfRank.text = "*";
+
+			if (leaderboardSelfName != null)
+			{
+				leaderboardSelfName.text = snapshot.hasBoard ? snapshot.boardName : "This PC";
+			}
+
+			if (leaderboardSelfSpec != null)
+			{
+				string spec = (snapshot.cpuCount > 0 ? snapshot.cpuName : "no CPU") + "  /  " +
+							  (snapshot.gpuCount > 0 ? snapshot.gpuName : "no GPU");
+				leaderboardSelfSpec.text = spec;
+			}
+
+			if (leaderboardSelfScore != null)
+			{
+				leaderboardSelfScore.text = best > 0 ? best.ToString() : "--";
+			}
+
+			if (leaderboardSelfFps != null)
+			{
+				var history = LoadHistory();
+				int lastFps = history.Count > 0 ? history[0].fps : 0;
+				leaderboardSelfFps.text = lastFps > 0 ? lastFps.ToString() + " fps" : "--";
+			}
+
+			if (leaderboardAverage != null)
+			{
+				int sum = 0;
+				for (int i = 0; i < ReferenceBenchmarks.Length; i++) sum += ReferenceBenchmarks[i].score;
+				int avg = ReferenceBenchmarks.Length > 0 ? sum / ReferenceBenchmarks.Length : 0;
+				leaderboardAverage.text = "Average of " + ReferenceBenchmarks.Length + " reference PCs: " + avg +
+										  "   |   Your best: " + (best > 0 ? best.ToString() : "--");
+			}
+		}
+
+		private void RefreshHistory()
+		{
+			var history = LoadHistory();
+
+			for (int i = 0; i < HistoryRows; i++)
+			{
+				bool hasRow = i < history.Count && history[i] != null;
+				int number = hasRow ? history.Count - i : 0;
+
+				SetCell(historyIndex, i, hasRow ? "#" + number : "--", new Color(0.75f, 0.75f, 0.8f));
+				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--", new Color(0.85f, 0.87f, 0.92f));
+				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
+				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() + " fps" : "--", new Color(0.55f, 0.9f, 0.6f));
+			}
+
+			if (historyEmpty != null) historyEmpty.gameObject.SetActive(history.Count == 0);
+
+			if (historyBest != null)
+			{
+				int best = GetBestScore();
+				historyBest.text = best > 0
+					? "Best score: " + best
+					: "Best score: -- (no runs yet)";
+			}
+		}
+
+		private static void SetCell(Text[] cells, int index, string value, Color color)
+		{
+			if (cells == null || index < 0 || index >= cells.Length) return;
+			var cell = cells[index];
+			if (cell == null) return;
+			cell.text = value;
+			cell.color = color;
+		}
+
+		private static string FormatDate(long unixSeconds)
+		{
+			try
+			{
+				var date = new DateTime(1970, 1, 1).AddSeconds(unixSeconds);
+				return date.ToString("dd.MM.yy HH:mm");
+			}
+			catch
+			{
+				return "--";
+			}
+		}
+
+		private static string FormatRam(int megabytes)
+		{
+			if (megabytes >= 1024)
+			{
+				return (megabytes / 1024f).ToString("0.#") + " GB";
+			}
+			return megabytes + " MB";
+		}
+
+		private static long NowUnix()
+		{
+			return (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
+		}
+
+		private static int GetBestScore()
+		{
+			return PlayerPrefs.GetInt(BestScorePrefsKey, 0);
+		}
+
+		private static List<HistoryEntry> LoadHistory()
+		{
+			var result = new List<HistoryEntry>();
+			string json = PlayerPrefs.GetString(HistoryPrefsKey, string.Empty);
+			if (string.IsNullOrEmpty(json)) return result;
+
+			try
+			{
+				var data = JsonUtility.FromJson<HistoryData>(json);
+				if (data != null && data.entries != null)
+				{
+					for (int i = 0; i < data.entries.Count; i++)
+					{
+						if (data.entries[i] != null) result.Add(data.entries[i]);
+					}
+				}
+			}
+			catch (Exception)
+			{
+				result.Clear();
+			}
+
+			return result;
+		}
+
+		private static void PushHistory(int score, int fps, int graphics, int physics, int memory)
+		{
+			var history = LoadHistory();
+
+			history.Insert(0, new HistoryEntry
+			{
+				score = score,
+				fps = fps,
+				graphics = graphics,
+				physics = physics,
+				memory = memory,
+				unixTime = NowUnix()
+			});
+
+			while (history.Count > MaxHistoryEntries) history.RemoveAt(history.Count - 1);
+
+			PlayerPrefs.SetString(HistoryPrefsKey, JsonUtility.ToJson(new HistoryData { entries = history }));
+
+			if (GetBestScore() < score)
+			{
+				PlayerPrefs.SetInt(BestScorePrefsKey, score);
+			}
+
+			PlayerPrefs.Save();
+		}
+
+		private HardwareSnapshot CollectHardware()
+		{
+			var snapshot = new HardwareSnapshot();
+
+			var board = system != null ? system.Board : null;
+			snapshot.hasBoard = board != null;
+			if (board != null) snapshot.boardName = board.gameObject.name;
+
+			if (board != null)
+			{
+				var gpus = board.GetHardwares(HardwareType.GPU);
+				if (gpus != null)
+				{
+					for (int i = 0; i < gpus.Count; i++)
+					{
+						var g = gpus[i];
+						if (g == null || g.Damaged) continue;
+						snapshot.gpuCount++;
+						snapshot.gpuScore += g.Score;
+						snapshot.gpuName = g.gameObject.name;
+					}
+				}
+
+				var cpus = board.GetHardwares(HardwareType.CPU);
+				if (cpus != null)
+				{
+					for (int i = 0; i < cpus.Count; i++)
+					{
+						var cpu = cpus[i] as CPU;
+						if (cpu == null || cpu.Damaged) continue;
+						snapshot.cpuCount++;
+						snapshot.cpuScore += cpu.frequency * cpu.Score;
+						snapshot.cpuName = cpu.gameObject.name;
+					}
+				}
+
+				var rams = board.GetHardwares(HardwareType.RAM);
+				if (rams != null)
+				{
+					for (int i = 0; i < rams.Count; i++)
+					{
+						var r = rams[i];
+						if (r == null || r.Damaged) continue;
+						snapshot.ramCount++;
+						snapshot.ramScore += r.Score;
+						snapshot.ramCapacity += r.Capacity;
+					}
+				}
+			}
+
+			if (snapshot.gpuScore == 0) snapshot.gpuScore = 200;
+			if (snapshot.cpuScore <= 0f) snapshot.cpuScore = 2000f;
+			if (snapshot.ramScore == 0) snapshot.ramScore = 1000;
+			if (snapshot.ramCapacity == 0) snapshot.ramCapacity = 2048;
+
+			return snapshot;
 		}
 
 		public void RunBenchmark()
@@ -338,7 +811,10 @@ namespace PC.Component.Software
 		{
 			if (buttonClose != null) buttonClose.interactable = false;
 			if (buttonRun != null) buttonRun.interactable = false;
+			if (buttonStart != null) buttonStart.interactable = false;
+			if (buttonMenu != null) buttonMenu.interactable = false;
 
+			if (startPanel != null) startPanel.SetActive(false);
 			if (resultsPanel != null) resultsPanel.SetActive(false);
 			if (testPanel != null) testPanel.SetActive(true);
 
@@ -357,60 +833,15 @@ namespace PC.Component.Software
 			{
 				CleanupCamera();
 				CleanupStage();
+				ShowStartScreen();
 				yield break;
 			}
 
-			int gpuRawScore = 0;
-			if (board != null)
-			{
-				var gpus = board.GetHardwares(HardwareType.GPU);
-				if (gpus != null)
-				{
-					for (int i = 0; i < gpus.Count; i++)
-					{
-						var g = gpus[i];
-						if (g != null && !g.Damaged) gpuRawScore += g.Score;
-					}
-				}
-			}
-			if (gpuRawScore == 0) gpuRawScore = 200;
-
-			float cpuRawScore = 0f;
-			if (board != null)
-			{
-				var cpus = board.GetHardwares(HardwareType.CPU);
-				if (cpus != null)
-				{
-					for (int i = 0; i < cpus.Count; i++)
-					{
-						var cpu = cpus[i] as CPU;
-						if (cpu != null && !cpu.Damaged)
-							cpuRawScore += cpu.frequency * cpu.Score;
-					}
-				}
-			}
-			if (cpuRawScore == 0f) cpuRawScore = 2000f;
-
-			int ramScore = 0;
-			int ramCapacity = 0;
-			if (board != null)
-			{
-				var rams = board.GetHardwares(HardwareType.RAM);
-				if (rams != null)
-				{
-					for (int i = 0; i < rams.Count; i++)
-					{
-						var r = rams[i];
-						if (r != null && !r.Damaged)
-						{
-							ramScore += r.Score;
-							ramCapacity += r.Capacity;
-						}
-					}
-				}
-			}
-			if (ramScore == 0) ramScore = 1000;
-			if (ramCapacity == 0) ramCapacity = 2048;
+			var hardware = CollectHardware();
+			int gpuRawScore = hardware.gpuScore;
+			float cpuRawScore = hardware.cpuScore;
+			int ramScore = hardware.ramScore;
+			int ramCapacity = hardware.ramCapacity;
 
 			// Расчёт базового FPS для собранного ПК
 			float cpuFactor = Mathf.Clamp(cpuRawScore / 8000f, 0.45f, 1.4f);
@@ -496,6 +927,7 @@ namespace PC.Component.Software
 					{
 						CleanupCamera();
 						CleanupStage();
+						ShowStartScreen();
 						yield break;
 					}
 
@@ -527,9 +959,13 @@ namespace PC.Component.Software
 							Vector3 lookPoint = seg.lookAtTransform != null ? seg.lookAtTransform.position : seg.lookAtPos;
 							Vector3 lookDir = lookPoint - targetPos;
 							if (lookDir.sqrMagnitude > 0.001f)
+							{
 								targetRot = Quaternion.LookRotation(lookDir, Vector3.up);
+							}
 							else
+							{
 								targetRot = camObj.transform.rotation;
+							}
 						}
 						else if (seg.hasRotations)
 						{
@@ -539,9 +975,13 @@ namespace PC.Component.Software
 						{
 							Vector3 fwd = seg.endPos - seg.startPos;
 							if (fwd.sqrMagnitude > 0.001f)
+							{
 								targetRot = Quaternion.LookRotation(fwd, Vector3.up);
+							}
 							else
+							{
 								targetRot = camObj.transform.rotation;
+							}
 						}
 
 						// Первый кадр ориентируем сразу, далее мягко сглаживаем поворот (Slerp)
@@ -591,6 +1031,9 @@ namespace PC.Component.Software
 
 			int totalScore = Mathf.RoundToInt((graphicsScore * 0.60f) + (physicsScore * 0.25f) + (memoryScore * 0.15f));
 			totalScore = Mathf.Max(200, totalScore);
+
+			// Сохраняем прогон в локальную историю этого ПК
+			PushHistory(totalScore, Mathf.RoundToInt(baseFps), graphicsScore, physicsScore, memoryScore);
 
 			// Переход на экран результатов
 			if (testPanel != null) testPanel.SetActive(false);
@@ -655,13 +1098,6 @@ namespace PC.Component.Software
 				yield return new WaitForSeconds(0.2f);
 			}
 
-			// Сохранение рекорда 3DMork
-			if (PlayerPrefs.GetInt("3DMork_Score", 0) < totalScore)
-			{
-				PlayerPrefs.SetInt("3DMork_Score", totalScore);
-				PlayerPrefs.Save();
-			}
-
 			// Анимация кольца и общего счёта
 			float tScore = 0f;
 			while (tScore < 1f)
@@ -676,6 +1112,7 @@ namespace PC.Component.Software
 
 			if (buttonClose != null) buttonClose.interactable = true;
 			if (buttonRun != null) buttonRun.interactable = true;
+			if (buttonMenu != null) buttonMenu.interactable = true;
 
 			benchmarkCoroutine = null;
 		}

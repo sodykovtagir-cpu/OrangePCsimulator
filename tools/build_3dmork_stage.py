@@ -271,7 +271,7 @@ lights_children.append(add_light_obj("Neon_Orange_Point", id_lights_tr, (3.8, 2.
 # Cyan Point Light (type 2)
 lights_children.append(add_light_obj("Neon_Cyan_Point", id_lights_tr, (-3.8, 2.5, 3.8), (0, 0, 0, 1), 2, (0.1, 0.75, 1.0), 2.5, 14))
 # Spotlight pointing at pedestal (type 0)
-lights_children.append(add_light_obj("Pedestal_Spot", id_lights_tr, (0, 5.8, 0), (0.7071, 0, 0, 0.7071), 0, (1.0, 0.98, 0.9), 3.2, 10, spot_angle=58))
+lights_children.append(add_light_obj("Pedestal_Spot", id_lights_tr, (0, 5.8, 0), (0.7071068, 0, 0, 0.7071068), 0, (1.0, 0.98, 0.9), 3.2, 10, spot_angle=58))
 
 # 4. Waypoints
 wp_children = []

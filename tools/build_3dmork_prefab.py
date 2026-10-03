@@ -1,4 +1,19 @@
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from unity_ui_emitter import (  # noqa: E402
+    UIEmitter,
+    ALIGN_MIDDLE_CENTER,
+    ALIGN_MIDDLE_LEFT,
+    FONT_BOLD,
+    FONT_ITALIC,
+)
+
+# Количество заранее собранных строк в таблице сравнения и в истории
+LEADERBOARD_ROWS = 8
+HISTORY_ROWS = 5
 
 FONT_GUID = "2644e223131232f41a7199fc4aef1e34"
 CIRCLE_SPRITE_GUID = "09807ade07a9e244dabec7885cc0a17a"
@@ -33,6 +48,142 @@ id_root_tr = b.next_id()
 id_root_cr = b.next_id()
 id_root_img = b.next_id()
 id_root_app = b.next_id()
+
+# ============================================================================
+# 0. START PANEL - предсобранный (не процедурный) стартовый экран:
+#    слева сравнительная таблица результатов других ПК, справа история
+#    тестов на этой машине + сводка по установленному железу.
+#    Скрипт ThreeDMork только подставляет текст в эти заранее собранные поля.
+# ============================================================================
+ui = UIEmitter(b)
+
+C_PANEL = "0.12, 0.12, 0.16, 0.92"
+C_PANEL_DARK = "0.09, 0.09, 0.12, 0.95"
+C_HEADER = "0.19, 0.2, 0.26, 1"
+C_ROW_A = "0.15, 0.15, 0.2, 0.9"
+C_ROW_B = "0.175, 0.175, 0.225, 0.9"
+C_ROW_SELF = "0.3, 0.2, 0.05, 0.95"
+C_TEXT = "1, 1, 1, 1"
+C_TEXT_DIM = "0.62, 0.65, 0.72, 1"
+C_TEXT_SOFT = "0.85, 0.87, 0.92, 1"
+C_TEXT_ORANGE = "1, 0.72, 0.2, 1"
+C_TEXT_GREEN = "0.55, 0.9, 0.6, 1"
+C_TEXT_HEADER = "0.72, 0.76, 0.85, 1"
+
+# Идентификаторы кнопки "в меню" резервируются заранее: её GameObject создаётся
+# ниже, в секции экрана результатов, но на неё ссылается и корневой скрипт.
+MENU_BTN_IDS = tuple(b.next_id() for _ in range(5))
+id_btn_menu = MENU_BTN_IDS[4]
+id_btn_menu_tr = MENU_BTN_IDS[1]
+
+id_start_panel_go, id_start_panel_tr = ui.stretch_panel("StartPanel", id_root_tr)
+
+# --- Левая колонка: сравнение с другими ПК ---------------------------------
+LB_X, LB_Y, LB_W, LB_H = 12, 10, 486, 380
+_, id_lb_tr, _ = ui.background("LeaderboardPanel", id_start_panel_tr, LB_X, LB_Y, LB_W, LB_H, C_PANEL)
+
+ui.text("Title", id_lb_tr, 10, 6, 466, 22, "COMPARISON WITH OTHER PCs",
+        color=C_TEXT_ORANGE, size=15, style=FONT_BOLD, align=ALIGN_MIDDLE_LEFT)
+ui.text("Subtitle", id_lb_tr, 10, 30, 466, 16, "Reference 3DMork results of the global leaderboard",
+        color=C_TEXT_DIM, size=10, align=ALIGN_MIDDLE_LEFT)
+
+ui.background("HeaderRow", id_lb_tr, 8, 50, 470, 22, C_HEADER)
+LB_HEADER = [("#", 8, 30, ALIGN_MIDDLE_CENTER), ("PC", 38, 128, ALIGN_MIDDLE_LEFT),
+             ("CPU", 166, 96, ALIGN_MIDDLE_LEFT), ("GPU", 262, 108, ALIGN_MIDDLE_LEFT),
+             ("SCORE", 370, 60, ALIGN_MIDDLE_CENTER), ("FPS", 430, 48, ALIGN_MIDDLE_CENTER)]
+for _label, _x, _w, _align in LB_HEADER:
+    ui.text("Header_" + _label, id_lb_tr, _x, 50, _w, 22, _label,
+            color=C_TEXT_HEADER, size=11, style=FONT_BOLD, align=_align)
+
+lb_rank, lb_name, lb_cpu, lb_gpu, lb_score, lb_fps = [], [], [], [], [], []
+for _i in range(LEADERBOARD_ROWS):
+    _y = 74 + _i * 25
+    ui.background("LbRow_%d" % _i, id_lb_tr, 8, _y, 470, 24, C_ROW_A if _i % 2 == 0 else C_ROW_B)
+    lb_rank.append(ui.text("LbRank_%d" % _i, id_lb_tr, 8, _y, 30, 24, "#%d" % (_i + 1),
+                           color=C_TEXT_DIM, size=11, align=ALIGN_MIDDLE_CENTER))
+    lb_name.append(ui.text("LbName_%d" % _i, id_lb_tr, 38, _y, 128, 24, "--",
+                           color=C_TEXT, size=11, align=ALIGN_MIDDLE_LEFT, best_fit=1))
+    lb_cpu.append(ui.text("LbCpu_%d" % _i, id_lb_tr, 166, _y, 96, 24, "--",
+                          color=C_TEXT_SOFT, size=10, align=ALIGN_MIDDLE_LEFT, best_fit=1))
+    lb_gpu.append(ui.text("LbGpu_%d" % _i, id_lb_tr, 262, _y, 108, 24, "--",
+                          color=C_TEXT_SOFT, size=10, align=ALIGN_MIDDLE_LEFT, best_fit=1))
+    lb_score.append(ui.text("LbScore_%d" % _i, id_lb_tr, 370, _y, 60, 24, "--",
+                            color=C_TEXT_ORANGE, size=11, style=FONT_BOLD, align=ALIGN_MIDDLE_CENTER))
+    lb_fps.append(ui.text("LbFps_%d" % _i, id_lb_tr, 430, _y, 48, 24, "--",
+                          color=C_TEXT_GREEN, size=10, align=ALIGN_MIDDLE_CENTER))
+
+# Строка "этот компьютер"
+ui.background("SelfRow", id_lb_tr, 8, 276, 470, 28, C_ROW_SELF)
+lb_self_rank = ui.text("SelfRank", id_lb_tr, 8, 276, 30, 28, "*", color=C_TEXT_ORANGE, size=13,
+                       style=FONT_BOLD, align=ALIGN_MIDDLE_CENTER)
+lb_self_name = ui.text("SelfName", id_lb_tr, 38, 276, 128, 28, "This PC", color=C_TEXT, size=11,
+                       style=FONT_BOLD, align=ALIGN_MIDDLE_LEFT, best_fit=1)
+lb_self_spec = ui.text("SelfSpec", id_lb_tr, 166, 276, 204, 28, "--", color=C_TEXT_SOFT, size=10,
+                       align=ALIGN_MIDDLE_LEFT, best_fit=1)
+lb_self_score = ui.text("SelfScore", id_lb_tr, 370, 276, 60, 28, "--", color=C_TEXT_ORANGE, size=11,
+                        style=FONT_BOLD, align=ALIGN_MIDDLE_CENTER)
+lb_self_fps = ui.text("SelfFps", id_lb_tr, 430, 276, 48, 28, "--", color=C_TEXT_GREEN, size=10,
+                     align=ALIGN_MIDDLE_CENTER)
+lb_average = ui.text("Average", id_lb_tr, 8, 310, 470, 18, "Average of reference PCs: --",
+                     color=C_TEXT_DIM, size=10, align=ALIGN_MIDDLE_LEFT)
+ui.text("Hint", id_lb_tr, 8, 330, 470, 18, "Your PC is marked with * - the row updates after every run.",
+        color=C_TEXT_DIM, size=10, style=FONT_ITALIC, align=ALIGN_MIDDLE_LEFT)
+
+# --- Правая колонка: история тестов этого ПК --------------------------------
+HI_X, HI_Y, HI_W, HI_H = 506, 10, 332, 380
+_, id_hist_tr, _ = ui.background("HistoryPanel", id_start_panel_tr, HI_X, HI_Y, HI_W, HI_H, C_PANEL)
+
+ui.text("Title", id_hist_tr, 10, 6, 312, 22, "TEST HISTORY - THIS PC",
+        color=C_TEXT_ORANGE, size=15, style=FONT_BOLD, align=ALIGN_MIDDLE_LEFT)
+ui.text("Subtitle", id_hist_tr, 10, 30, 312, 16, "Runs are stored locally on this computer",
+        color=C_TEXT_DIM, size=10, align=ALIGN_MIDDLE_LEFT)
+
+ui.background("HeaderRow", id_hist_tr, 8, 50, 316, 20, C_HEADER)
+HI_HEADER = [("#", 8, 24, ALIGN_MIDDLE_CENTER), ("DATE", 32, 118, ALIGN_MIDDLE_LEFT),
+             ("SCORE", 150, 78, ALIGN_MIDDLE_CENTER), ("FPS", 228, 88, ALIGN_MIDDLE_CENTER)]
+for _label, _x, _w, _align in HI_HEADER:
+    ui.text("Header_" + _label, id_hist_tr, _x, 50, _w, 20, _label,
+            color=C_TEXT_HEADER, size=11, style=FONT_BOLD, align=_align)
+
+hist_index, hist_date, hist_score, hist_fps = [], [], [], []
+for _i in range(HISTORY_ROWS):
+    _y = 72 + _i * 25
+    ui.background("HistRow_%d" % _i, id_hist_tr, 8, _y, 316, 24, C_ROW_A if _i % 2 == 0 else C_ROW_B)
+    hist_index.append(ui.text("HistIndex_%d" % _i, id_hist_tr, 8, _y, 24, 24, "--",
+                              color=C_TEXT_DIM, size=11, align=ALIGN_MIDDLE_CENTER))
+    hist_date.append(ui.text("HistDate_%d" % _i, id_hist_tr, 32, _y, 118, 24, "--",
+                             color=C_TEXT_SOFT, size=10, align=ALIGN_MIDDLE_LEFT))
+    hist_score.append(ui.text("HistScore_%d" % _i, id_hist_tr, 150, _y, 78, 24, "--",
+                              color=C_TEXT_ORANGE, size=11, style=FONT_BOLD, align=ALIGN_MIDDLE_CENTER))
+    hist_fps.append(ui.text("HistFps_%d" % _i, id_hist_tr, 228, _y, 88, 24, "--",
+                            color=C_TEXT_GREEN, size=10, align=ALIGN_MIDDLE_CENTER))
+
+hist_empty = ui.text("EmptyHint", id_hist_tr, 8, 72, 316, 125, "No benchmark runs on this PC yet.",
+                     color=C_TEXT_DIM, size=11, align=ALIGN_MIDDLE_CENTER, active=1)
+hist_best = ui.text("BestScore", id_hist_tr, 8, 200, 316, 20, "Best score: --",
+                    color=C_TEXT_ORANGE, size=12, style=FONT_BOLD, align=ALIGN_MIDDLE_LEFT)
+
+# Сводка по текущему железу
+_, id_hw_tr, _ = ui.background("HardwarePanel", id_hist_tr, 8, 226, 316, 146, C_PANEL_DARK)
+hw_title = ui.text("HwTitle", id_hw_tr, 8, 6, 300, 20, "THIS PC", color=C_TEXT, size=12,
+                   style=FONT_BOLD, align=ALIGN_MIDDLE_LEFT)
+hw_cpu = ui.text("HwCpu", id_hw_tr, 8, 30, 300, 22, "CPU: --", color=C_TEXT_SOFT, size=11,
+                 align=ALIGN_MIDDLE_LEFT, best_fit=1)
+hw_gpu = ui.text("HwGpu", id_hw_tr, 8, 56, 300, 22, "GPU: --", color=C_TEXT_SOFT, size=11,
+                 align=ALIGN_MIDDLE_LEFT, best_fit=1)
+hw_ram = ui.text("HwRam", id_hw_tr, 8, 82, 300, 22, "RAM: --", color=C_TEXT_SOFT, size=11,
+                 align=ALIGN_MIDDLE_LEFT, best_fit=1)
+hw_board = ui.text("HwBoard", id_hw_tr, 8, 108, 300, 22, "BOARD: --", color=C_TEXT_SOFT, size=11,
+                   align=ALIGN_MIDDLE_LEFT, best_fit=1)
+
+# --- Кнопки стартового экрана ----------------------------------------------
+id_btn_start, _, _ = ui.button("ButtonStart", id_start_panel_tr, 305, 400, 240, 44, "START TEST",
+                               "1, 0.5, 0, 1", label_size=20)
+id_btn_start_close, _, _ = ui.button("ButtonStartClose", id_start_panel_tr, 688, 400, 150, 44, "CLOSE",
+                                    "0.32, 0.32, 0.38, 1", label_size=18)
+ui.text("FooterNote", id_start_panel_tr, 12, 404, 260, 36,
+        "Camera flyby runs in a separate benchmark room. FPS depends on the PC you built.",
+        color=C_TEXT_DIM, size=9, style=FONT_ITALIC, align=ALIGN_MIDDLE_LEFT)
 
 # 2. Title Bar IDs
 id_title_go = b.next_id()
@@ -224,6 +375,7 @@ RectTransform:
   m_LocalScale: {{x: 1, y: 1, z: 1}}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {{fileID: {id_start_panel_tr}}}
   - {{fileID: {id_title_tr}}}
   - {{fileID: {id_test_panel_tr}}}
   - {{fileID: {id_res_panel_tr}}}
@@ -287,8 +439,45 @@ MonoBehaviour:
   maximizeSprite: {{fileID: 21300000, guid: {MAX_SPRITE_GUID}, type: 2}}
   normalSprite: {{fileID: 0}}
   windowState: {{fileID: {id_title_max_img}}}
+  startPanel: {{fileID: {id_start_panel_go}}}
   testPanel: {{fileID: {id_test_panel_go}}}
   resultsPanel: {{fileID: {id_res_panel_go}}}
+  buttonStart: {{fileID: {id_btn_start}}}
+  buttonStartClose: {{fileID: {id_btn_start_close}}}
+  buttonMenu: {{fileID: {id_btn_menu}}}
+  leaderboardRank:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_rank)}
+  leaderboardName:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_name)}
+  leaderboardCpu:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_cpu)}
+  leaderboardGpu:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_gpu)}
+  leaderboardScore:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_score)}
+  leaderboardFps:
+{chr(10).join("  - {fileID: %s}" % t for t in lb_fps)}
+  leaderboardSelfRank: {{fileID: {lb_self_rank}}}
+  leaderboardSelfName: {{fileID: {lb_self_name}}}
+  leaderboardSelfSpec: {{fileID: {lb_self_spec}}}
+  leaderboardSelfScore: {{fileID: {lb_self_score}}}
+  leaderboardSelfFps: {{fileID: {lb_self_fps}}}
+  leaderboardAverage: {{fileID: {lb_average}}}
+  historyIndex:
+{chr(10).join("  - {fileID: %s}" % t for t in hist_index)}
+  historyDate:
+{chr(10).join("  - {fileID: %s}" % t for t in hist_date)}
+  historyScore:
+{chr(10).join("  - {fileID: %s}" % t for t in hist_score)}
+  historyFps:
+{chr(10).join("  - {fileID: %s}" % t for t in hist_fps)}
+  historyBest: {{fileID: {hist_best}}}
+  historyEmpty: {{fileID: {hist_empty}}}
+  hardwareTitle: {{fileID: {hw_title}}}
+  hardwareCpu: {{fileID: {hw_cpu}}}
+  hardwareGpu: {{fileID: {hw_gpu}}}
+  hardwareRam: {{fileID: {hw_ram}}}
+  hardwareBoard: {{fileID: {hw_board}}}
   viewportImage: {{fileID: {id_viewport_raw}}}
   fpsText: {{fileID: {id_fps_text}}}
   sceneInfoText: {{fileID: {id_scene_text}}}
@@ -968,7 +1157,7 @@ GameObject:
   m_Icon: {{fileID: 0}}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &{id_test_panel_tr}
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1601,6 +1790,11 @@ MonoBehaviour:
   m_FillCenter: 1
 """)
 
+# Кнопка "в меню" на экране результатов (возврат к стартовому экрану)
+id_btn_menu, _, id_btn_menu_tr = ui.button("ButtonMenu", id_res_panel_tr, -140, 40, 160, 38,
+                                           "TO MENU", "0.32, 0.32, 0.38, 1", label_size=16,
+                                           anchor="bottomcenter", track=False, ids=MENU_BTN_IDS)
+
 # --- RESULTS PANEL ---
 b.add(f"""
 --- !u!1 &{id_res_panel_go}
@@ -1641,6 +1835,7 @@ RectTransform:
   - {{fileID: {cat_ids[3]['row_tr']}}}
   - {{fileID: {id_btn_run_tr}}}
   - {{fileID: {id_btn_close_tr}}}
+  - {{fileID: {id_btn_menu_tr}}}
   m_Father: {{fileID: {id_root_tr}}}
   m_LocalEulerAnglesHint: {{x: 0, y: 0, z: 0}}
   m_AnchorMin: {{x: 0, y: 0}}
@@ -2947,6 +3142,8 @@ MonoBehaviour:
     m_LineSpacing: 1
   m_Text: Close
 """)
+
+ui.finalize()
 
 full_yaml = "%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n" + "\n".join(b.chunks) + "\n"
 out_path = "Assets/Resources/apps/3DMork.prefab"
