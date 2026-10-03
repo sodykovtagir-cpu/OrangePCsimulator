@@ -39,6 +39,16 @@ def references(value):
             yield from references(child)
 
 
+def generated_keys():
+    """Keys owned by the 3DMork translation table, they must cover all 42 columns."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("dm3_i18n", ROOT / "tools/3dmork_i18n.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return set(module.STRINGS)
+
+
 def main():
     table_path = ASSETS / "Resources/Translate.txt"
     rows = [line.split("\t") for line in table_path.read_text().splitlines()]
@@ -47,18 +57,33 @@ def main():
     assert len(table) == len(rows), "duplicate keys"
     languages = table["*Short Form"]
     assert len(languages) == len(set(languages)) == 42
+    # The owner maintains EN/RU/UA by hand, Localization.GetText falls back to EN
+    # for every other column, so a partial row is allowed for hand written copy.
+    # Rows owned by tools/3dmork_i18n.py are generated and must be complete.
+    complete = set(generated_keys())
+    partial = 0
     for key, values in table.items():
         if key.startswith("*"):
             continue
-        assert len(values) == len(languages) and all(value.strip() for value in values), key
+        assert len(values) == len(languages), key
+        if key in complete:
+            assert all(value.strip() for value in values), key
+        else:
+            for language in ("EN", "RU", "UA"):
+                assert values[languages.index(language)].strip(), (key, language)
+            partial += not all(value.strip() for value in values)
         expected = Counter(re.findall(r"\{\d+\}", values[0]))
         for language, value in zip(languages, values):
+            if not value.strip():
+                continue
             assert Counter(re.findall(r"\{\d+\}", value)) == expected, (key, language)
             assert not re.search(r"(?:ZZ|ЗЗ|ΖΖ)(?:BRAND|БРАНД)", value, re.I), (key, language)
     for path in CS.rglob("*.cs"):
         for match in re.finditer(r'\b(?:Localization.GetText|Tr)\(\s*"((?:\\.|[^"\\])*)"\s*(?=[,)])', path.read_text(errors="replace")):
             assert match[1] in table, (path, match[1])
-    print("PASS: every runtime literal lookup is present; all", len(rows) - 6, "text rows have 42 nonempty translations and matching format arguments")
+    print("PASS: every runtime literal lookup is present;", len(complete),
+          "generated rows have 42 nonempty translations;", len(rows) - 6 - len(complete),
+          "hand written rows keep EN/RU/UA", "and", partial, "of them are still partial")
 
     localizers = {guid(CS / "LocalizationText.cs"), guid(CS / "LocalizationTextBracket.cs")}
     targets = {
@@ -69,6 +94,13 @@ def main():
         "Resources/apps/Viewer.prefab": {"Viewer"},
         "GameObject/ModForge.prefab": {"Products", "Checkout", "Build a PC that is uniquely yours.", "No resolution limit"},
         "Resources/apps/Personalization.prefab": {"Select wallpaper"},
+        "Resources/apps/3DMork.prefab": {
+            "3DMork", "3DMork comparison title", "3DMork comparison hint",
+            "3DMork column cpu", "3DMork column gpu", "3DMork column score",
+            "3DMork history title", "3DMork history empty", "3DMork start test",
+            "Close", "3DMork run again", "3DMork to menu", "3DMork results title",
+            "3DMork score label", "3DMork graphics score", "3DMork memory score",
+        },
     }
     for name, labels in targets.items():
         objects = docs(ASSETS / name)

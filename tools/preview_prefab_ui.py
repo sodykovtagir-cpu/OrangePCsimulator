@@ -7,6 +7,7 @@ the Unity editor. It is a development tool, never shipped in a build.
 Usage: python3 tools/preview_prefab_ui.py <prefab> <RootGameObjectName> <out.png>
 """
 
+import os
 import re
 import sys
 
@@ -78,25 +79,46 @@ class Prefab:
 
 
 def rect_of(prefab, tr_id, parent_rect):
-    amin, amax, pos, size, pivot, _, _ = prefab.rect_data(tr_id)
+    """Unity layout: the pivot sits on the anchor reference point + anchoredPosition.
+
+    The anchor reference point is placed at (anchorMin + pivot * (anchorMax - anchorMin))
+    inside the parent, which is what makes a top-left pivot with stretched anchors
+    behave like a plain top-left offset. parent_rect is (left, bottom, width, height)
+    with y growing upwards, the drawing helpers flip it for the image.
+    """
+    amin, amax, pos, size_delta, pivot, _, _ = prefab.rect_data(tr_id)
     px, py, pw, ph = parent_rect
-    x0 = px + amin[0] * pw
-    y0 = py + amin[1] * ph
-    x1 = px + amax[0] * pw
-    y1 = py + amax[1] * ph
-    left = x0 + pos[0] - pivot[0] * size[0] * (1 if amax[0] == amin[0] else 0)
-    top = y0 + pos[1] - pivot[1] * size[1] * (1 if amax[1] == amin[1] else 0)
-    if amax[0] != amin[0]:
-        left = x0 + pos[0]
-        width = (x1 - x0) + size[0]
-    else:
-        width = size[0]
-    if amax[1] != amin[1]:
-        top = y0 + pos[1]
-        height = (y1 - y0) + size[1]
-    else:
-        height = size[1]
-    return (left, top, width, height)
+    width = (amax[0] - amin[0]) * pw + size_delta[0]
+    height = (amax[1] - amin[1]) * ph + size_delta[1]
+    anchor_x = px + (amin[0] + pivot[0] * (amax[0] - amin[0])) * pw + pos[0]
+    anchor_y = py + (amin[1] + pivot[1] * (amax[1] - amin[1])) * ph + pos[1]
+    return (anchor_x - pivot[0] * width, anchor_y - pivot[1] * height, width, height)
+
+
+def load_translations(prefab_path, language="EN"):
+    """Localization.GetText equivalent for the offline preview.
+
+    Any authored m_Text that exists as a key in Resources/Translate.txt is
+    replaced by its translation, exactly like LocalizationText does in Unity.
+    """
+    table = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(prefab_path)),
+                                         "..", "Translate.txt"))
+    if not os.path.exists(table):
+        # prefabs rendered from a temp copy fall back to the shipped table
+        table = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             "..", "Assets", "Resources", "Translate.txt"))
+    if not os.path.exists(table):
+        return {}
+    rows = [line.split("\t") for line in open(table, encoding="utf-8").read().splitlines() if line.strip()]
+    if not rows:
+        return {}
+    languages = rows[0][1:]
+    column = languages.index(language) if language in languages else 0
+    out = {}
+    for row in rows[1:]:
+        if len(row) > column + 1 and row[1 + column].strip():
+            out[row[0]] = row[1 + column]
+    return out
 
 
 def color_of(body, prefix="m_Color: {r: "):
@@ -107,7 +129,8 @@ def color_of(body, prefix="m_Color: {r: "):
     return (int(r * 255), int(g * 255), int(b * 255), int(a * 255))
 
 
-def render(prefab, tr_id, rect, font, draw_image, draw_text):
+def render(prefab, tr_id, rect, font, draw_image, draw_text, translations=None):
+    translations = translations or {}
     amin, amax, pos, size, pivot, father, kids = prefab.rect_data(tr_id)
     if father != "0" and not parent_visible(prefab, father):
         return
@@ -124,12 +147,13 @@ def render(prefab, tr_id, rect, font, draw_image, draw_text):
             content = content.group(1).strip() if content else ""
             if content.startswith("'") and content.endswith("'"):
                 content = content[1:-1].replace("''", "'")
+            content = translations.get(content, content)
             size_px = int(re.search(r"    m_FontSize: (\d+)", body).group(1))
             align = int(re.search(r"    m_Alignment: (\d+)", body).group(1))
             draw_text(rect, content, color_of(body), size_px, align, font)
 
     for kid in kids:
-        render(prefab, kid, rect_of(prefab, kid, rect), font, draw_image, draw_text)
+        render(prefab, kid, rect_of(prefab, kid, rect), font, draw_image, draw_text, translations)
 
 
 def parent_visible(prefab, tr_id):
@@ -143,8 +167,10 @@ def parent_visible(prefab, tr_id):
     return parent_visible(prefab, father)
 
 
-def main(prefab_path, root_name, out_path, width=850, height=520, panel=None, force_active=True):
+def main(prefab_path, root_name, out_path, width=850, height=520, panel=None,
+         force_active=True, language="EN"):
     prefab = Prefab(prefab_path)
+    translations = load_translations(prefab_path, language)
     if force_active:
         for fid in prefab.active:
             prefab.active[fid] = True
@@ -200,10 +226,12 @@ def main(prefab_path, root_name, out_path, width=850, height=520, panel=None, fo
         panel_tr = prefab.rect_of(panel_go)
         # draw everything, then overlay only the requested panel
         for child in prefab.rect_data(panel_tr)[6]:
-            render(prefab, child, rect_of(prefab, child, (0, 0, size[0], size[1])), font, draw_image, draw_text)
+            render(prefab, child, rect_of(prefab, child, (0, 0, size[0], size[1])),
+                   font, draw_image, draw_text, translations)
     else:
         for child in prefab.rect_data(root_tr)[6]:
-            render(prefab, child, rect_of(prefab, child, (0, 0, size[0], size[1])), font, draw_image, draw_text)
+            render(prefab, child, rect_of(prefab, child, (0, 0, size[0], size[1])),
+                   font, draw_image, draw_text, translations)
 
     img.save(out_path)
     print("wrote %s (%dx%d)" % (out_path, img.width, img.height))
@@ -211,4 +239,5 @@ def main(prefab_path, root_name, out_path, width=850, height=520, panel=None, fo
 
 if __name__ == "__main__":
     main(sys.argv[1], sys.argv[2], sys.argv[3],
-         panel=sys.argv[4] if len(sys.argv) > 4 else None)
+         panel=sys.argv[4] if len(sys.argv) > 4 else None,
+         language=sys.argv[5] if len(sys.argv) > 5 else "EN")

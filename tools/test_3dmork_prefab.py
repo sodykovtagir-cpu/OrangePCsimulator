@@ -24,6 +24,9 @@ SCRIPT = ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/ThreeDMork
 STAGE = ROOT / "Assets/Resources/3DMork_Stage.prefab"
 SCENE = ROOT / "Assets/Scenes/3DMork_Room.unity"
 SCRIPT_GUID = "48ab01ab22fd4bc78201ca8ad4b6d729"
+LOCALIZER_GUID = re.search(r"^guid: (\w+)$",
+                           (ROOT / "Assets/Scripts/Assembly-CSharp/LocalizationText.cs.meta")
+                           .read_text(encoding="utf-8"), re.M).group(1)
 
 LEADERBOARD_ROWS = 8
 HISTORY_ROWS = 5
@@ -112,6 +115,14 @@ for panel in ("StartPanel", "TestPanel", "ResultsPanel"):
         check(active[go] == (panel == "StartPanel"),
               f"{panel} активен в префабе: {'да' if panel == 'StartPanel' else 'нет'}")
 
+def rect_of(go_id: str) -> tuple[float, float]:
+    """(width, height) of the RectTransform of a GameObject."""
+    rect_id = components_of(go_id)[0]
+    body = by_id[rect_id][1]
+    size = re.search(r"^  m_SizeDelta: \{x: (-?[\d.]+), y: (-?[\d.]+)\}$", body, re.M)
+    return float(size.group(1)), float(size.group(2))
+
+
 def descendants(go_id: str) -> list[str]:
     rect = [c for c in components_of(go_id) if by_id[c][0] == 224]
     if not rect:
@@ -193,7 +204,7 @@ REQUIRED_SINGLE = [
     "leaderboardSelfScore", "leaderboardSelfFps", "leaderboardAverage",
     "historyBest", "historyEmpty",
     "hardwareTitle", "hardwareCpu", "hardwareGpu", "hardwareRam", "hardwareBoard",
-    "viewportImage", "fpsText", "sceneInfoText", "testProgressBar",
+    "viewportImage", "fpsText", "testProgressBar",
     "textTotalScore", "markCircle", "buttonClose", "buttonRun",
 ]
 REQUIRED_ARRAYS = [
@@ -259,13 +270,92 @@ check("ReferenceBenchmarks" in script_text, "таблица сравнения �
 check("ShowStartScreen" in script_text, "перед тестом открывается стартовый экран")
 
 # ---------------------------------------------------------------------------
-# 6. Генератор префаба воспроизводим
+# 6. Патчер префаба идемпотентен, локализация строк на месте
 # ---------------------------------------------------------------------------
+# Префаб правится вручную в Unity, генератор tools/build_3dmork_prefab.py больше
+# не используется: его проверяет только то, что он не запускается.
 before = PREFAB.read_text(encoding="utf-8")
-subprocess.run([sys.executable, "tools/build_3dmork_prefab.py"],
-               cwd=str(ROOT), capture_output=True, text=True)
+result = subprocess.run([sys.executable, "tools/patch_3dmork_prefab.py"],
+                        cwd=str(ROOT), capture_output=True, text=True)
+check(result.returncode == 0, "патчер префаба отрабатывает без ошибок")
 check(PREFAB.read_text(encoding="utf-8") == before,
-      "повторный запуск генератора не меняет префаб")
+      "повторный запуск патчера не меняет префаб")
+
+import importlib.util  # noqa: E402
+
+spec = importlib.util.spec_from_file_location("dm3_i18n", ROOT / "tools/3dmork_i18n.py")
+i18n = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(i18n)
+
+table = {}
+for row in (ROOT / "Assets/Resources/Translate.txt").read_text(encoding="utf-8").splitlines():
+    cells = row.split("\t")
+    if cells and cells[0]:
+        table[cells[0]] = cells[1:]
+
+LOCALIZED = {
+    "Header_PC": "3DMork column pc", "Header_CPU": "3DMork column cpu",
+    "Header_GPU": "3DMork column gpu", "Header_SCORE": "3DMork column score",
+    "Header_DATE": "3DMork column date", "Header_FPS": "3DMork column fps",
+    "Title": None, "Subtitle": None, "EmptyHint": "3DMork history empty",
+    "Hint": "3DMork comparison hint", "ScoreLabel": "3DMork score label",
+    "Label": None, "Text": None, "Header": "3DMork results title",
+}
+
+localized = 0
+missing_localizer = []
+missing_key = []
+for file_id, (class_id, body) in by_id.items():
+    if class_id != 114 or "\n  m_Text: " not in body:
+        continue
+    go = re.search(r"m_GameObject: \{fileID: (\d+)\}", body).group(1)
+    key = re.search(r"\n  m_Text: '?([^'\n]*)'?\n", body).group(1)
+    if not key.startswith("3DMork") and key not in ("Close", "Benchmark", "Start", "Back"):
+        continue
+    localized += 1
+    if key not in table:
+        missing_key.append(key)
+    has = any(by_id.get(c, (0, ""))[0] == 114 and LOCALIZER_GUID in by_id.get(c, (0, ""))[1]
+              for c in components_of(go))
+    if not has:
+        missing_localizer.append(names.get(go, "?") + " -> " + key)
+check(localized >= 25, f"статические подписи хранят ключ перевода (найдено {localized})")
+check(not missing_key, f"все ключи префаба есть в таблице перевода ({missing_key[:3]})")
+check(not missing_localizer,
+      f"на каждой статической подписи висят LocalizationText ({missing_localizer[:3]})")
+
+# размер окна уменьшен и совпадает с SetDefaultSize в скрипте
+root = game_object("3DMork")
+root_rect = rect_of(root)
+check(abs(root_rect[0] - 722.5) < 0.01 and abs(root_rect[1] - 408.534) < 0.01,
+      f"окно уменьшено до 722.5x408.5 (сейчас {root_rect[0]:.1f}x{root_rect[1]:.1f})")
+match = re.search(r"SetDefaultSize\(new Vector2\(([\d.]+)f, ([\d.]+)f\)\)", script_text)
+check(bool(match) and abs(float(match.group(1)) - 722.5) < 0.01,
+      "SetDefaultSize в скрипте совпадает с размером префаба")
+
+# best fit не должен увеличивать подпись выше авторского кегля
+grown = 0
+for file_id, (class_id, body) in by_id.items():
+    if class_id != 114 or "m_FontData" not in body:
+        continue
+    size = re.search(r"m_FontSize: (\d+)", body)
+    best = re.search(r"m_BestFit: (\d)", body)
+    top = re.search(r"m_MaxSize: (\d+)", body)
+    if best and best.group(1) == "1" and top and int(top.group(1)) > int(size.group(1)):
+        grown += 1
+check(grown == 0, f"best fit может только уменьшать шрифт (растущих подписей: {grown})")
+
+# удалённые пользователем объекты не возвращаются
+for deleted in ("FooterNote", "SceneInfoText"):
+    check(game_object(deleted) == "", f"удалённый объект {deleted} не возвращён")
+check("sceneInfoText" in fields and not fields["sceneInfoText"],
+      "поле sceneInfoText осталось пустым после удаления подписи")
+
+# переводчики строк приложения
+for key in ("3DMork start test", "3DMork hardware cpu", "3DMork average", "3DMork fps"):
+    check(key in i18n.STRINGS, f"ключ {key} есть в таблице переводов")
+check(len(i18n.STRINGS) == len(i18n.LANGS) and len(i18n.LANGS) == 42,
+      f"на каждую строку 3DMork есть {len(i18n.LANGS)} переводов")
 
 # ---------------------------------------------------------------------------
 print()

@@ -40,6 +40,7 @@ namespace PC.Component.Software
 
 	public class ThreeDMork : App
 	{
+		// 3DMork strings are localized, see tools/localize_3dmork_source.py
 		[Header("Panels")]
 		[SerializeField]
 		private GameObject startPanel;
@@ -294,13 +295,65 @@ namespace PC.Component.Software
 		private Coroutine benchmarkCoroutine;
 		private GameObject currentStageInstance;
 		private bool isAdditiveSceneLoaded;
+		private int liveFps = -1;
+		private string currentSceneName = string.Empty;
 
 		protected override void Start()
 		{
 			base.Start();
-			SetDefaultSize(new Vector2(850f, 520f));
+			SetDefaultSize(new Vector2(722.5f, 408.5f));
 			WireButtons();
+			Localization.LanguageChanged += OnLanguageChanged;
 			ShowStartScreen();
+		}
+
+		/// <summary>Перевод строки приложения, ключ берётся из Resources/Translate.txt.</summary>
+		private static string Tr(string key)
+		{
+			return Localization.GetText(key);
+		}
+
+		/// <summary>Перевод строки с одним подставляемым значением.</summary>
+		private static string Format(string key, object value)
+		{
+			string pattern = Localization.GetText(key);
+			return pattern.Contains("{0}") ? string.Format(pattern, value) : pattern;
+		}
+
+		/// <summary>Перевод строки с тремя подставляемыми значениями.</summary>
+		private static string Format(string key, object a, object b, object c)
+		{
+			string pattern = Localization.GetText(key);
+			return pattern.Contains("{0}") ? string.Format(pattern, a, b, c) : pattern;
+		}
+
+		private void RefreshTestTexts()
+		{
+			if (fpsText != null)
+			{
+				fpsText.text = Format("3DMork fps", liveFps >= 0 ? liveFps.ToString() : "--");
+			}
+
+			if (sceneInfoText != null)
+			{
+				sceneInfoText.text = string.IsNullOrEmpty(currentSceneName)
+					? Tr("3DMork initialising")
+					: currentSceneName;
+			}
+		}
+
+		/// <summary>Смена языка перерисовывает подписи, не прерывая тест.</summary>
+		private void OnLanguageChanged()
+		{
+			if (startPanel != null && startPanel.activeSelf)
+			{
+				var snapshot = CollectHardware();
+				RefreshHardwareSummary(snapshot);
+				RefreshLeaderboard(snapshot);
+				RefreshHistory();
+			}
+
+			RefreshTestTexts();
 		}
 
 		private void WireButtons()
@@ -369,36 +422,36 @@ namespace PC.Component.Software
 			if (hardwareTitle != null)
 			{
 				hardwareTitle.text = snapshot.hasBoard
-					? "THIS PC - " + snapshot.boardName
-					: "THIS PC - NO MOTHERBOARD";
+					? Format("3DMork hardware title", snapshot.boardName)
+					: Tr("3DMork hardware no board");
 			}
 
 			if (hardwareCpu != null)
 			{
-				hardwareCpu.text = snapshot.cpuCount > 0
-					? "CPU: " + snapshot.cpuName
-					: "CPU: not installed";
+				hardwareCpu.text = Format("3DMork hardware cpu", snapshot.cpuCount > 0
+					? snapshot.cpuName
+					: Tr("3DMork hardware missing"));
 			}
 
 			if (hardwareGpu != null)
 			{
-				hardwareGpu.text = snapshot.gpuCount > 0
-					? "GPU: " + snapshot.gpuName
-					: "GPU: not installed";
+				hardwareGpu.text = Format("3DMork hardware gpu", snapshot.gpuCount > 0
+					? snapshot.gpuName
+					: Tr("3DMork hardware missing"));
 			}
 
 			if (hardwareRam != null)
 			{
-				hardwareRam.text = snapshot.ramCount > 0
-					? "RAM: " + FormatRam(snapshot.ramCapacity)
-					: "RAM: not installed";
+				hardwareRam.text = Format("3DMork hardware ram", snapshot.ramCount > 0
+					? FormatRam(snapshot.ramCapacity)
+					: Tr("3DMork hardware missing"));
 			}
 
 			if (hardwareBoard != null)
 			{
-				hardwareBoard.text = snapshot.hasBoard
-					? "BOARD: " + snapshot.boardName
-					: "BOARD: build a PC to run the benchmark";
+				hardwareBoard.text = Format("3DMork hardware board", snapshot.hasBoard
+					? snapshot.boardName
+					: Tr("3DMork hardware build first"));
 			}
 		}
 
@@ -416,20 +469,20 @@ namespace PC.Component.Software
 				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardScore, i, hasRow ? entry.score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
-				SetCell(leaderboardFps, i, hasRow ? entry.fps.ToString() + " fps" : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(leaderboardFps, i, hasRow ? Format("3DMork fps", entry.fps.ToString()) : "--", new Color(0.55f, 0.9f, 0.6f));
 			}
 
 			if (leaderboardSelfRank != null) leaderboardSelfRank.text = "*";
 
 			if (leaderboardSelfName != null)
 			{
-				leaderboardSelfName.text = snapshot.hasBoard ? snapshot.boardName : "This PC";
+				leaderboardSelfName.text = snapshot.hasBoard ? snapshot.boardName : Tr("3DMork self pc");
 			}
 
 			if (leaderboardSelfSpec != null)
 			{
-				string spec = (snapshot.cpuCount > 0 ? snapshot.cpuName : "no CPU") + "  /  " +
-							  (snapshot.gpuCount > 0 ? snapshot.gpuName : "no GPU");
+				string spec = (snapshot.cpuCount > 0 ? snapshot.cpuName : Tr("3DMork no cpu")) + "  /  " +
+							  (snapshot.gpuCount > 0 ? snapshot.gpuName : Tr("3DMork no gpu"));
 				leaderboardSelfSpec.text = spec;
 			}
 
@@ -442,7 +495,7 @@ namespace PC.Component.Software
 			{
 				var history = LoadHistory();
 				int lastFps = history.Count > 0 ? history[0].fps : 0;
-				leaderboardSelfFps.text = lastFps > 0 ? lastFps.ToString() + " fps" : "--";
+				leaderboardSelfFps.text = lastFps > 0 ? Format("3DMork fps", lastFps.ToString()) : "--";
 			}
 
 			if (leaderboardAverage != null)
@@ -450,8 +503,8 @@ namespace PC.Component.Software
 				int sum = 0;
 				for (int i = 0; i < ReferenceBenchmarks.Length; i++) sum += ReferenceBenchmarks[i].score;
 				int avg = ReferenceBenchmarks.Length > 0 ? sum / ReferenceBenchmarks.Length : 0;
-				leaderboardAverage.text = "Average of " + ReferenceBenchmarks.Length + " reference PCs: " + avg +
-										  "   |   Your best: " + (best > 0 ? best.ToString() : "--");
+				leaderboardAverage.text = Format("3DMork average", ReferenceBenchmarks.Length, avg,
+										  best > 0 ? best.ToString() : "--");
 			}
 		}
 
@@ -467,7 +520,7 @@ namespace PC.Component.Software
 				SetCell(historyIndex, i, hasRow ? "#" + number : "--", new Color(0.75f, 0.75f, 0.8f));
 				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--", new Color(0.85f, 0.87f, 0.92f));
 				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
-				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() + " fps" : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(historyFps, i, hasRow ? Format("3DMork fps", history[i].fps.ToString()) : "--", new Color(0.55f, 0.9f, 0.6f));
 			}
 
 			if (historyEmpty != null) historyEmpty.gameObject.SetActive(history.Count == 0);
@@ -475,9 +528,9 @@ namespace PC.Component.Software
 			if (historyBest != null)
 			{
 				int best = GetBestScore();
-				historyBest.text = best > 0
-					? "Best score: " + best
-					: "Best score: -- (no runs yet)";
+				historyBest.text = Format("3DMork best score", best > 0
+					? best.ToString()
+					: Tr("3DMork no runs yet"));
 			}
 		}
 
@@ -692,8 +745,8 @@ namespace PC.Component.Software
 
 					var wp = pStart.GetComponent<FlybyWaypoint>();
 					string pName = wp != null && !string.IsNullOrEmpty(wp.phaseName)
-						? wp.phaseName
-						: string.Format("Scene {0}: Benchmark Flyby", i + 1);
+						? Localization.GetText(wp.phaseName)
+						: Format("3DMork scene generic", (i + 1).ToString());
 					float pDuration = wp != null ? wp.duration : 4f;
 					float pLoad = wp != null ? wp.loadMultiplier : 1f;
 
@@ -730,7 +783,9 @@ namespace PC.Component.Software
 
 					var seg = new FlybySegment
 					{
-						name = string.IsNullOrEmpty(phase.phaseName) ? string.Format("Scene {0}", i + 1) : phase.phaseName,
+						name = string.IsNullOrEmpty(phase.phaseName)
+							? Format("3DMork scene generic", (i + 1).ToString())
+							: Localization.GetText(phase.phaseName),
 						duration = Mathf.Max(1f, phase.duration),
 						loadMultiplier = phase.loadMultiplier
 					};
@@ -769,7 +824,7 @@ namespace PC.Component.Software
 			// Способ 3: Автоматический кинематографический облёт мастерской по умолчанию
 			segments.Add(new FlybySegment
 			{
-				name = "Scene 1: Tech Showcase Flyby",
+				name = Tr("3DMork scene 1"),
 				duration = 4f,
 				loadMultiplier = 0.95f,
 				startPos = anchor + new Vector3(-5.2f, 3.2f, -5.5f),
@@ -780,7 +835,7 @@ namespace PC.Component.Software
 
 			segments.Add(new FlybySegment
 			{
-				name = "Scene 2: Hardware & Geometry Test",
+				name = Tr("3DMork scene 2"),
 				duration = 4f,
 				loadMultiplier = 0.85f,
 				startPos = anchor + new Vector3(2.8f, 0.75f, 2.2f),
@@ -791,7 +846,7 @@ namespace PC.Component.Software
 
 			segments.Add(new FlybySegment
 			{
-				name = "Scene 3: Dynamic Lighting Test",
+				name = Tr("3DMork scene 3"),
 				duration = 4f,
 				loadMultiplier = 1.15f,
 				isOrbit = true,
@@ -818,8 +873,9 @@ namespace PC.Component.Software
 			if (resultsPanel != null) resultsPanel.SetActive(false);
 			if (testPanel != null) testPanel.SetActive(true);
 
-			if (fpsText != null) fpsText.text = "FPS: --";
-			if (sceneInfoText != null) sceneInfoText.text = "Initializing 3DMork...";
+			liveFps = -1;
+			currentSceneName = "";
+			RefreshTestTexts();
 			if (testProgressBar != null)
 			{
 				testProgressBar.minValue = 0f;
@@ -918,7 +974,8 @@ namespace PC.Component.Software
 			for (int segIdx = 0; segIdx < segments.Count; segIdx++)
 			{
 				var seg = segments[segIdx];
-				if (sceneInfoText != null) sceneInfoText.text = seg.name;
+				currentSceneName = seg.name;
+				RefreshTestTexts();
 
 				float segTime = 0f;
 				while (segTime < seg.duration)
@@ -1004,9 +1061,10 @@ namespace PC.Component.Software
 
 					// Расчёт FPS, зависящего от виртуального железа
 					float jitter = Mathf.Sin(Time.time * 7f) * (baseFps * 0.04f) + UnityEngine.Random.Range(-1.5f, 1.5f);
-					float liveFps = Mathf.Max(5f, baseFps * seg.loadMultiplier + jitter);
+					float currentFps = Mathf.Max(5f, baseFps * seg.loadMultiplier + jitter);
 
-					if (fpsText != null) fpsText.text = "FPS: " + Mathf.RoundToInt(liveFps).ToString();
+					liveFps = Mathf.RoundToInt(currentFps);
+					RefreshTestTexts();
 					if (testProgressBar != null) testProgressBar.value = Mathf.Clamp01(elapsed / totalDuration);
 
 					yield return null;
@@ -1087,7 +1145,7 @@ namespace PC.Component.Software
 					if (text_marks != null && i < text_marks.Length && text_marks[i] != null)
 					{
 						if (i == 3)
-							text_marks[i].text = (v / 100f).ToString("0.0") + " FPS";
+							text_marks[i].text = Format("3DMork fps", (v / 100f).ToString("0.0"));
 						else
 							text_marks[i].text = v.ToString("0");
 					}
@@ -1160,6 +1218,7 @@ namespace PC.Component.Software
 
 		private void OnDestroy()
 		{
+			Localization.LanguageChanged -= OnLanguageChanged;
 			if (benchmarkCoroutine != null)
 			{
 				StopCoroutine(benchmarkCoroutine);
