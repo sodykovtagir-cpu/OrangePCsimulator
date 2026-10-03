@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: SSD_M.2 8TB
   m_EditorClassIdentifier: 
-  itemName: SSD_M.2 8TB
+  itemName: M.2 SSD 8TB
   price: 1300
   bitcoin: 14
   sprite: {fileID: 21300000, guid: d3f7720fcb2fc6144addba0711972719, type: 2}
-  spawn: {fileID: 666984428960998898, guid: d39e733f8d6e6b74da5465733fd58a52, type: 2}
+  spawn: {fileID: 666984428960998898, guid: d39e733f8d6e6b74da5465733fd58a52, type: 3}
   large: 0
   translateDescription: 1
   description: 
