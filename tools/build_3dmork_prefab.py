@@ -307,6 +307,10 @@ MonoBehaviour:
   - {{fileID: {cat_ids[3]['val_txt']}}}
   buttonClose: {{fileID: {id_btn_close}}}
   buttonRun: {{fileID: {id_btn_run}}}
+  flybyPhases: []
+  waypointsRoot: {{fileID: 0}}
+  rotationSmoothing: 5.5
+  cameraFov: 65
 """)
 
 # --- TITLE BAR ---

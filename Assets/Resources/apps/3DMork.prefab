@@ -114,6 +114,10 @@ MonoBehaviour:
   - {fileID: 5000000000000182}
   buttonClose: {fileID: 5000000000000196}
   buttonRun: {fileID: 5000000000000187}
+  flybyPhases: []
+  waypointsRoot: {fileID: 0}
+  rotationSmoothing: 5.5
+  cameraFov: 65
 --- !u!1 &5000000000000006
 GameObject:
   m_ObjectHideFlags: 0
