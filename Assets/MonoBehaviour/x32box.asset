@@ -19,5 +19,4 @@ MonoBehaviour:
   spawn: {fileID: 3232047612826269505, guid: 392081fea287525498ad2cee2cc3fb9e, type: 3}
   large: 0
   translateDescription: 1
-  description: Mini PC with built-in processor and 8 GB of RAM. M.2 storage slot
-    and a USB port for installing PCOS.
+  description: Mini PC with built-in processor and 8 GB of RAM. M.2 storage slot and a USB port for installing PCOS.

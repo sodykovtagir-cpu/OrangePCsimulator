@@ -18,7 +18,16 @@ public class Item : MonoBehaviour, ISave
 	[SerializeField]
 	private Vector3 slotOffset;
 
+	[SerializeField]
+	private bool grabCenterOfMass;
+
 	public bool glue;
+
+	public bool GrabCenterOfMass
+	{
+		get => grabCenterOfMass;
+		set => grabCenterOfMass = value;
+	}
 
 	public string SpawnId
 	{

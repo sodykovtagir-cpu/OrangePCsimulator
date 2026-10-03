@@ -227,7 +227,16 @@ public class Raycast : MonoBehaviour
                 currentDrag = drag;
 
                 var sTr = spring.transform;
-                if (!AutoRotation)
+                bool useCom = AutoRotation;
+                if (!useCom)
+                {
+                    if (hit.transform && hit.transform.TryGetComponent<Item>(out var itm) && itm.GrabCenterOfMass)
+                        useCom = true;
+                    else if (hitRb && hitRb.TryGetComponent<Item>(out var rbItm) && rbItm.GrabCenterOfMass)
+                        useCom = true;
+                }
+
+                if (!useCom)
                 {
                     sTr.position = hit.point;
                     drag.distance = hit.distance;
@@ -242,6 +251,17 @@ public class Raycast : MonoBehaviour
 
                 spring.connectedBody = hitRb;
                 StartCoroutine("DragObject");
+            }
+            else if (hitRb && hitRb.isKinematic)
+            {
+                if (hitRb.TryGetComponent<Hook>(out var hook))
+                {
+                    hook.ShowTip();
+                }
+                else if (hit.transform && hit.transform.TryGetComponent<Hook>(out var childHook))
+                {
+                    childHook.ShowTip();
+                }
             }
         }
 
@@ -360,7 +380,14 @@ public class Raycast : MonoBehaviour
         if (rb == null) yield break;
 
         rb.drag = targetDrag;
-        rb.angularDrag = targetAngularDrag;
+        bool isStableItem = false;
+        if (currentDrag != null && currentDrag.target != null)
+        {
+            var itm = currentDrag.target.GetComponentInParent<Item>();
+            if (itm != null && itm.GrabCenterOfMass)
+                isStableItem = true;
+        }
+        rb.angularDrag = isStableItem ? 15f : targetAngularDrag;
 
         if (distanceObj)
             distanceObj.SetActive(true);

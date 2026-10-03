@@ -52,7 +52,7 @@ Rigidbody:
   m_Mass: 5
   m_Drag: 0
   m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_CenterOfMass: {x: 0, y: -2, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
   m_IncludeLayers:
@@ -61,7 +61,7 @@ Rigidbody:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_ImplicitCom: 1
+  m_ImplicitCom: 0
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
@@ -180,10 +180,12 @@ MonoBehaviour:
   info: '{FloorShelf}'
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
+  grabCenterOfMass: 1
   glue: 0
   detectInterval: 0.5
-  detectDistance: 0.2
-  hookOffset: {x: 0, y: -4.4, z: 0}
+  detectDistance: 0.35
+  hookOffset: {x: 0, y: -4.2, z: 0}
+  hookDirection: {x: 0, y: -1, z: 0}
   fixSound: {fileID: 8300000, guid: 555240bc0c10acc4eb8797beb14f6b95, type: 3}
   releaseSound: {fileID: 8300000, guid: 3069c7e7b27ae5a478b4bfd71e2dbf23, type: 3}
 --- !u!1 &1030019346334318026

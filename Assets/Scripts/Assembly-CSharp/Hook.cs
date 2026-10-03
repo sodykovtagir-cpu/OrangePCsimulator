@@ -15,6 +15,9 @@ public class Hook : Item, ISave
 	private Vector3 hookOffset;
 
 	[SerializeField]
+	private Vector3 hookDirection = Vector3.zero;
+
+	[SerializeField]
 	private AudioClip fixSound;
 
 	[SerializeField]
@@ -26,16 +29,21 @@ public class Hook : Item, ISave
 
 	private float time;
 
-	private bool lastWall;
+	private float unhookCooldown;
 
 	private bool hooked;
 
-	private bool Hooked
+	public bool Hooked
 	{
 		get => hooked;
-		set
+		set => SetHooked(value);
+	}
+
+	private void SetHooked(bool value)
+	{
+		hooked = value;
+		if (rb != null)
 		{
-			hooked = value;
 			rb.isKinematic = value;
 		}
 	}
@@ -50,15 +58,19 @@ public class Hook : Item, ISave
 	{
 		if (!hooked)
 		{
+			if (unhookCooldown > 0f)
+			{
+				unhookCooldown -= Time.deltaTime;
+				return;
+			}
+
 			time += Time.deltaTime;
 			if (time >= detectInterval)
 			{
 				time = 0f;
-				bool currentWall = IsWall();
-				if (lastWall != currentWall)
+				if (IsWall())
 				{
-					if (currentWall) Fix();
-					lastWall = currentWall;
+					Fix();
 				}
 			}
 		}
@@ -68,10 +80,22 @@ public class Hook : Item, ISave
 	{
 		var tr = transform;
 		Vector3 origin = tr.position + tr.TransformDirection(hookOffset);
-		Vector3 dir = -tr.forward;
-		if (Physics.Raycast(origin, dir, out RaycastHit hit, detectDistance))
+		Vector3 dir = hookDirection != Vector3.zero
+			? tr.TransformDirection(hookDirection.normalized)
+			: -tr.forward;
+
+		RaycastHit[] hits = Physics.RaycastAll(origin, dir, detectDistance);
+		System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+		for (int i = 0; i < hits.Length; i++)
 		{
-			if (hit.transform != null && hit.transform.CompareTag("Wall"))
+			var hit = hits[i];
+			if (hit.collider == null || hit.collider.isTrigger)
+				continue;
+			if (hit.transform == tr || hit.transform.IsChildOf(tr))
+				continue;
+
+			if (hit.transform.CompareTag("Wall") || (hit.collider.attachedRigidbody == null && !hit.transform.CompareTag("Player")))
 				return true;
 		}
 		return false;
@@ -97,29 +121,33 @@ public class Hook : Item, ISave
 	private void Release()
 	{
 		Hooked = false;
+		unhookCooldown = 1.0f;
+		time = 0f;
 		if (releaseSound != null && source != null) source.PlayOneShot(releaseSound);
 	}
 
 	public void ShowTip()
 	{
 		if (!Hooked) return;
-		Main.Instance.FadeText(Localization.GetText("Remove with hammer"));
+		Main.Instance?.FadeText(Localization.GetText("Remove with hammer"));
 	}
 
 	public void OnDrawGizmos()
-    {
-        var tr = GetComponent<Transform>();
-        if (tr != null)
-        {
-            Vector3 position = tr.position;
-            Vector3 dir = tr.TransformDirection(hookOffset);
-            Vector3 forward = tr.forward;
-            Color color = new Color(1f, 0f, 0f, 1f);
-            Vector3 start = position + dir;
-            Vector3 end = -forward * detectDistance;
-            Debug.DrawRay(start, end, color);
-        }
-    }
+	{
+		var tr = GetComponent<Transform>();
+		if (tr != null)
+		{
+			Vector3 position = tr.position;
+			Vector3 dir = tr.TransformDirection(hookOffset);
+			Vector3 forward = hookDirection != Vector3.zero
+				? tr.TransformDirection(hookDirection.normalized)
+				: -tr.forward;
+			Color color = new Color(1f, 0f, 0f, 1f);
+			Vector3 start = position + dir;
+			Vector3 end = forward * detectDistance;
+			Debug.DrawRay(start, end, color);
+		}
+	}
 
 	public override void ToData(JObject jObject)
 	{
