@@ -92,7 +92,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   appName: 3DMork
-  icon: {fileID: 21300000, guid: 96035d719d554591ac698214dd94ed9c, type: 2}
+  icon: {fileID: 21300000, guid: 96035d719d554591ac698214dd94ed9c, type: 3}
   fileName: 
   fileIcon: {fileID: 0}
   size: 650
