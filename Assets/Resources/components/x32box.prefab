@@ -889,7 +889,7 @@ MonoBehaviour:
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 32000
+  capacity: 128000
   score: 5500
   wattage: 2
   health: 100
@@ -902,10 +902,12 @@ MonoBehaviour:
   - path: System/boot.bin
     content: pcos
     hidden: 1
+    isFolder: 0
     size: 24000
   - path: App Downloader.exe
     content: 
     hidden: 0
+    isFolder: 0
     size: 432
 --- !u!1 &4102573702936842500
 GameObject:

@@ -129,6 +129,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 338771690b44421b9a8e5a2d99362f84, type: 2}
   - pageName: Case
     item:
+    - {fileID: 11400000, guid: adce21cb74c2b914580337547456fc4a, type: 2}
+    - {fileID: 11400000, guid: 9dae6c6979a24b24a895cafa39e82766, type: 2}
     - {fileID: 11400000, guid: 6dff74bb6190a14499d2632638b7cb01, type: 2}
     - {fileID: 11400000, guid: 301c88f5c44c9f9499174521e8b3a4c0, type: 2}
     - {fileID: 11400000, guid: e38b1e1ed025a0f4b981166acfeeee5a, type: 2}
@@ -153,6 +155,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}
   - pageName: Ready PC
     item:
+    - {fileID: 11400000, guid: 78348b2c142bcb88381354c04ae3fce7, type: 2}
     - {fileID: 11400000, guid: 37369c251a2077cf14eda7b9cb979509, type: 2}
     - {fileID: 11400000, guid: 141cc59db548bec45f9c140a5e000624, type: 2}
     - {fileID: 11400000, guid: bcddaaf55820715ccdfe7eadc4820ede, type: 2}
