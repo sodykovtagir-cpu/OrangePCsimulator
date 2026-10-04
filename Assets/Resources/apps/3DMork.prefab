@@ -114,8 +114,6 @@ MonoBehaviour:
   - {fileID: 5000000000000144}
   - {fileID: 5000000000000172}
   - {fileID: 5000000000000200}
-  - {fileID: 5000000000000228}
-  - {fileID: 5000000000000256}
   leaderboardName:
   - {fileID: 5000000000000064}
   - {fileID: 5000000000000092}
@@ -123,8 +121,6 @@ MonoBehaviour:
   - {fileID: 5000000000000148}
   - {fileID: 5000000000000176}
   - {fileID: 5000000000000204}
-  - {fileID: 5000000000000232}
-  - {fileID: 5000000000000260}
   leaderboardCpu:
   - {fileID: 5000000000000068}
   - {fileID: 5000000000000096}
@@ -132,8 +128,6 @@ MonoBehaviour:
   - {fileID: 5000000000000152}
   - {fileID: 5000000000000180}
   - {fileID: 5000000000000208}
-  - {fileID: 5000000000000236}
-  - {fileID: 5000000000000264}
   leaderboardGpu:
   - {fileID: 5000000000000072}
   - {fileID: 5000000000000100}
@@ -141,8 +135,6 @@ MonoBehaviour:
   - {fileID: 5000000000000156}
   - {fileID: 5000000000000184}
   - {fileID: 5000000000000212}
-  - {fileID: 5000000000000240}
-  - {fileID: 5000000000000268}
   leaderboardScore:
   - {fileID: 5000000000000076}
   - {fileID: 5000000000000104}
@@ -150,8 +142,6 @@ MonoBehaviour:
   - {fileID: 5000000000000160}
   - {fileID: 5000000000000188}
   - {fileID: 5000000000000216}
-  - {fileID: 5000000000000244}
-  - {fileID: 5000000000000272}
   leaderboardFps:
   - {fileID: 5000000000000080}
   - {fileID: 5000000000000108}
@@ -159,8 +149,6 @@ MonoBehaviour:
   - {fileID: 5000000000000164}
   - {fileID: 5000000000000192}
   - {fileID: 5000000000000220}
-  - {fileID: 5000000000000248}
-  - {fileID: 5000000000000276}
   leaderboardSelfRank: {fileID: 5000000000000284}
   leaderboardSelfName: {fileID: 5000000000000288}
   leaderboardSelfCpu: {fileID: 5000000000000292}
@@ -4643,7 +4631,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5000000000000222
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5192,7 +5180,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5000000000000250
 RectTransform:
   m_ObjectHideFlags: 0

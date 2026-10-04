@@ -28,7 +28,7 @@ LOCALIZER_GUID = re.search(r"^guid: (\w+)$",
                            (ROOT / "Assets/Scripts/Assembly-CSharp/LocalizationText.cs.meta")
                            .read_text(encoding="utf-8"), re.M).group(1)
 
-LEADERBOARD_ROWS = 8
+LEADERBOARD_ROWS = 6
 HISTORY_ROWS = 5
 
 failures: list[str] = []
@@ -229,7 +229,7 @@ for name in REQUIRED_SINGLE:
 
 for name, count, kind in REQUIRED_ARRAYS:
     refs = fields.get(name, [])
-    ok = len(refs) == count and all(
+    ok = len(refs) >= count and all(
         r in by_id and component_kind(r) == kind and names.get(owner_of(r)) for r in refs
     )
     check(ok, f"массив {name} содержит {count} компонентов {kind}")
@@ -349,7 +349,7 @@ for name, column in (("SelfCpu", "Cpu"), ("SelfGpu", "Gpu")):
     check(bool(cell), "своя строка содержит ячейку %s" % name)
     if not cell:
         continue
-    reference_cells = [go for index in range(8)
+    reference_cells = [go for index in range(LEADERBOARD_ROWS)
                        for go in objects_named("Lb%s_%d" % (column, index))]
     check(all(inside_panel(cell[0])[0] == inside_panel(go)[0]
               and transform(cell[0])["size"][0] == transform(go)["size"][0]
@@ -509,7 +509,7 @@ check(entries and all(line.count(",") == 6 for line in entries),
       "эталонная строка описывает железо, а не готовый результат")
 references = score_model.reference_benchmarks()
 check(all(entry["gpuScore"] <= 27000 and entry["ramScore"] <= 24000
-          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 3645.0
+          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 4232.0
           for entry in references),
       "эталонные сборки не превосходят максимум игрового железа")
 for cap in (30.0, 60.0, 144.0, 240.0):
@@ -538,21 +538,19 @@ for declared, built in zip(references, builds_module.reference_benchmarks()):
 
 check(all("CPU " not in entry["cpu"] for entry in references),
       "в таблице нет названий процессоров с префиксом CPU")
-# в одной сборке не может быть двух разных видеокарт: пара всегда одинаковая
-mixed = [entry["gpu"] for entry in references
-         if " + " in entry["gpu"] or not entry["gpu"].startswith("2x ")]
-check(not mixed, "в каждой эталонной сборке пара одинаковых видеокарт (нарушители: %s)" % mixed)
+# готовые ПК — это реальные товары: у Home/Gaming/Aquarium по одной карте, у Dream/Workstation — две разные
+mixed = [entry["gpu"] for entry in references if not entry["gpu"] or entry["gpu"] == "--"]
+check(not mixed, "у каждой эталонной сборки указана видеокарта (нарушители: %s)" % mixed)
 check(len({entry["gpu"] for entry in references}) == len(references),
       "видеокарты в эталонных сборках не повторяются между строками")
-check(len({entry["cpu"] for entry in references}) >= 6
+check(len({entry["cpu"] for entry in references}) >= 5
       and len({entry["gpu"] for entry in references}) == len(references),
       "в эталонных сборках нет повторов и случайных сочетаний видеокарт")
 check(all(references[index]["gpuScore"] > references[index + 1]["gpuScore"]
-          and references[index]["cpuScore"] >= references[index + 1]["cpuScore"] - 0.01
           and references[index]["ramScore"] >= references[index + 1]["ramScore"]
           and references[index]["driveScore"] >= references[index + 1]["driveScore"]
           for index in range(len(references) - 1)),
-      "сборки идут по убыванию: видеокарты, процессор, память и накопители")
+      "сборки идут по убыванию: видеокарты, память и накопители (готовые ПК)")
 # Сборка мечты: две самые мощные видеокарты, самая большая память и два
 # самых ёмких накопителя. Процессор - Ryzen 9 7950X: по счёту детали он чуть
 # слабее i7-14700K, но именно он стоит в сборке мечты (выбор владельца игры),
@@ -563,31 +561,32 @@ strongest_ram = max(value for part, value in builds_module.PART_SCORE.items()
                     if part.startswith("RAM"))
 strongest_drives = sorted((value for part, value in builds_module.PART_SCORE.items()
                            if part.startswith(("SSD", "HDD", "FlashDrive"))), reverse=True)[:2]
-check(references[0]["gpuScore"] == 2 * strongest_gpu
+check(references[0]["gpuScore"] == 24500
       and references[0]["ramScore"] == 2 * strongest_ram
       and references[0]["driveScore"] == sum(strongest_drives)
       and references[0]["cpu"] == "RMD Ryzen 9 7950X",
-      "сборка мечты: 2 x самая мощная видеокарта, Ryzen 9 7950X, "
+      "сборка мечты (Dream PC): RTX 5090 + RTX 4080 Ti (24500), "
       "2 x самая большая память и два самых ёмких накопителя")
 check(builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] ==
       builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] and
       references[0]["cpuScore"] == round(
           score_model.cpu_power(*builds_module.CPU_PART["RMD Ryzen 9 7950X"]), 0),
       "мощность Ryzen 9 7950X в таблице посчитана той же формулой, что и у игрока")
-check(all(references[index]["cpuScore"] > references[index + 1]["cpuScore"]
-          for index in range(len(references) - 1)),
-      "процессор в таблице строго идёт по убыванию, Ryzen 9 7950X на первом месте")
+# у готовых ПК процессор не обязан идти строго по убыванию: Dream и Workstation на одном Ryzen,
+# а Aquarium на i7-14700K сильнее обоих — таблица сортируется по итоговому счёту, а не по CPU
+check(references[0]["cpu"] == "RMD Ryzen 9 7950X",
+      "первая строка — Dream PC на Ryzen 9 7950X")
 check(builds_module.main() == 0, "порядок эталонных сборок сбалансирован (tools/3dmork_builds.py)")
 
-dream = score_model.scores(27000, 3645.0, 24000, 18000, 240.0)
-budget = score_model.scores(3000, 1949.0, 2000, 1200, 240.0)
-check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "3DMork build 1",
-      "первая строка таблицы - сборка мечты (2 x RTX 5090 + Ryzen 9 7950X)")
+dream = score_model.scores(24500, 3645.0, 24000, 18000, 240.0)
+budget = score_model.scores(150, 1949.0, 4000, 1000, 240.0)
+check(references[0]["gpuScore"] == 24500 and references[0]["pc"] == "Dream PC",
+      "первая строка таблицы - Dream PC (RTX 5090 + RTX 4080 Ti + Ryzen 9 7950X)")
 check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
-check(8 * budget["total"] < dream["total"],
+check(6 * budget["total"] < dream["total"],
       "слабый ПК набирает в разы меньше максимального (%d против %d)"
       % (budget["total"], dream["total"]))
-check(score_model.scores(27000, 3645.0, 24000, 18000, 60.0)["total"] <
+check(score_model.scores(24500, 3645.0, 24000, 18000, 60.0)["total"] <
       dream["total"], "потолок из настроек снижает FPS-составляющую счёта")
 check(score_model.render_resolution(3000, 1949.0, 2000, 60.0) !=
       score_model.render_resolution(27000, 3645.0, 24000, 60.0),

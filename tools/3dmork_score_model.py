@@ -98,7 +98,7 @@ def reference_benchmarks() -> list:
             "gpuScore": int(match.group(4)), "cpuScore": float(match.group(5)),
             "ramScore": int(match.group(6)), "driveScore": int(match.group(7)),
         })
-    assert len(rows) == 8, "expected 8 reference machines, got %d" % len(rows)
+    assert len(rows) == 6, "expected 6 reference machines (готовые ПК), got %d" % len(rows)
     return rows
 
 

@@ -202,14 +202,14 @@ namespace PC.Component.Software
 		[SerializeField]
 		private float cameraFov = 65f;
 
-		private const int LeaderboardRows = 8;
+		private const int LeaderboardRows = 6;
 		private const int HistoryRows = 5;
 		private const int MaxHistoryEntries = 12;
 		private const string HistoryPrefsKey = "3DMork_History";
 		private const string BestScorePrefsKey = "3DMork_Score";
 		private const string FormulaPrefsKey = "3DMork_Formula";
 		/// <summary>Версия формулы очков. Меняется вместе с пересчётом результатов.</summary>
-		private const int FormulaVersion = 2;
+		private const int FormulaVersion = 3;
 
 		[Serializable]
 		private class HistoryData
@@ -262,10 +262,11 @@ namespace PC.Component.Software
 
 		/// <summary>
 		/// Референсные максимумы игрового железа (значения из ассетов):
-		/// это детали сборки мечты - первой строки таблицы сравнения:
-		/// 2 x RTX 5090, RMD Ryzen 9 7950X (3 ГГц), 2 x 64 ГБ (RGB),
-		/// SSD 16 ТБ + M.2 8 ТБ. Сборка мечты набирает потолок во всех
-		/// категориях, а ПК игрока не может превзойти эти потолки.
+		/// потолки берутся из самых мощных деталей игры (2 x RTX 5090 = 27000,
+		/// 2 x 64 ГБ RGB = 24000, SSD 16 ТБ + M.2 8 ТБ = 18000, RMD Ryzen 9 7950X = 3645).
+		/// Готовые ПК в таблице — усечённые до 2 планок/2 накопителей: Dream PC идёт
+		/// с RTX 5090 + RTX 4080 Ti (24500) и 2 x 64 ГБ, поэтому не достигает потолка
+		/// GPU, но остаётся на первом месте за счёт памяти и накопителей.
 		/// </summary>
 		private const float RefGpuScore = 27000f;
 		private const float RefCpuScore = 3645f;
@@ -310,27 +311,22 @@ namespace PC.Component.Software
 		}
 
 		/// <summary>
-		/// Эталонные результаты других машин (сортировка по убыванию счёта).
-		/// Каждая строка - настоящая сборка из деталей игры: видеокарты,
-		/// процессор, память и накопители подобраны друг к другу, а видеокарты
-		/// в паре всегда одинаковые - "RTX 5090 + RTX 3090" никто не собирает.
-		/// Сверху стоит сборка
-		/// мечты - в каждой категории там самая мощная деталь.
-		/// Название - ключ перевода, чтобы таблица читалась на любом языке.
-		/// Список сборок продублирован в tools/3dmork_builds.py вместе с
-		/// проверкой баланса, тесты сверяют оба источника.
+		/// Эталонные результаты других машин — теперь это 6 готовых ПК из магазина
+		/// (Ready PC) в усечённом виде: 2 планки памяти, 2 накопителя (у Office — 1),
+		/// видеокарты — как продаётся (1 или 2, одинаковые или разные). Каждая строка
+		/// — точный товар из Shop.asset, очки считаются той же формулой, что и прогон
+		/// купленного ПК, поэтому таблица всегда соответствует магазину.
+		/// Сортировка по убыванию итогового счёта, Dream PC на первом месте.
+		/// Список продублирован в tools/3dmork_builds.py, тесты сверяют оба источника.
 		/// </summary>
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
-			//                       ключ перевода              процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
-			new LeaderboardEntry("3DMork build 1", "RMD Ryzen 9 7950X", "2x RTX 5090", 27000, 3645f, 24000, 18000),
-			new LeaderboardEntry("3DMork build 2", "i9-9900K", "2x RTX 4080 Ti", 22000, 3214f, 20000, 17000),
-			new LeaderboardEntry("3DMork build 3", "i9-7900X", "2x RTX 4080", 20000, 2974f, 12000, 14000),
-			new LeaderboardEntry("3DMork build 4", "Xeon E5-2689", "2x RTX 3080 Ti", 14000, 2776f, 10000, 13000),
-			new LeaderboardEntry("3DMork build 5", "i7-8700K", "2x RTX 3080", 12000, 2622f, 10000, 11000),
-			new LeaderboardEntry("3DMork build 6", "i5-8400", "2x RTX 2080 Ti", 11000, 2328f, 9000, 10000),
-			new LeaderboardEntry("3DMork build 7", "i3-8300", "2x GTX 1080 Ti", 9000, 2219f, 6000, 8500),
-			new LeaderboardEntry("3DMork build 8", "Celeron G3920", "2x GTX 1060", 6000, 1949f, 4000, 1700)
+			new LeaderboardEntry("Dream PC", "RMD Ryzen 9 7950X", "RTX 5090 + RTX 4080 Ti", 24500, 3645f, 24000, 18000),
+			new LeaderboardEntry("Workstation PC", "RMD Ryzen 9 7950X", "RTX 4080 Ti + Titan V", 16800, 3645f, 24000, 12000),
+			new LeaderboardEntry("Aquarium PC", "i7-14700K", "RTX 5090", 13500, 4232f, 12000, 11000),
+			new LeaderboardEntry("Gaming PC", "i9-12900K", "RTX 4080", 10000, 3751f, 12000, 11000),
+			new LeaderboardEntry("Home PC", "i5-8400", "GTX 1060", 3000, 2328f, 6000, 5200),
+			new LeaderboardEntry("Office PC", "Celeron G3920", "GT 440", 150, 1949f, 4000, 1000)
 		};
 
 		/// <summary>Мощность процессора для бенчмарка.</summary>
