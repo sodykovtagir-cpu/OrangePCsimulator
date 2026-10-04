@@ -15,7 +15,7 @@ namespace PC.Component.Software
 		public string phaseName = "Phase";
 
 		[Tooltip("Длительность пролёта (в секундах)")]
-		public float duration = 4f;
+		public float duration = 2.5f;
 
 		[Tooltip("Множитель нагрузки на железо (влияет на FPS)")]
 		public float loadMultiplier = 1f;
@@ -1003,7 +1003,7 @@ namespace PC.Component.Software
 					string pName = wp != null && !string.IsNullOrEmpty(wp.phaseName)
 						? Localization.GetText(wp.phaseName)
 						: Format("3DMork scene generic", (i + 1).ToString());
-					float pDuration = wp != null ? wp.duration : 4f;
+					float pDuration = wp != null ? wp.duration : 2.5f;
 					float pLoad = wp != null ? wp.loadMultiplier : 1f;
 
 					var seg = new FlybySegment
@@ -1081,7 +1081,7 @@ namespace PC.Component.Software
 			segments.Add(new FlybySegment
 			{
 				name = Tr("3DMork scene 1"),
-				duration = 4f,
+				duration = 2.5f,
 				loadMultiplier = 0.95f,
 				startPos = anchor + new Vector3(-5.2f, 3.2f, -5.5f),
 				endPos = anchor + new Vector3(3.8f, 2.0f, 2.5f),
@@ -1092,7 +1092,7 @@ namespace PC.Component.Software
 			segments.Add(new FlybySegment
 			{
 				name = Tr("3DMork scene 2"),
-				duration = 4f,
+				duration = 2.5f,
 				loadMultiplier = 0.85f,
 				startPos = anchor + new Vector3(2.8f, 0.75f, 2.2f),
 				endPos = anchor + new Vector3(-2.8f, 0.5f, 1.2f),
@@ -1103,7 +1103,7 @@ namespace PC.Component.Software
 			segments.Add(new FlybySegment
 			{
 				name = Tr("3DMork scene 3"),
-				duration = 4f,
+				duration = 2.5f,
 				loadMultiplier = 1.15f,
 				isOrbit = true,
 				orbitCenter = anchor + new Vector3(0f, 0.2f, 0f),

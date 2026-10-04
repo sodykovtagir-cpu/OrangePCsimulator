@@ -9,7 +9,7 @@ namespace PC.Component.Software
 		public string phaseName = "";
 
 		[Tooltip("Длительность пролёта от этой точки до следующей (в секундах)")]
-		public float duration = 4f;
+		public float duration = 2.5f;
 
 		[Tooltip("Множитель нагрузки на видеокарту/процессор в этой сцене")]
 		public float loadMultiplier = 1f;
