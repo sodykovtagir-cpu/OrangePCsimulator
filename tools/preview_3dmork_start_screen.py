@@ -35,8 +35,10 @@ PREFAB = ROOT / "Assets/Resources/apps/3DMork.prefab"
 # что и в игре (tools/3dmork_score_model.py), чтобы превью не расходилось.
 FPS_CAP = 240.0
 
-def reference_rows():
-    return [(entry["pc"], entry["cpu"], entry["gpu"],
+def reference_rows(language: str = "EN"):
+    """Строки таблицы: название сборки переводится по ключу из ThreeDMork.cs."""
+    tr = translated(language)
+    return [(tr.get(entry["pc"], entry["pc"]), entry["cpu"], entry["gpu"],
              str(score_model.scores(entry["gpuScore"], entry["cpuScore"],
                                     entry["ramScore"], entry["driveScore"],
                                     FPS_CAP)["total"]))
@@ -75,7 +77,8 @@ def hardware_sample(language: str = "EN") -> dict:
     board = "ATX (Black)"
     return {
         "SelfName": board,
-        "SelfSpec": "i7-14700K  /  RTX 5090 + RTX 4080",
+        "SelfCpu": "RMD Ryzen 9 7950X",
+        "SelfGpu": "RTX 5090 + RTX 4080 Ti",
         "SelfScore": "112604",
         "SelfFps": "180",
         "Average": tr["3DMork average"].format(8, 53150, 112604),
@@ -115,7 +118,7 @@ def main(out_path: str, language: str = "EN") -> int:
                                             FPS_CAP)["achievedFps"])
                      for entry in score_model.reference_benchmarks()]
 
-    for index, (pc, cpu, gpu, score) in enumerate(reference_rows()):
+    for index, (pc, cpu, gpu, score) in enumerate(reference_rows(language)):
         for key, value in (("LbName_%d" % index, pc), ("LbCpu_%d" % index, cpu),
                            ("LbGpu_%d" % index, gpu), ("LbScore_%d" % index, score),
                            ("LbFps_%d" % index, reference_fps[index])):

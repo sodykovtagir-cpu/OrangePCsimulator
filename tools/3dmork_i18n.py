@@ -902,3 +902,125 @@ add_map("3DMork scene generic", {
     "VN": "Cảnh {0}", "GR": "Σκηνή {0}", "BRL": "Cena {0}", "SK": "Scéna {0}",
     "SW": "Sura {0}", "FA": "صحنه {0}",
 })
+
+# ---------------------------------------------------------------------------
+# Названия эталонных сборок в таблице сравнения
+# ---------------------------------------------------------------------------
+# Сверху - сборка мечты: в каждой категории самая мощная деталь из игры.
+# Ниже ступени вниз, детали подобраны так, чтобы видеокарта, процессор,
+# память и накопители соответствовали друг другу.
+add_map("3DMork build 1", {
+    "EN": "Dream Rig", "HU": "Álomgép", "NL": "Droomwerk", "ES": "Equipo de ensueño",
+    "RO": "Ruling de vis", "PL": "Maszyna marzeń", "CS": "Sen o stroji",
+    "BS": "San mašina", "PT-BR": "PC dos sonhos", "PT-PT": "PC dos sonhos",
+    "ET": "Unistusarvuti", "FR-CA": "Configuration de rêve", "FR-FR": "Configuration de rêve",
+    "KR": "드림 리그", "ZH-CN": "梦幻主机", "ZH-TW": "夢幻主機", "SR": "Mašina iz snova",
+    "RU": "ПК мечты", "TR": "Hayanat Makinesi", "FI": "Unelmakone", "BG": "Мечтата",
+    "UA": "ПК мрії", "DE": "Traumrechner", "CAT": "Màquina de somni", "IT": "PC dei sogni",
+    "JP": "ドリームマシン", "LT": "SAPNŲ DARBAS", "AR": "حاسوب الأحلام", "KZ": "Аңдағарма машина",
+    "NO": "Drømmemaskin", "FIL": "Pangarap na PC", "HIN": "ड्रीम रिग", "TH": "เครื่องฝัน",
+    "ID": "PC Mimpi", "GE": "სულის ოცნელი", "LV": "Sapņu dators", "VN": "Máy mơ",
+    "GR": "Ρύθμιση ονείρου", "BRL": "PC dos sonhos", "SK": "Stroj snov", "SW": "PC ya ndoto",
+    "FA": "رایانه رویایی",
+})
+
+add_map("3DMork build 2", {
+    "EN": "Flagship", "HU": "Csúcsszállító", "NL": "Vlaggenschip", "ES": "Buque insignia",
+    "RO": "Amirală", "PL": "Flagowy", "CS": "Flagship", "BS": "Vodeći", "PT-BR": "Carro-chefe",
+    "PT-PT": "Carro-chefe", "ET": "Lippilaev", "FR-CA": "Vaisseau amiral", "FR-FR": "Vaisseau amiral",
+    "KR": "플래그십", "ZH-CN": "旗舰机", "ZH-TW": "旗艦機", "SR": "Zastavni brod", "RU": "Флагман",
+    "TR": "Amiral Gemisi", "FI": "Lippulaiva", "BG": "Флагман", "UA": "Флагман",
+    "DE": "Flaggschiff", "CAT": "Vaixell insígnia", "IT": "Ammiraglia", "JP": "フラッグシップ",
+    "LT": "Vėliavos laivas", "AR": "سفن الراية", "KZ": "Флагман", "NO": "Flagskip",
+    "FIL": "Pangunahing barko", "HIN": "फ्लैगशिप", "TH": "ธงตรา", "ID": "Kapal", "GE": "დროში",
+    "LV": "Karogs kuģis", "VN": "Hàng hải", "GR": "Πλοηγό πλοίο", "BRL": "Carro-chefe",
+    "SK": "Vlajková loď", "SW": "Bendera", "FA": "ناوگان شاخص",
+})
+
+add_map("3DMork build 3", {
+    "EN": "High-End Gaming", "HU": "Csúcsminőségű gaming", "NL": "High-end gaming",
+    "ES": "Gaming de alta gama", "RO": "Gaming de vârf", "PL": "Gaming high-end",
+    "CS": "Herní high-end", "BS": "Vrhunski gaming", "PT-BR": "Gaming topo de linha",
+    "PT-PT": "Gaming topo de linha", "ET": "Kõrgeklassi mängimine",
+    "FR-CA": "Jeu haute gamme", "FR-FR": "Jouet haute gamme", "KR": "하이엔드 게이밍",
+    "ZH-CN": "高端游戏机", "ZH-TW": "高端遊戲機", "SR": "Vrhunski gejming", "RU": "Игровой топ",
+    "TR": "Üst seviye oyun", "FI": "Pelikone huippuluokka", "BG": "Висок клас гейминг",
+    "UA": "Ігровий топ", "DE": "High-End-Gaming", "CAT": "Gaming d'alta gamma",
+    "IT": "Gaming di fascia alta", "JP": "ハイエンドゲーム", "LT": "Aukščiausios klasės žaidimų",
+    "AR": "ألعاب فائقة الفئة", "KZ": "Жоғары деңгейлі ойын", "NO": "High-end gaming",
+    "FIL": "High-end na laro", "HIN": "हाई-एंड गेमिंग", "TH": "เกมมิ่งระดับสูง",
+    "ID": "Gaming kelas atas", "GE": "მაღალი კლასის გეიმინგი", "LV": "Augstas klases spēles",
+    "VN": "Máy chơi game cao cấp", "GR": "Παιχνίδια υψηλής τεχνολογίας", "BRL": "Gaming topo de linha",
+    "SK": "Herné high-end", "SW": "Gaming ya juu", "FA": "بازی رده‌بالا",
+})
+
+add_map("3DMork build 4", {
+    "EN": "Studio Pro", "HU": "Profi stúdió", "NL": "Studio Pro", "ES": "Studio Pro",
+    "RO": "Studio Pro", "PL": "Studio Pro", "CS": "Studio Pro", "BS": "Studio Pro",
+    "PT-BR": "Studio Pro", "PT-PT": "Studio Pro", "ET": "Stuudio Pro", "FR-CA": "Studio Pro",
+    "FR-FR": "Studio Pro", "KR": "스튜디오 프로", "ZH-CN": "专业工作室", "ZH-TW": "專業工作室",
+    "SR": "Studio Pro", "RU": "Студия", "TR": "Stüdyo Pro", "FI": "Studio Pro", "BG": "Студио Pro",
+    "UA": "Студія", "DE": "Studio Pro", "CAT": "Studio Pro", "IT": "Studio Pro", "JP": "スタジオプロ",
+    "LT": "Studijos profesionalas", "AR": "استوديو احترافي", "KZ": "Кәсіби студия",
+    "NO": "Studio Pro", "FIL": "Studio Pro", "HIN": "स्टूडियो प्रो", "TH": "สตูดิโอมืออาชีพ",
+    "ID": "Studio Pro", "GE": "სტუდია პრო", "LV": "Studijas Pro", "VN": "Studio Pro",
+    "GR": "Studio Pro", "BRL": "Studio Pro", "SK": "Studio Pro", "SW": "Studio Pro",
+    "FA": "استودیو حرفه‌ای",
+})
+
+add_map("3DMork build 5", {
+    "EN": "Mid-Range Gaming", "HU": "Középkategóriás gaming", "NL": "Middenklasse gaming",
+    "ES": "Gaming de gama media", "RO": "Gaming de clasă medie", "PL": "Gaming średniej klasy",
+    "CS": "Herní střední třída", "BS": "Gaming srednje klase", "PT-BR": "Gaming classe média",
+    "PT-PT": "Gaming classe média", "ET": "Keskmise klassi mängimine",
+    "FR-CA": "Jeu de milieu de gamme", "FR-FR": "Jouet milieu de gamme", "KR": "중급 게이밍",
+    "ZH-CN": "中端游戏机", "ZH-TW": "中端遊戲機", "SR": "Gejming srednje klase", "RU": "Средний класс",
+    "TR": "Orta seviye oyun", "FI": "Keskiluokan pelikone", "BG": "Среден клас гейминг",
+    "UA": "Середній клас", "DE": "Gaming der Mittelklasse", "CAT": "Gaming de gamma mitjana",
+    "IT": "Gaming fascia media", "JP": "ミドルクラスゲーム", "LT": "Vidutinės klasės žaidimų",
+    "AR": "ألعاب الفئة المتوسطة", "KZ": "Орта деңгейлі ойын", "NO": "Middelklasse gaming",
+    "FIL": "Mid-range na laro", "HIN": "मिड-रेंज गेमिंग", "TH": "เกมมิ่งระดับกลาง",
+    "ID": "Gaming kelas menengah", "GE": "საშუალო კლასის გეიმინგი", "LV": "Vidējās klases spēles",
+    "VN": "Máy chơi game tầm trung", "GR": "Παιχνίδια μεσαίας κατηγορίας",
+    "BRL": "Gaming classe média", "SK": "Herná stredná trieda", "SW": "Gaming ya wastani",
+    "FA": "بازی میان‌رده",
+})
+
+add_map("3DMork build 6", {
+    "EN": "Mainstream", "HU": "Általános", "NL": " mainstream".strip(), "ES": "Gama mainstream",
+    "RO": "Uzual", "PL": "Klasa średnia", "CS": "Běžná třída", "BS": "Standardna klasa",
+    "PT-BR": "Mainstream", "PT-PT": "Mainstream", "ET": "Tavapärane", "FR-CA": "Grand public",
+    "FR-FR": "Grand public", "KR": "일반용", "ZH-CN": "主流配置", "ZH-TW": "主流配置",
+    "SR": "Standardna klasa", "RU": "Массовый", "TR": "Genel", "FI": "Yleinen", "BG": "Масов",
+    "UA": "Масовий", "DE": "Mainstream", "CAT": "Mainstream", "IT": "Mainstream", "JP": "メインストリーム",
+    "LT": "Vidutinė klasė", "AR": "الحاسوب العام", "KZ": "Қарапайым", "NO": "Mainstream",
+    "FIL": "Mainstream", "HIN": "मेनस्ट्रीम", "TH": "ระดับทั่วไป", "ID": "Kelas mainstream",
+    "GE": "ჩვეულებრივი", "LV": "Vidējā klase", "VN": "Máy phổ thông", "GR": "Μεσαία κατηγορία",
+    "BRL": "Gaming mainstream", "SK": "Bežná trieda", "SW": "Kawaida", "FA": "میان‌رده عمومی",
+})
+
+add_map("3DMork build 7", {
+    "EN": "Old Office", "HU": "Régi irodai", "NL": "Oude kantoor-pc", "ES": "Oficina antigua",
+    "RO": "Birou vechi", "PL": "Stary biuro", "CS": "Starý kancelářský", "BS": "Stara kancelarija",
+    "PT-BR": "Escritório antigo", "PT-PT": "Escritório antigo", "ET": "Vana kontor",
+    "FR-CA": "Bureau ancien", "FR-FR": "Bureau ancien", "KR": "구형 사무용", "ZH-CN": "老式办公机",
+    "ZH-TW": "老式辦公機", "SR": "Stara kancelarija", "RU": "Старый офис", "TR": "Eski ofis",
+    "FI": "Vanha toimisto", "BG": "Стара канцелария", "UA": "Старий офіс", "DE": "Alter Büro-PC",
+    "CAT": "Oficina antiga", "IT": "Ufficio vecchio", "JP": "旧式オフィス", "LT": "Sena biurų kompiuteris",
+    "AR": "مكتب قديم", "KZ": "Ескі кеңсе", "NO": "Gammelt kontor", "FIL": "Lumaang opisina",
+    "HIN": "पुराना ऑफिस", "TH": "เครื่องสำนักงานเก่า", "ID": "Kantor lama", "GE": "ძველი ოფისი",
+    "LV": "Vecā biroja", "VN": "Máy văn phòng cũ", "GR": "Παλιό γραφείο", "BRL": "Escritório antigo",
+    "SK": "Stará kancelária", "SW": "Ofisi ya zamani", "FA": "اداری قدیمی",
+})
+
+add_map("3DMork build 8", {
+    "EN": "Budget", "HU": "Belépő szint", "NL": "Budget", "ES": "Económico", "RO": "Buget",
+    "PL": "Budżetowy", "CS": "Rozpočtový", "BS": "Budžet", "PT-BR": "Econômico", "PT-PT": "Económico",
+    "ET": "Eelarve", "FR-CA": "Économique", "FR-FR": "Économique", "KR": "입문용", "ZH-CN": "入门机",
+    "ZH-TW": "入門機", "SR": "Budžet", "RU": "Бюджет", "TR": "Bütçe", "FI": "Budjetti",
+    "BG": "Бюджетен", "UA": "Бюджетний", "DE": "Budget", "CAT": "Econòmic", "IT": "Economico",
+    "JP": "了解的", "LT": "Biudžetinis", "AR": "اقتصادي", "KZ": "Бюджетті", "NO": "Budsjett",
+    "FIL": "Mura", "HIN": "बजट", "TH": "ประหยัด", "ID": "Ekonomis", "GE": "ეკონომიური",
+    "LV": "Budžeta", "VN": "Máy kinh tế", "GR": "Οικονομική", "BRL": "Econômico", "SK": "Rozpočtový",
+    "SW": "Bei ya bei", "FA": "اقتصادی",
+})

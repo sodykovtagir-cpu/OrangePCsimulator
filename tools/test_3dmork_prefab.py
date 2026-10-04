@@ -199,7 +199,8 @@ if script_block:
 REQUIRED_SINGLE = [
     "startPanel", "testPanel", "resultsPanel",
     "buttonStart", "buttonStartClose", "buttonMenu",
-    "leaderboardSelfRank", "leaderboardSelfName", "leaderboardSelfSpec",
+    "leaderboardSelfRank", "leaderboardSelfName", "leaderboardSelfCpu",
+    "leaderboardSelfGpu",
     "leaderboardSelfScore", "leaderboardSelfFps", "leaderboardAverage",
     "historyBest", "historyEmpty",
     "hardwareTitle", "hardwareCpu", "hardwareGpu", "hardwareRam", "hardwareDrive",
@@ -342,8 +343,21 @@ for panel, prefix, count in (("LeaderboardPanel", "Lb", 8), ("HistoryPanel", "Hi
     header_top = inside_panel([go for go in objects_named("Header_#") if panel_of(go) == panel][0])[1]
     check(header_top > tops[0], "шапка таблицы %s выше первой строки" % panel)
 
+# своя строка повторяет колонки таблицы, иначе длинная сборка налезает на счёт
+for name, column in (("SelfCpu", "Cpu"), ("SelfGpu", "Gpu")):
+    cell = [go for go in objects_named(name) if panel_of(go) == "LeaderboardPanel"]
+    check(bool(cell), "своя строка содержит ячейку %s" % name)
+    if not cell:
+        continue
+    reference_cells = [go for index in range(8)
+                       for go in objects_named("Lb%s_%d" % (column, index))]
+    check(all(inside_panel(cell[0])[0] == inside_panel(go)[0]
+              and transform(cell[0])["size"][0] == transform(go)["size"][0]
+              for go in reference_cells),
+          "%s стоит на месте колонки %s" % (name, column))
+
 # длинная строка состава ПК не переносится на вторую строку
-for name in ("SelfSpec", "SelfName"):
+for name in ("SelfCpu", "SelfGpu", "SelfName"):
     for fid, (cls, body) in by_id.items():
         if cls != 114 or "m_FontData" not in body:
             continue
@@ -506,10 +520,45 @@ for cap in (30.0, 60.0, 144.0, 240.0):
     check(all(0 < t <= 130000 for t in totals),
           "счёт эталонных машин правдоподобен (потолок %d)" % cap)
 
+# каждая эталонная строка - реальная сборка из деталей игры
+import importlib.util as _importlib  # noqa: E402
+
+_spec = _importlib.spec_from_file_location("dm3_builds", ROOT / "tools/3dmork_builds.py")
+builds_module = _importlib.module_from_spec(_spec)
+_spec.loader.exec_module(builds_module)
+
+for declared, built in zip(references, builds_module.reference_benchmarks()):
+    check(declared["pc"] == built["key"] and declared["cpu"] == built["cpu"]
+          and declared["gpu"] == built["gpu"] and declared["gpuScore"] == built["gpuScore"]
+          and abs(declared["cpuScore"] - built["cpuScore"]) < 1.0
+          and declared["ramScore"] == built["ramScore"]
+          and declared["driveScore"] == built["driveScore"],
+          "строка %s в ThreeDMork.cs совпадает со сборкой %s (%s + %s)"
+          % (declared["pc"], built["key"], built["cpu"], built["gpu"]))
+
+check(all("CPU " not in entry["cpu"] for entry in references),
+      "в таблице нет названий процессоров с префиксом CPU")
+check(len({entry["cpu"] for entry in references}) >= 6
+      and len({entry["gpu"] for entry in references}) == len(references),
+      "в эталонных сборках нет повторов и случайных сочетаний видеокарт")
+check(all(references[index]["gpuScore"] > references[index + 1]["gpuScore"]
+          and references[index]["cpuScore"] >= references[index + 1]["cpuScore"] - 0.01
+          and references[index]["ramScore"] >= references[index + 1]["ramScore"]
+          and references[index]["driveScore"] >= references[index + 1]["driveScore"]
+          for index in range(len(references) - 1)),
+      "сборки идут по убыванию: видеокарты, процессор, память и накопители")
+check(references[0]["gpuScore"] == 2 * builds_module.PART_SCORE["RTX5090"]
+      and references[0]["cpuScore"] == round(builds_module.model.cpu_power(4250, 3.4), 0)
+      and references[0]["ramScore"] == 2 * builds_module.PART_SCORE["RAM 64GB(RGB)"]
+      and references[0]["driveScore"] == builds_module.PART_SCORE["SSD 16TB"]
+      + builds_module.PART_SCORE["SSD_M.2 8TB"],
+      "сборка мечты собрана из самых мощных деталей игры")
+check(builds_module.main() == 0, "порядок эталонных сборок сбалансирован (tools/3dmork_builds.py)")
+
 dream = score_model.scores(27000, 4232.0, 24000, 18000, 240.0)
 budget = score_model.scores(3000, 1949.0, 2000, 1200, 240.0)
-check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "Orange Workstation",
-      "первая строка таблицы - эталонная сборка мечты (2 x RTX 5090)")
+check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "3DMork build 1",
+      "первая строка таблицы - сборка мечты (2 x RTX 5090 + i7-14700K)")
 check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
 check(8 * budget["total"] < dream["total"],
       "слабый ПК набирает в разы меньше максимального (%d против %d)"

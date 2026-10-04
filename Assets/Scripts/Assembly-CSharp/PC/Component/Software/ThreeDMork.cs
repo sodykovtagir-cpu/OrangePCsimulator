@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -87,7 +88,8 @@ namespace PC.Component.Software
 		private Text leaderboardSelfName;
 
 		[SerializeField]
-		private Text leaderboardSelfSpec;
+		private Text leaderboardSelfCpu;
+		private Text leaderboardSelfGpu;
 
 		[SerializeField]
 		private Text leaderboardSelfScore;
@@ -228,7 +230,7 @@ namespace PC.Component.Software
 
 		private class LeaderboardEntry
 		{
-			public string pcName;
+			public string pcKey;
 			public string cpuName;
 			public string gpuName;
 			public int gpuScore;
@@ -236,10 +238,10 @@ namespace PC.Component.Software
 			public int ramScore;
 			public int driveScore;
 
-			public LeaderboardEntry(string pc, string cpu, string gpuLabel,
+			public LeaderboardEntry(string pcKey, string cpu, string gpuLabel,
 				int gpuRaw, float cpuRaw, int ramRaw, int driveRaw)
 			{
-				pcName = pc;
+				this.pcKey = pcKey;
 				cpuName = cpu;
 				gpuName = gpuLabel;
 				gpuScore = gpuRaw;
@@ -306,20 +308,25 @@ namespace PC.Component.Software
 
 		/// <summary>
 		/// Эталонные результаты других машин (сортировка по убыванию счёта).
-		/// В таблице хранится реальное железо из ассетов игры, счёт считается
-		/// формулой ComputeScores - той же, что применяется к прогонам игрока.
+		/// Каждая строка - настоящая сборка из деталей игры: видеокарты,
+		/// процессор, память и накопители подобраны друг к другу, поэтому
+		/// не бывает строк вида "RTX 5090 + RTX 3090". Сверху стоит сборка
+		/// мечты - в каждой категории там самая мощная деталь.
+		/// Название - ключ перевода, чтобы таблица читалась на любом языке.
+		/// Список сборок продублирован в tools/3dmork_builds.py вместе с
+		/// проверкой баланса, тесты сверяют оба источника.
 		/// </summary>
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
-			//                       имя                     процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
-			new LeaderboardEntry("Orange Workstation", "i7-14700K", "2x RTX 5090", 27000, 4232f, 24000, 18000),
-			new LeaderboardEntry("TITAN X rig", "i7-13700K", "RTX 5090 + 4080 Ti", 24500, 4073f, 10000, 17000),
-			new LeaderboardEntry("Gaming Beast", "i9-12900K", "2x RTX 4080", 20000, 3751f, 12000, 16000),
-			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4080 Ti", 11000, 4073f, 9000, 14000),
-			new LeaderboardEntry("Creator Mini", "i7-8700K", "RTX 3080 Ti", 7000, 2622f, 9000, 12000),
-			new LeaderboardEntry("Home Cinema PC", "i5-8400", "RTX 2080 Ti", 5500, 2328f, 6000, 6000),
-			new LeaderboardEntry("Office Workstation", "i3-8300", "GTX 1080 Ti", 4500, 2219f, 3000, 5000),
-			new LeaderboardEntry("Budget King", "Celeron G3920", "GTX 1060", 3000, 1949f, 2000, 1200)
+			//                       ключ перевода              процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
+			new LeaderboardEntry("3DMork build 1", "i7-14700K", "2x RTX 5090", 27000, 4232f, 24000, 18000),
+			new LeaderboardEntry("3DMork build 2", "i7-14700K", "RTX 5090 + RTX 4080 Ti", 24500, 4232f, 20000, 17000),
+			new LeaderboardEntry("3DMork build 3", "i7-13700K", "2x RTX 4080", 20000, 4073f, 12000, 14000),
+			new LeaderboardEntry("3DMork build 4", "i9-12900K", "RTX 4080 Ti", 11000, 3751f, 10000, 13000),
+			new LeaderboardEntry("3DMork build 5", "i7-8700K", "RTX 3080 Ti", 7000, 2622f, 8000, 11000),
+			new LeaderboardEntry("3DMork build 6", "i5-8400", "RTX 3080", 6000, 2328f, 7500, 10000),
+			new LeaderboardEntry("3DMork build 7", "i3-8300", "GTX 1080 Ti", 4500, 2219f, 6000, 8500),
+			new LeaderboardEntry("3DMork build 8", "Celeron G3920", "GTX 1060", 3000, 1949f, 4000, 1700)
 		};
 
 		/// <summary>Мощность процессора для бенчмарка.</summary>
@@ -656,7 +663,7 @@ namespace PC.Component.Software
 				var scores = hasRow ? entry.ScoresAt(fpsCap) : new BenchmarkScores();
 
 				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--", new Color(0.75f, 0.75f, 0.8f));
-				SetCell(leaderboardName, i, hasRow ? entry.pcName : "--", new Color(1f, 1f, 1f));
+				SetCell(leaderboardName, i, hasRow ? Tr(entry.pcKey) : "--", new Color(1f, 1f, 1f));
 				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--", new Color(1f, 0.72f, 0.2f));
@@ -672,11 +679,19 @@ namespace PC.Component.Software
 				leaderboardSelfName.text = snapshot.hasBoard ? snapshot.boardName : Tr("3DMork self pc");
 			}
 
-			if (leaderboardSelfSpec != null)
+			// Своя строка повторяет колонки таблицы: процессор в колонке ЦП,
+			// видеокарты в колонке ВИДЕО. Раньше обе детали писались одной
+			// строкой через " / ", и длинная сборка налезала на счёт.
+			if (leaderboardSelfCpu != null)
 			{
-				string spec = (snapshot.cpuCount > 0 ? snapshot.cpuName : Tr("3DMork no cpu")) + "  /  " +
-							  (snapshot.gpuCount > 0 ? JoinPair(snapshot.gpuName, snapshot.gpuName2) : Tr("3DMork no gpu"));
-				leaderboardSelfSpec.text = spec;
+				leaderboardSelfCpu.text = snapshot.cpuCount > 0 ? snapshot.cpuName : Tr("3DMork no cpu");
+			}
+
+			if (leaderboardSelfGpu != null)
+			{
+				leaderboardSelfGpu.text = snapshot.gpuCount > 0
+					? JoinPair(snapshot.gpuName, snapshot.gpuName2)
+					: Tr("3DMork no gpu");
 			}
 
 			if (leaderboardSelfScore != null)
@@ -817,12 +832,28 @@ namespace PC.Component.Software
 			PlayerPrefs.Save();
 		}
 
-		/// <summary>Убирает служебный суффикс Unity "(Clone)" из названия детали.</summary>
+		/// <summary>
+		/// Приводит название детали к виду, как оно записано в таблице:
+		/// убирает служебный сужефикс Unity и префикс категории "CPU ",
+		/// а в названиях видеокарт ставит пробелы ("RTX5090Ti" -> "RTX 5090 Ti").
+		/// </summary>
 		private static string CleanName(string value)
 		{
 			if (string.IsNullOrEmpty(value)) return string.Empty;
 			string clean = value.Replace("(Clone)", string.Empty).Replace("(clone)", string.Empty).Trim();
-			return clean;
+			if (clean.StartsWith("CPU ", StringComparison.OrdinalIgnoreCase)) clean = clean.Substring(4).Trim();
+			return PrettyGpuName(clean);
+		}
+
+		/// <summary>"RTX5090" -> "RTX 5090", "GTX1080Ti" -> "GTX 1080 Ti", "RX570" -> "RX 570".</summary>
+		private static string PrettyGpuName(string value)
+		{
+			if (string.IsNullOrEmpty(value)) return value;
+			var match = Regex.Match(value, @"^([A-Za-z]{2,4})(\d{2,4})([A-Za-z]{0,3})$");
+			if (!match.Success) return value;
+			string tail = match.Groups[3].Value;
+			if (tail.Length == 0) return match.Groups[1].Value + " " + match.Groups[2].Value;
+			return match.Groups[1].Value + " " + match.Groups[2].Value + " " + tail;
 		}
 
 		/// <summary>Соединяет названия двух деталей в одну строку, например "RTX 5090 + RTX 4080".</summary>

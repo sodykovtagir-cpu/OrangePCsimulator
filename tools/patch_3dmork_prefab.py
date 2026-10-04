@@ -142,7 +142,8 @@ NO_WRAP = [
     "3DMork/StartPanel/HistoryPanel/Header_SCORE",
     "3DMork/StartPanel/HistoryPanel/Header_FPS",
     "3DMork/StartPanel/LeaderboardPanel/SelfName",
-    "3DMork/StartPanel/LeaderboardPanel/SelfSpec",
+    "3DMork/StartPanel/LeaderboardPanel/SelfCpu",
+    "3DMork/StartPanel/LeaderboardPanel/SelfGpu",
 ]
 
 # Подпись разрешения рендера в верхнем оверлее теста.
@@ -348,6 +349,81 @@ def main():
                 # best fit только уменьшает подпись, но никогда не увеличивает
                 set_field(text_fid, "m_MaxSize", str(size), "    ")
 
+    # ---- своя строка: процессор и видеокарты в своих колонках --------------
+    # Раньше обе детали писались одной строкой "CPU / GPU" в ячейке шириной
+    # 173 px, и длинная сборка (например Ryzen 9 7950X + RTX 5090 + RTX 4080 Ti)
+    # налезала на счёт и FPS. Теперь это две ячейки ровно под колонками ЦП и
+    # ВИДЕО, как у строк таблицы.
+    self_cpu_path = "3DMork/StartPanel/LeaderboardPanel/SelfCpu"
+    self_gpu_path = "3DMork/StartPanel/LeaderboardPanel/SelfGpu"
+    old_spec = "3DMork/StartPanel/LeaderboardPanel/SelfSpec"
+    panel_rect = by_path["3DMork/StartPanel/LeaderboardPanel"]
+
+    if old_spec in by_path and self_cpu_path not in by_path:
+        spec_rect = by_path[old_spec]
+        spec_go = game_object[spec_rect]
+        set_field(spec_go, "m_Name", "SelfCpu")
+        names[spec_go] = "SelfCpu"
+        set_field(spec_rect, "m_AnchoredPosition", "{x: 141.1, y: -234.6}")
+        set_field(spec_rect, "m_SizeDelta", "{x: 81.6, y: 23.8}")
+        rebuild_paths()
+        changed.append("SelfSpec -> SelfCpu (колонка ЦП)")
+
+    if self_gpu_path not in by_path:
+        assert self_cpu_path in by_path, "missing object " + self_cpu_path
+        template_rect = by_path[self_cpu_path]
+        template_go = game_object[template_rect]
+        template_parts = {}
+        for fid in re.findall(r"^  - component: \{fileID: (\d+)\}$", docs[template_go][1], re.M):
+            fid = int(fid)
+            template_parts[docs[fid][0]] = fid
+        assert 222 in template_parts and 114 in template_parts, "SelfCpu is not a plain text"
+
+        used = set(docs)
+        next_fid = max(used) + 1
+        free = [next_fid + step for step in range(4) if next_fid + step not in used]
+        gpu_go, gpu_rect, gpu_canvas, gpu_text = free
+        used.update(free)
+
+        def copy_text_part(new_fid, template_fid, replacements=()):
+            body = docs[template_fid][1]
+            body = body.replace("m_GameObject: {fileID: %d}" % template_go,
+                                "m_GameObject: {fileID: %d}" % gpu_go, 1)
+            for anchor_from, anchor_to in replacements:
+                body = body.replace(anchor_from, anchor_to, 1)
+            docs[new_fid] = [docs[template_fid][0], body]
+
+        docs[gpu_go] = [1, docs[template_go][1].replace(
+            "  m_Name: SelfCpu\n", "  m_Name: SelfGpu\n", 1)]
+        copy_text_part(gpu_rect, template_rect, (
+            ("m_AnchoredPosition: {x: 141.1, y: -234.6}", "m_AnchoredPosition: {x: 222.7, y: -234.6}"),
+            ("m_SizeDelta: {x: 81.6, y: 23.8}", "m_SizeDelta: {x: 91.8, y: 23.8}")))
+        copy_text_part(gpu_canvas, template_parts[222])
+        copy_text_part(gpu_text, template_parts[114])
+        names[gpu_go] = "SelfGpu"
+        game_object[gpu_rect] = gpu_go
+        game_object[gpu_canvas] = gpu_go
+        game_object[gpu_text] = gpu_go
+        parent[gpu_rect] = panel_rect
+
+        # копия списка компонентов с новыми идентификаторами
+        for old_fid, new_fid in ((template_rect, gpu_rect), (template_parts[222], gpu_canvas),
+                                 (template_parts[114], gpu_text)):
+            assert ("  - component: {fileID: %d}\n" % old_fid) in docs[gpu_go][1], \
+                "component %d is not in the copied list" % old_fid
+            docs[gpu_go][1] = docs[gpu_go][1].replace(
+                "  - component: {fileID: %d}\n" % old_fid,
+                "  - component: {fileID: %d}\n" % new_fid, 1)
+
+        children = re.search(r"^  m_Children:\n(?:  - \{fileID: \d+\}\n)+",
+                             docs[panel_rect][1], re.M)
+        assert children, "no children list on LeaderboardPanel"
+        docs[panel_rect][1] = (docs[panel_rect][1][:children.end()]
+                               + "  - {fileID: %d}\n" % gpu_rect
+                               + docs[panel_rect][1][children.end():])
+        rebuild_paths()
+        changed.append("+ 3DMork/StartPanel/LeaderboardPanel/SelfGpu (колонка ВИДЕО)")
+
     # ---- ячейки заголовков выравниваются по колонкам данных ---------------
     # Заголовки повторяли геометрию своих колонок, но оставались растянутыми
     # по ширине (m_AnchorMax.x = 1). Панель растёт вместе с окном, и подпись
@@ -445,6 +521,23 @@ def main():
         docs[script_fid][1] = docs[script_fid][1][:board_field.start()] + \
             "  hardwareDrive: {fileID: %s}" % board_field.group(1) + docs[script_fid][1][board_field.end():]
         changed.append("ThreeDMork.hardwareBoard -> hardwareDrive")
+    # своя строка: одна ячейка стала двумя (процессор и видеокарты)
+    spec_field = re.search(r"^  leaderboardSelfSpec: \{fileID: (\d+)\}$", docs[script_fid][1], re.M)
+    if spec_field:
+        docs[script_fid][1] = (docs[script_fid][1][:spec_field.start()]
+                               + "  leaderboardSelfCpu: {fileID: %s}\n  leaderboardSelfGpu: {fileID: %d}"
+                               % (spec_field.group(1), gpu_text)
+                               + docs[script_fid][1][spec_field.end():])
+        changed.append("ThreeDMork.leaderboardSelfSpec -> leaderboardSelfCpu + leaderboardSelfGpu")
+    elif field(script_fid, "leaderboardSelfGpu") is None:
+        assert self_gpu_path in by_path, "missing object " + self_gpu_path
+        match = re.search(r"^  leaderboardSelfCpu: \{fileID: (\d+)\}$", docs[script_fid][1], re.M)
+        assert match, "leaderboardSelfCpu field not found"
+        docs[script_fid][1] = (docs[script_fid][1][:match.end() + 1]
+                               + "  leaderboardSelfGpu: {fileID: %d}\n" % text_of(by_path[self_gpu_path])
+                               + docs[script_fid][1][match.end() + 1:])
+        changed.append("ThreeDMork.+ leaderboardSelfGpu")
+
     if field(script_fid, "resolutionText") is None:
         match = re.search(r"^  fpsText: \{fileID: (\d+)\}$", docs[script_fid][1], re.M)
         assert match, "fpsText field not found"
