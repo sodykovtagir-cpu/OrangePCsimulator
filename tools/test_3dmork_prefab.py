@@ -538,6 +538,12 @@ for declared, built in zip(references, builds_module.reference_benchmarks()):
 
 check(all("CPU " not in entry["cpu"] for entry in references),
       "в таблице нет названий процессоров с префиксом CPU")
+# в одной сборке не может быть двух разных видеокарт: пара всегда одинаковая
+mixed = [entry["gpu"] for entry in references
+         if " + " in entry["gpu"] or not entry["gpu"].startswith("2x ")]
+check(not mixed, "в каждой эталонной сборке пара одинаковых видеокарт (нарушители: %s)" % mixed)
+check(len({entry["gpu"] for entry in references}) == len(references),
+      "видеокарты в эталонных сборках не повторяются между строками")
 check(len({entry["cpu"] for entry in references}) >= 6
       and len({entry["gpu"] for entry in references}) == len(references),
       "в эталонных сборках нет повторов и случайных сочетаний видеокарт")

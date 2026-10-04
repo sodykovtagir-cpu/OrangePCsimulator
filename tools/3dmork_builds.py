@@ -38,32 +38,35 @@ CPU_PART = {
     "i3-8300": (2200, 3.7), "Celeron G3920": (2000, 2.9),
 }
 
+# Пара видеокарт в сборке всегда одинаковая: "RTX 5090 + RTX 4080 Ti" -
+# это не собранная в жизни машина, а набор случайных деталей.
+
 # Сборка мечты, дальше - ступени вниз. Названия идут ключами перевода,
 # чтобы таблица читалась на любом языке (см. ThreeDMork.cs).
 BUILDS = [
     {"key": "3DMork build 1", "cpu": "i7-14700K",
      "gpus": ["RTX5090", "RTX5090"], "rams": ["RAM 64GB(RGB)", "RAM 64GB(RGB)"],
      "drives": ["SSD 16TB", "SSD_M.2 8TB"]},
-    {"key": "3DMork build 2", "cpu": "i7-14700K",
-     "gpus": ["RTX5090", "RTX4080Ti"], "rams": ["RAM 64GB", "RAM 64GB"],
+    {"key": "3DMork build 2", "cpu": "i7-13700K",
+     "gpus": ["RTX4080Ti", "RTX4080Ti"], "rams": ["RAM 64GB", "RAM 64GB"],
      "drives": ["SSD 8TB", "SSD_M.2 8TB"]},
-    {"key": "3DMork build 3", "cpu": "i7-13700K",
+    {"key": "3DMork build 3", "cpu": "i9-12900K",
      "gpus": ["RTX4080", "RTX4080"], "rams": ["RAM 32GB(RGB)", "RAM 32GB(RGB)"],
      "drives": ["SSD 4TB", "SSD_M.2 2TB"]},
-    {"key": "3DMork build 4", "cpu": "i9-12900K",
-     "gpus": ["RTX4080Ti"], "rams": ["RAM 32GB", "RAM 32GB"],
+    {"key": "3DMork build 4", "cpu": "RMD Ryzen 9 7950X",
+     "gpus": ["RTX3080Ti", "RTX3080Ti"], "rams": ["RAM 32GB", "RAM 32GB"],
      "drives": ["SSD 2TB", "SSD_M.2 2TB"]},
     {"key": "3DMork build 5", "cpu": "i7-8700K",
-     "gpus": ["RTX3080Ti"], "rams": ["RAM 16GB(RGB)", "RAM 8GB"],
+     "gpus": ["RTX3080", "RTX3080"], "rams": ["RAM 16GB(RGB)", "RAM 16GB(RGB)"],
      "drives": ["SSD 1TB", "SSD_M.2 1TB"]},
     {"key": "3DMork build 6", "cpu": "i5-8400",
-     "gpus": ["RTX3080"], "rams": ["RAM 16GB", "RAM 8GB"],
+     "gpus": ["RTX2080Ti", "RTX2080Ti"], "rams": ["RAM 16GB", "RAM 16GB"],
      "drives": ["SSD 1TB", "SSD_M.2 512GB"]},
     {"key": "3DMork build 7", "cpu": "i3-8300",
-     "gpus": ["GTX1080Ti"], "rams": ["RAM 8GB", "RAM 8GB"],
+     "gpus": ["GTX1080Ti", "GTX1080Ti"], "rams": ["RAM 8GB", "RAM 8GB"],
      "drives": ["SSD 512GB", "SSD_M.2 256GB"]},
     {"key": "3DMork build 8", "cpu": "Celeron G3920",
-     "gpus": ["GTX1060"], "rams": ["RAM 4GB", "RAM 4GB"],
+     "gpus": ["GTX1060", "GTX1060"], "rams": ["RAM 4GB", "RAM 4GB"],
      "drives": ["HDD 2TB", "FlashDrive"]},
 ]
 
@@ -112,6 +115,12 @@ def reference_benchmarks() -> list:
 
 def main() -> int:
     problems = []
+    for build in BUILDS:
+        gpus = build["gpus"]
+        if len(set(gpus)) != 1:
+            problems.append("в сборке %s две разные видеокарты: %s" % (build["key"], " + ".join(gpus)))
+        if len(build["rams"]) != 2 or len(build["drives"]) != 2:
+            problems.append("в сборке %s не два накопителя и не две планки памяти" % build["key"])
     for cap in (240.0, 60.0):
         print("=== потолок %d кадров" % cap)
         previous = None
