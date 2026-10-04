@@ -233,16 +233,16 @@ namespace PC.Component.Software
 			public int ramScore;
 			public int driveScore;
 
-			public LeaderboardEntry(string pc, string cpu, string gpu,
-				int gpu, float cpuRaw, int ram, int drive)
+			public LeaderboardEntry(string pc, string cpu, string gpuLabel,
+				int gpuRaw, float cpuRaw, int ramRaw, int driveRaw)
 			{
 				pcName = pc;
 				cpuName = cpu;
-				gpuName = gpu;
-				gpuScore = gpu;
+				gpuName = gpuLabel;
+				gpuScore = gpuRaw;
 				cpuScore = cpuRaw;
-				ramScore = ram;
-				driveScore = drive;
+				ramScore = ramRaw;
+				driveScore = driveRaw;
 			}
 
 			/// <summary>
