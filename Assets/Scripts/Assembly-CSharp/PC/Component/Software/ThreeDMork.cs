@@ -261,11 +261,14 @@ namespace PC.Component.Software
 		}
 
 		/// <summary>
-		/// Референсные максимумы игрового железа (реальные значения из ассетов):
-		/// 2 x RTX 5090, i7-14700K (3.4 ГГц), 2 x 64 ГБ (RGB), 2 x SSD 16 ТБ.
+		/// Референсные максимумы игрового железа (значения из ассетов):
+		/// это детали сборки мечты - первой строки таблицы сравнения:
+		/// 2 x RTX 5090, RMD Ryzen 9 7950X (3 ГГц), 2 x 64 ГБ (RGB),
+		/// SSD 16 ТБ + M.2 8 ТБ. Сборка мечты набирает потолок во всех
+		/// категориях, а ПК игрока не может превзойти эти потолки.
 		/// </summary>
 		private const float RefGpuScore = 27000f;
-		private const float RefCpuScore = 4232f;
+		private const float RefCpuScore = 3645f;
 		private const float RefRamScore = 24000f;
 		private const float RefDriveScore = 18000f;
 
@@ -320,10 +323,10 @@ namespace PC.Component.Software
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
 			//                       ключ перевода              процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
-			new LeaderboardEntry("3DMork build 1", "i7-14700K", "2x RTX 5090", 27000, 4232f, 24000, 18000),
-			new LeaderboardEntry("3DMork build 2", "i7-13700K", "2x RTX 4080 Ti", 22000, 4073f, 20000, 17000),
-			new LeaderboardEntry("3DMork build 3", "i9-12900K", "2x RTX 4080", 20000, 3751f, 12000, 14000),
-			new LeaderboardEntry("3DMork build 4", "RMD Ryzen 9 7950X", "2x RTX 3080 Ti", 14000, 3645f, 10000, 13000),
+			new LeaderboardEntry("3DMork build 1", "RMD Ryzen 9 7950X", "2x RTX 5090", 27000, 3645f, 24000, 18000),
+			new LeaderboardEntry("3DMork build 2", "i9-9900K", "2x RTX 4080 Ti", 22000, 3214f, 20000, 17000),
+			new LeaderboardEntry("3DMork build 3", "i9-7900X", "2x RTX 4080", 20000, 2974f, 12000, 14000),
+			new LeaderboardEntry("3DMork build 4", "Xeon E5-2689", "2x RTX 3080 Ti", 14000, 2776f, 10000, 13000),
 			new LeaderboardEntry("3DMork build 5", "i7-8700K", "2x RTX 3080", 12000, 2622f, 10000, 11000),
 			new LeaderboardEntry("3DMork build 6", "i5-8400", "2x RTX 2080 Ti", 11000, 2328f, 9000, 10000),
 			new LeaderboardEntry("3DMork build 7", "i3-8300", "2x GTX 1080 Ti", 9000, 2219f, 6000, 8500),

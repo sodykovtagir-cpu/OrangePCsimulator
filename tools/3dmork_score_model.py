@@ -19,7 +19,7 @@ SCRIPT = os.path.join(REPO, "Assets", "Scripts", "Assembly-CSharp", "PC", "Compo
                       "Software", "ThreeDMork.cs")
 
 REF_GPU = 27000.0
-REF_CPU = 4232.0
+REF_CPU = 3645.0
 REF_RAM = 24000.0
 REF_DRIVE = 18000.0
 

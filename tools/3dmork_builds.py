@@ -33,9 +33,12 @@ PART_SCORE = {
 
 # Процессоры: название, счёт детали, штатная частота в ГГц.
 CPU_PART = {
-    "i7-14700K": (4250, 3.4), "i7-13700K": (4090, 3.4), "i9-12900K": (3800, 3.2),
-    "RMD Ryzen 9 7950X": (3725, 3.0), "i7-8700K": (2600, 3.7), "i5-8400": (2400, 2.8),
+    "RMD Ryzen 9 7950X": (3725, 3.0), "i9-9900K": (3200, 3.6), "i9-7900X": (3000, 3.3),
+    "Xeon E5-2689": (2800, 3.3), "i7-8700K": (2600, 3.7), "i5-8400": (2400, 2.8),
     "i3-8300": (2200, 3.7), "Celeron G3920": (2000, 2.9),
+    # остальные процессоры игры (i7-14700K, i7-13700K, i9-12900K,
+    # Xeon E5-2678 v3) в таблицу не попадают: по счёту детали они сильнее
+    # Ryzen 9 7950X, а сборка мечты должна быть на самых мощных деталях.
 }
 
 # Пара видеокарт в сборке всегда одинаковая: "RTX 5090 + RTX 4080 Ti" -
@@ -44,16 +47,16 @@ CPU_PART = {
 # Сборка мечты, дальше - ступени вниз. Названия идут ключами перевода,
 # чтобы таблица читалась на любом языке (см. ThreeDMork.cs).
 BUILDS = [
-    {"key": "3DMork build 1", "cpu": "i7-14700K",
+    {"key": "3DMork build 1", "cpu": "RMD Ryzen 9 7950X",
      "gpus": ["RTX5090", "RTX5090"], "rams": ["RAM 64GB(RGB)", "RAM 64GB(RGB)"],
      "drives": ["SSD 16TB", "SSD_M.2 8TB"]},
-    {"key": "3DMork build 2", "cpu": "i7-13700K",
+    {"key": "3DMork build 2", "cpu": "i9-9900K",
      "gpus": ["RTX4080Ti", "RTX4080Ti"], "rams": ["RAM 64GB", "RAM 64GB"],
      "drives": ["SSD 8TB", "SSD_M.2 8TB"]},
-    {"key": "3DMork build 3", "cpu": "i9-12900K",
+    {"key": "3DMork build 3", "cpu": "i9-7900X",
      "gpus": ["RTX4080", "RTX4080"], "rams": ["RAM 32GB(RGB)", "RAM 32GB(RGB)"],
      "drives": ["SSD 4TB", "SSD_M.2 2TB"]},
-    {"key": "3DMork build 4", "cpu": "RMD Ryzen 9 7950X",
+    {"key": "3DMork build 4", "cpu": "Xeon E5-2689",
      "gpus": ["RTX3080Ti", "RTX3080Ti"], "rams": ["RAM 32GB", "RAM 32GB"],
      "drives": ["SSD 2TB", "SSD_M.2 2TB"]},
     {"key": "3DMork build 5", "cpu": "i7-8700K",

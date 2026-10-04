@@ -509,7 +509,7 @@ check(entries and all(line.count(",") == 6 for line in entries),
       "эталонная строка описывает железо, а не готовый результат")
 references = score_model.reference_benchmarks()
 check(all(entry["gpuScore"] <= 27000 and entry["ramScore"] <= 24000
-          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 4232.0
+          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 3645.0
           for entry in references),
       "эталонные сборки не превосходят максимум игрового железа")
 for cap in (30.0, 60.0, 144.0, 240.0):
@@ -553,26 +553,44 @@ check(all(references[index]["gpuScore"] > references[index + 1]["gpuScore"]
           and references[index]["driveScore"] >= references[index + 1]["driveScore"]
           for index in range(len(references) - 1)),
       "сборки идут по убыванию: видеокарты, процессор, память и накопители")
-check(references[0]["gpuScore"] == 2 * builds_module.PART_SCORE["RTX5090"]
-      and references[0]["cpuScore"] == round(builds_module.model.cpu_power(4250, 3.4), 0)
-      and references[0]["ramScore"] == 2 * builds_module.PART_SCORE["RAM 64GB(RGB)"]
-      and references[0]["driveScore"] == builds_module.PART_SCORE["SSD 16TB"]
-      + builds_module.PART_SCORE["SSD_M.2 8TB"],
-      "сборка мечты собрана из самых мощных деталей игры")
+# Сборка мечты: две самые мощные видеокарты, самая большая память и два
+# самых ёмких накопителя. Процессор - Ryzen 9 7950X: по счёту детали он чуть
+# слабее i7-14700K, но именно он стоит в сборке мечты (выбор владельца игры),
+# и вся лестница ниже идёт по убыванию, чтобы AMD оставался наверху.
+strongest_gpu = max(value for part, value in builds_module.PART_SCORE.items()
+                    if part.startswith(("RTX", "GTX", "RX")))
+strongest_ram = max(value for part, value in builds_module.PART_SCORE.items()
+                    if part.startswith("RAM"))
+strongest_drives = sorted((value for part, value in builds_module.PART_SCORE.items()
+                           if part.startswith(("SSD", "HDD", "FlashDrive"))), reverse=True)[:2]
+check(references[0]["gpuScore"] == 2 * strongest_gpu
+      and references[0]["ramScore"] == 2 * strongest_ram
+      and references[0]["driveScore"] == sum(strongest_drives)
+      and references[0]["cpu"] == "RMD Ryzen 9 7950X",
+      "сборка мечты: 2 x самая мощная видеокарта, Ryzen 9 7950X, "
+      "2 x самая большая память и два самых ёмких накопителя")
+check(builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] ==
+      builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] and
+      references[0]["cpuScore"] == round(
+          score_model.cpu_power(*builds_module.CPU_PART["RMD Ryzen 9 7950X"]), 0),
+      "мощность Ryzen 9 7950X в таблице посчитана той же формулой, что и у игрока")
+check(all(references[index]["cpuScore"] > references[index + 1]["cpuScore"]
+          for index in range(len(references) - 1)),
+      "процессор в таблице строго идёт по убыванию, Ryzen 9 7950X на первом месте")
 check(builds_module.main() == 0, "порядок эталонных сборок сбалансирован (tools/3dmork_builds.py)")
 
-dream = score_model.scores(27000, 4232.0, 24000, 18000, 240.0)
+dream = score_model.scores(27000, 3645.0, 24000, 18000, 240.0)
 budget = score_model.scores(3000, 1949.0, 2000, 1200, 240.0)
 check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "3DMork build 1",
-      "первая строка таблицы - сборка мечты (2 x RTX 5090 + i7-14700K)")
+      "первая строка таблицы - сборка мечты (2 x RTX 5090 + Ryzen 9 7950X)")
 check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
 check(8 * budget["total"] < dream["total"],
       "слабый ПК набирает в разы меньше максимального (%d против %d)"
       % (budget["total"], dream["total"]))
-check(score_model.scores(27000, 4232.0, 24000, 18000, 60.0)["total"] <
+check(score_model.scores(27000, 3645.0, 24000, 18000, 60.0)["total"] <
       dream["total"], "потолок из настроек снижает FPS-составляющую счёта")
 check(score_model.render_resolution(3000, 1949.0, 2000, 60.0) !=
-      score_model.render_resolution(27000, 4232.0, 24000, 60.0),
+      score_model.render_resolution(27000, 3645.0, 24000, 60.0),
       "слабый ПК рендерит тест в меньшем разрешении")
 old_cpu = score_model.cpu_power(2200, 3.7)   # i3-8300
 new_cpu = score_model.cpu_power(2400, 2.8)   # i5-8400
