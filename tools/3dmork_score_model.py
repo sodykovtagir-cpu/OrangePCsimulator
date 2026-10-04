@@ -3,7 +3,7 @@
 Нужна, чтобы эталонная таблица, превью и тесты считались одной и той же
 формулой, а не расходились с игрой. Значения железа берутся из ассетов:
     GPU   RTX 5090 = 13500, RTX 4080 Ti = 11000, RTX 3080 Ti = 7000 ...
-    CPU   i7-14700K = 3.4 ГГц * 4250 = 14450
+    CPU   i7-14700K = 4250 * (0.85 + 0.15 * 3.4 / 3.5) = 4232
     RAM   64 ГБ = 10000 (64 ГБ RGB = 12000)
     Drive SSD 16 ТБ = 9000
 """
@@ -19,7 +19,7 @@ SCRIPT = os.path.join(REPO, "Assets", "Scripts", "Assembly-CSharp", "PC", "Compo
                       "Software", "ThreeDMork.cs")
 
 REF_GPU = 27000.0
-REF_CPU = 14450.0
+REF_CPU = 4232.0
 REF_RAM = 24000.0
 REF_DRIVE = 18000.0
 
@@ -35,6 +35,16 @@ RESOLUTIONS = ((1920, 1080), (1600, 900), (1280, 720), (960, 540), (640, 360))
 
 def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
+
+
+def cpu_power(score: int, frequency: float) -> float:
+    """Мощность процессора: порт CpuPower из ThreeDMork.cs.
+
+    Раньше была произведённая на частоту величина, из-за чего разогнанный
+    i3-8300 (3.7 ГГц) выглядел мощнее нового i5-8400 (2.8 ГГц).
+    """
+    factor = 0.85 + 0.15 * min(1.2, max(0.5, frequency / 3.5))
+    return score * factor
 
 
 def machine_fps(gpu: int, cpu: float, ram: int) -> float:

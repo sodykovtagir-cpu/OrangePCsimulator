@@ -50,8 +50,7 @@ def check(condition: bool, message: str) -> bool:
 # 1. Префаб существует и структурно корректен
 # ---------------------------------------------------------------------------
 check(PREFAB.exists(), "префаб 3DMork на месте")
-if not PREFAB.exists():
-    raise SystemExit(1)
+if not PREFAB.exists():    raise SystemExit(1)
 
 result = subprocess.run(
     [sys.executable, str(ROOT / "tools/check_prefab_yaml.py"), str(PREFAB)],
@@ -240,6 +239,121 @@ check(STAGE.exists(), "префаб отдельной комнаты бенчм
 check(SCENE.exists(), "отдельная сцена бенчмарка на месте")
 
 # ---------------------------------------------------------------------------
+# 4б. Сетка таблиц: подпись стоит ровно на месте своей колонки
+# ---------------------------------------------------------------------------
+# Панели растягиваются вместе с окном, поэтому растянутая по ширине ячейка
+# заголовка (m_AnchorMax.x = 1) уносила центрированную подпись в середину
+# пустого места, а "#"history попадал на колонку процессора. Проверяем, что
+# у заголовка и его данных совпадают якоря, позиция и ширина.
+rect_of_go: dict[str, str] = {}
+rect_parent: dict[str, int] = {}
+for file_id, (class_id, body) in by_id.items():
+    if class_id != 224:
+        continue
+    go_id = owner_of(file_id)
+    rect_of_go[go_id] = file_id
+    match = re.search(r"^  m_Father: \{fileID: (\d+)\}$", body, flags=re.M)
+    rect_parent[file_id] = match.group(1) if match else "0"
+
+
+def transform(go_id: str) -> dict:
+    body = by_id[rect_of_go[go_id]][1]
+    def pair(field: str) -> tuple[float, float]:
+        match = re.search(r"^  %s: \{x: (-?[\d.]+), y: (-?[\d.]+)\}$" % field, body, re.M)
+        return float(match.group(1)), float(match.group(2))
+    return {"pos": pair("m_AnchoredPosition"), "size": pair("m_SizeDelta"),
+            "anchor_min": pair("m_AnchorMin"), "anchor_max": pair("m_AnchorMax")}
+
+
+def inside_panel(go_id: str) -> tuple[float, float]:
+    """Позиция объекта относительно своей панели (родители могут быть любыми)."""
+    x = y = 0.0
+    current = go_id
+    while current and names.get(current) not in ("LeaderboardPanel", "HistoryPanel"):
+        entry = transform(current)
+        x += entry["pos"][0]
+        y += entry["pos"][1]
+        parent = rect_parent.get(rect_of_go.get(current, ""), "0")
+        current = owner_of(parent) if parent in by_id else ""
+    return round(x, 2), round(y, 2)
+
+
+def objects_named(name: str) -> list[str]:
+    return [go for go, value in names.items() if value == name]
+
+
+# заголовок и его колонка: (подпись в таблице, ячейка данных)
+COLUMNS = [("Header_#", "Rank"), ("Header_PC", "Name"), ("Header_CPU", "Cpu"),
+           ("Header_GPU", "Gpu"), ("Header_SCORE", "Score"), ("Header_FPS", "Fps")]
+PREFIX = {"LeaderboardPanel": "Lb", "HistoryPanel": "Hist"}
+ROWS = {"LeaderboardPanel": 8, "HistoryPanel": 5}
+
+
+def panel_of(go_id: str) -> str:
+    current = go_id
+    while current and names.get(current) not in PREFIX:
+        parent = rect_parent.get(rect_of_go.get(current, ""), "0")
+        current = owner_of(parent) if parent in by_id else ""
+    return names.get(current, "")
+
+
+for header_name, column in COLUMNS:
+    for header in objects_named(header_name):
+        panel = panel_of(header)
+        header_rect = transform(header)
+        if header_rect["size"][0] <= 0:
+            check(False, "%s не растянут (ширина %s)" % (header_name, header_rect["size"][0]))
+            continue
+        if header_rect["anchor_max"] != header_rect["anchor_min"]:
+            check(False, "%s не привязан к левому краю, как его данные" % header_name)
+            continue
+        # первая строка этой же таблицы - эталон для колонки
+        for index in range(ROWS.get(panel, 0)):
+            wanted = ["%s%s_%d" % (PREFIX[panel], column, index),
+                      "%sRank_%d" % (PREFIX[panel], index),
+                      "%sIndex_%d" % (PREFIX[panel], index)]
+            cells = [go for name in wanted for go in objects_named(name) if panel_of(go) == panel]
+            if not cells:
+                continue
+            cell = cells[0]
+            cell_rect = transform(cell)
+            header_x = inside_panel(header)[0]
+            cell_x = inside_panel(cell)[0]
+            check(abs(header_x - cell_x) <= 0.05
+                  and abs(header_rect["size"][0] - cell_rect["size"][0]) <= 0.05
+                  and header_rect["anchor_max"] == cell_rect["anchor_max"],
+                  "%s в %s совпадает со своей колонкой (x %s против %s, ширина %s против %s)"
+                  % (header_name, panel, header_x, cell_x,
+                     header_rect["size"][0], cell_rect["size"][0]))
+            break
+
+# строки таблиц идут с одинаковым шагом, шапка выше первой строки
+for panel, prefix, count in (("LeaderboardPanel", "Lb", 8), ("HistoryPanel", "Hist", 5)):
+    tops = []
+    for index in range(count):
+        wanted = ["%sRank_%d" % (prefix, index), "%sIndex_%d" % (prefix, index)]
+        cell = [go for name in wanted for go in objects_named(name) if panel_of(go) == panel]
+        check(bool(cell), "строка %d таблицы %s на месте" % (index, panel))
+        if cell:
+            tops.append(inside_panel(cell[0])[1])
+    steps = [round(tops[i + 1] - tops[i], 2) for i in range(len(tops) - 1)]
+    check(len(set(steps)) == 1 and steps[0] < 0,
+          "шаг строк таблицы %s одинаков (%s)" % (panel, sorted(set(steps))))
+    header_top = inside_panel([go for go in objects_named("Header_#") if panel_of(go) == panel][0])[1]
+    check(header_top > tops[0], "шапка таблицы %s выше первой строки" % panel)
+
+# длинная строка состава ПК не переносится на вторую строку
+for name in ("SelfSpec", "SelfName"):
+    for fid, (cls, body) in by_id.items():
+        if cls != 114 or "m_FontData" not in body:
+            continue
+        if owner_of(fid) not in objects_named(name):
+            continue
+        overflow = re.search(r"^    m_HorizontalOverflow: (\d)$", body, re.M)
+        check(overflow is not None and overflow.group(1) == "1",
+              "%s не переносится на вторую строку" % name)
+
+# ---------------------------------------------------------------------------
 # 5. В скрипте нет процедурного UI
 # ---------------------------------------------------------------------------
 script_text = SCRIPT.read_text(encoding="utf-8")
@@ -381,7 +495,7 @@ check(entries and all(line.count(",") == 6 for line in entries),
       "эталонная строка описывает железо, а не готовый результат")
 references = score_model.reference_benchmarks()
 check(all(entry["gpuScore"] <= 27000 and entry["ramScore"] <= 24000
-          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 14450.0
+          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 4232.0
           for entry in references),
       "эталонные сборки не превосходят максимум игрового железа")
 for cap in (30.0, 60.0, 144.0, 240.0):
@@ -392,19 +506,30 @@ for cap in (30.0, 60.0, 144.0, 240.0):
     check(all(0 < t <= 130000 for t in totals),
           "счёт эталонных машин правдоподобен (потолок %d)" % cap)
 
-dream = score_model.scores(27000, 14450.0, 24000, 18000, 240.0)
-budget = score_model.scores(3000, 5800.0, 2000, 1200, 240.0)
+dream = score_model.scores(27000, 4232.0, 24000, 18000, 240.0)
+budget = score_model.scores(3000, 1949.0, 2000, 1200, 240.0)
 check(references[0]["gpuScore"] == 27000 and references[0]["pc"] == "Orange Workstation",
       "первая строка таблицы - эталонная сборка мечты (2 x RTX 5090)")
 check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
 check(8 * budget["total"] < dream["total"],
       "слабый ПК набирает в разы меньше максимального (%d против %d)"
       % (budget["total"], dream["total"]))
-check(score_model.scores(27000, 14450.0, 24000, 18000, 60.0)["total"] <
+check(score_model.scores(27000, 4232.0, 24000, 18000, 60.0)["total"] <
       dream["total"], "потолок из настроек снижает FPS-составляющую счёта")
-check(score_model.render_resolution(3000, 5800.0, 2000, 60.0) !=
-      score_model.render_resolution(27000, 14450.0, 24000, 60.0),
+check(score_model.render_resolution(3000, 1949.0, 2000, 60.0) !=
+      score_model.render_resolution(27000, 4232.0, 24000, 60.0),
       "слабый ПК рендерит тест в меньшем разрешении")
+old_cpu = score_model.cpu_power(2200, 3.7)   # i3-8300
+new_cpu = score_model.cpu_power(2400, 2.8)   # i5-8400
+check(new_cpu > old_cpu,
+      "новый i5-8400 мощнее разогнанного i3-8300 (%.0f против %.0f)" % (new_cpu, old_cpu))
+check(score_model.cpu_power(4250, 3.4) > score_model.cpu_power(3725, 3.0),
+      "i7-14700K мощнее Ryzen 9 7950X по игровым очкам компонента")
+check("cpu.frequency * cpu.Score" not in script_text and "CpuPower(cpu)" in script_text,
+      "мощность процессора больше не домножается на частоту")
+check("FormulaVersion" in script_text and "ResetStaleResults" in script_text,
+      "прогоны по прошлой формуле очищаются при запуске")
+
 check("(Clone)" in script_text and 'Replace("(Clone)"' in script_text,
       "из названий деталей убирается суффикс (Clone)")
 check("HardwareType.Drive" in script_text and "gpuName2" in script_text and

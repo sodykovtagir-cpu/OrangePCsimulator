@@ -112,6 +112,39 @@ FONTS = [
     ("3DMork/ResultsPanel/Category (*)/Value", 17),
 ]
 
+# Геометрия ячеек заголовков: у них остались отрицательные размеры от
+# масштабирования, из-за чего подписи уезжали мимо своих колонок.
+# Ширина = ширине колонки с данными: путь -> (x, y, ширина, высота).
+RECTS = {
+    "3DMork/StartPanel/LeaderboardPanel/Header_#": (6.8, -42.5, 25.5, 18.7),
+    "3DMork/StartPanel/LeaderboardPanel/Header_PC": (32.3, -42.5, 108.8, 18.7),
+    "3DMork/StartPanel/LeaderboardPanel/Header_CPU": (141.1, -42.5, 81.6, 18.7),
+    "3DMork/StartPanel/LeaderboardPanel/Header_GPU": (222.7, -42.5, 91.8, 18.7),
+    "3DMork/StartPanel/LeaderboardPanel/Header_SCORE": (314.5, -42.5, 51.0, 18.7),
+    "3DMork/StartPanel/LeaderboardPanel/Header_FPS": (365.5, -42.5, 40.8, 18.7),
+    "3DMork/StartPanel/HistoryPanel/Header_#": (6.8, -42.5, 20.4, 17.0),
+    "3DMork/StartPanel/HistoryPanel/Header_DATE": (27.2, -42.5, 100.3, 17.0),
+    "3DMork/StartPanel/HistoryPanel/Header_SCORE": (127.5, -42.5, 66.3, 17.0),
+    "3DMork/StartPanel/HistoryPanel/Header_FPS": (193.8, -42.5, 74.8, 17.0),
+}
+
+# Подписи, которые не должны переноситься на вторую строку.
+# 1 = Overflow: текст рисуется в одну строку и ужимается по ширине.
+NO_WRAP = [
+    "3DMork/StartPanel/LeaderboardPanel/Header_#",
+    "3DMork/StartPanel/LeaderboardPanel/Header_PC",
+    "3DMork/StartPanel/LeaderboardPanel/Header_CPU",
+    "3DMork/StartPanel/LeaderboardPanel/Header_GPU",
+    "3DMork/StartPanel/LeaderboardPanel/Header_SCORE",
+    "3DMork/StartPanel/LeaderboardPanel/Header_FPS",
+    "3DMork/StartPanel/HistoryPanel/Header_#",
+    "3DMork/StartPanel/HistoryPanel/Header_DATE",
+    "3DMork/StartPanel/HistoryPanel/Header_SCORE",
+    "3DMork/StartPanel/HistoryPanel/Header_FPS",
+    "3DMork/StartPanel/LeaderboardPanel/SelfName",
+    "3DMork/StartPanel/LeaderboardPanel/SelfSpec",
+]
+
 # Подпись разрешения рендера в верхнем оверлее теста.
 # Создаётся один раз, повторный запуск патчера её не трогает.
 RES_TEXT_RECT = """RectTransform:
@@ -314,6 +347,30 @@ def main():
             if field(text_fid, "m_BestFit", "    ") == "1":
                 # best fit только уменьшает подпись, но никогда не увеличивает
                 set_field(text_fid, "m_MaxSize", str(size), "    ")
+
+    # ---- ячейки заголовков выравниваются по колонкам данных ---------------
+    # Заголовки повторяли геометрию своих колонок, но оставались растянутыми
+    # по ширине (m_AnchorMax.x = 1). Панель растёт вместе с окном, и подпись
+    # по центру растянутой ячейки уезжала в середину пустого места, а "#"
+    # вообще вставал на колонку процессора. Теперь якоря, размер и позиция
+    # у заголовка и у его данных совпадают.
+    for wanted, (x, y, w, h) in RECTS.items():
+        assert wanted in by_path, "missing object " + wanted
+        rect = by_path[wanted]
+        if set_field(rect, "m_AnchorMin", "{x: 0, y: 1}"):
+            changed.append("%s anchor" % wanted)
+        if set_field(rect, "m_AnchorMax", "{x: 0, y: 1}"):
+            changed.append("%s anchor" % wanted)
+        if set_field(rect, "m_AnchoredPosition", "{x: %s, y: %s}" % (number(x), number(y))):
+            changed.append("%s position" % wanted)
+        if set_field(rect, "m_SizeDelta", "{x: %s, y: %s}" % (number(w), number(h))):
+            changed.append("%s size" % wanted)
+
+    for wanted in NO_WRAP:
+        text_fid = text_of(by_path[wanted])
+        assert text_fid, "no Text component on " + wanted
+        if set_field(text_fid, "m_HorizontalOverflow", "1", "    "):
+            changed.append("%s не переносится" % wanted)
 
     # ---- подпись разрешения рендера в оверлее теста ------------------------
     res_path = "3DMork/TestPanel/TopOverlay/ResText"

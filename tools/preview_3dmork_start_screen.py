@@ -43,13 +43,21 @@ def reference_rows():
             for entry in score_model.reference_benchmarks()]
 
 
-HISTORY = [
-    ("03.10.26 14:22", "113072", 240),
-    ("01.10.26 19:05", "112884", 240),
-    ("28.09.26 11:47", "111668", 60),
-    ("21.09.26 20:12", "110975", 60),
-    ("14.09.26 09:30", "108430", 60),
-]
+def history_sample() -> list[tuple[str, str, int]]:
+    """Пример истории: прогоны той же формулы, что и в игре.
+
+    Раньше здесь стояли значения старой формулы (1059 FPS и 117669 очков),
+    из-за чего превью выглядело как поломка. Смена формулы чистит историю
+    в PlayerPrefs, и превью показывает уже чистую таблицу.
+    """
+    entries = score_model.reference_benchmarks()[:3]
+    dates = [("04.10.26 20:14", 240.0), ("04.10.26 19:52", 180.0), ("03.10.26 21:05", 120.0)]
+    rows = []
+    for entry, (date, cap) in zip(entries, dates):
+        result = score_model.scores(entry["gpuScore"], entry["cpuScore"],
+                                    entry["ramScore"], entry["driveScore"], cap)
+        rows.append((date, str(result["total"]), int(result["achievedFps"])))
+    return rows
 
 def translated(language: str):
     """Тот же ключ + string.Format, что использует ThreeDMork в рантайме."""
@@ -68,10 +76,10 @@ def hardware_sample(language: str = "EN") -> dict:
     return {
         "SelfName": board,
         "SelfSpec": "i7-14700K  /  RTX 5090 + RTX 4080",
-        "SelfScore": "113072",
-        "SelfFps": "240",
-        "Average": tr["3DMork average"].format(8, 54727, 113072),
-        "BestScore": one("3DMork best score", 113072),
+        "SelfScore": "112604",
+        "SelfFps": "180",
+        "Average": tr["3DMork average"].format(8, 53150, 112604),
+        "BestScore": one("3DMork best score", 112604),
         "HwTitle": one("3DMork hardware title", board),
         "HwCpu": one("3DMork hardware cpu", "i7-14700K"),
         "HwGpu": one("3DMork hardware gpu", "RTX 5090 + RTX 4080"),
@@ -113,10 +121,16 @@ def main(out_path: str, language: str = "EN") -> int:
                            ("LbFps_%d" % index, reference_fps[index])):
             text = set_label(text, key, value)
 
-    for index, (date, score, fps) in enumerate(HISTORY):
-        for key, value in (("HistDate_%d" % index, date), ("HistScore_%d" % index, score),
-                           ("HistFps_%d" % index, str(fps)),
-                           ("HistIndex_%d" % index, "#%d" % (len(HISTORY) - index))):
+    history = history_sample()
+    for index in range(5):
+        # незаполненные строки остаются пустыми, а не "--", как в игре
+        if index < len(history):
+            date, score, fps = history[index]
+            cells = (date, score, str(fps), "#%d" % (len(history) - index))
+        else:
+            cells = ("", "", "", "")
+        for key, value in zip(("HistDate_%d" % index, "HistScore_%d" % index,
+                               "HistFps_%d" % index, "HistIndex_%d" % index), cells):
             text = set_label(text, key, value)
 
     for key, value in hardware_sample(language).items():

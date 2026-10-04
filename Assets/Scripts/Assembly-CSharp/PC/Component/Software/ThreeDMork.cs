@@ -205,6 +205,9 @@ namespace PC.Component.Software
 		private const int MaxHistoryEntries = 12;
 		private const string HistoryPrefsKey = "3DMork_History";
 		private const string BestScorePrefsKey = "3DMork_Score";
+		private const string FormulaPrefsKey = "3DMork_Formula";
+		/// <summary>Версия формулы очков. Меняется вместе с пересчётом результатов.</summary>
+		private const int FormulaVersion = 2;
 
 		[Serializable]
 		private class HistoryData
@@ -260,7 +263,7 @@ namespace PC.Component.Software
 		/// 2 x RTX 5090, i7-14700K (3.4 ГГц), 2 x 64 ГБ (RGB), 2 x SSD 16 ТБ.
 		/// </summary>
 		private const float RefGpuScore = 27000f;
-		private const float RefCpuScore = 14450f;
+		private const float RefCpuScore = 4232f;
 		private const float RefRamScore = 24000f;
 		private const float RefDriveScore = 18000f;
 
@@ -309,15 +312,29 @@ namespace PC.Component.Software
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
 			//                       имя                     процессор       видеокарты                    CPU сырой  GPU  RAM  накопители
-			new LeaderboardEntry("Orange Workstation", "i7-14700K", "2x RTX 5090", 27000, 14450f, 24000, 18000),
-			new LeaderboardEntry("TITAN X rig", "i7-13700K", "RTX 5090 + 4080 Ti", 24500, 13906f, 10000, 17000),
-			new LeaderboardEntry("Gaming Beast", "i9-12900K", "2x RTX 4080", 20000, 12160f, 12000, 16000),
-			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4080 Ti", 11000, 13906f, 9000, 14000),
-			new LeaderboardEntry("Creator Mini", "i7-8700K", "RTX 3080 Ti", 7000, 9620f, 9000, 12000),
-			new LeaderboardEntry("Home Cinema PC", "i5-8400", "RTX 2080 Ti", 5500, 6720f, 6000, 6000),
-			new LeaderboardEntry("Office Workstation", "i3-8300", "GTX 1080 Ti", 4500, 8140f, 3000, 5000),
-			new LeaderboardEntry("Budget King", "Celeron G3920", "GTX 1060", 3000, 5800f, 2000, 1200)
+			new LeaderboardEntry("Orange Workstation", "i7-14700K", "2x RTX 5090", 27000, 4232f, 24000, 18000),
+			new LeaderboardEntry("TITAN X rig", "i7-13700K", "RTX 5090 + 4080 Ti", 24500, 4073f, 10000, 17000),
+			new LeaderboardEntry("Gaming Beast", "i9-12900K", "2x RTX 4080", 20000, 3751f, 12000, 16000),
+			new LeaderboardEntry("Studio Pro", "i7-13700K", "RTX 4080 Ti", 11000, 4073f, 9000, 14000),
+			new LeaderboardEntry("Creator Mini", "i7-8700K", "RTX 3080 Ti", 7000, 2622f, 9000, 12000),
+			new LeaderboardEntry("Home Cinema PC", "i5-8400", "RTX 2080 Ti", 5500, 2328f, 6000, 6000),
+			new LeaderboardEntry("Office Workstation", "i3-8300", "GTX 1080 Ti", 4500, 2219f, 3000, 5000),
+			new LeaderboardEntry("Budget King", "Celeron G3920", "GTX 1060", 3000, 1949f, 2000, 1200)
 		};
+
+		/// <summary>Мощность процессора для бенчмарка.</summary>
+		/// <remarks>
+		/// Раньше здесь была произведённая на частоту величина (frequency * Score),
+		/// из-за чего разогнанный i3-8300 (3.7 ГГц) считался мощнее нового
+		/// i5-8400 (2.8 ГГц) - гонка частоты ломала порядок поколений.
+		/// Теперь основной вес даёт Score компонента, а частота добавляет
+		/// не более 15% поправки.
+		/// </remarks>
+		private static float CpuPower(CPU cpu)
+		{
+			float frequencyFactor = 0.85f + 0.15f * Mathf.Clamp(cpu.frequency / 3.5f, 0.5f, 1.2f);
+			return cpu.Score * frequencyFactor;
+		}
 
 		/// <summary>Потолок кадров в секунду, выбранный игроком в настройках игры.</summary>
 		private static float GetFpsCap()
@@ -447,9 +464,25 @@ namespace PC.Component.Software
 		{
 			base.Start();
 			SetDefaultSize(new Vector2(722.5f, 408.5f));
+			ResetStaleResults();
 			WireButtons();
 			Localization.LanguageChanged += OnLanguageChanged;
 			ShowStartScreen();
+		}
+
+		/// <summary>
+		/// Прогоны, сделанные по прошлой формуле, показывались рядом с новыми
+		/// и выглядели как ошибка: тот же ПК получал 1059 FPS и 117669 очков.
+		/// При смене формулы старая история и рекорд удаляются.
+		/// </summary>
+		private void ResetStaleResults()
+		{
+			if (PlayerPrefs.GetInt(FormulaPrefsKey, 0) == FormulaVersion) return;
+
+			PlayerPrefs.DeleteKey(HistoryPrefsKey);
+			PlayerPrefs.DeleteKey(BestScorePrefsKey);
+			PlayerPrefs.SetInt(FormulaPrefsKey, FormulaVersion);
+			PlayerPrefs.Save();
 		}
 
 		/// <summary>Перевод строки приложения, ключ берётся из Resources/Translate.txt.</summary>
@@ -833,7 +866,7 @@ namespace PC.Component.Software
 						var cpu = cpus[i] as CPU;
 						if (cpu == null || cpu.Damaged) continue;
 						snapshot.cpuCount++;
-						snapshot.cpuScore += cpu.frequency * cpu.Score;
+						snapshot.cpuScore += CpuPower(cpu);
 						snapshot.cpuName = CleanName(cpu.gameObject.name);
 					}
 				}
