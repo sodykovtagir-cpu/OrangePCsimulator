@@ -209,7 +209,7 @@ namespace PC.Component.Software
 		private const string BestScorePrefsKey = "3DMork_Score";
 		private const string FormulaPrefsKey = "3DMork_Formula";
 		/// <summary>Версия формулы очков. Меняется вместе с пересчётом результатов.</summary>
-		private const int FormulaVersion = 3;
+		private const int FormulaVersion = 4;
 
 		[Serializable]
 		private class HistoryData
@@ -321,12 +321,12 @@ namespace PC.Component.Software
 		/// </summary>
 		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
 		{
-			new LeaderboardEntry("Dream PC", "RMD Ryzen 9 7950X", "RTX 5090 + RTX 4080 Ti", 24500, 3645f, 24000, 18000),
-			new LeaderboardEntry("Workstation PC", "RMD Ryzen 9 7950X", "RTX 4080 Ti + Titan V", 16800, 3645f, 24000, 12000),
-			new LeaderboardEntry("Aquarium PC", "i7-14700K", "RTX 5090", 13500, 4232f, 12000, 11000),
-			new LeaderboardEntry("Gaming PC", "i9-12900K", "RTX 4080", 10000, 3751f, 12000, 11000),
-			new LeaderboardEntry("Home PC", "i5-8400", "GTX 1060", 3000, 2328f, 6000, 5200),
-			new LeaderboardEntry("Office PC", "Celeron G3920", "GT 440", 150, 1949f, 4000, 1000)
+			new LeaderboardEntry("Dream PC", "RMD Ryzen 9 7950X", "RTX 5090 + RTX 4080 Ti", 24500, 3565f, 24000, 18000),
+			new LeaderboardEntry("Workstation PC", "RMD Ryzen 9 7950X", "RTX 4080 Ti + Titan V", 16800, 3565f, 24000, 12000),
+			new LeaderboardEntry("Aquarium PC", "i7-14700K", "RTX 5090", 13500, 4213f, 12000, 11000),
+			new LeaderboardEntry("Gaming PC", "i9-12900K", "RTX 4080", 10000, 3702f, 12000, 11000),
+			new LeaderboardEntry("Home PC", "i5-8400", "GTX 1060", 3000, 2256f, 6000, 5200),
+			new LeaderboardEntry("Office PC", "Celeron G3920", "GT 440", 150, 1897f, 4000, 1000)
 		};
 
 		/// <summary>Мощность процессора для бенчмарка.</summary>
@@ -339,7 +339,11 @@ namespace PC.Component.Software
 		/// </remarks>
 		private static float CpuPower(CPU cpu)
 		{
-			float frequencyFactor = 0.85f + 0.15f * Mathf.Clamp(cpu.frequency / 3.5f, 0.5f, 1.2f);
+			// Разгон теперь заметен: 30% веса от частоты (было 15% — почти не влияло).
+			// При 3.5 ГГц = 1.0x, при 4.2 ГГц (+20%) = 1.06x, при 5 ГГц = 1.12x (clamp 1.2).
+			// i5-8400 (2.8 ГГц, Score 2328) всё ещё чуть быстрее i3-8300 (3.7 ГГц, Score 2219) с разгоном,
+			// но уже чувствуется: +300 МГц дают ~+2-3% к physics/fps, а +1 ГГц ~+8%.
+			float frequencyFactor = 0.70f + 0.30f * Mathf.Clamp(cpu.frequency / 3.5f, 0.5f, 1.2f);
 			return cpu.Score * frequencyFactor;
 		}
 
@@ -466,6 +470,7 @@ namespace PC.Component.Software
 		private int liveFps = -1;
 		private string liveResolution = string.Empty;
 		private string currentSceneName = string.Empty;
+		private bool benchmarkCancelled;
 
 		protected override void Start()
 		{
@@ -588,6 +593,7 @@ namespace PC.Component.Software
 		/// </summary>
 		public void ShowStartScreen()
 		{
+			benchmarkCancelled = true;
 			if (benchmarkCoroutine != null)
 			{
 				StopCoroutine(benchmarkCoroutine);
@@ -962,6 +968,7 @@ namespace PC.Component.Software
 
 		public void RunBenchmark()
 		{
+			benchmarkCancelled = false;
 			if (benchmarkCoroutine != null)
 			{
 				StopCoroutine(benchmarkCoroutine);
@@ -1199,6 +1206,7 @@ namespace PC.Component.Software
 					var sceneWp = GameObject.Find("3DMork_Waypoints") ?? GameObject.Find("Waypoints");
 					if (sceneWp != null) stageWaypoints = sceneWp.transform;
 					anchor = Vector3.zero;
+					IsolateAdditiveSceneLights(stageSceneName);
 				}
 			}
 			else
@@ -1210,6 +1218,7 @@ namespace PC.Component.Software
 					currentStageInstance = Instantiate(prefab, stageSpawnPosition, Quaternion.identity);
 					var wpObj = currentStageInstance.transform.Find("Waypoints") ?? currentStageInstance.transform.Find("3DMork_Waypoints");
 					if (wpObj != null) stageWaypoints = wpObj;
+					IsolateStageInstance(currentStageInstance);
 				}
 				else
 				{
@@ -1241,8 +1250,11 @@ namespace PC.Component.Software
 			testCamera.fieldOfView = cameraFov;
 			testCamera.clearFlags = CameraClearFlags.Skybox;
 			testCamera.backgroundColor = new Color(0.10f, 0.10f, 0.14f, 1f);
-			// Включаем геометрию мира и свет, исключаем UI (слой 5), игрока (слой 10) и будку превью (слой 11)
-			testCamera.cullingMask = ~((1 << 5) | (1 << 10) | (1 << 11));
+			// Включаем геометрию мира + изолированную сцену бенчмарка (слой 11 Preview),
+			// исключаем только UI (5) и игрока (10). Раньше исключали и 11, из-за чего
+			// изолированная комната на слое 11 не рендерилась, а её направленный свет
+			// с cullingMask=all всё равно засвечивал основную карту.
+			testCamera.cullingMask = ~((1 << 5) | (1 << 10));
 			testCamera.enabled = false; // Рендерим явно через testCamera.Render()
 
 			List<FlybySegment> segments = BuildSegments(anchor, stageWaypoints);
@@ -1263,6 +1275,13 @@ namespace PC.Component.Software
 				float segTime = 0f;
 				while (segTime < seg.duration)
 				{
+					if (benchmarkCancelled)
+					{
+						CleanupCamera();
+						CleanupStage();
+						benchmarkCoroutine = null;
+						yield break;
+					}
 					if (board != null && board.StressGraphics())
 					{
 						CleanupCamera();
@@ -1358,6 +1377,13 @@ namespace PC.Component.Software
 			// Очистка камеры и отдельной сцены/комнаты после завершения облёта
 			CleanupCamera();
 			CleanupStage();
+
+			// Если тест отменили (закрыли окно / выключили ПК) — не сохраняем результат
+			if (benchmarkCancelled)
+			{
+				benchmarkCoroutine = null;
+				yield break;
+			}
 
 			// Подсчёт очков 3DMork по общей формуле (та же, что у эталонных машин)
 			int graphicsScore = plan.graphics;
@@ -1474,8 +1500,37 @@ namespace PC.Component.Software
 			}
 		}
 
+		/// <summary>Изолирует свет комнаты бенчмарка, чтобы он не засвечивал основную карту.</summary>
+		private void IsolateStageInstance(GameObject stage)
+		{
+			if (stage == null) return;
+			const int previewLayer = 11;
+			int mask = 1 << previewLayer;
+			var renderers = stage.GetComponentsInChildren<Renderer>(true);
+			foreach (var r in renderers) r.gameObject.layer = previewLayer;
+			var lights = stage.GetComponentsInChildren<Light>(true);
+			foreach (var l in lights) l.cullingMask = mask;
+		}
+
+		private void IsolateAdditiveSceneLights(string sceneName)
+		{
+			var scene = SceneManager.GetSceneByName(sceneName);
+			if (!scene.IsValid()) return;
+			const int previewLayer = 11;
+			int mask = 1 << previewLayer;
+			var roots = scene.GetRootGameObjects();
+			foreach (var root in roots)
+			{
+				var lights = root.GetComponentsInChildren<Light>(true);
+				foreach (var l in lights) l.cullingMask = mask;
+				var renderers = root.GetComponentsInChildren<Renderer>(true);
+				foreach (var r in renderers) r.gameObject.layer = previewLayer;
+			}
+		}
+
 		public override void OnSystemStop()
 		{
+			benchmarkCancelled = true;
 			base.OnSystemStop();
 			if (benchmarkCoroutine != null)
 			{
@@ -1488,6 +1543,7 @@ namespace PC.Component.Software
 
 		private void OnDestroy()
 		{
+			benchmarkCancelled = true;
 			Localization.LanguageChanged -= OnLanguageChanged;
 			if (benchmarkCoroutine != null)
 			{
@@ -1500,6 +1556,13 @@ namespace PC.Component.Software
 
 		public override void Close()
 		{
+			// Закрытие окна во время теста не должно сохранять результат
+			benchmarkCancelled = true;
+			if (benchmarkCoroutine != null)
+			{
+				StopCoroutine(benchmarkCoroutine);
+				benchmarkCoroutine = null;
+			}
 			CleanupCamera();
 			CleanupStage();
 			base.Close();
