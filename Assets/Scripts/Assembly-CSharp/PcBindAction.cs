@@ -18,5 +18,6 @@ public enum PcBindAction
     Configuration,
     AutoRotation,
     VisualWiring,
-    Earn
+    Earn,
+    ToggleGrid
 }

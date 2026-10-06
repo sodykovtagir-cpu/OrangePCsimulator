@@ -84,6 +84,9 @@ public class HotbarHotkeys : MonoBehaviour
 
         if (PcKeybinds.GetDown(PcBindAction.Earn))
             OnEarn();
+
+        if (PcKeybinds.GetDown(PcBindAction.ToggleGrid))
+            OnToggleGrid();
 #endif
     }
 
@@ -170,6 +173,17 @@ public class HotbarHotkeys : MonoBehaviour
         {
             Debug.LogWarning("HotbarHotkeys: Functions не назначен, VisualWiring не сработает.");
         }
+    }
+
+    public void OnToggleGrid()
+    {
+        // Через PlacementGrid напрямую, чтобы работало даже без Functions
+        if (PlacementGrid.Instance != null)
+            PlacementGrid.Instance.Toggle();
+        else if (functions != null)
+            functions.ToggleGrid();
+        else
+            Debug.LogWarning("HotbarHotkeys: PlacementGrid не найден, ToggleGrid не сработает.");
     }
 
     public void OnEarn()

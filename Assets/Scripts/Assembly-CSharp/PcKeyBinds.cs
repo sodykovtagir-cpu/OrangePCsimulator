@@ -55,6 +55,7 @@ public static class PcKeybinds
         keys[PcBindAction.AutoRotation] = KeyCode.Alpha6;
         keys[PcBindAction.VisualWiring] = KeyCode.Alpha7;
         keys[PcBindAction.Earn] = KeyCode.E;
+        keys[PcBindAction.ToggleGrid] = KeyCode.G;
     }
 
     private static void LoadSaved()

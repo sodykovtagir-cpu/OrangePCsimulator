@@ -89,6 +89,12 @@ public class Raycast : MonoBehaviour
     private void Start()
     {
         cam = GetComponent<Camera>();
+        // Гарантируем наличие сетки
+        if (PlacementGrid.Instance == null)
+        {
+            var gridGo = new GameObject("PlacementGrid");
+            gridGo.AddComponent<PlacementGrid>();
+        }
         var go = GameObject.Find("Touch");
         if (go == null) return;
 
@@ -410,6 +416,10 @@ public class Raycast : MonoBehaviour
 
         int oldLayer = go.layer;
 
+        // Защита ПК — заморозка внутренних констрейнтов
+        if (PlacementGrid.Instance != null)
+            PlacementGrid.Instance.OnDragStarted(t);
+
         while (currentDrag != null && currentDrag.target)
         {
             AutoRotate();
@@ -417,16 +427,17 @@ public class Raycast : MonoBehaviour
             if (cam != null && spring)
             {
                 Vector3 point;
+                Ray ray;
 
                 if (pointer != null)
                 {
-                    var ray = cam.ScreenPointToRay(pointer.position);
+                    ray = cam.ScreenPointToRay(pointer.position);
                     point = ray.GetPoint(currentDrag.distance);
                 }
                 else
                 {
                     // ПК режим - центр экрана
-                    var ray = cam.ScreenPointToRay(
+                    ray = cam.ScreenPointToRay(
                         new Vector3(
                             Screen.width * 0.5f,
                             Screen.height * 0.5f,
@@ -435,6 +446,19 @@ public class Raycast : MonoBehaviour
                     );
 
                     point = ray.GetPoint(currentDrag.distance);
+                }
+
+                // Сетка: снапаем точку захвата к мировой сетке с учётом стены/лифта/склона
+                if (PlacementGrid.Instance != null && PlacementGrid.Instance.SnapEnabled)
+                {
+                    if (Physics.Raycast(ray, out var gridHit, maxDistance, layer))
+                    {
+                        point = PlacementGrid.Instance.SnapPosition(point, gridHit.normal, gridHit.collider);
+                    }
+                    else
+                    {
+                        point = PlacementGrid.Instance.SnapPosition(point, Vector3.up, null);
+                    }
                 }
 
                 spring.transform.position = point;
@@ -513,6 +537,9 @@ public class Raycast : MonoBehaviour
 
     public void End()
     {
+        if (PlacementGrid.Instance != null)
+            PlacementGrid.Instance.OnDragEnded();
+
         if (currentDrag != null)
         {
             StopCoroutine("DragObject");

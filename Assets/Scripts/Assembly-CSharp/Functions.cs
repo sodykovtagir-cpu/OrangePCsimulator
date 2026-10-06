@@ -60,6 +60,16 @@ public class Functions : MonoBehaviour
     [SerializeField]
     private Sprite visualWiringOff;
 
+    [Header("Grid")]
+    [SerializeField]
+    private Image gridImage;
+
+    [SerializeField]
+    private Sprite gridOnSprite;
+
+    [SerializeField]
+    private Sprite gridOffSprite;
+
     [SerializeField]
     private ConnectLine visualLinePrefab;
 
@@ -375,5 +385,32 @@ public class Functions : MonoBehaviour
             if (visualWiring != null)
                 visualWiring.sprite = visualWiringOff;
         }
+    }
+
+    public void ToggleGrid()
+    {
+#if UNITY_ANDROID
+        if (MobileCustomizeManager.EditMode)
+            return;
+#endif
+        var grid = PlacementGrid.Instance;
+        if (grid == null)
+        {
+            // создаём на лету если нет в сцене
+            var go = new GameObject("PlacementGrid");
+            grid = go.AddComponent<PlacementGrid>();
+        }
+        grid.Toggle();
+        UpdateGridIcon();
+    }
+
+    void UpdateGridIcon()
+    {
+        if (gridImage == null) return;
+        var grid = PlacementGrid.Instance;
+        bool on = grid != null && grid.SnapEnabled;
+        if (gridOnSprite != null && gridOffSprite != null)
+            gridImage.sprite = on ? gridOnSprite : gridOffSprite;
+        gridImage.color = on ? new Color(0.3f, 1f, 0.4f, 1f) : Color.white;
     }
 }
