@@ -45,16 +45,76 @@ public class PlacementGrid : MonoBehaviour
 
     void Start()
     {
-        // Фолбэк кнопка для ПК/мобилы если в сцене нет хука
-        EnsureFallbackButton();
+        // Создаём нормальную кнопку через оригинальную механику (Canvas + Button), не OnGUI
+        TryCreateHotbarButton();
+        EnsureBindButton();
     }
 
-    void Update()
+    void EnsureBindButton()
     {
-#if !UNITY_ANDROID
-        if (PcKeybinds.GetDown(PcBindAction.ToggleGrid))
-            Toggle();
-#endif
+        // Только в меню где есть PcBindButton — добавляем ToggleGrid если нет
+        var all = FindObjectsOfType<PcBindButton>();
+        if (all == null || all.Length == 0) return;
+        bool hasGrid = false;
+        foreach (var b in all) if (b.action == PcBindAction.ToggleGrid) { hasGrid = true; break; }
+        if (hasGrid) return;
+
+        // Клонируем целый блок Earn (родитель кнопки) как шаблон, чтобы скопировать и лейбл
+        PcBindButton templateBtn = null;
+        foreach (var b in all) if (b.action == PcBindAction.Earn) templateBtn = b;
+        if (templateBtn == null) templateBtn = all[all.Length - 1];
+        if (templateBtn == null) return;
+
+        // Родитель кнопки — это объект Earn (содержит лейбл и кнопку)
+        Transform earnRoot = templateBtn.transform.parent;
+        if (earnRoot == null) return;
+        // Проверяем что это именно Earn (имя)
+        if (!earnRoot.name.Contains("Earn"))
+        {
+            // Если структура другая — клонируем саму кнопку
+            earnRoot = templateBtn.transform;
+        }
+
+        var container = earnRoot.parent;
+        if (container == null) container = earnRoot;
+
+        GameObject go;
+        if (earnRoot != templateBtn.transform)
+        {
+            go = Instantiate(earnRoot.gameObject, container);
+            go.name = "Grid";
+            var rt = go.GetComponent<RectTransform>();
+            var trt = earnRoot.GetComponent<RectTransform>();
+            if (rt != null && trt != null)
+                rt.anchoredPosition = trt.anchoredPosition + new Vector2(0, -60);
+
+            // Внутри клона находим PcBindButton и меняем action
+            var btn = go.GetComponentInChildren<PcBindButton>(true);
+            if (btn != null) btn.action = PcBindAction.ToggleGrid;
+
+            // Меняем текст лейбла Earn -> Grid
+            var texts = go.GetComponentsInChildren<UnityEngine.UI.Text>(true);
+            foreach (var t in texts)
+            {
+                if (t.text == "Earn") t.text = "Grid";
+                if (t.gameObject.name == "Earn" || t.gameObject.name.Contains("Earn"))
+                    t.gameObject.name = "Grid";
+            }
+            // Обновляем keyText
+            var newBtn = go.GetComponentInChildren<PcBindButton>(true);
+            if (newBtn != null) newBtn.Refresh();
+        }
+        else
+        {
+            // Фолбэк — клонируем только кнопку
+            var go2 = Instantiate(templateBtn.gameObject, container);
+            go2.name = "Grid";
+            var rt = go2.GetComponent<RectTransform>();
+            if (rt != null) rt.anchoredPosition = templateBtn.GetComponent<RectTransform>().anchoredPosition + new Vector2(0, -60);
+            var btn2 = go2.GetComponent<PcBindButton>();
+            if (btn2 != null) btn2.action = PcBindAction.ToggleGrid;
+            if (btn2 != null) btn2.Refresh();
+        }
     }
 
     void OnDestroy()
@@ -62,41 +122,125 @@ public class PlacementGrid : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    // Создаёт простую кнопку в углу если ни Functions ни MobileHotbar не назначили
-    void EnsureFallbackButton()
+    // Создаёт кнопку в хотбаре рядом с остальными иконками (как LockRotation и т.д.)
+    void TryCreateHotbarButton()
     {
-        // Если уже есть кнопка с PlacementGrid в сцене — не создаём
-        if (FindObjectOfType<UnityEngine.UI.Button>() != null) return;
-        // Создаём только если не нашли существующий Canvas с нашей иконкой
-        if (GameObject.Find("GridToggleFallback") != null) return;
-        // На мобиле/ПК создадим невидимый хост — пользователь может сам привязать иконку из Assets/UI_GridIcon.png
-        // Делаем лёгкий OnGUI фолбэк чтобы всегда было управление
-    }
+        // Если уже есть gridImage через Functions — не надо
+        var func = FindObjectOfType<Functions>();
+        if (func != null)
+        {
+            // Пытаемся найти уже существующий gridImage через рефлексию — если назначен, выходим
+            var fi = typeof(Functions).GetField("gridImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (fi != null)
+            {
+                var existing = fi.GetValue(func) as UnityEngine.UI.Image;
+                if (existing != null) return;
+            }
+        }
 
-    // Быстрый OnGUI фолбэк — всегда работает без настройки Canvas
-    void OnGUI()
-    {
-        if (Instance != this) return;
-        // Маленькая кнопка в правом нижнем углу, над хотбаром, как на твоей фигме
-        float w = 64f, h = 64f;
-        float x = Screen.width - w - 12f;
-        float y = Screen.height - h - 12f;
+        // Ищем Canvas хотбара (первый Canvas в сцене)
+        var canvas = FindObjectOfType<UnityEngine.Canvas>();
+        if (canvas == null) return;
+
+        // Ищем хотбар панель — обычно Functions находится на том же объекте что и HotbarHotkeys
+        Transform hotbarParent = null;
+        if (func != null) hotbarParent = func.transform;
+        else
+        {
+            var hotkeys = FindObjectOfType<HotbarHotkeys>();
+            if (hotkeys != null) hotbarParent = hotkeys.transform;
+        }
+        if (hotbarParent == null) hotbarParent = canvas.transform;
+
+        // Пытаемся клонировать существующую кнопку хотбара для стиля
+        UnityEngine.UI.Button template = null;
+        var buttons = hotbarParent.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+        foreach (var b in buttons)
+        {
+            if (b != null && b.gameObject.activeInHierarchy)
+            {
+                template = b;
+                break;
+            }
+        }
+
+        GameObject go;
+        UnityEngine.UI.Image img;
+        if (template != null)
+        {
+            go = Instantiate(template.gameObject, hotbarParent);
+            go.name = "GridToggleButton";
+            // Чистим старые listeners, ставим наш
+            var btn = go.GetComponent<UnityEngine.UI.Button>();
+            if (btn != null)
+            {
+                btn.onClick.RemoveAllListeners();
+                btn.onClick.AddListener(() => Toggle());
+            }
+            img = go.GetComponent<UnityEngine.UI.Image>();
+            if (img == null) img = go.GetComponentInChildren<UnityEngine.UI.Image>(true);
+        }
+        else
+        {
+            // Фолбэк: создаём простую кнопку
+            go = new GameObject("GridToggleButton");
+            go.transform.SetParent(hotbarParent, false);
+            var rt = go.AddComponent<UnityEngine.RectTransform>();
+            rt.sizeDelta = new Vector2(64, 64);
+            rt.anchorMin = new Vector2(1, 0);
+            rt.anchorMax = new Vector2(1, 0);
+            rt.pivot = new Vector2(1, 0);
+            rt.anchoredPosition = new Vector2(-12, 12);
+            img = go.AddComponent<UnityEngine.UI.Image>();
+            var btn = go.AddComponent<UnityEngine.UI.Button>();
+            btn.targetGraphic = img;
+            btn.onClick.AddListener(() => Toggle());
+            // Текст подсказки
+            var txtGo = new GameObject("Text");
+            txtGo.transform.SetParent(go.transform, false);
+            var txt = txtGo.AddComponent<UnityEngine.UI.Text>();
+            txt.text = SnapEnabled ? "Сетка вкл" : "Сетка выкл";
+            txt.font = UnityEngine.Resources.GetBuiltinResource<UnityEngine.Font>("Arial.ttf");
+            txt.alignment = UnityEngine.TextAnchor.MiddleCenter;
+            txt.color = UnityEngine.Color.white;
+        }
+
+        // Грузим иконку из Resources (Assets/Resources/GridIcon.png) или из Assets/UI_GridIcon.png
+        Sprite gridSprite = UnityEngine.Resources.Load<Sprite>("GridIcon");
+        if (gridSprite == null)
+        {
+            // Пробуем загрузить как Texture2D и сделать спрайт
+            var tex = UnityEngine.Resources.Load<UnityEngine.Texture2D>("GridIcon");
+            if (tex != null) gridSprite = UnityEngine.Sprite.Create(tex, new UnityEngine.Rect(0, 0, tex.width, tex.height), new UnityEngine.Vector2(0.5f, 0.5f), 100f);
+        }
+        if (gridSprite != null && img != null)
+        {
+            img.sprite = gridSprite;
+            img.preserveAspect = true;
+        }
+
+        // Если есть Functions — привязываем для UpdateGridIcon
+        if (func != null)
+        {
+            var fi = typeof(Functions).GetField("gridImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (fi != null) fi.SetValue(func, img);
+            var onFi = typeof(Functions).GetField("gridOnSprite", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var offFi = typeof(Functions).GetField("gridOffSprite", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (onFi != null && offFi != null && gridSprite != null)
+            {
+                onFi.SetValue(func, gridSprite);
+                offFi.SetValue(func, gridSprite);
+            }
+            func.SendMessage("UpdateGridIcon", UnityEngine.SendMessageOptions.DontRequireReceiver);
+        }
+
+        // Для мобилы — делаем кнопку покрупнее и выше
 #if UNITY_ANDROID
-        // На телефоне чуть крупнее
-        w = 72f; h = 72f;
-        x = Screen.width - w - 16f;
-        y = Screen.height - h - 96f; // над джойстиком
-#endif
-        Color bg = SnapEnabled ? new Color(0.2f, 0.85f, 0.35f, 0.9f) : new Color(0.15f, 0.15f, 0.15f, 0.85f);
-        Color prev = GUI.backgroundColor;
-        GUI.backgroundColor = bg;
-        string label = SnapEnabled ? "◧ Вкл" : "◧ Выкл";
-        if (GUI.Button(new Rect(x, y, w, h), label))
-            Toggle();
-        GUI.backgroundColor = prev;
-        // подсказка бинда G на ПК
-#if !UNITY_ANDROID
-        GUI.Label(new Rect(x, y - 18f, w, 16f), SnapEnabled ? "G — сетка" : "G — сетка", new GUIStyle(GUI.skin.label){alignment = TextAnchor.MiddleCenter, fontSize = 10});
+        var rt2 = go.GetComponent<UnityEngine.RectTransform>();
+        if (rt2 != null)
+        {
+            rt2.sizeDelta = new Vector2(72, 72);
+        }
 #endif
     }
 
