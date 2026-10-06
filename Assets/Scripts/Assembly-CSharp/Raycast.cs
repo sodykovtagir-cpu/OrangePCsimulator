@@ -95,6 +95,10 @@ public class Raycast : MonoBehaviour
             var gridGo = new GameObject("PlacementGrid");
             gridGo.AddComponent<PlacementGrid>();
         }
+
+        // Сетка целится тем же слоем и той же камерой, что и перетаскивание
+        PlacementGrid.AimLayer = layer;
+        PlacementGrid.AimCamera = cam;
         var go = GameObject.Find("Touch");
         if (go == null) return;
 
@@ -454,10 +458,15 @@ public class Raycast : MonoBehaviour
                     if (Physics.Raycast(ray, out var gridHit, maxDistance, layer))
                     {
                         point = PlacementGrid.Instance.SnapPosition(point, gridHit.normal, gridHit.collider);
+
+                        // кормим визуал сетки: поверхность под прицелом
+                        // + уже отснапанная точка, чтобы подсветка клетки не врала
+                        PlacementGrid.Instance.ReportAim(gridHit.point, gridHit.normal, point);
                     }
                     else
                     {
                         point = PlacementGrid.Instance.SnapPosition(point, Vector3.up, null);
+                        PlacementGrid.Instance.ReportAim(point, Vector3.up);
                     }
                 }
 

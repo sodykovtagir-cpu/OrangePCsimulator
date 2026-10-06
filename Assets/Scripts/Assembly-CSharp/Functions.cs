@@ -82,6 +82,9 @@ public class Functions : MonoBehaviour
 
     private void Start()
     {
+        // Синхронизируем иконку сетки с сохранённым состоянием
+        RefreshGridIcon();
+
         var player = Player.Instance;
 
         if (player == null)
@@ -401,16 +404,33 @@ public class Functions : MonoBehaviour
             grid = go.AddComponent<PlacementGrid>();
         }
         grid.Toggle();
-        UpdateGridIcon();
+        RefreshGridIcon();
     }
 
-    void UpdateGridIcon()
+    // Цвет иконки «выключенной» сетки запоминаем один раз — он свой у каждой
+    // панели (на ПК иконки приглушённые, на телефоне белые).
+    private Color gridOffColor = Color.white;
+    private bool gridOffColorSaved;
+
+    /// <summary>Красит иконку сетки в хотбаре по текущему состоянию режима.</summary>
+    public void RefreshGridIcon()
     {
         if (gridImage == null) return;
+
+        if (!gridOffColorSaved)
+        {
+            gridOffColor = gridImage.color;
+            gridOffColorSaved = true;
+        }
+
         var grid = PlacementGrid.Instance;
         bool on = grid != null && grid.SnapEnabled;
-        if (gridOnSprite != null && gridOffSprite != null)
-            gridImage.sprite = on ? gridOnSprite : gridOffSprite;
-        gridImage.color = on ? new Color(0.3f, 1f, 0.4f, 1f) : Color.white;
+
+        var spr = on ? gridOnSprite : gridOffSprite;
+        if (spr == null) spr = on ? gridOffSprite : gridOnSprite;
+        if (spr != null) gridImage.sprite = spr;
+
+        // Оранжевый фирменный, когда режим включён
+        gridImage.color = on ? new Color(1f, 0.62f, 0.18f, 1f) : gridOffColor;
     }
 }

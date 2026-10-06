@@ -2,6 +2,26 @@
 
 ## Added
 
+### Grid mode (Orange Grid)
+
+- A visible orange grid. When the mode is on, it lies on the surface under the crosshair (floor, wall, table) and highlights the cell the part will land in. Before this, the grid only snapped the part and was invisible.
+
+- Parts now move cell by cell while dragging: the grab point snaps to the world grid and the drawn lines match the snap points, so you always see where the part goes.
+
+- Every fourth line is thicker, the grid fades softly towards the edges and lines never get thinner than a pixel — the grid stays visible from afar.
+
+- Grid button in the hotbar, both on the mobile panel and the standalone panel. The icon turns orange while the mode is on.
+
+- Bind setting: Menu → Settings → PC controls → Grid (G by default). The missing Auto rotation bind was added too.
+
+- Height snapping is off by default, so parts no longer jump on the Y axis on tables and shelves.
+
+- Fallback renderer: if the grid shader is unavailable, the grid is drawn with GL lines.
+
+### Developer tools
+
+- `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.
+
 ### Hardware and devices
 
 - MSG ATX motherboards in black and white.
