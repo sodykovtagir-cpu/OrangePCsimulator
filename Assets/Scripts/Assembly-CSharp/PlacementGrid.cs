@@ -45,9 +45,9 @@ public class PlacementGrid : MonoBehaviour
     [Header("Вид сетки")]
     public bool showVisual = true;
 
-    public Color lineColor = new Color(1f, 0.55f, 0.14f, 1f);
+    public Color lineColor = new Color(0.68f, 0.68f, 0.70f, 1f);
 
-    public Color cellColor = new Color(1f, 0.80f, 0.30f, 1f);
+    public Color cellColor = new Color(0.95f, 0.95f, 0.97f, 1f);
 
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
     public int cellsPerSide = 24;
