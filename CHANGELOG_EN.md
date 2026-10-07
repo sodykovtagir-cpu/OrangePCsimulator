@@ -18,6 +18,10 @@
 
 - Fallback renderer: if the grid shader is unavailable, the grid is drawn with GL lines.
 
+### Rotating items while dragging
+
+- The dragged item can be rotated with arrows: a panel with four arrows (left/up/right/down) appears on screen, and on PC the regular arrow keys work. The step is 45° per press, a full turn is 8 presses. For a PC/miner the whole case turns at once. The panel is created automatically and needs no scene changes.
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.

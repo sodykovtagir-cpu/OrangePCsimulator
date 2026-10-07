@@ -105,6 +105,9 @@ public class Raycast : MonoBehaviour
             gridGo.AddComponent<PlacementGrid>();
         }
 
+        // Панель поворота предмета (стрелки) — создаём сразу, показываем при перетаскивании
+        DragRotateControls.EnsureExists(this);
+
         // Сетка целится тем же слоем и той же камерой, что и перетаскивание
         PlacementGrid.AimLayer = layer;
         PlacementGrid.AimCamera = cam;
@@ -158,9 +161,19 @@ public class Raycast : MonoBehaviour
 
             UpdateDistanceUI(currentDrag.distance);
         }
+
+        // Поворот тащимого предмета обычными стрелками
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) RotateDragged(-1, 0);
+        if (Input.GetKeyDown(KeyCode.RightArrow)) RotateDragged(1, 0);
+        if (Input.GetKeyDown(KeyCode.UpArrow)) RotateDragged(0, -1);
+        if (Input.GetKeyDown(KeyCode.DownArrow)) RotateDragged(0, 1);
     }
 
 #endif
+
+        // Панель поворота (стрелки) видна только пока тащишь предмет
+        if (DragRotateControls.Instance != null)
+            DragRotateControls.Instance.SetVisible(currentDrag != null);
     }
 
     private void UpdateDistanceUI(float distance)
@@ -433,6 +446,103 @@ public class Raycast : MonoBehaviour
         gridSpringApplied = false;
     }
 
+    /// <summary>
+    /// Поворачивает тащимый предмет на шаг (стрелки клавиатуры или кнопки
+    /// панели DragRotateControls). У ПК/майнера поворачивается весь корпус
+    /// целиком — иначе детали раскачиваются и отваливаются.
+    /// </summary>
+    public void RotateDragged(int yawDir, int pitchDir)
+    {
+        if (LockRotation) return;
+
+        var body = spring != null ? spring.connectedBody : null;
+        if (body == null || currentDrag == null) return;
+
+        var delta = Quaternion.Euler(pitchDir * rotateStep, yawDir * rotateStep, 0f);
+
+        var assembly = PlacementGrid.Instance != null
+            ? PlacementGrid.Instance.DragAssemblyBodies
+            : null;
+
+        if (assembly != null && assembly.Length > 1)
+        {
+            for (int i = 0; i < assembly.Length; i++)
+            {
+                var rb = assembly[i];
+                if (rb == null) continue;
+
+                rb.MoveRotation(rb.rotation * delta);
+            }
+        }
+        else
+        {
+            body.MoveRotation(body.rotation * delta);
+        }
+    }
+
+    /// <summary>
+    /// Не даёт протащить предмет сквозь стену/пол: если луч от камеры к точке
+    /// захвата упирается в препятствие раньше самой точки, точка обрезается
+    /// перед ним. Сам тащимый предмет (и его корпус целиком) препятствием не
+    /// считается, триггеры игнорируются.
+    /// </summary>
+    private Vector3 ClampDragPoint(Vector3 point)
+    {
+        var c = cam;
+        if (c == null || currentDrag == null) return point;
+
+        Vector3 origin = c.transform.position;
+        Vector3 toPoint = point - origin;
+        float dist = toPoint.magnitude;
+        if (dist < 0.05f) return point;
+
+        Vector3 dir = toPoint / dist;
+        var hits = Physics.RaycastAll(new Ray(origin, dir), dist, layer,
+            QueryTriggerInteraction.Ignore);
+
+        float nearest = dist;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var h = hits[i];
+            if (IsPartOfDrag(h.collider)) continue;
+            if (h.distance < nearest) nearest = h.distance;
+        }
+
+        if (nearest >= dist - 0.01f) return point; // препятствий по пути нет
+
+        // Останавливаемся чуть перед препятствием
+        return origin + dir * Mathf.Max(0.05f, nearest - 0.02f);
+    }
+
+    /// <summary>Принадлежит ли коллайдер тащимому предмету (или его корпусу целиком).</summary>
+    private bool IsPartOfDrag(Collider col)
+    {
+        if (col == null || currentDrag == null) return false;
+
+        var body = spring != null ? spring.connectedBody : null;
+        if (body != null)
+        {
+            var rb = col.attachedRigidbody;
+            if (rb == body) return true;
+            if (rb != null && rb.transform.IsChildOf(body.transform)) return true;
+        }
+
+        var target = currentDrag.target;
+        if (target != null && col.transform.IsChildOf(target)) return true;
+
+        // ПК/майнер: препятствием не считаем весь корпус
+        var caseA = target != null
+            ? target.GetComponentInParent<PC.Component.Case>()
+            : null;
+        if (caseA != null)
+        {
+            var caseB = col.GetComponentInParent<PC.Component.Case>();
+            if (caseB != null && ReferenceEquals(caseB, caseA)) return true;
+        }
+
+        return false;
+    }
+
     private IEnumerator DragObject()
     {
         var j = spring;
@@ -500,6 +610,10 @@ public class Raycast : MonoBehaviour
 
                     point = ray.GetPoint(currentDrag.distance);
                 }
+
+                // Нельзя протащить предмет сквозь стену или пол: обрезаем точку
+                // по первому препятствию на пути от камеры.
+                point = ClampDragPoint(point);
 
                 // Сетка: снапаем САМ предмет к мировой сетке с учётом стены/лифта/склона
                 var grid = PlacementGrid.Instance;

@@ -83,7 +83,9 @@ public class PlacementGrid : MonoBehaviour
 
     private PlacementGridVisual visual;
     private Rigidbody[] pcBodies;
-    private RigidbodyConstraints[] pcOldConstraints;
+    private Joint[] pcJoints;
+    private float[] pcJointBreakForce;
+    private float[] pcJointBreakTorque;
     private bool dragging;
 
     public bool SnapEnabled { get; private set; }
@@ -284,7 +286,6 @@ public class PlacementGrid : MonoBehaviour
         dragging = true;
         DragTarget = target;
 
-        if (!SnapEnabled) return;
         if (target == null) return;
 
         var pcCase = target.GetComponentInParent<PC.Component.Case>();
@@ -292,20 +293,16 @@ public class PlacementGrid : MonoBehaviour
 
         if (pcCase != null)
         {
+            // Весь корпус целиком: снап сетки и поворот двигают все тела
+            // сразу — ПК/майнер едет как единое целое и не рассыпается.
             pcBodies = pcCase.GetComponentsInChildren<Rigidbody>(true);
-            if (pcBodies != null && pcBodies.Length > 0)
-            {
-                pcOldConstraints = new RigidbodyConstraints[pcBodies.Length];
-                for (int i = 0; i < pcBodies.Length; i++)
-                {
-                    if (pcBodies[i] == null) continue;
+            DragAssemblyBodies = pcBodies;
 
-                    pcOldConstraints[i] = pcBodies[i].constraints;
-                    pcBodies[i].constraints |= RigidbodyConstraints.FreezeRotation;
-                    pcBodies[i].drag = Mathf.Max(pcBodies[i].drag, 5f);
-                    pcBodies[i].angularDrag = Mathf.Max(pcBodies[i].angularDrag, 5f);
-                }
-            }
+            // Джойнты корпуса не рвём, пока тащишь. В режиме сетки — всегда
+            // (там весь корпус и так едет целиком), без сетки — только когда
+            // схватили сам корпус: деталь по-прежнему можно вырвать силой.
+            if (SnapEnabled || IsCaseBody(target, pcCase))
+                ProtectCaseJoints(pcCase);
         }
         else
         {
@@ -313,10 +310,7 @@ public class PlacementGrid : MonoBehaviour
             if (rb != null)
             {
                 pcBodies = new[] { rb };
-                pcOldConstraints = new[] { rb.constraints };
-                rb.constraints |= RigidbodyConstraints.FreezeRotation;
-                rb.drag = Mathf.Max(rb.drag, 4f);
-                rb.angularDrag = Mathf.Max(rb.angularDrag, 4f);
+                DragAssemblyBodies = pcBodies;
             }
         }
 
@@ -327,21 +321,70 @@ public class PlacementGrid : MonoBehaviour
     {
         dragging = false;
         DragTarget = null;
+        DragAssemblyBodies = null;
 
-        if (pcBodies != null)
-        {
-            for (int i = 0; i < pcBodies.Length; i++)
-            {
-                if (pcBodies[i] == null) continue;
-                if (pcOldConstraints != null && i < pcOldConstraints.Length)
-                    pcBodies[i].constraints = pcOldConstraints[i];
-            }
+        RestoreCaseJoints();
 
-            pcBodies = null;
-            pcOldConstraints = null;
-        }
+        pcBodies = null;
 
         if (visual != null) visual.ClearAim();
+    }
+
+    /// <summary>Схватили ли сам корпус (а не деталь внутри него).</summary>
+    private static bool IsCaseBody(Transform target, PC.Component.Case pcCase)
+    {
+        var caseBody = pcCase.GetComponent<Rigidbody>();
+        if (caseBody == null) caseBody = pcCase.GetComponentInParent<Rigidbody>();
+        if (caseBody == null) return false;
+
+        var grabbed = target.GetComponentInParent<Rigidbody>();
+        return grabbed == caseBody;
+    }
+
+    /// <summary>
+    /// Делает джойнты корпуса неразрывными на время перетаскивания, чтобы
+    /// ПК/майнер не рассыпался от рывков. Значения вернёт RestoreCaseJoints.
+    /// </summary>
+    private void ProtectCaseJoints(PC.Component.Case pcCase)
+    {
+        var joints = pcCase.GetComponentsInChildren<Joint>(true);
+        if (joints == null || joints.Length == 0) return;
+
+        pcJoints = joints;
+        pcJointBreakForce = new float[joints.Length];
+        pcJointBreakTorque = new float[joints.Length];
+
+        for (int i = 0; i < joints.Length; i++)
+        {
+            var j = joints[i];
+            if (j == null) continue;
+
+            pcJointBreakForce[i] = j.breakForce;
+            pcJointBreakTorque[i] = j.breakTorque;
+            j.breakForce = Mathf.Infinity;
+            j.breakTorque = Mathf.Infinity;
+        }
+    }
+
+    /// <summary>Возвращает джойнтам корпуса сохранённые breakForce/breakTorque.</summary>
+    private void RestoreCaseJoints()
+    {
+        if (pcJoints == null) return;
+
+        for (int i = 0; i < pcJoints.Length; i++)
+        {
+            var j = pcJoints[i];
+            if (j == null) continue;
+
+            if (pcJointBreakForce != null && i < pcJointBreakForce.Length)
+                j.breakForce = pcJointBreakForce[i];
+            if (pcJointBreakTorque != null && i < pcJointBreakTorque.Length)
+                j.breakTorque = pcJointBreakTorque[i];
+        }
+
+        pcJoints = null;
+        pcJointBreakForce = null;
+        pcJointBreakTorque = null;
     }
 
 #if UNITY_EDITOR
