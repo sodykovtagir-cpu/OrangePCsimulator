@@ -11,8 +11,8 @@ Shader "OrangePC/GridOverlay"
 
     Properties
     {
-        _Color        ("Линия",                 Color)  = (1, 0.55, 0.14, 1)
-        _Accent       ("Клетка под курсором",   Color)  = (1, 0.80, 0.30, 1)
+        _Color        ("Линия",                 Color)  = (0.68, 0.68, 0.70, 1)
+        _Accent       ("Клетка под курсором",   Color)  = (0.95, 0.95, 0.97, 1)
         _CellSize     ("Размер клетки (м)",     Float)  = 0.5
         _LineHalfWidth("Полутолщина линии (м)", Float)  = 0.008
         _PixelWidth   ("Ширина в пикселях",     Float)  = 0.9

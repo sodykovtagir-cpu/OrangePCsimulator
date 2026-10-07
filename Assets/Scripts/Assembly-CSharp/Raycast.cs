@@ -18,6 +18,10 @@ public class Raycast : MonoBehaviour
         public float oldAngularDrag;
         public float distance;
         public RigidbodyConstraints oldConstrains;
+
+        // Смещение от точки захвата до центра масс в локальных осях тела.
+        // Нужно, чтобы по сетке снапался САМ предмет, а не только его угол.
+        public Vector3 grabOffsetLocal;
     }
 
     [SerializeField]
@@ -37,6 +41,16 @@ public class Raycast : MonoBehaviour
 
     [SerializeField]
     private float targetAngularDrag = 5f;
+
+    [Header("Сетка")]
+    [Tooltip("Как быстро предмет догоняет клетку, когда включена сетка (рад/с). " +
+             "Чем больше — тем отчётливее скачки по клеткам.")]
+    [SerializeField]
+    private float gridSpringFrequency = 18f;
+
+    [Tooltip("Демпфирование пружины в режиме сетки (0.85 — почти без болтанки).")]
+    [SerializeField]
+    private float gridSpringDamping = 0.85f;
 
     [SerializeField]
     private bool showHint;
@@ -62,6 +76,11 @@ public class Raycast : MonoBehaviour
     private Camera cam;
     private Slot[] slots;
     private SpringJoint spring;
+
+    // Пружина, которую ставит режим сетки (жёстче обычной), и чем её вернуть
+    private bool gridSpringApplied;
+    private float savedSpring = 100f;
+    private float savedDamper = 5f;
     private Drag currentDrag;
     private PointerEventData pointer;
 
@@ -250,6 +269,11 @@ public class Raycast : MonoBehaviour
                     drag.distance = new Vector3(p0.x - p1.x, p0.y - p1.y, p0.z - p1.z).magnitude;
                 }
 
+                // Смещение «точка захвата -> центр масс» в осях самого тела.
+                // С ним по сетке снапается корпус целиком, а не только его угол.
+                drag.grabOffsetLocal = hitRb.transform.InverseTransformDirection(
+                    hitRb.worldCenterOfMass - sTr.position);
+
                 spring.connectedBody = hitRb;
                 StartCoroutine("DragObject");
             }
@@ -384,6 +408,48 @@ public class Raycast : MonoBehaviour
         return slot.Hardware as Motherboard;
     }
 
+    /// <summary>
+    /// Делает пружину жёсткой на время сетки: иначе предмет плавно доползает
+    /// до клетки и скачков по 0.5 м не видно. Параметры считаются от массы,
+    /// поэтому тяжёлый корпус и лёгкий вентилятор догоняют цель одинаково.
+    /// </summary>
+    private void ApplyGridSpring(Rigidbody body)
+    {
+        if (spring == null || body == null) return;
+
+        if (!gridSpringApplied)
+        {
+            savedSpring = spring.spring;
+            savedDamper = spring.damper;
+            gridSpringApplied = true;
+        }
+
+        float m = Mathf.Max(0.5f, body.mass);
+        float w = Mathf.Max(4f, gridSpringFrequency);
+
+        spring.spring = m * w * w;
+        spring.damper = 2f * m * w * gridSpringDamping;
+
+        // Штатный drag при перетаскивании (10) дополнительно тормозит тело
+        // и смазывает шаг. В режиме сетки убираем его почти полностью
+        // (вернётся в End() из сохранённого значения).
+        if (body.drag > 2f) body.drag = 2f;
+    }
+
+    /// <summary>Возвращает обычную мягкую пружину.</summary>
+    private void RestoreSpring()
+    {
+        if (!gridSpringApplied) return;
+
+        if (spring != null)
+        {
+            spring.spring = savedSpring;
+            spring.damper = savedDamper;
+        }
+
+        gridSpringApplied = false;
+    }
+
     private IEnumerator DragObject()
     {
         var j = spring;
@@ -452,22 +518,55 @@ public class Raycast : MonoBehaviour
                     point = ray.GetPoint(currentDrag.distance);
                 }
 
-                // Сетка: снапаем точку захвата к мировой сетке с учётом стены/лифта/склона
-                if (PlacementGrid.Instance != null && PlacementGrid.Instance.SnapEnabled)
-                {
-                    if (Physics.Raycast(ray, out var gridHit, maxDistance, layer))
-                    {
-                        point = PlacementGrid.Instance.SnapPosition(point, gridHit.normal, gridHit.collider);
+                // Сетка: снапаем САМ предмет к мировой сетке с учётом стены/лифта/склона
+                var grid = PlacementGrid.Instance;
 
-                        // кормим визуал сетки: поверхность под прицелом
-                        // + уже отснапанная точка, чтобы подсветка клетки не врала
-                        PlacementGrid.Instance.ReportAim(gridHit.point, gridHit.normal, point);
+                if (grid != null && grid.SnapEnabled)
+                {
+                    // Сначала узнаём поверхность под прицелом — по её нормали
+                    // снап выбирает оси (пол снапает XZ, стена — YZ/XY).
+                    Vector3 normal = Vector3.up;
+                    Collider surface = null;
+                    Vector3 aimPoint = point;
+                    bool hasSurface = Physics.Raycast(ray, out var gridHit, maxDistance, layer);
+
+                    if (hasSurface)
+                    {
+                        normal = gridHit.normal;
+                        surface = gridHit.collider;
+                        aimPoint = gridHit.point;
+                    }
+
+                    var body = spring.connectedBody;
+                    Vector3 bodySnapped;
+
+                    if (body != null)
+                    {
+                        // Раньше снапалась точка захвата — предмет висел на ней
+                        // углом и по клеткам не ходил. Теперь снапаем центр масс
+                        // тела, а точку захвата просто сдвигаем вместе с ним.
+                        Vector3 offset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
+                        bodySnapped = grid.SnapPosition(point + offset, normal, surface);
+                        point = bodySnapped - offset;
                     }
                     else
                     {
-                        point = PlacementGrid.Instance.SnapPosition(point, Vector3.up, null);
-                        PlacementGrid.Instance.ReportAim(point, Vector3.up);
+                        bodySnapped = grid.SnapPosition(point, normal, surface);
+                        point = bodySnapped;
                     }
+
+                    // Визуал: сетка лежит на поверхности под прицелом,
+                    // а подсвечиваем клетку, в которой окажется САМ предмет.
+                    grid.ReportAim(aimPoint, normal, bodySnapped);
+
+                    // Мягкая пружина (100/5) размазывает шаг в 0.5 м в плавное
+                    // скольжение — скачков не видно. В режиме сетки делаем её
+                    // жёсткой, чтобы предмет реально прыгал по клеткам.
+                    ApplyGridSpring(body);
+                }
+                else
+                {
+                    RestoreSpring();
                 }
 
                 spring.transform.position = point;
@@ -546,6 +645,9 @@ public class Raycast : MonoBehaviour
 
     public void End()
     {
+        // Обычную мягкую пружину вернём до того, как отпустим тело
+        RestoreSpring();
+
         if (PlacementGrid.Instance != null)
             PlacementGrid.Instance.OnDragEnded();
 

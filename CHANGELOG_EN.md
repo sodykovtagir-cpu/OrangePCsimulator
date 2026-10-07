@@ -76,6 +76,12 @@
 
 ## Fixed
 
+- Dragged parts now actually move cell by cell. Only the grab point used to be snapped, so a case just hung off it by a corner and never lined up with the grid. Now the centre of mass of the part itself is snapped and the grab point is shifted along with it.
+
+- The 0.5 m steps are visible now. The soft drag spring (100/5) smeared every step into a smooth slide; with the grid on the spring becomes stiff and the extra body drag is removed, so the part visibly hops from cell to cell. Tune it with Grid Spring Frequency and Grid Spring Damping on Raycast.
+
+- The grid is grey now: light grey lines and a near-white highlight for the cell under the cursor instead of the orange ones.
+
 - A monitor responds to being connected on the first try. Previously you had to leave connection mode, pick the monitor up and drop it again.
 
 - Items placed in the world are restored correctly from a save. Some of them used to disappear silently on load.
