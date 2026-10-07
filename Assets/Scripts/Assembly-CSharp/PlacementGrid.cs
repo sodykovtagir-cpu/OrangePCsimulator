@@ -8,9 +8,9 @@ using UnityEngine;
 /// в Menu -> Settings -> PC controls -> Grid).
 ///
 /// Что делает:
-///  • снапает точку захвата (spring) к ближайшей клетке мировой сетки,
-///    поэтому предмет сам «ходит» по клеткам;
-///  • показывает видимую оранжевую сетку (PlacementGridVisual) на поверхности
+///  • снапает предмет к ближайшей клетке мировой сетки мгновенно (без
+///    прыгучести), поэтому предмет сам «ходит» по клеткам;
+///  • показывает видимую берёзовую сетку (PlacementGridVisual) на поверхности
 ///    под прицелом и подсвечивает клетку, куда предмет встанет.
 ///
 /// Защиты:
@@ -45,9 +45,11 @@ public class PlacementGrid : MonoBehaviour
     [Header("Вид сетки")]
     public bool showVisual = true;
 
-    public Color lineColor = new Color(0.68f, 0.68f, 0.70f, 1f);
+    [Tooltip("Берёзовая сетка: кремовые линии.")]
+    public Color lineColor = new Color(0.95f, 0.90f, 0.78f, 1f);
 
-    public Color cellColor = new Color(0.95f, 0.95f, 0.97f, 1f);
+    [Tooltip("Подсветка клетки под курсором — чуть светлее берёзового.")]
+    public Color cellColor = new Color(1f, 0.97f, 0.86f, 1f);
 
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
     public int cellsPerSide = 24;
@@ -91,6 +93,12 @@ public class PlacementGrid : MonoBehaviour
     {
         get { return dragging; }
     }
+
+    /// <summary>
+    /// Предмет, который сейчас тащат. Нужен визуалу: сетка не должна
+    /// накладываться на него (PlacementGridVisual строит вокруг него окклюдер).
+    /// </summary>
+    public Transform DragTarget { get; private set; }
 
     private void Awake()
     {
@@ -274,6 +282,7 @@ public class PlacementGrid : MonoBehaviour
     public void OnDragStarted(Transform target)
     {
         dragging = true;
+        DragTarget = target;
 
         if (!SnapEnabled) return;
         if (target == null) return;
@@ -317,6 +326,7 @@ public class PlacementGrid : MonoBehaviour
     public void OnDragEnded()
     {
         dragging = false;
+        DragTarget = null;
 
         if (pcBodies != null)
         {

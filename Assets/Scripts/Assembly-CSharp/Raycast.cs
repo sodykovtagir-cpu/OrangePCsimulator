@@ -42,16 +42,6 @@ public class Raycast : MonoBehaviour
     [SerializeField]
     private float targetAngularDrag = 5f;
 
-    [Header("Сетка")]
-    [Tooltip("Как быстро предмет догоняет клетку, когда включена сетка (рад/с). " +
-             "Чем больше — тем отчётливее скачки по клеткам.")]
-    [SerializeField]
-    private float gridSpringFrequency = 18f;
-
-    [Tooltip("Демпфирование пружины в режиме сетки (0.85 — почти без болтанки).")]
-    [SerializeField]
-    private float gridSpringDamping = 0.85f;
-
     [SerializeField]
     private bool showHint;
 
@@ -77,7 +67,7 @@ public class Raycast : MonoBehaviour
     private Slot[] slots;
     private SpringJoint spring;
 
-    // Пружина, которую ставит режим сетки (жёстче обычной), и чем её вернуть
+    // В режиме сетки пружина отключается (мгновенный снап), а здесь — чем её вернуть
     private bool gridSpringApplied;
     private float savedSpring = 100f;
     private float savedDamper = 5f;
@@ -409,13 +399,14 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Делает пружину жёсткой на время сетки: иначе предмет плавно доползает
-    /// до клетки и скачков по 0.5 м не видно. Параметры считаются от массы,
-    /// поэтому тяжёлый корпус и лёгкий вентилятор догоняют цель одинаково.
+    /// В режиме сетки пружина не нужна: предмет должен МГНОВЕННО вставать в
+    /// клетку, а не догонять её с раскачкой и отскоком. Поэтому силу пружины
+    /// отключаем (spring/damper = 0) — положение тела задаётся напрямую через
+    /// MovePosition в DragObject. Сохранённые значения вернёт RestoreSpring.
     /// </summary>
-    private void ApplyGridSpring(Rigidbody body)
+    private void DisableSpringForGrid()
     {
-        if (spring == null || body == null) return;
+        if (spring == null) return;
 
         if (!gridSpringApplied)
         {
@@ -424,16 +415,8 @@ public class Raycast : MonoBehaviour
             gridSpringApplied = true;
         }
 
-        float m = Mathf.Max(0.5f, body.mass);
-        float w = Mathf.Max(4f, gridSpringFrequency);
-
-        spring.spring = m * w * w;
-        spring.damper = 2f * m * w * gridSpringDamping;
-
-        // Штатный drag при перетаскивании (10) дополнительно тормозит тело
-        // и смазывает шаг. В режиме сетки убираем его почти полностью
-        // (вернётся в End() из сохранённого значения).
-        if (body.drag > 2f) body.drag = 2f;
+        spring.spring = 0f;
+        spring.damper = 0f;
     }
 
     /// <summary>Возвращает обычную мягкую пружину.</summary>
@@ -559,10 +542,20 @@ public class Raycast : MonoBehaviour
                     // а подсвечиваем клетку, в которой окажется САМ предмет.
                     grid.ReportAim(aimPoint, normal, bodySnapped);
 
-                    // Мягкая пружина (100/5) размазывает шаг в 0.5 м в плавное
-                    // скольжение — скачков не видно. В режиме сетки делаем её
-                    // жёсткой, чтобы предмет реально прыгал по клеткам.
-                    ApplyGridSpring(body);
+                    // Мгновенный снап без прыгучести: пружину отключаем, а тело
+                    // сразу ставим так, чтобы его центр масс оказался ровно в
+                    // отснапанной точке — предмет встаёт в клетку моментально,
+                    // без «догоняния» пружиной и отскоков. MovePosition двигает
+                    // пивот тела (Rigidbody.position), поэтому целевой пивот
+                    // считаем от текущего центра масс.
+                    if (body != null)
+                    {
+                        Vector3 comOffset = body.worldCenterOfMass - body.position;
+                        body.MovePosition(bodySnapped - comOffset);
+                        body.velocity = Vector3.zero;
+                    }
+
+                    DisableSpringForGrid();
                 }
                 else
                 {

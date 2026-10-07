@@ -4,13 +4,13 @@
 
 ### Grid mode (Orange Grid)
 
-- A visible orange grid. When the mode is on, it lies on the surface under the crosshair (floor, wall, table) and highlights the cell the part will land in. Before this, the grid only snapped the part and was invisible.
+- A visible birch grid. When the mode is on, it lies on the surface under the crosshair (floor, wall, table) and highlights the cell the part will land in. Before this, the grid only snapped the part and was invisible.
 
 - Parts now move cell by cell while dragging: the grab point snaps to the world grid and the drawn lines match the snap points, so you always see where the part goes.
 
 - Every fourth line is thicker, the grid fades softly towards the edges and lines never get thinner than a pixel — the grid stays visible from afar.
 
-- Grid button in the hotbar, both on the mobile panel and the standalone panel. The icon turns orange while the mode is on.
+- Grid button in the hotbar, both on the mobile panel and the standalone panel. It has a new snap-to-grid icon; the icon turns orange while the mode is on.
 
 - Bind setting: Menu → Settings → PC controls → Grid (G by default). The missing Auto rotation bind was added too.
 
@@ -76,11 +76,15 @@
 
 ## Fixed
 
+- The grid shader compiles again: a variable named `line` is a reserved HLSL keyword, which caused «syntax error: unexpected token 'line'» on d3d11 (shader lines 108 and 119). Renamed to `gridLine`.
+
+- The grid no longer overlays the item you are dragging: an invisible occluder around the item marks its area, so the grid is not drawn over the item's transparent parts (glass panels) or where it is closer to the camera than the item itself.
+
 - Dragged parts now actually move cell by cell. Only the grab point used to be snapped, so a case just hung off it by a corner and never lined up with the grid. Now the centre of mass of the part itself is snapped and the grab point is shifted along with it.
 
-- The 0.5 m steps are visible now. The soft drag spring (100/5) smeared every step into a smooth slide; with the grid on the spring becomes stiff and the extra body drag is removed, so the part visibly hops from cell to cell. Tune it with Grid Spring Frequency and Grid Spring Damping on Raycast.
+- With the grid on, the part snaps into the cell instantly. The soft drag spring (100/5) used to smear the 0.5 m step into a smooth slide, and the stiff spring added a bounce; now the spring is disabled in grid mode and the body is placed with its centre of mass exactly on the snapped cell — no gliding, no bounciness. The Grid Spring Frequency / Grid Spring Damping fields were removed as no longer needed.
 
-- The grid is grey now: light grey lines and a near-white highlight for the cell under the cursor instead of the orange ones.
+- The grid is birch now: cream lines and a slightly lighter highlight for the cell under the cursor instead of the orange ones.
 
 - A monitor responds to being connected on the first try. Previously you had to leave connection mode, pick the monitor up and drop it again.
 

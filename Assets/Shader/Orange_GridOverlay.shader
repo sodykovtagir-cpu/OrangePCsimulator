@@ -6,13 +6,21 @@ Shader "OrangePC/GridOverlay"
     // всегда совпадают с точками снапа PlacementGrid — предмет встаёт ровно
     // в центр подсвеченной клетки.
     //
+    // Цвет — берёзовый (кремовые линии, чуть светлее подсветка клетки).
+    //
+    // Сетка не накладывается на перетаскиваемый предмет: OrangePC/GridOccluder
+    // рисует вокруг предмета невидимый box и помечает его область стенсилом
+    // (Ref 57). Этот шейдер пропускает пиксели только там, где стенсил НЕ
+    // равен 57, поэтому сетка не просвечивает ни через стекло предмета, ни
+    // там, где она геометрически ближе к камере, чем сам предмет.
+    //
     // Совместимость: встроенный конвейер (built-in), GLES2/GLES3/Vulkan/GL.
     // Никаких производных (fwidth) и текстур — чтобы не ломалось на ГЛЕС2.
 
     Properties
     {
-        _Color        ("Линия",                 Color)  = (0.68, 0.68, 0.70, 1)
-        _Accent       ("Клетка под курсором",   Color)  = (0.95, 0.95, 0.97, 1)
+        _Color        ("Линия",                 Color)  = (0.95, 0.90, 0.78, 1)
+        _Accent       ("Клетка под курсором",   Color)  = (1.00, 0.97, 0.86, 1)
         _CellSize     ("Размер клетки (м)",     Float)  = 0.5
         _LineHalfWidth("Полутолщина линии (м)", Float)  = 0.008
         _PixelWidth   ("Ширина в пикселях",     Float)  = 0.9
@@ -45,6 +53,12 @@ Shader "OrangePC/GridOverlay"
             Cull Off
             Lighting Off
             Fog { Mode Off }
+            // Не рисуемся там, где OrangePC/GridOccluder пометил перетаскиваемый предмет.
+            Stencil
+            {
+                Ref 57
+                Comp NotEqual
+            }
 
             HLSLPROGRAM
             #pragma vertex   vert
@@ -105,7 +119,9 @@ Shader "OrangePC/GridOverlay"
                 float camDist = distance(i.world, _WorldSpaceCameraPos);
                 float w = max(_LineHalfWidth, camDist * _PixelScale * _PixelWidth);
 
-                float line = 1.0 - smoothstep(w, w * 2.2, dist);
+                // Внимание: line — зарезервированное слово HLSL (примитив
+                // отрисовки), поэтому переменная названа gridLine.
+                float gridLine = 1.0 - smoothstep(w, w * 2.2, dist);
 
                 // Каждая N-я линия — жирнее
                 float2 gi = floor(g + 0.5);
@@ -116,7 +132,7 @@ Shader "OrangePC/GridOverlay"
                 float majorY = step(my, 0.5);
                 float major = lerp(majorY, majorX, step(dcell.x, dcell.y));
 
-                float strength = line * (1.0 + major * 0.85);
+                float strength = gridLine * (1.0 + major * 0.85);
 
                 // Подсветка клетки, куда встанет предмет
                 float2 hd = abs(g - _HighlightUV.xy);

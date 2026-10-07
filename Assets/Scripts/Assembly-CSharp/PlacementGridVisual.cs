@@ -3,11 +3,12 @@ using UnityEngine;
 /// <summary>
 /// Визуальная сетка Orange PC.
 ///
-/// Рисует оранжевую «голограмму» сетки на той поверхности, куда ты сейчас
+/// Рисует берёзовую «голограмму» сетки на той поверхности, куда ты сейчас
 /// целишься (пол, стена, стол), когда включён режим сетки:
 ///   • линии мировой сетки (каждая N-я — жирнее),
 ///   • подсветка клетки, в центр которой встанет предмет,
-///   • мягкое затухание к краям, чтобы не резало глаз.
+///   • мягкое затухание к краям, чтобы не резало глаз,
+///   • сетка не накладывается на перетаскиваемый предмет (окклюдер-stencil).
 ///
 /// Координаты линий считаются по МИРОВЫМ осям, поэтому рисунок всегда
 /// совпадает со снапом PlacementGrid: предмет встаёт ровно в центр
@@ -23,9 +24,11 @@ public class PlacementGridVisual : MonoBehaviour
     public static PlacementGridVisual Instance { get; private set; }
 
     [Header("Цвета")]
-    public Color lineColor = new Color(0.68f, 0.68f, 0.70f, 1f);
+    [Tooltip("Берёзовая сетка: кремовые линии.")]
+    public Color lineColor = new Color(0.95f, 0.90f, 0.78f, 1f);
 
-    public Color cellColor = new Color(0.95f, 0.95f, 0.97f, 1f);
+    [Tooltip("Подсветка клетки под курсором — чуть светлее берёзового.")]
+    public Color cellColor = new Color(1f, 0.97f, 0.86f, 1f);
 
     [Header("Геометрия")]
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
@@ -72,6 +75,9 @@ public class PlacementGridVisual : MonoBehaviour
     private Material glMaterial;
     private bool glFallback;
     private Camera cachedCamera;
+    // Невидимый box-окклюдер вокруг перетаскиваемого предмета: помечает его
+    // область стенсилом, чтобы сетка через него не просвечивала.
+    private Transform occluder;
 
     private float opacity;
     private bool hasAim;
@@ -171,6 +177,99 @@ public class PlacementGridVisual : MonoBehaviour
 
         quad = quadGo.transform;
         quadGo.SetActive(false);
+
+        BuildOccluder();
+    }
+
+    // ──────────────────────────────────────────────────────── окклюдер предмета
+    /// <summary>
+    /// Невидимый box-окклюдер вокруг перетаскиваемого предмета (по габаритам
+    /// всех его рендереров). Шейдер OrangePC/GridOccluder рисует его перед
+    /// сеткой, ничего не закрашивает и не пишет глубину, а только помечает
+    /// область стенсилом (Ref 57). Шейдер сетки не рисуется в помеченной
+    /// области — поэтому сетка не накладывается на предмет, который тащат:
+    /// ни на прозрачные части (стекло), ни там, где она ближе к камере.
+    /// </summary>
+    private void BuildOccluder()
+    {
+        var shader = Shader.Find("OrangePC/GridOccluder");
+        if (shader == null)
+        {
+            // Без шейдера окклюдера сетка работает как раньше (с наложением).
+            return;
+        }
+
+        var go = new GameObject("GridOccluder");
+        go.transform.SetParent(transform, false);
+        go.hideFlags = HideFlags.DontSave;
+        go.layer = 2; // Ignore Raycast (коллайдера нет, но на всякий случай)
+
+        var filt = go.AddComponent<MeshFilter>();
+        filt.sharedMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+
+        var rend = go.AddComponent<MeshRenderer>();
+        rend.sharedMaterial = new Material(shader);
+        rend.sharedMaterial.hideFlags = HideFlags.HideAndDontSave;
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rend.receiveShadows = false;
+
+        occluder = go.transform;
+        go.SetActive(false);
+    }
+
+    /// <summary>Двигает окклюдер за перетаскиваемым предметом (или выключает).</summary>
+    private void UpdateOccluder()
+    {
+        if (occluder == null) return;
+
+        var target = grid != null ? grid.DragTarget : null;
+        bool show = target != null
+            && quad != null
+            && quad.gameObject.activeSelf;
+
+        if (show)
+        {
+            var rends = target.GetComponentsInChildren<Renderer>();
+            var b = new Bounds();
+            bool has = false;
+
+            for (int i = 0; i < rends.Length; i++)
+            {
+                var r = rends[i];
+                if (r == null || !r.enabled) continue;
+
+                if (!has)
+                {
+                    b = r.bounds;
+                    has = true;
+                }
+                else
+                {
+                    b.Encapsulate(r.bounds);
+                }
+            }
+
+            if (has)
+            {
+                // Минимальный зазор, чтобы box гарантированно накрывал предмет.
+                Vector3 size = b.size;
+                size.x = Mathf.Max(size.x, 0.02f);
+                size.y = Mathf.Max(size.y, 0.02f);
+                size.z = Mathf.Max(size.z, 0.02f);
+
+                occluder.position = b.center;
+                occluder.rotation = Quaternion.identity;
+                occluder.localScale = size;
+
+                if (!occluder.gameObject.activeSelf)
+                    occluder.gameObject.SetActive(true);
+
+                return;
+            }
+        }
+
+        if (occluder.gameObject.activeSelf)
+            occluder.SetActive(false);
     }
 
     // ────────────────────────────────────────────────────────────── управление
@@ -206,27 +305,25 @@ public class PlacementGridVisual : MonoBehaviour
         if (!grid.SnapEnabled)
         {
             Hide();
-            return;
         }
-
-        if (!grid.IsDragging)
-        {
-            if (!showWhenIdle)
-            {
-                Hide();
-                return;
-            }
-
-            UpdateIdleAim();
-        }
-
-        if (!hasAim)
+        else if (!grid.IsDragging && !showWhenIdle)
         {
             Hide();
-            return;
+        }
+        else
+        {
+            if (!grid.IsDragging)
+                UpdateIdleAim();
+
+            if (!hasAim)
+                Hide();
+            else
+                Apply();
         }
 
-        Apply();
+        // Окклюдер обновляется всегда: пока тащат предмет — он следует за ним,
+        // в остальных случаях выключен (Hide() мог только что скрыть сетку).
+        UpdateOccluder();
     }
 
     private void Hide()
