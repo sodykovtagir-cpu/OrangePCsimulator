@@ -42,6 +42,11 @@ public class Raycast : MonoBehaviour
     [SerializeField]
     private float targetAngularDrag = 5f;
 
+    [Header("Поворот предмета")]
+    [Tooltip("Шаг поворота тащимого предмета стрелками, градусов за нажатие.")]
+    [SerializeField]
+    private float rotateStep = 45f;
+
     [SerializeField]
     private bool showHint;
 
@@ -665,8 +670,26 @@ public class Raycast : MonoBehaviour
                     if (body != null)
                     {
                         Vector3 comOffset = body.worldCenterOfMass - body.position;
-                        body.MovePosition(bodySnapped - comOffset);
+                        Vector3 targetPivot = bodySnapped - comOffset;
+                        Vector3 delta = targetPivot - body.position;
+
+                        body.MovePosition(targetPivot);
                         body.velocity = Vector3.zero;
+
+                        // ПК/майнер: все тела корпуса едут тем же смещением,
+                        // иначе джойнты рвутся и сборка рассыпается.
+                        var assembly = grid.DragAssemblyBodies;
+                        if (assembly != null && assembly.Length > 1)
+                        {
+                            for (int i = 0; i < assembly.Length; i++)
+                            {
+                                var partRb = assembly[i];
+                                if (partRb == null || partRb == body) continue;
+
+                                partRb.MovePosition(partRb.position + delta);
+                                partRb.velocity = Vector3.zero;
+                            }
+                        }
                     }
 
                     DisableSpringForGrid();
