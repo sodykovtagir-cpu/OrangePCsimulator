@@ -269,7 +269,7 @@ public class PlacementGridVisual : MonoBehaviour
         }
 
         if (occluder.gameObject.activeSelf)
-            occluder.SetActive(false);
+            occluder.gameObject.SetActive(false);
     }
 
     // ────────────────────────────────────────────────────────────── управление
