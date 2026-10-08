@@ -20,7 +20,7 @@
 
 ### Rotating items while dragging
 
-- The dragged item can be rotated with arrows — only in grid mode: on mobile a panel with four arrows (left/up/right/down) appears, on PC the regular arrow keys work (there is no panel on PC). The step is 45° per press, a full turn is 8 presses. For a PC/miner the whole case turns at once. In grid mode the orientation changes only via the arrows: auto-rotation and collision wobble are disabled. The panel is created automatically and needs no scene changes.
+- The dragged item can be rotated with arrows — only in grid mode: on mobile a panel with four arrows (left/up/right/down) appears, on PC the regular arrow keys work (there is no panel on PC). The step is 90° per press and the angle is always a multiple of the step: e.g. 87° → press → 180°, reverse → 90°. For a PC/miner the whole case turns at once. In grid mode the orientation changes only via the arrows: auto-rotation and collision wobble are disabled. The panel is created automatically and needs no scene changes.
 
 - Orientation lock in grid mode: when you grab an item with the grid on, all its bodies get FreezeRotation — bumping the item won't flip or tilt it; only the arrows can rotate it. On release (or when the grid is turned off) the constraints are restored.
 
@@ -81,6 +81,8 @@
 - Translations for all new interface elements across the game's 42 languages.
 
 ## Fixed
+
+- The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.
 

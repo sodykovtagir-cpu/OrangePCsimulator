@@ -43,9 +43,11 @@ public class Raycast : MonoBehaviour
     private float targetAngularDrag = 5f;
 
     [Header("Поворот предмета")]
-    [Tooltip("Шаг поворота тащимого предмета стрелками, градусов за нажатие.")]
+    [Tooltip("Шаг и квант поворота стрелками, градусов: угол всегда кратен шагу. " +
+             "Нажал — угол встал на ближайшее кратное + ещё шаг (87 -> 180, " +
+             "обратно -> 90 при шаге 90).")]
     [SerializeField]
-    private float rotateStep = 45f;
+    private float rotateStep = 90f;
 
     [SerializeField]
     private bool showHint;
@@ -474,7 +476,20 @@ public class Raycast : MonoBehaviour
         var body = spring != null ? spring.connectedBody : null;
         if (body == null || currentDrag == null) return;
 
-        var delta = Quaternion.Euler(pitchDir * rotateStep, yawDir * rotateStep, 0f);
+        // Квантование: каждое нажатие ставит угол на ближайшее кратное шагу
+        // и добавляет ещё шаг: было 87° — нажал вправо → 180°, обратно → 90°.
+        float step = Mathf.Max(1f, rotateStep);
+        var e = body.rotation.eulerAngles;
+
+        float yaw = e.y;
+        float pitch = e.x;
+
+        if (yawDir != 0)
+            yaw = Mathf.Round(yaw / step) * step + yawDir * step;
+        if (pitchDir != 0)
+            pitch = Mathf.Round(pitch / step) * step + pitchDir * step;
+
+        var delta = Quaternion.Inverse(body.rotation) * Quaternion.Euler(pitch, yaw, e.z);
 
         var assembly = PlacementGrid.Instance != null
             ? PlacementGrid.Instance.DragAssemblyBodies

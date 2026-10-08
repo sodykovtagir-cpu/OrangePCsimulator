@@ -80,7 +80,6 @@ public class PlacementGrid : MonoBehaviour
     [Tooltip("Слои поверхностей для визуала. Если пусто — любые.")]
     public LayerMask surfaceMask = ~0;
 
-    private const string PrefKey = "PlacementGrid_Enabled";
     private const float MaxSlopeAngle = 45f;
 
     private PlacementGridVisual visual;
@@ -182,7 +181,10 @@ public class PlacementGrid : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        SnapEnabled = PlayerPrefs.GetInt(PrefKey, enabledByDefault ? 1 : 0) == 1;
+        // По умолчанию сетка ВЫКЛЮЧЕНА. Сохранение в PlayerPrefs убрано:
+        // раньше OnDestroy инвертировал и писал настройку при teardown, из-за
+        // чего сетка «сама включалась» на следующий запуск.
+        SnapEnabled = enabledByDefault;
 
         CreateVisual();
     }
@@ -233,9 +235,6 @@ public class PlacementGrid : MonoBehaviour
             if (on) ApplyRotationLock();
             else ReleaseRotationLock();
         }
-
-        PlayerPrefs.SetInt(PrefKey, on ? 1 : 0);
-        PlayerPrefs.Save();
 
         if (visual != null) visual.aimMaskOverride = AimLayer;
 
