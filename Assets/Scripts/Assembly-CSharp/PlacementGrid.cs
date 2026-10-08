@@ -331,6 +331,12 @@ public class PlacementGrid : MonoBehaviour
         return new Vector3(SnapAxis(pos.x), pos.y, SnapAxis(pos.z));
     }
 
+    /// <summary>Снап координаты к шагу мировой сетки (для драга/визуала).</summary>
+    public float SnapCoord(float v)
+    {
+        return SnapAxis(v);
+    }
+
     private float SnapAxis(float v)
     {
         float cell = Mathf.Max(cellSize, 0.01f);

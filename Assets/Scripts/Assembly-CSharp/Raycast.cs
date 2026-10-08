@@ -47,17 +47,6 @@ public class Raycast : MonoBehaviour
     [SerializeField]
     private float rotateStep = 45f;
 
-    [Header("Пружина сетки")]
-    [Tooltip("Как быстро предмет догоняет клетку в режиме сетки (рад/с). " +
-             "Демпфирование критическое — догоняет без отскока.")]
-    [SerializeField]
-    private float gridSpringOmega = 12f;
-
-    [Tooltip("Максимальная жёсткость пружины сетки (Н/м): ограничена, чтобы " +
-             "предмет не ломал другие, если по ним вести.")]
-    [SerializeField]
-    private float gridSpringMaxK = 700f;
-
     [SerializeField]
     private bool showHint;
 
@@ -438,16 +427,13 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// В режиме сетки пружина ведёт предмет к отснапанной клетке быстро и БЕЗ
-    /// отскока: жёсткость ограничена сверху, демпфирование критическое
-    /// (zeta = 1). Предмет ведёт себя как при обычном перетаскивании — стены,
-    /// полы (включая перекрытия этажей) и другие предметы останавливают его
-    /// естественно: он не пролетает сквозь них и не ломает их, потому что
-    /// сила пружины конечна. Сохранённые значения вернёт RestoreSpring.
+    /// В режиме сетки положение задаёт резкий снап (TryPinAssembly), поэтому
+    /// силу пружины отключаем — иначе она размазывает шаг и тянет предмет в
+    /// стены. Сохранённые значения вернёт RestoreSpring.
     /// </summary>
-    private void ApplyGridSpringCritical(Rigidbody body)
+    private void DisableSpringForGrid()
     {
-        if (spring == null || body == null) return;
+        if (spring == null) return;
 
         if (!gridSpringApplied)
         {
@@ -456,11 +442,8 @@ public class Raycast : MonoBehaviour
             gridSpringApplied = true;
         }
 
-        float m = Mathf.Max(0.5f, body.mass);
-        float k = Mathf.Min(m * gridSpringOmega * gridSpringOmega, gridSpringMaxK);
-
-        spring.spring = k;
-        spring.damper = 2f * Mathf.Sqrt(k * m); // критическое демпфирование
+        spring.spring = 0f;
+        spring.damper = 0f;
     }
 
     /// <summary>Возвращает обычную мягкую пружину.</summary>
@@ -525,6 +508,91 @@ public class Raycast : MonoBehaviour
 
         rb.MoveRotation(next);
         rb.transform.rotation = next;
+    }
+
+    /// <summary>Корень тащимой сборки: корпус ПК/майнера целиком или само тело.</summary>
+    private static Transform DraggedRoot(Rigidbody body)
+    {
+        var pcCase = body.GetComponentInParent<PC.Component.Case>();
+        return pcCase != null ? pcCase.transform : body.transform;
+    }
+
+    /// <summary>Мировой Y низа габарита тащимой сборки.</summary>
+    private float DraggedBoundsMinY(Rigidbody body)
+    {
+        var root = DraggedRoot(body);
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        if (cols == null || cols.Length == 0) return body.worldCenterOfMass.y;
+
+        var b = cols[0].bounds;
+        for (int i = 1; i < cols.Length; i++)
+        {
+            if (cols[i] == null) continue;
+            b.Encapsulate(cols[i].bounds);
+        }
+
+        return b.min.y;
+    }
+
+    /// <summary>
+    /// Резко (телепортом) смещает тащимый предмет/корпус на дельту — но только
+    /// если в целевой позиции он ни с кем не пересекается: стены, перекрытия и
+    /// другие предметы принимаются за препятствия. Сил не прикладываем — значит,
+    /// ничего не ломаем, не проталкиваем и никуда не пролетаем.
+    /// </summary>
+    private bool TryPinAssembly(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    {
+        if (delta.sqrMagnitude < 1e-9f) return true;
+
+        var root = DraggedRoot(body);
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        if (cols == null || cols.Length == 0) return true;
+
+        var b = cols[0].bounds;
+        for (int i = 1; i < cols.Length; i++)
+        {
+            if (cols[i] == null) continue;
+            b.Encapsulate(cols[i].bounds);
+        }
+
+        // Чек-бокс чуть сжат, чтобы простое касание (стоит на полу)
+        // не считалось «занято».
+        const float skin = 0.015f;
+        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
+        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
+
+        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity, layer,
+            QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var col = hits[i];
+            if (col == null) continue;
+            if (col.transform.IsChildOf(root)) continue; // своё тело/корпус
+
+            return false; // клетка занята
+        }
+
+        // Путь чист — резко встаём в клетку
+        body.MovePosition(body.position + delta);
+        body.velocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+
+        var assembly = grid.DragAssemblyBodies;
+        if (assembly != null)
+        {
+            for (int i = 0; i < assembly.Length; i++)
+            {
+                var partRb = assembly[i];
+                if (partRb == null || partRb == body) continue;
+
+                partRb.MovePosition(partRb.position + delta);
+                partRb.velocity = Vector3.zero;
+                partRb.angularVelocity = Vector3.zero;
+            }
+        }
+
+        return true;
     }
 
 
@@ -621,32 +689,62 @@ public class Raycast : MonoBehaviour
 
                     var body = spring.connectedBody;
                     Vector3 bodySnapped;
+                    Vector3 grabOffset = Vector3.zero;
 
                     if (body != null)
                     {
                         // Раньше снапалась точка захвата — предмет висел на ней
                         // углом и по клеткам не ходил. Теперь снапаем центр масс
                         // тела, а точку захвата просто сдвигаем вместе с ним.
-                        Vector3 offset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
-                        bodySnapped = grid.SnapPosition(point + offset, normal, surface);
-                        point = bodySnapped - offset;
+                        grabOffset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
+                        bodySnapped = grid.SnapPosition(point + grabOffset, normal, surface);
                     }
                     else
                     {
                         bodySnapped = grid.SnapPosition(point, normal, surface);
-                        point = bodySnapped;
                     }
+
+                    // Высота на полоподобных поверхностях: низ предмета ставим
+                    // на отснапанную плоскость (если она не ниже самой
+                    // поверхности), чтобы предмет не уходил в пол.
+                    if (body != null && hasSurface && normal.y > 0.7f)
+                    {
+                        float bottomOffset = body.worldCenterOfMass.y - DraggedBoundsMinY(body);
+                        float bottom = grid.snapHeight
+                            ? grid.SnapCoord(gridHit.point.y)
+                            : gridHit.point.y;
+                        if (bottom < gridHit.point.y - 0.02f) bottom = gridHit.point.y;
+                        bodySnapped.y = bottom + bottomOffset;
+                    }
+
+                    point = bodySnapped - grabOffset;
 
                     // Визуал: сетка лежит на поверхности под прицелом,
                     // а подсвечиваем клетку, в которой окажется САМ предмет.
                     grid.ReportAim(aimPoint, normal, bodySnapped);
 
-                    // Предмет ведёт себя как при обычном перетаскивании, только
-                    // цель пружины — отснапанная клетка: догоняет быстро, без
-                    // отскока (критическое демпфирование), сила ограничена.
-                    // Стены, перекрытия этажей и другие предметы останавливают
-                    // его естественно — без пролётов насквозь и без ломания.
-                    ApplyGridSpringCritical(body);
+                    // Резко, по клеткам: клетка занимается мгновенно, но только
+                    // если она свободна. Стены, перекрытия этажей и другие
+                    // предметы — препятствия («боится» их). Сил не прикладываем
+                    // вовсе — значит, ничего не ломаем и не проталкиваем.
+                    if (body != null)
+                    {
+                        Vector3 comOffset = body.worldCenterOfMass - body.position;
+                        Vector3 delta = (bodySnapped - comOffset) - body.position;
+
+                        if (!TryPinAssembly(grid, body, delta) && hasSurface && normal.y > 0.7f)
+                        {
+                            // С отснапанной высотой клетка занята — пробуем
+                            // встать прямо на поверхность.
+                            float bottomOffset = body.worldCenterOfMass.y - DraggedBoundsMinY(body);
+                            bodySnapped.y = gridHit.point.y + bottomOffset;
+                            point = bodySnapped - grabOffset;
+                            delta = (bodySnapped - comOffset) - body.position;
+                            TryPinAssembly(grid, body, delta);
+                        }
+                    }
+
+                    DisableSpringForGrid();
                 }
                 else
                 {
