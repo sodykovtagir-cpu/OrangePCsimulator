@@ -464,8 +464,9 @@ public class Raycast : MonoBehaviour
 
     /// <summary>
     /// Поворачивает тащимый предмет на шаг (стрелки клавиатуры или кнопки
-    /// панели DragRotateControls). У ПК/майнера поворачивается весь корпус
-    /// целиком — иначе детали раскачиваются и отваливаются.
+    /// панели DragRotateControls). Вся сборка (корпус + мать + стекло, всё,
+    /// что в графе джойнтов) крутится вокруг ОДНОЙ точки — иначе детали
+    /// «крутятся на месте», джойнты растягиваются и при отпускании отлетают.
     /// </summary>
     public void RotateDragged(int yawDir, int pitchDir)
     {
@@ -476,24 +477,41 @@ public class Raycast : MonoBehaviour
         var body = spring != null ? spring.connectedBody : null;
         if (body == null || currentDrag == null) return;
 
+        float step = Mathf.Max(1f, rotateStep);
+        var grid = PlacementGrid.Instance;
+        var assembly = grid != null ? grid.DragAssemblyBodies : null;
+
+        // Раскладываем ориентацию на рыскание и тангаж сами: стандартные
+        // eulerAngles возле вертикали врут — из-за них предмет при нажатии
+        // «вверх» падал на грань. Рыскание берём из вектора «вправо» (он
+        // корректен всегда), тангаж — из «вперёд» в системе рыскания.
+        var q = body.rotation;
+        Vector3 right = q * Vector3.right;
+        Vector3 fwd = q * Vector3.forward;
+
+        float yaw = Mathf.Atan2(-right.z, right.x) * Mathf.Rad2Deg;
+        Vector3 fLocal = Quaternion.Euler(0f, -yaw, 0f) * fwd;
+        float pitch = Mathf.Atan2(-fLocal.y, fLocal.z) * Mathf.Rad2Deg;
+
         // Квантование: каждое нажатие ставит угол на ближайшее кратное шагу
         // и добавляет ещё шаг: было 87° — нажал вправо → 180°, обратно → 90°.
-        float step = Mathf.Max(1f, rotateStep);
-        var e = body.rotation.eulerAngles;
-
-        float yaw = e.y;
-        float pitch = e.x;
-
         if (yawDir != 0)
             yaw = Mathf.Round(yaw / step) * step + yawDir * step;
         if (pitchDir != 0)
             pitch = Mathf.Round(pitch / step) * step + pitchDir * step;
 
-        var delta = Quaternion.Inverse(body.rotation) * Quaternion.Euler(pitch, yaw, e.z);
+        // Euler(pitch, yaw, 0) = поворот вокруг вертикали на рыскание, затем
+        // наклон вокруг собственной правой оси на тангаж — ровно то, что
+        // делают стрелки. Последовательность «вверх»: стоит → смотрит вверх
+        // → вверх ногами → смотрит вниз → стоит; без падений на грань.
+        var target = Quaternion.Euler(pitch, yaw, 0f);
+        var worldDelta = target * Quaternion.Inverse(q);
 
-        var assembly = PlacementGrid.Instance != null
-            ? PlacementGrid.Instance.DragAssemblyBodies
-            : null;
+        // Пивот — центр габарита всей сборки: крутим вокруг него.
+        Vector3 pivot = body.worldCenterOfMass;
+        Bounds b;
+        if (grid != null && TryAssemblyBounds(grid, body, out b))
+            pivot = b.center;
 
         if (assembly != null && assembly.Length > 1)
         {
@@ -502,27 +520,25 @@ public class Raycast : MonoBehaviour
                 var rb = assembly[i];
                 if (rb == null) continue;
 
-                RotateBody(rb, delta);
+                Quaternion next = worldDelta * rb.rotation;
+                Vector3 pos = pivot + worldDelta * (rb.position - pivot);
+
+                rb.MoveRotation(next);
+                rb.transform.rotation = next;
+                rb.MovePosition(pos);
+                rb.transform.position = pos;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
             }
         }
         else
         {
-            RotateBody(body, delta);
+            var next = worldDelta * body.rotation;
+            body.MoveRotation(next);
+            body.transform.rotation = next;
+            body.velocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
         }
-    }
-
-    /// <summary>
-    /// Поворачивает тело на дельту. MoveRotation — штатный путь; прямая
-    /// установка transform.rotation — страховка: при FreezeRotation (блокировка
-    /// ориентации в режиме сетки) PhysX может игнорировать MoveRotation, а
-    /// телепорт поворота констрейнты не блокируют.
-    /// </summary>
-    private static void RotateBody(Rigidbody rb, Quaternion delta)
-    {
-        var next = rb.rotation * delta;
-
-        rb.MoveRotation(next);
-        rb.transform.rotation = next;
     }
 
     /// <summary>
