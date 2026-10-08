@@ -370,37 +370,89 @@ public class PlacementGrid : MonoBehaviour
 
         if (target == null) return;
 
+        // Сборка — не только дети по иерархии: мать стоит в слоте с
+        // setParent: 0 и держится ТОЛЬКО FixedJoint. Собираем тела графом
+        // джойнтов + иерархией, чтобы весь ПК ехал и крутился целиком.
+        var startRb = target.GetComponentInParent<Rigidbody>();
+        if (startRb != null)
+        {
+            pcBodies = CollectAssembly(startRb);
+            DragAssemblyBodies = pcBodies;
+        }
+
         var pcCase = target.GetComponentInParent<PC.Component.Case>();
         if (pcCase == null) pcCase = target.GetComponent<PC.Component.Case>();
 
-        if (pcCase != null)
-        {
-            // Весь корпус целиком: снап сетки и поворот двигают все тела
-            // сразу — ПК/майнер едет как единое целое и не рассыпается.
-            pcBodies = pcCase.GetComponentsInChildren<Rigidbody>(true);
-            DragAssemblyBodies = pcBodies;
-
-            // Джойнты корпуса не рвём, пока тащишь. В режиме сетки — всегда
-            // (там весь корпус и так едет целиком), без сетки — только когда
-            // схватили сам корпус: деталь по-прежнему можно вырвать силой.
-            if (SnapEnabled || IsCaseBody(target, pcCase))
-                ProtectCaseJoints(pcCase);
-        }
-        else
-        {
-            var rb = target.GetComponentInParent<Rigidbody>();
-            if (rb != null)
-            {
-                pcBodies = new[] { rb };
-                DragAssemblyBodies = pcBodies;
-            }
-        }
+        // Джойнты сборки не рвём, пока тащишь. В режиме сетки — всегда,
+        // без сетки — только когда схватили сам корпус: деталь по-прежнему
+        // можно вырвать силой.
+        if (pcBodies != null && (SnapEnabled || (pcCase != null && IsCaseBody(target, pcCase))))
+            ProtectAssemblyJoints();
 
         // В режиме сетки — блокировка ориентации: поворот только стрелками,
         // от ударов предмет не переворачивается.
         if (SnapEnabled) ApplyRotationLock();
 
         if (visual != null) visual.aimMaskOverride = AimLayer;
+    }
+
+    /// <summary>
+    /// Сборка тащимого тела: оно само + всё, что соединено с ним джойнтами
+    /// (мать держится только FixedJoint, не иерархией), плюс дети по
+    /// иерархии каждого тела. Кинематические тела (драггер) не входят.
+    /// </summary>
+    private static Rigidbody[] CollectAssembly(Rigidbody start)
+    {
+        var lookup = new HashSet<Rigidbody>();
+        var queue = new Queue<Rigidbody>();
+        var order = new List<Rigidbody>();
+
+        lookup.Add(start);
+        queue.Enqueue(start);
+
+        var joints = FindObjectsOfType<Joint>();
+        var adj = new Dictionary<Rigidbody, List<Rigidbody>>();
+        for (int i = 0; i < joints.Length; i++)
+        {
+            var j = joints[i];
+            if (j == null) continue;
+
+            var a = j.attachedRigidbody;
+            var b = j.connectedBody;
+            if (a == null || b == null || a.isKinematic || b.isKinematic) continue;
+
+            List<Rigidbody> la;
+            if (!adj.TryGetValue(a, out la)) { la = new List<Rigidbody>(); adj[a] = la; }
+            List<Rigidbody> lb;
+            if (!adj.TryGetValue(b, out lb)) { lb = new List<Rigidbody>(); adj[b] = lb; }
+            la.Add(b);
+            lb.Add(a);
+        }
+
+        while (queue.Count > 0)
+        {
+            var rb = queue.Dequeue();
+            order.Add(rb);
+
+            var children = rb.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = 0; i < children.Length; i++)
+            {
+                if (children[i] != null && lookup.Add(children[i]))
+                    queue.Enqueue(children[i]);
+            }
+
+            List<Rigidbody> neigh;
+            if (adj.TryGetValue(rb, out neigh))
+            {
+                for (int i = 0; i < neigh.Count; i++)
+                {
+                    if (neigh[i] != null && lookup.Add(neigh[i]))
+                        queue.Enqueue(neigh[i]);
+                }
+            }
+        }
+
+        return order.ToArray();
     }
 
     public void OnDragEnded()
@@ -429,21 +481,33 @@ public class PlacementGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Делает джойнты корпуса неразрывными на время перетаскивания, чтобы
+    /// Делает джойнты ВСЕЙ сборки неразрывными на время перетаскивания, чтобы
     /// ПК/майнер не рассыпался от рывков. Значения вернёт RestoreCaseJoints.
     /// </summary>
-    private void ProtectCaseJoints(PC.Component.Case pcCase)
+    private void ProtectAssemblyJoints()
     {
-        var joints = pcCase.GetComponentsInChildren<Joint>(true);
-        if (joints == null || joints.Length == 0) return;
-
-        pcJoints = joints;
-        pcJointBreakForce = new float[joints.Length];
-        pcJointBreakTorque = new float[joints.Length];
-
-        for (int i = 0; i < joints.Length; i++)
+        var seen = new List<Joint>();
+        for (int i = 0; i < pcBodies.Length; i++)
         {
-            var j = joints[i];
+            var rb = pcBodies[i];
+            if (rb == null) continue;
+
+            var js = rb.GetComponentsInChildren<Joint>(true);
+            for (int j = 0; j < js.Length; j++)
+            {
+                if (js[j] != null && !seen.Contains(js[j])) seen.Add(js[j]);
+            }
+        }
+
+        if (seen.Count == 0) return;
+
+        pcJoints = seen.ToArray();
+        pcJointBreakForce = new float[pcJoints.Length];
+        pcJointBreakTorque = new float[pcJoints.Length];
+
+        for (int i = 0; i < pcJoints.Length; i++)
+        {
+            var j = pcJoints[i];
             if (j == null) continue;
 
             pcJointBreakForce[i] = j.breakForce;

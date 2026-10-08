@@ -525,49 +525,68 @@ public class Raycast : MonoBehaviour
         rb.transform.rotation = next;
     }
 
-    /// <summary>Корень тащимой сборки: корпус ПК/майнера целиком или само тело.</summary>
-    private static Transform DraggedRoot(Rigidbody body)
+    /// <summary>
+    /// Габарит ВСЕЙ тащимой сборки (включая детали, которые держатся только
+    /// джойнтами и не являются детьми корпуса — мать и т.п.).
+    /// </summary>
+    private static bool TryAssemblyBounds(PlacementGrid grid, Rigidbody body, out Bounds b)
     {
-        var pcCase = body.GetComponentInParent<PC.Component.Case>();
-        return pcCase != null ? pcCase.transform : body.transform;
+        b = default(Bounds);
+        var assembly = grid.DragAssemblyBodies;
+        if (assembly == null || assembly.Length == 0) return false;
+
+        bool has = false;
+        for (int i = 0; i < assembly.Length; i++)
+        {
+            var rb = assembly[i];
+            if (rb == null) continue;
+
+            var cs = rb.GetComponentsInChildren<Collider>(true);
+            for (int j = 0; j < cs.Length; j++)
+            {
+                if (cs[j] == null || !cs[j].enabled) continue;
+
+                if (!has)
+                {
+                    b = cs[j].bounds;
+                    has = true;
+                }
+                else
+                {
+                    b.Encapsulate(cs[j].bounds);
+                }
+            }
+        }
+
+        return has;
     }
 
     /// <summary>Мировой Y низа габарита тащимой сборки.</summary>
-    private float DraggedBoundsMinY(Rigidbody body)
+    private float AssemblyBoundsMinY(PlacementGrid grid, Rigidbody body)
     {
-        var root = DraggedRoot(body);
-        var cols = root.GetComponentsInChildren<Collider>(true);
-        if (cols == null || cols.Length == 0) return body.worldCenterOfMass.y;
-
-        var b = cols[0].bounds;
-        for (int i = 1; i < cols.Length; i++)
-        {
-            if (cols[i] == null) continue;
-            b.Encapsulate(cols[i].bounds);
-        }
-
+        Bounds b;
+        if (!TryAssemblyBounds(grid, body, out b)) return body.worldCenterOfMass.y;
         return b.min.y;
     }
 
     /// <summary>
-    /// Резко (телепортом) смещает тащимый предмет/корпус на дельту — но только
-    /// если в целевой позиции он ни с кем не пересекается: стены, перекрытия и
-    /// другие предметы принимаются за препятствия. Сил не прикладываем — значит,
-    /// ничего не ломаем, не проталкиваем и никуда не пролетаем.
+    /// Резко (телепортом) смещает ВСЮ тащимую сборку на дельту — но только
+    /// если в целевой позиции она ни с кем не пересекается: стены, перекрытия
+    /// и другие предметы принимаются за препятствия. Сил не прикладываем —
+    /// значит, ничего не ломаем, не проталкиваем и никуда не пролетаем.
     /// </summary>
     private bool TryPinAssembly(PlacementGrid grid, Rigidbody body, Vector3 delta)
     {
         if (delta.sqrMagnitude < 1e-9f) return true;
 
-        var root = DraggedRoot(body);
-        var cols = root.GetComponentsInChildren<Collider>(true);
-        if (cols == null || cols.Length == 0) return true;
+        Bounds b;
+        if (!TryAssemblyBounds(grid, body, out b)) return true;
 
-        var b = cols[0].bounds;
-        for (int i = 1; i < cols.Length; i++)
+        var assembly = grid.DragAssemblyBodies;
+        var self = new HashSet<Rigidbody>();
+        for (int i = 0; i < assembly.Length; i++)
         {
-            if (cols[i] == null) continue;
-            b.Encapsulate(cols[i].bounds);
+            if (assembly[i] != null) self.Add(assembly[i]);
         }
 
         // Чек-бокс чуть сжат, чтобы простое касание (стоит на полу)
@@ -583,28 +602,23 @@ public class Raycast : MonoBehaviour
         {
             var col = hits[i];
             if (col == null) continue;
-            if (col.transform.IsChildOf(root)) continue; // своё тело/корпус
+
+            var rb = col.attachedRigidbody;
+            if (rb != null && self.Contains(rb)) continue; // своя сборка
+            if (col.transform.IsChildOf(body.transform)) continue;
 
             return false; // клетка занята
         }
 
-        // Путь чист — резко встаём в клетку
-        body.MovePosition(body.position + delta);
-        body.velocity = Vector3.zero;
-        body.angularVelocity = Vector3.zero;
-
-        var assembly = grid.DragAssemblyBodies;
-        if (assembly != null)
+        // Путь чист — резко встаём в клетку всей сборкой
+        for (int i = 0; i < assembly.Length; i++)
         {
-            for (int i = 0; i < assembly.Length; i++)
-            {
-                var partRb = assembly[i];
-                if (partRb == null || partRb == body) continue;
+            var partRb = assembly[i];
+            if (partRb == null) continue;
 
-                partRb.MovePosition(partRb.position + delta);
-                partRb.velocity = Vector3.zero;
-                partRb.angularVelocity = Vector3.zero;
-            }
+            partRb.MovePosition(partRb.position + delta);
+            partRb.velocity = Vector3.zero;
+            partRb.angularVelocity = Vector3.zero;
         }
 
         return true;
@@ -719,12 +733,13 @@ public class Raycast : MonoBehaviour
                         bodySnapped = grid.SnapPosition(point, normal, surface);
                     }
 
-                    // Высота на полоподобных поверхностях: низ предмета ставим
-                    // на отснапанную плоскость (если она не ниже самой
-                    // поверхности), чтобы предмет не уходил в пол.
+                    // Высота на полоподобных поверхностях: низ ПРЕДМЕТА ВМЕСТЕ
+                    // С ДЕТАЛЯМИ (вся сборка) ставим на отснапанную плоскость
+                    // (если она не ниже самой поверхности), чтобы предмет не
+                    // уходил в пол.
                     if (body != null && hasSurface && normal.y > 0.7f)
                     {
-                        float bottomOffset = body.worldCenterOfMass.y - DraggedBoundsMinY(body);
+                        float bottomOffset = body.worldCenterOfMass.y - AssemblyBoundsMinY(grid, body);
                         float bottom = grid.snapHeight
                             ? grid.SnapCoord(gridHit.point.y)
                             : gridHit.point.y;
@@ -742,19 +757,23 @@ public class Raycast : MonoBehaviour
                     // если она свободна. Стены, перекрытия этажей и другие
                     // предметы — препятствия («боится» их). Сил не прикладываем
                     // вовсе — значит, ничего не ломаем и не проталкиваем.
+                    // По вертикали — не больше клетки за кадр: «вверх/вниз по
+                    // сетке» ступеньками, без странного слома к земле.
                     if (body != null)
                     {
                         Vector3 comOffset = body.worldCenterOfMass - body.position;
                         Vector3 delta = (bodySnapped - comOffset) - body.position;
+                        delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
 
                         if (!TryPinAssembly(grid, body, delta) && hasSurface && normal.y > 0.7f)
                         {
                             // С отснапанной высотой клетка занята — пробуем
                             // встать прямо на поверхность.
-                            float bottomOffset = body.worldCenterOfMass.y - DraggedBoundsMinY(body);
+                            float bottomOffset = body.worldCenterOfMass.y - AssemblyBoundsMinY(grid, body);
                             bodySnapped.y = gridHit.point.y + bottomOffset;
                             point = bodySnapped - grabOffset;
                             delta = (bodySnapped - comOffset) - body.position;
+                            delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
                             TryPinAssembly(grid, body, delta);
                         }
                     }

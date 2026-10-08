@@ -86,6 +86,8 @@
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.
 
+- A PC no longer falls apart when snapped/rotated in grid mode: the assembly is now collected through the joint graph, not only hierarchy children — the motherboard (sits in a setParent: 0 slot, held only by a FixedJoint), glass and boards move and rotate together with the case, and their joints are protected during the drag. Before, the motherboard stayed behind and tore its joints ("first it doesn't move, then it bangs"). Vertically the snap advances one cell per frame — no weird slam to the ground.
+
 - A PC/miner no longer falls apart when you grab it: the whole case moves as one (grid snap and rotation move all its bodies at once), and the case joints become unbreakable for the duration of the drag. Without grid mode a part can still be pulled out of the case by force — unless you grabbed the case itself, then the build holds together.
 
 - The grid no longer climbs onto the player or the dragged item: the surface under the crosshair is found through them, so the grid always lies on the floor/wall/table.
