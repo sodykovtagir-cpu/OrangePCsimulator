@@ -38,8 +38,7 @@ public class PlacementGrid : MonoBehaviour
     [Tooltip("Размер клетки в метрах. 0.5 = полметра.")]
     public float cellSize = 0.5f;
 
-    [Tooltip("Снапать высоту. Выключено — предмет не прыгает по Y на столах/полках.")]
-    [Tooltip("Снапать ли высоту (ось Y) — предмет встаёт по сетке и вверх/вниз.")]
+    [Tooltip("Снапать высоту (ось Y): предмет встаёт по сетке и вверх/вниз.")]
     public bool snapHeight = true;
 
     [Tooltip("Снап включён по умолчанию?")]
