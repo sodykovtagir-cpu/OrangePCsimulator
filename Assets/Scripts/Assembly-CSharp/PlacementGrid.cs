@@ -47,11 +47,12 @@ public class PlacementGrid : MonoBehaviour
     [Header("Вид сетки")]
     public bool showVisual = true;
 
-    [Tooltip("Берёзовая сетка: белёсые линии с тёплым оттенком.")]
-    public Color lineColor = new Color(0.97f, 0.95f, 0.86f, 1f);
+    [Tooltip("Берёзовая сетка: линии цвета берёзовой древесины (тёплый тан), " +
+             "как годовые кольца на фанере.")]
+    public Color lineColor = new Color(0.85f, 0.72f, 0.52f, 1f);
 
-    [Tooltip("Подсветка клетки под курсором — чуть светлее берёзового.")]
-    public Color cellColor = new Color(1f, 0.98f, 0.92f, 1f);
+    [Tooltip("Подсветка клетки под курсором — светлая берёзовая, кремовая.")]
+    public Color cellColor = new Color(0.95f, 0.90f, 0.78f, 1f);
 
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
     public int cellsPerSide = 24;
@@ -88,6 +89,8 @@ public class PlacementGrid : MonoBehaviour
     private Joint[] pcJoints;
     private float[] pcJointBreakForce;
     private float[] pcJointBreakTorque;
+    private Rigidbody[] lockBodies;
+    private RigidbodyConstraints[] lockOld;
     private bool dragging;
 
     public bool SnapEnabled { get; private set; }
@@ -223,6 +226,14 @@ public class PlacementGrid : MonoBehaviour
     public void SetEnabled(bool on)
     {
         SnapEnabled = on;
+
+        // Если предмет сейчас тащат: включили сетку — блокируем ориентацию
+        // (поворот только стрелками), выключили — возвращаем как было.
+        if (dragging)
+        {
+            if (on) ApplyRotationLock();
+            else ReleaseRotationLock();
+        }
 
         PlayerPrefs.SetInt(PrefKey, on ? 1 : 0);
         PlayerPrefs.Save();
@@ -381,6 +392,10 @@ public class PlacementGrid : MonoBehaviour
             }
         }
 
+        // В режиме сетки — блокировка ориентации: поворот только стрелками,
+        // от ударов предмет не переворачивается.
+        if (SnapEnabled) ApplyRotationLock();
+
         if (visual != null) visual.aimMaskOverride = AimLayer;
     }
 
@@ -390,6 +405,7 @@ public class PlacementGrid : MonoBehaviour
         DragTarget = null;
         DragAssemblyBodies = null;
 
+        ReleaseRotationLock();
         RestoreCaseJoints();
 
         pcBodies = null;
@@ -452,6 +468,47 @@ public class PlacementGrid : MonoBehaviour
         pcJoints = null;
         pcJointBreakForce = null;
         pcJointBreakTorque = null;
+    }
+
+    /// <summary>
+    /// Блокирует ориентацию тащимого предмета в режиме сетки: физика больше не
+    /// может его повернуть или перевернуть от удара — ориентация меняется
+    /// только стрелками (RotateDragged). Ставит FreezeRotation всем телам
+    /// сборки; сохранённые констрейнты вернёт ReleaseRotationLock.
+    /// </summary>
+    private void ApplyRotationLock()
+    {
+        if (lockBodies != null) return;
+
+        var bodies = DragAssemblyBodies;
+        if (bodies == null || bodies.Length == 0) return;
+
+        lockBodies = bodies;
+        lockOld = new RigidbodyConstraints[bodies.Length];
+
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            if (bodies[i] == null) continue;
+
+            lockOld[i] = bodies[i].constraints;
+            bodies[i].constraints |= RigidbodyConstraints.FreezeRotation;
+        }
+    }
+
+    /// <summary>Возвращает телам сборки сохранённые констрейнты.</summary>
+    private void ReleaseRotationLock()
+    {
+        if (lockBodies == null) return;
+
+        for (int i = 0; i < lockBodies.Length; i++)
+        {
+            if (lockBodies[i] == null) continue;
+            if (lockOld != null && i < lockOld.Length)
+                lockBodies[i].constraints = lockOld[i];
+        }
+
+        lockBodies = null;
+        lockOld = null;
     }
 
 #if UNITY_EDITOR

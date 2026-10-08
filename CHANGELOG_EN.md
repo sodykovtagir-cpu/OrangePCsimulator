@@ -22,6 +22,8 @@
 
 - The dragged item can be rotated with arrows — only in grid mode: on mobile a panel with four arrows (left/up/right/down) appears, on PC the regular arrow keys work (there is no panel on PC). The step is 45° per press, a full turn is 8 presses. For a PC/miner the whole case turns at once. In grid mode the orientation changes only via the arrows: auto-rotation and collision wobble are disabled. The panel is created automatically and needs no scene changes.
 
+- Orientation lock in grid mode: when you grab an item with the grid on, all its bodies get FreezeRotation — bumping the item won't flip or tilt it; only the arrows can rotate it. On release (or when the grid is turned off) the constraints are restored.
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.
@@ -94,7 +96,7 @@
 
 - With the grid on, the part snaps into the cell instantly. The soft drag spring (100/5) used to smear the 0.5 m step into a smooth slide, and the stiff spring added a bounce; now the spring is disabled in grid mode and the body is placed with its centre of mass exactly on the snapped cell — no gliding, no bounciness. The Grid Spring Frequency / Grid Spring Damping fields were removed as no longer needed.
 
-- The grid is birch now: pale whitish lines with a warm tint and a slightly lighter highlight for the cell under the cursor instead of the orange ones.
+- The grid is birch now: the lines are the colour of birch wood (warm tan, like the growth rings on plywood), the highlight of the cell under the cursor is a light cream.
 
 - A monitor responds to being connected on the first try. Previously you had to leave connection mode, pick the monitor up and drop it again.
 
