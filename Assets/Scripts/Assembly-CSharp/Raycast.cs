@@ -640,6 +640,26 @@ public class Raycast : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// TryPinAssembly + «ступенька»: если клетку блокирует маленький осколок/
+    /// обломок на полу — приподнимаем цель, чтобы переехать через него.
+    /// Высокое (стены, другие ПК, плиты) по-прежнему блокирует.
+    /// </summary>
+    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    {
+        if (TryPinAssembly(grid, body, delta)) return true;
+
+        float[] climbs = { 0.25f, 0.5f, grid.cellSize };
+        for (int i = 0; i < climbs.Length; i++)
+        {
+            var up = delta;
+            up.y += climbs[i];
+            if (TryPinAssembly(grid, body, up)) return true;
+        }
+
+        return false;
+    }
+
 
     private IEnumerator DragObject()
     {
@@ -779,9 +799,16 @@ public class Raycast : MonoBehaviour
                     {
                         Vector3 comOffset = body.worldCenterOfMass - body.position;
                         Vector3 delta = (bodySnapped - comOffset) - body.position;
-                        delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
 
-                        if (!TryPinAssembly(grid, body, delta) && hasSurface && normal.y > 0.7f)
+                        // Если предмет провален в пол (например, после
+                        // переворота) — поднимаем за один раз, иначе он так и
+                        // останется в полу: ступенчатый лимит не даёт выбраться.
+                        bool sunk = hasSurface && normal.y > 0.7f &&
+                                    AssemblyBoundsMinY(grid, body) < gridHit.point.y - 0.02f;
+                        if (!sunk)
+                            delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
+
+                        if (!TryPinWithClimb(grid, body, delta) && hasSurface && normal.y > 0.7f)
                         {
                             // С отснапанной высотой клетка занята — пробуем
                             // встать прямо на поверхность.
@@ -789,8 +816,9 @@ public class Raycast : MonoBehaviour
                             bodySnapped.y = gridHit.point.y + bottomOffset;
                             point = bodySnapped - grabOffset;
                             delta = (bodySnapped - comOffset) - body.position;
-                            delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
-                            TryPinAssembly(grid, body, delta);
+                            if (!sunk)
+                                delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
+                            TryPinWithClimb(grid, body, delta);
                         }
                     }
 

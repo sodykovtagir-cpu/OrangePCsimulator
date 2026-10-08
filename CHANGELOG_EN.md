@@ -86,6 +86,12 @@
 
 - Up/down arrows: no more falling "onto the edge". Rotation is now decomposed into true yaw/pitch: up is a clean 90° tumble backwards (standing → facing up → upside down → facing down → standing). Alignment is preserved: the angle is always a multiple of the step (87° → press → 180° → reverse → 90°).
 
+- A flipped item no longer gets stuck in the floor: if after a flip its bottom is below the surface, it is lifted back in one go (the per-frame step limit is disabled for that case).
+
+- The item now drives over small shards/debris on the floor: if a cell is blocked by a low obstacle, the target is raised (a step of up to 0.5 m) and the item keeps going. Tall obstacles (walls, other PCs, slabs) still block.
+
+- No more "trail" of parts when dragging/rotating in grid mode: during the drag the whole assembly becomes kinematic — MovePosition/MoveRotation apply instantly, parts move in perfect sync with the case. isKinematic and constraints are restored on release.
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.

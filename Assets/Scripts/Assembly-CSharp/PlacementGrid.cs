@@ -90,6 +90,7 @@ public class PlacementGrid : MonoBehaviour
     private float[] pcJointBreakTorque;
     private Rigidbody[] lockBodies;
     private RigidbodyConstraints[] lockOld;
+    private bool[] kinOld;
     private bool dragging;
 
     public bool SnapEnabled { get; private set; }
@@ -351,6 +352,14 @@ public class PlacementGrid : MonoBehaviour
         if (tag == "Elevator" || tag == "Lift" || tag == "MovingPlatform") return true;
 
         var rb = col.attachedRigidbody;
+
+        // Тащимая сборка кинематическая на время переноса — не считаем её лифтом
+        if (dragging && rb != null && DragAssemblyBodies != null)
+        {
+            for (int i = 0; i < DragAssemblyBodies.Length; i++)
+                if (DragAssemblyBodies[i] == rb) return false;
+        }
+
         if (rb != null && rb.isKinematic && rb.velocity.sqrMagnitude > 0.01f) return true;
 
         var parent = col.GetComponentInParent<MonoBehaviour>();
@@ -543,7 +552,9 @@ public class PlacementGrid : MonoBehaviour
     /// Блокирует ориентацию тащимого предмета в режиме сетки: физика больше не
     /// может его повернуть или перевернуть от удара — ориентация меняется
     /// только стрелками (RotateDragged). Ставит FreezeRotation всем телам
-    /// сборки; сохранённые констрейнты вернёт ReleaseRotationLock.
+    /// сборки и делает их кинематическими — MovePosition/MoveRotation
+    /// применяются мгновенно, без физического отставания и «шлейфа» деталей.
+    /// Сохранённые констрейнты и isKinematic вернёт ReleaseRotationLock.
     /// </summary>
     private void ApplyRotationLock()
     {
@@ -554,17 +565,20 @@ public class PlacementGrid : MonoBehaviour
 
         lockBodies = bodies;
         lockOld = new RigidbodyConstraints[bodies.Length];
+        kinOld = new bool[bodies.Length];
 
         for (int i = 0; i < bodies.Length; i++)
         {
             if (bodies[i] == null) continue;
 
             lockOld[i] = bodies[i].constraints;
+            kinOld[i] = bodies[i].isKinematic;
             bodies[i].constraints |= RigidbodyConstraints.FreezeRotation;
+            bodies[i].isKinematic = true;
         }
     }
 
-    /// <summary>Возвращает телам сборки сохранённые констрейнты.</summary>
+    /// <summary>Возвращает телам сборки сохранённые констрейнты и isKinematic.</summary>
     private void ReleaseRotationLock()
     {
         if (lockBodies == null) return;
@@ -574,10 +588,13 @@ public class PlacementGrid : MonoBehaviour
             if (lockBodies[i] == null) continue;
             if (lockOld != null && i < lockOld.Length)
                 lockBodies[i].constraints = lockOld[i];
+            if (kinOld != null && i < kinOld.Length)
+                lockBodies[i].isKinematic = kinOld[i];
         }
 
         lockBodies = null;
         lockOld = null;
+        kinOld = null;
     }
 
 #if UNITY_EDITOR
