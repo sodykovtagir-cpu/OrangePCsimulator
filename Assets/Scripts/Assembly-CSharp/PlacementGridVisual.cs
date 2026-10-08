@@ -24,11 +24,11 @@ public class PlacementGridVisual : MonoBehaviour
     public static PlacementGridVisual Instance { get; private set; }
 
     [Header("Цвета")]
-    [Tooltip("Берёзовая сетка: линии цвета берёзовой древесины (тёплый тан).")]
-    public Color lineColor = new Color(0.85f, 0.72f, 0.52f, 1f);
+    [Tooltip("«Берёзовый» цвет сетки: #30D5C8.")]
+    public Color lineColor = new Color(0.188f, 0.835f, 0.784f, 1f);
 
-    [Tooltip("Подсветка клетки под курсором — светлая берёзовая, кремовая.")]
-    public Color cellColor = new Color(0.95f, 0.90f, 0.78f, 1f);
+    [Tooltip("Подсветка клетки под курсором — тот же цвет, светлее.")]
+    public Color cellColor = new Color(0.5f, 0.92f, 0.89f, 1f);
 
     [Header("Геометрия")]
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]

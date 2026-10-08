@@ -96,7 +96,7 @@
 
 - With the grid on, the part snaps into the cell instantly. The soft drag spring (100/5) used to smear the 0.5 m step into a smooth slide, and the stiff spring added a bounce; now the spring is disabled in grid mode and the body is placed with its centre of mass exactly on the snapped cell — no gliding, no bounciness. The Grid Spring Frequency / Grid Spring Damping fields were removed as no longer needed.
 
-- The grid is birch now: the lines are the colour of birch wood (warm tan, like the growth rings on plywood), the highlight of the cell under the cursor is a light cream.
+- The grid is «birch» now: the line colour is #30D5C8 (turquoise, as set by the author), the highlight of the cell under the cursor is a lighter tint of it.
 
 - A monitor responds to being connected on the first try. Previously you had to leave connection mode, pick the monitor up and drop it again.
 

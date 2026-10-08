@@ -47,12 +47,11 @@ public class PlacementGrid : MonoBehaviour
     [Header("Вид сетки")]
     public bool showVisual = true;
 
-    [Tooltip("Берёзовая сетка: линии цвета берёзовой древесины (тёплый тан), " +
-             "как годовые кольца на фанере.")]
-    public Color lineColor = new Color(0.85f, 0.72f, 0.52f, 1f);
+    [Tooltip("«Берёзовый» цвет сетки: #30D5C8.")]
+    public Color lineColor = new Color(0.188f, 0.835f, 0.784f, 1f);
 
-    [Tooltip("Подсветка клетки под курсором — светлая берёзовая, кремовая.")]
-    public Color cellColor = new Color(0.95f, 0.90f, 0.78f, 1f);
+    [Tooltip("Подсветка клетки под курсором — тот же цвет, светлее.")]
+    public Color cellColor = new Color(0.5f, 0.92f, 0.89f, 1f);
 
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
     public int cellsPerSide = 24;
