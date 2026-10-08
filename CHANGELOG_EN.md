@@ -82,7 +82,7 @@
 
 ## Fixed
 
-- An item can no longer be dragged through a wall or the floor: in grid mode (where the item is teleported into the cell and physics cannot catch up) the snap target is clamped to obstacles taking the item's size into account — the item presses against the wall with its whole body, like in normal dragging. Floors and slopes the item stands on are not treated as obstacles. Without grid mode — as before, pure physics.
+- An item no longer flies through walls, floor slabs or other objects: in grid mode the item is no longer teleported into the cell — a spring pulls it there, like in normal dragging, so physics stops it at obstacles naturally. The spring force is capped, so the item doesn't break others even when dragged across them (before, the teleport made it "invincible" and it wrecked PCs on touch).
 
 - A PC/miner no longer falls apart when you grab it: the whole case moves as one (grid snap and rotation move all its bodies at once), and the case joints become unbreakable for the duration of the drag. Without grid mode a part can still be pulled out of the case by force — unless you grabbed the case itself, then the build holds together.
 
@@ -94,7 +94,7 @@
 
 - Dragged parts now actually move cell by cell. Only the grab point used to be snapped, so a case just hung off it by a corner and never lined up with the grid. Now the centre of mass of the part itself is snapped and the grab point is shifted along with it.
 
-- With the grid on, the part snaps into the cell instantly. The soft drag spring (100/5) used to smear the 0.5 m step into a smooth slide, and the stiff spring added a bounce; now the spring is disabled in grid mode and the body is placed with its centre of mass exactly on the snapped cell — no gliding, no bounciness. The Grid Spring Frequency / Grid Spring Damping fields were removed as no longer needed.
+- With the grid on, the part catches up to the cell quickly without bouncing: the spring stiffness is capped and the damping is critical (no overshoot). Tune it with Grid Spring Omega and Grid Spring Max K on Raycast.
 
 - The grid is «birch» now: the line colour is #30D5C8 (turquoise, as set by the author), the highlight of the cell under the cursor is a lighter tint of it.
 

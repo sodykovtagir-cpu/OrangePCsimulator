@@ -47,6 +47,17 @@ public class Raycast : MonoBehaviour
     [SerializeField]
     private float rotateStep = 45f;
 
+    [Header("Пружина сетки")]
+    [Tooltip("Как быстро предмет догоняет клетку в режиме сетки (рад/с). " +
+             "Демпфирование критическое — догоняет без отскока.")]
+    [SerializeField]
+    private float gridSpringOmega = 12f;
+
+    [Tooltip("Максимальная жёсткость пружины сетки (Н/м): ограничена, чтобы " +
+             "предмет не ломал другие, если по ним вести.")]
+    [SerializeField]
+    private float gridSpringMaxK = 700f;
+
     [SerializeField]
     private bool showHint;
 
@@ -427,14 +438,16 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// В режиме сетки пружина не нужна: предмет должен МГНОВЕННО вставать в
-    /// клетку, а не догонять её с раскачкой и отскоком. Поэтому силу пружины
-    /// отключаем (spring/damper = 0) — положение тела задаётся напрямую через
-    /// MovePosition в DragObject. Сохранённые значения вернёт RestoreSpring.
+    /// В режиме сетки пружина ведёт предмет к отснапанной клетке быстро и БЕЗ
+    /// отскока: жёсткость ограничена сверху, демпфирование критическое
+    /// (zeta = 1). Предмет ведёт себя как при обычном перетаскивании — стены,
+    /// полы (включая перекрытия этажей) и другие предметы останавливают его
+    /// естественно: он не пролетает сквозь них и не ломает их, потому что
+    /// сила пружины конечна. Сохранённые значения вернёт RestoreSpring.
     /// </summary>
-    private void DisableSpringForGrid()
+    private void ApplyGridSpringCritical(Rigidbody body)
     {
-        if (spring == null) return;
+        if (spring == null || body == null) return;
 
         if (!gridSpringApplied)
         {
@@ -443,8 +456,11 @@ public class Raycast : MonoBehaviour
             gridSpringApplied = true;
         }
 
-        spring.spring = 0f;
-        spring.damper = 0f;
+        float m = Mathf.Max(0.5f, body.mass);
+        float k = Mathf.Min(m * gridSpringOmega * gridSpringOmega, gridSpringMaxK);
+
+        spring.spring = k;
+        spring.damper = 2f * Mathf.Sqrt(k * m); // критическое демпфирование
     }
 
     /// <summary>Возвращает обычную мягкую пружину.</summary>
@@ -511,102 +527,6 @@ public class Raycast : MonoBehaviour
         rb.transform.rotation = next;
     }
 
-    /// <summary>
-    /// Обрезает цель снапа (центр масс предмета) по препятствиям на пути от
-    /// камеры. В режиме сетки предмет телепортируется в клетку, и физика не
-    /// успевает остановить его у стены — поэтому считаем так, чтобы ВЕСЬ
-    /// предмет остался перед препятствием, как при обычном перетаскивании.
-    /// Пол/склон (на них предмет стоит) препятствием не считаются.
-    /// </summary>
-    private Vector3 ClampDragTarget(Vector3 comTarget, Rigidbody body)
-    {
-        var c = cam;
-        if (c == null || currentDrag == null || body == null) return comTarget;
-
-        Vector3 origin = c.transform.position;
-        Vector3 toTarget = comTarget - origin;
-        float dist = toTarget.magnitude;
-        if (dist < 0.05f) return comTarget;
-
-        Vector3 dir = toTarget / dist;
-
-        // Насколько предмет (весь корпус) торчит за центр масс вдоль луча
-        float depth = DraggedDepthAlong(dir, comTarget, body);
-
-        var hits = Physics.RaycastAll(new Ray(origin, dir), dist + depth + 0.05f, layer,
-            QueryTriggerInteraction.Ignore);
-
-        float nearest = float.MaxValue;
-        for (int i = 0; i < hits.Length; i++)
-        {
-            var h = hits[i];
-            if (IsPartOfDrag(h.collider)) continue;
-            if (h.normal.y > 0.5f) continue; // пол/склон — предмет на нём стоит
-            if (h.distance < nearest) nearest = h.distance;
-        }
-
-        // Вылет центра масс: препятствие минус выступ предмета и зазор
-        float limit = nearest - 0.02f - depth;
-        if (limit >= dist) return comTarget; // препятствий по пути нет
-
-        // Останавливаемся так, чтобы весь предмет остался перед препятствием
-        return origin + dir * Mathf.Max(0.05f, limit);
-    }
-
-    /// <summary>Насколько тащимый корпус торчит за указанную точку вдоль направления.</summary>
-    private float DraggedDepthAlong(Vector3 dir, Vector3 reference, Rigidbody body)
-    {
-        // Весь корпус целиком (ПК/майнер), не только схваченное тело
-        var root = body.transform;
-        var pcCase = body.GetComponentInParent<PC.Component.Case>();
-        if (pcCase != null) root = pcCase.transform;
-
-        var cols = root.GetComponentsInChildren<Collider>(true);
-        if (cols == null || cols.Length == 0) return 0f;
-
-        var b = cols[0].bounds;
-        for (int i = 1; i < cols.Length; i++)
-        {
-            if (cols[i] == null) continue;
-            b.Encapsulate(cols[i].bounds);
-        }
-
-        // Габарит вдоль луча: от опорной точки до самого дальнего угла AABB
-        Vector3 half = b.size * 0.5f;
-        float along = half.x * Mathf.Abs(dir.x)
-                    + half.y * Mathf.Abs(dir.y)
-                    + half.z * Mathf.Abs(dir.z);
-        return Mathf.Max(0f, Vector3.Dot(b.center - reference, dir) + along);
-    }
-
-    /// <summary>Принадлежит ли коллайдер тащимому предмету (или его корпусу целиком).</summary>
-    private bool IsPartOfDrag(Collider col)
-    {
-        if (col == null || currentDrag == null) return false;
-
-        var body = spring != null ? spring.connectedBody : null;
-        if (body != null)
-        {
-            var rb = col.attachedRigidbody;
-            if (rb == body) return true;
-            if (rb != null && rb.transform.IsChildOf(body.transform)) return true;
-        }
-
-        var target = currentDrag.target;
-        if (target != null && col.transform.IsChildOf(target)) return true;
-
-        // ПК/майнер: препятствием не считаем весь корпус
-        var caseA = target != null
-            ? target.GetComponentInParent<PC.Component.Case>()
-            : null;
-        if (caseA != null)
-        {
-            var caseB = col.GetComponentInParent<PC.Component.Case>();
-            if (caseB != null && ReferenceEquals(caseB, caseA)) return true;
-        }
-
-        return false;
-    }
 
     private IEnumerator DragObject()
     {
@@ -709,13 +629,6 @@ public class Raycast : MonoBehaviour
                         // тела, а точку захвата просто сдвигаем вместе с ним.
                         Vector3 offset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
                         bodySnapped = grid.SnapPosition(point + offset, normal, surface);
-
-                        // В режиме сетки предмет телепортируется в клетку, физика
-                        // не успевает остановить его у стены — обрезаем цель по
-                        // препятствиям, как в обычном перетаскивании (предмет
-                        // упирается в стену, но не проходит сквозь неё).
-                        bodySnapped = ClampDragTarget(bodySnapped, body);
-
                         point = bodySnapped - offset;
                     }
                     else
@@ -728,42 +641,12 @@ public class Raycast : MonoBehaviour
                     // а подсвечиваем клетку, в которой окажется САМ предмет.
                     grid.ReportAim(aimPoint, normal, bodySnapped);
 
-                    // Мгновенный снап без прыгучести: пружину отключаем, а тело
-                    // сразу ставим так, чтобы его центр масс оказался ровно в
-                    // отснапанной точке — предмет встаёт в клетку моментально,
-                    // без «догоняния» пружиной и отскоков. MovePosition двигает
-                    // пивот тела (Rigidbody.position), поэтому целевой пивот
-                    // считаем от текущего центра масс.
-                    if (body != null)
-                    {
-                        Vector3 comOffset = body.worldCenterOfMass - body.position;
-                        Vector3 targetPivot = bodySnapped - comOffset;
-                        Vector3 delta = targetPivot - body.position;
-
-                        body.MovePosition(targetPivot);
-                        body.velocity = Vector3.zero;
-                        // Угловую скорость гасим: в режиме сетки ориентация
-                        // меняется только стрелками, без раскачивания от коллизий.
-                        body.angularVelocity = Vector3.zero;
-
-                        // ПК/майнер: все тела корпуса едут тем же смещением,
-                        // иначе джойнты рвутся и сборка рассыпается.
-                        var assembly = grid.DragAssemblyBodies;
-                        if (assembly != null && assembly.Length > 1)
-                        {
-                            for (int i = 0; i < assembly.Length; i++)
-                            {
-                                var partRb = assembly[i];
-                                if (partRb == null || partRb == body) continue;
-
-                                partRb.MovePosition(partRb.position + delta);
-                                partRb.velocity = Vector3.zero;
-                                partRb.angularVelocity = Vector3.zero;
-                            }
-                        }
-                    }
-
-                    DisableSpringForGrid();
+                    // Предмет ведёт себя как при обычном перетаскивании, только
+                    // цель пружины — отснапанная клетка: догоняет быстро, без
+                    // отскока (критическое демпфирование), сила ограничена.
+                    // Стены, перекрытия этажей и другие предметы останавливают
+                    // его естественно — без пролётов насквозь и без ломания.
+                    ApplyGridSpringCritical(body);
                 }
                 else
                 {
