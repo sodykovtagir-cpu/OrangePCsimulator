@@ -14,13 +14,13 @@
 
 - Bind setting: Menu → Settings → PC controls → Grid (G by default). The missing Auto rotation bind was added too.
 
-- Height snapping is off by default, so parts no longer jump on the Y axis on tables and shelves.
+- Height snapping is back on: in grid mode the part snaps on the Y axis too (up/down), not only horizontally.
 
 - Fallback renderer: if the grid shader is unavailable, the grid is drawn with GL lines.
 
 ### Rotating items while dragging
 
-- The dragged item can be rotated with arrows: a panel with four arrows (left/up/right/down) appears on screen, and on PC the regular arrow keys work. The step is 45° per press, a full turn is 8 presses. For a PC/miner the whole case turns at once. The panel is created automatically and needs no scene changes.
+- The dragged item can be rotated with arrows — only in grid mode: on mobile a panel with four arrows (left/up/right/down) appears, on PC the regular arrow keys work (there is no panel on PC). The step is 45° per press, a full turn is 8 presses. For a PC/miner the whole case turns at once. In grid mode the orientation changes only via the arrows: auto-rotation and collision wobble are disabled. The panel is created automatically and needs no scene changes.
 
 ### Developer tools
 
@@ -80,6 +80,12 @@
 
 ## Fixed
 
+- An item can no longer be dragged through a wall or the floor: in grid mode (where the item is teleported into the cell and physics cannot catch up) the snap target is clamped to obstacles taking the item's size into account — the item presses against the wall with its whole body, like in normal dragging. Floors and slopes the item stands on are not treated as obstacles. Without grid mode — as before, pure physics.
+
+- A PC/miner no longer falls apart when you grab it: the whole case moves as one (grid snap and rotation move all its bodies at once), and the case joints become unbreakable for the duration of the drag. Without grid mode a part can still be pulled out of the case by force — unless you grabbed the case itself, then the build holds together.
+
+- The grid no longer climbs onto the player or the dragged item: the surface under the crosshair is found through them, so the grid always lies on the floor/wall/table.
+
 - The grid shader compiles again: a variable named `line` is a reserved HLSL keyword, which caused «syntax error: unexpected token 'line'» on d3d11 (shader lines 108 and 119). Renamed to `gridLine`.
 
 - The grid no longer overlays the item you are dragging: an invisible occluder around the item marks its area, so the grid is not drawn over the item's transparent parts (glass panels) or where it is closer to the camera than the item itself.
@@ -88,7 +94,7 @@
 
 - With the grid on, the part snaps into the cell instantly. The soft drag spring (100/5) used to smear the 0.5 m step into a smooth slide, and the stiff spring added a bounce; now the spring is disabled in grid mode and the body is placed with its centre of mass exactly on the snapped cell — no gliding, no bounciness. The Grid Spring Frequency / Grid Spring Damping fields were removed as no longer needed.
 
-- The grid is birch now: cream lines and a slightly lighter highlight for the cell under the cursor instead of the orange ones.
+- The grid is birch now: pale whitish lines with a warm tint and a slightly lighter highlight for the cell under the cursor instead of the orange ones.
 
 - A monitor responds to being connected on the first try. Previously you had to leave connection mode, pick the monitor up and drop it again.
 

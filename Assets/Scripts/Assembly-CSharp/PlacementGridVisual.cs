@@ -24,11 +24,11 @@ public class PlacementGridVisual : MonoBehaviour
     public static PlacementGridVisual Instance { get; private set; }
 
     [Header("Цвета")]
-    [Tooltip("Берёзовая сетка: кремовые линии.")]
-    public Color lineColor = new Color(0.95f, 0.90f, 0.78f, 1f);
+    [Tooltip("Берёзовая сетка: белёсые линии с тёплым оттенком.")]
+    public Color lineColor = new Color(0.97f, 0.95f, 0.86f, 1f);
 
     [Tooltip("Подсветка клетки под курсором — чуть светлее берёзового.")]
-    public Color cellColor = new Color(1f, 0.97f, 0.86f, 1f);
+    public Color cellColor = new Color(1f, 0.98f, 0.92f, 1f);
 
     [Header("Геометрия")]
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
@@ -357,7 +357,9 @@ public class PlacementGridVisual : MonoBehaviour
         var ray = new Ray(cam.transform.position, cam.transform.forward);
 
         RaycastHit hit;
-        if (Physics.Raycast(ray, out hit, maxDistance, AimMask()))
+        // Поверхность ищем сквозь игрока и тащимый предмет: сетка ложится на
+        // пол/стену, а не на них (иначе залезает на игрока или на сам предмет).
+        if (grid.RaycastAimSurface(ray, maxDistance, AimMask(), out hit))
         {
             SetAim(hit.point, hit.normal);
         }

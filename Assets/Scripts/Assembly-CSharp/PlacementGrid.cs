@@ -39,7 +39,8 @@ public class PlacementGrid : MonoBehaviour
     public float cellSize = 0.5f;
 
     [Tooltip("Снапать высоту. Выключено — предмет не прыгает по Y на столах/полках.")]
-    public bool snapHeight = false;
+    [Tooltip("Снапать ли высоту (ось Y) — предмет встаёт по сетке и вверх/вниз.")]
+    public bool snapHeight = true;
 
     [Tooltip("Снап включён по умолчанию?")]
     public bool enabledByDefault = false;
@@ -47,11 +48,11 @@ public class PlacementGrid : MonoBehaviour
     [Header("Вид сетки")]
     public bool showVisual = true;
 
-    [Tooltip("Берёзовая сетка: кремовые линии.")]
-    public Color lineColor = new Color(0.95f, 0.90f, 0.78f, 1f);
+    [Tooltip("Берёзовая сетка: белёсые линии с тёплым оттенком.")]
+    public Color lineColor = new Color(0.97f, 0.95f, 0.86f, 1f);
 
     [Tooltip("Подсветка клетки под курсором — чуть светлее берёзового.")]
-    public Color cellColor = new Color(1f, 0.97f, 0.86f, 1f);
+    public Color cellColor = new Color(1f, 0.98f, 0.92f, 1f);
 
     [Tooltip("Сколько клеток рисовать в каждую сторону.")]
     public int cellsPerSide = 24;
@@ -110,6 +111,64 @@ public class PlacementGrid : MonoBehaviour
     /// двигают все эти тела разом, чтобы сборка не рассыпалась.
     /// </summary>
     public Rigidbody[] DragAssemblyBodies { get; private set; }
+
+    /// <summary>
+    /// Можно ли целиться сквозь этот коллайдер при поиске поверхности для
+    /// сетки: сквозь игрока и сквозь тащимый предмет — да (сетка ложится на
+    /// пол/стену за ними, а не на них самих).
+    /// </summary>
+    public bool IsAimBlocker(Collider col)
+    {
+        if (col == null) return false;
+
+        // Игрок: сетка не должна ложиться на самого игрока
+        var player = Player.Instance;
+        if (player != null && col.transform.IsChildOf(player.transform)) return true;
+
+        // Тащимый предмет (весь корпус)
+        var target = DragTarget;
+        if (target != null)
+        {
+            if (col.transform.IsChildOf(target)) return true;
+
+            var rb = col.attachedRigidbody;
+            var bodies = DragAssemblyBodies;
+            if (rb != null && bodies != null)
+            {
+                for (int i = 0; i < bodies.Length; i++)
+                {
+                    if (bodies[i] == rb) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Ищет поверхность под прицелом для сетки: ближайший коллайдер по пути,
+    /// сквозь игрока и тащимый предмет (см. IsAimBlocker).
+    /// </summary>
+    public bool RaycastAimSurface(Ray ray, float maxDistance, LayerMask mask, out RaycastHit hit)
+    {
+        var hits = Physics.RaycastAll(ray, maxDistance, mask, QueryTriggerInteraction.UseGlobal);
+
+        hit = default(RaycastHit);
+        float best = float.MaxValue;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var h = hits[i];
+            if (IsAimBlocker(h.collider)) continue;
+            if (h.distance < best)
+            {
+                best = h.distance;
+                hit = h;
+            }
+        }
+
+        return best < float.MaxValue;
+    }
 
     private void Awake()
     {

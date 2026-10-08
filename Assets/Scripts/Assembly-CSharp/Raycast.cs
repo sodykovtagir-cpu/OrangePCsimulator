@@ -167,18 +167,28 @@ public class Raycast : MonoBehaviour
             UpdateDistanceUI(currentDrag.distance);
         }
 
-        // Поворот тащимого предмета обычными стрелками
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) RotateDragged(-1, 0);
-        if (Input.GetKeyDown(KeyCode.RightArrow)) RotateDragged(1, 0);
-        if (Input.GetKeyDown(KeyCode.UpArrow)) RotateDragged(0, -1);
-        if (Input.GetKeyDown(KeyCode.DownArrow)) RotateDragged(0, 1);
+        // Поворот тащимого предмета обычными стрелками — только в режиме сетки
+        if (GridMode())
+        {
+            if (Input.GetKeyDown(KeyCode.LeftArrow)) RotateDragged(-1, 0);
+            if (Input.GetKeyDown(KeyCode.RightArrow)) RotateDragged(1, 0);
+            if (Input.GetKeyDown(KeyCode.UpArrow)) RotateDragged(0, -1);
+            if (Input.GetKeyDown(KeyCode.DownArrow)) RotateDragged(0, 1);
+        }
     }
 
 #endif
 
-        // Панель поворота (стрелки) видна только пока тащишь предмет
+        // Панель поворота (стрелки) видна только при перетаскивании в режиме
+        // сетки. На ПК её нет — там поворот с клавиатуры.
         if (DragRotateControls.Instance != null)
-            DragRotateControls.Instance.SetVisible(currentDrag != null);
+            DragRotateControls.Instance.SetVisible(currentDrag != null && GridMode());
+    }
+
+    /// <summary>Включён ли режим сетки.</summary>
+    private static bool GridMode()
+    {
+        return PlacementGrid.Instance != null && PlacementGrid.Instance.SnapEnabled;
     }
 
     private void UpdateDistanceUI(float distance)
@@ -458,6 +468,8 @@ public class Raycast : MonoBehaviour
     /// </summary>
     public void RotateDragged(int yawDir, int pitchDir)
     {
+        // Стрелки поворачивают предмет только в режиме сетки
+        if (!GridMode()) return;
         if (LockRotation) return;
 
         var body = spring != null ? spring.connectedBody : null;
@@ -486,37 +498,71 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Не даёт протащить предмет сквозь стену/пол: если луч от камеры к точке
-    /// захвата упирается в препятствие раньше самой точки, точка обрезается
-    /// перед ним. Сам тащимый предмет (и его корпус целиком) препятствием не
-    /// считается, триггеры игнорируются.
+    /// Обрезает цель снапа (центр масс предмета) по препятствиям на пути от
+    /// камеры. В режиме сетки предмет телепортируется в клетку, и физика не
+    /// успевает остановить его у стены — поэтому считаем так, чтобы ВЕСЬ
+    /// предмет остался перед препятствием, как при обычном перетаскивании.
+    /// Пол/склон (на них предмет стоит) препятствием не считаются.
     /// </summary>
-    private Vector3 ClampDragPoint(Vector3 point)
+    private Vector3 ClampDragTarget(Vector3 comTarget, Rigidbody body)
     {
         var c = cam;
-        if (c == null || currentDrag == null) return point;
+        if (c == null || currentDrag == null || body == null) return comTarget;
 
         Vector3 origin = c.transform.position;
-        Vector3 toPoint = point - origin;
-        float dist = toPoint.magnitude;
-        if (dist < 0.05f) return point;
+        Vector3 toTarget = comTarget - origin;
+        float dist = toTarget.magnitude;
+        if (dist < 0.05f) return comTarget;
 
-        Vector3 dir = toPoint / dist;
-        var hits = Physics.RaycastAll(new Ray(origin, dir), dist, layer,
+        Vector3 dir = toTarget / dist;
+
+        // Насколько предмет (весь корпус) торчит за центр масс вдоль луча
+        float depth = DraggedDepthAlong(dir, comTarget, body);
+
+        var hits = Physics.RaycastAll(new Ray(origin, dir), dist + depth + 0.05f, layer,
             QueryTriggerInteraction.Ignore);
 
-        float nearest = dist;
+        float nearest = float.MaxValue;
         for (int i = 0; i < hits.Length; i++)
         {
             var h = hits[i];
             if (IsPartOfDrag(h.collider)) continue;
+            if (h.normal.y > 0.5f) continue; // пол/склон — предмет на нём стоит
             if (h.distance < nearest) nearest = h.distance;
         }
 
-        if (nearest >= dist - 0.01f) return point; // препятствий по пути нет
+        // Вылет центра масс: препятствие минус выступ предмета и зазор
+        float limit = nearest - 0.02f - depth;
+        if (limit >= dist) return comTarget; // препятствий по пути нет
 
-        // Останавливаемся чуть перед препятствием
-        return origin + dir * Mathf.Max(0.05f, nearest - 0.02f);
+        // Останавливаемся так, чтобы весь предмет остался перед препятствием
+        return origin + dir * Mathf.Max(0.05f, limit);
+    }
+
+    /// <summary>Насколько тащимый корпус торчит за указанную точку вдоль направления.</summary>
+    private float DraggedDepthAlong(Vector3 dir, Vector3 reference, Rigidbody body)
+    {
+        // Весь корпус целиком (ПК/майнер), не только схваченное тело
+        var root = body.transform;
+        var pcCase = body.GetComponentInParent<PC.Component.Case>();
+        if (pcCase != null) root = pcCase.transform;
+
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        if (cols == null || cols.Length == 0) return 0f;
+
+        var b = cols[0].bounds;
+        for (int i = 1; i < cols.Length; i++)
+        {
+            if (cols[i] == null) continue;
+            b.Encapsulate(cols[i].bounds);
+        }
+
+        // Габарит вдоль луча: от опорной точки до самого дальнего угла AABB
+        Vector3 half = b.size * 0.5f;
+        float along = half.x * Mathf.Abs(dir.x)
+                    + half.y * Mathf.Abs(dir.y)
+                    + half.z * Mathf.Abs(dir.z);
+        return Mathf.Max(0f, Vector3.Dot(b.center - reference, dir) + along);
     }
 
     /// <summary>Принадлежит ли коллайдер тащимому предмету (или его корпусу целиком).</summary>
@@ -590,7 +636,9 @@ public class Raycast : MonoBehaviour
 
         while (currentDrag != null && currentDrag.target)
         {
-            AutoRotate();
+            // В режиме сетки ориентация меняется только стрелками — автоповорот бы мешал
+            if (!GridMode())
+                AutoRotate();
 
             if (cam != null && spring)
             {
@@ -616,10 +664,6 @@ public class Raycast : MonoBehaviour
                     point = ray.GetPoint(currentDrag.distance);
                 }
 
-                // Нельзя протащить предмет сквозь стену или пол: обрезаем точку
-                // по первому препятствию на пути от камеры.
-                point = ClampDragPoint(point);
-
                 // Сетка: снапаем САМ предмет к мировой сетке с учётом стены/лифта/склона
                 var grid = PlacementGrid.Instance;
 
@@ -627,10 +671,12 @@ public class Raycast : MonoBehaviour
                 {
                     // Сначала узнаём поверхность под прицелом — по её нормали
                     // снап выбирает оси (пол снапает XZ, стена — YZ/XY).
+                    // Ищем сквозь игрока и тащимый предмет: сетка ложится на
+                    // пол/стену за ними, а не на них самих.
                     Vector3 normal = Vector3.up;
                     Collider surface = null;
                     Vector3 aimPoint = point;
-                    bool hasSurface = Physics.Raycast(ray, out var gridHit, maxDistance, layer);
+                    bool hasSurface = grid.RaycastAimSurface(ray, maxDistance, layer, out var gridHit);
 
                     if (hasSurface)
                     {
@@ -649,6 +695,13 @@ public class Raycast : MonoBehaviour
                         // тела, а точку захвата просто сдвигаем вместе с ним.
                         Vector3 offset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
                         bodySnapped = grid.SnapPosition(point + offset, normal, surface);
+
+                        // В режиме сетки предмет телепортируется в клетку, физика
+                        // не успевает остановить его у стены — обрезаем цель по
+                        // препятствиям, как в обычном перетаскивании (предмет
+                        // упирается в стену, но не проходит сквозь неё).
+                        bodySnapped = ClampDragTarget(bodySnapped, body);
+
                         point = bodySnapped - offset;
                     }
                     else
@@ -675,6 +728,9 @@ public class Raycast : MonoBehaviour
 
                         body.MovePosition(targetPivot);
                         body.velocity = Vector3.zero;
+                        // Угловую скорость гасим: в режиме сетки ориентация
+                        // меняется только стрелками, без раскачивания от коллизий.
+                        body.angularVelocity = Vector3.zero;
 
                         // ПК/майнер: все тела корпуса едут тем же смещением,
                         // иначе джойнты рвутся и сборка рассыпается.
@@ -688,6 +744,7 @@ public class Raycast : MonoBehaviour
 
                                 partRb.MovePosition(partRb.position + delta);
                                 partRb.velocity = Vector3.zero;
+                                partRb.angularVelocity = Vector3.zero;
                             }
                         }
                     }

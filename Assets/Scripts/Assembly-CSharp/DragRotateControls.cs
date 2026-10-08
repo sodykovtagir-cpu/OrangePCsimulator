@@ -15,9 +15,13 @@ public class DragRotateControls : MonoBehaviour
     private Raycast raycast;
     private GameObject panel;
 
-    /// <summary>Создаёт панель, если её ещё нет (вызывается из Raycast.Start).</summary>
+    /// <summary>
+    /// Создаёт панель, если её ещё нет (вызывается из Raycast.Start).
+    /// Только на Android: на ПК поворот идёт с клавиатуры, панель не нужна.
+    /// </summary>
     public static void EnsureExists(Raycast owner)
     {
+#if UNITY_ANDROID
         if (Instance != null) return; // Unity-null: после смены сцены создадим заново
 
         var canvas = FindHudCanvas();
@@ -38,6 +42,7 @@ public class DragRotateControls : MonoBehaviour
         controls.raycast = owner;
         controls.Build();
         Instance = controls;
+#endif
     }
 
     /// <summary>Показать/скрыть панель (видна только при перетаскивании).</summary>
