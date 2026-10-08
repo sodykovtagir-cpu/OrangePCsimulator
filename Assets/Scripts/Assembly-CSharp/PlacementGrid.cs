@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -417,7 +418,7 @@ public class PlacementGrid : MonoBehaviour
             var j = joints[i];
             if (j == null) continue;
 
-            var a = j.attachedRigidbody;
+            var a = j.GetComponent<Rigidbody>();
             var b = j.connectedBody;
             if (a == null || b == null || a.isKinematic || b.isKinematic) continue;
 
