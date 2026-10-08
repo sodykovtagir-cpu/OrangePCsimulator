@@ -488,13 +488,27 @@ public class Raycast : MonoBehaviour
                 var rb = assembly[i];
                 if (rb == null) continue;
 
-                rb.MoveRotation(rb.rotation * delta);
+                RotateBody(rb, delta);
             }
         }
         else
         {
-            body.MoveRotation(body.rotation * delta);
+            RotateBody(body, delta);
         }
+    }
+
+    /// <summary>
+    /// Поворачивает тело на дельту. MoveRotation — штатный путь; прямая
+    /// установка transform.rotation — страховка: при FreezeRotation (блокировка
+    /// ориентации в режиме сетки) PhysX может игнорировать MoveRotation, а
+    /// телепорт поворота констрейнты не блокируют.
+    /// </summary>
+    private static void RotateBody(Rigidbody rb, Quaternion delta)
+    {
+        var next = rb.rotation * delta;
+
+        rb.MoveRotation(next);
+        rb.transform.rotation = next;
     }
 
     /// <summary>
