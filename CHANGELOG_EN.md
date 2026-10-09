@@ -82,6 +82,10 @@
 
 ## Fixed
 
+- In grid mode a held item no longer drifts or flies off on its own. The snap target was computed from the pivot instead of the centre of mass, so every frame the item was shifted by the offset between the two — light and off-centre items were dragged to one side. Everything now uses the centre of mass: without arrow presses the item stays put, and an arrow step is no longer lost between physics steps.
+
+- Turning the grid off during a drag releases the item instead of pulling it towards the crosshair: the spring no longer yanks an item (especially a light one) right after the grid is switched off.
+
 - PC/miner rotation in grid mode: components now rotate TOGETHER with the case — the whole assembly (case, motherboard, glass, boards) turns around a single pivot. Before, each part spun around its own axis, joints got stretched, and everything flew apart on release.
 
 - Up/down arrows: no more falling "onto the edge". Rotation is now decomposed into true yaw/pitch: up is a clean 90° tumble backwards (standing → facing up → upside down → facing down → standing). Alignment is preserved: the angle is always a multiple of the step (87° → press → 180° → reverse → 90°).

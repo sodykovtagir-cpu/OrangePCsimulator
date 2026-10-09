@@ -22,6 +22,9 @@ public class Raycast : MonoBehaviour
         // Смещение от точки захвата до центра масс в локальных осях тела.
         // Нужно, чтобы по сетке снапался САМ предмет, а не только его угол.
         public Vector3 grabOffsetLocal;
+
+        // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
+        public bool gridTouched;
     }
 
     [SerializeField]
@@ -920,6 +923,12 @@ public class Raycast : MonoBehaviour
     /// <summary>Резко смещает всю сборку на дельту (без сил).</summary>
     private void ApplyPin(PlacementGrid grid, Vector3 delta)
     {
+        // MovePosition задаёт цель до следующего шага физики, и повторный вызов
+        // её перезаписывает. Нулевой сдвиг не должен перетирать цель, которую
+        // физика ещё не применила (шаг стрелки в прошлом кадре), — поэтому
+        // ничего не делаем.
+        if (delta.sqrMagnitude < 1e-10f) return;
+
         var assembly = grid.DragAssemblyBodies;
         if (assembly == null) return;
 
@@ -1030,6 +1039,11 @@ public class Raycast : MonoBehaviour
         if (drag == null)
             yield break;
 
+        // Состояние сетки — на один перенос: прошлый перенос мог оборваться
+        // без End() (цель уничтожена), и тогда старые значения не должны влиять.
+        gridMoveInit = false;
+        pendingGridMove = Vector3.zero;
+
         if (distanceScroll)
             distanceScroll.verticalNormalizedPosition =
                 Conversion.Map(drag.distance, 2f, maxDistance, 1f, 0f);
@@ -1113,19 +1127,26 @@ public class Raycast : MonoBehaviour
                     {
                         grabOffset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
 
+                        // Всё в сетке считаем от ЦЕНТРА МАСС: bodySnapped — цель
+                        // именно центра масс (ниже из неё вычитается смещение
+                        // «центр − пивот»). Раньше здесь брался пивот (body.position),
+                        // и каждый кадр предмет сдвигался на −смещение: он «тащился»
+                        // в одну сторону и «залетал», особенно если центр далеко от
+                        // пивота.
+                        Vector3 com = body.worldCenterOfMass;
+
                         // В режиме сетки предмет ходит ТОЛЬКО стрелками:
                         // горизонталь — текущая позиция + накопленный шаг
                         // стрелок (pendingGridMove), а не точка прицела.
-                        // Первый кадр — снап к ближайшей клетке.
+                        // Первый кадр — снап центра масс к ближайшей клетке.
                         if (!gridMoveInit)
                         {
-                            var s0 = grid.SnapPosition(body.position, Vector3.up, null);
-                            pendingGridMove += new Vector3(
-                                s0.x - body.position.x, 0f, s0.z - body.position.z);
+                            var s0 = grid.SnapPosition(com, Vector3.up, null);
+                            pendingGridMove += new Vector3(s0.x - com.x, 0f, s0.z - com.z);
                             gridMoveInit = true;
                         }
 
-                        bodySnapped = body.position + pendingGridMove;
+                        bodySnapped = com + pendingGridMove;
                         pendingGridMove = Vector3.zero;
                     }
                     else
@@ -1187,9 +1208,19 @@ public class Raycast : MonoBehaviour
                     }
 
                     DisableSpringForGrid();
+                    if (currentDrag != null) currentDrag.gridTouched = true;
                 }
                 else
                 {
+                    // Сетку выключили на ходу. Предмет ещё держит резкий снап, а
+                    // пружина вот-вот вернётся и потянет его к точке прицела —
+                    // на лёгких предметах это рывок «залетает». Поэтому отпускаем.
+                    if (currentDrag != null && currentDrag.gridTouched)
+                    {
+                        End();
+                        yield break;
+                    }
+
                     RestoreSpring();
                 }
 
