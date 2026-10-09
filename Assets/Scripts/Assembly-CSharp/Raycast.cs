@@ -173,6 +173,20 @@ public class Raycast : MonoBehaviour
     if (GridMode() && !IsTypingInInputField() && Input.GetKeyDown(KeyCode.R))
         ToggleArrowMode();
 
+    // Стрелки в режиме сетки — и для зажатого предмета, и для выбранного без
+    // зажатия: ArrowInput сам решает, что двигать. Ctrl — уменьшенный шаг.
+    // Стоят до ЛКМ: ранний выход из блока Fire их не должен пропускать.
+    if (GridMode() && !IsTypingInInputField())
+    {
+        bool fine = Input.GetKey(KeyCode.LeftControl) ||
+                    Input.GetKey(KeyCode.RightControl);
+
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) ArrowInput(-1, 0, fine);
+        if (Input.GetKeyDown(KeyCode.RightArrow)) ArrowInput(1, 0, fine);
+        if (Input.GetKeyDown(KeyCode.UpArrow)) ArrowInput(0, 1, fine);
+        if (Input.GetKeyDown(KeyCode.DownArrow)) ArrowInput(0, -1, fine);
+    }
+
     if (InputManager.GetButtonDown("Fire"))
     {
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
@@ -199,18 +213,6 @@ public class Raycast : MonoBehaviour
 
             UpdateDistanceUI(currentDrag.distance);
         }
-
-        // Стрелки в режиме сетки: Ctrl — уменьшенный шаг (и движения, и поворота).
-        if (GridMode() && !IsTypingInInputField())
-        {
-            bool fine = Input.GetKey(KeyCode.LeftControl) ||
-                        Input.GetKey(KeyCode.RightControl);
-
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) ArrowInput(-1, 0, fine);
-            if (Input.GetKeyDown(KeyCode.RightArrow)) ArrowInput(1, 0, fine);
-            if (Input.GetKeyDown(KeyCode.UpArrow)) ArrowInput(0, 1, fine);
-            if (Input.GetKeyDown(KeyCode.DownArrow)) ArrowInput(0, -1, fine);
-        }
     }
 
 #endif
@@ -219,10 +221,10 @@ public class Raycast : MonoBehaviour
         RefreshModeHint();
 #endif
 
-        // Панель поворота (стрелки) видна только при перетаскивании в режиме
-        // сетки. На ПК её нет — там поворот с клавиатуры.
+        // Панель поворота (стрелки) видна, пока предмет выбран или тащат его в
+        // режиме сетки. На ПК её нет — там стрелки с клавиатуры.
         if (DragRotateControls.Instance != null)
-            DragRotateControls.Instance.SetVisible(currentDrag != null && GridMode());
+            DragRotateControls.Instance.SetVisible(GridMode() && (currentDrag != null || selectedBody != null));
 
         // Обводка выбора — тоже только в режиме сетки
         if (!GridMode() && selectedBody != null) ClearSelection();
@@ -410,7 +412,13 @@ public class Raycast : MonoBehaviour
             }
             // ===============================================
 
-            if (hitRb && !hitRb.isKinematic && !hitRb.freezeRotation)
+            // Нажали на то, что нельзя подвинуть (стена, пол, кинематика,
+            // закреплённое тело) — выбор снимаем, как и при клике в пустоту.
+            // Во время переноса кнопка зажата, сюда не попадаем.
+            bool movable = hitRb && !hitRb.isKinematic && !hitRb.freezeRotation;
+            if (!movable && GridMode() && currentDrag == null) ClearSelection();
+
+            if (movable)
             {
                 // Двухступенчатый хват (только в режиме сетки): первое
                 // нажатие только выбирает предмет (обводка), второе по
@@ -737,7 +745,15 @@ public class Raycast : MonoBehaviour
     /// </summary>
     public void ArrowInput(int xDir, int yDirUp, bool fine)
     {
-        if (!GridMode() || currentDrag == null) return;
+        if (!GridMode()) return;
+
+        // Предмет зажат — стрелки двигают/крутят его (перенос). Выбран, но не
+        // зажат — шаг или поворот сразу (см. NudgeSelected).
+        if (currentDrag == null)
+        {
+            if (selectedBody != null) NudgeSelected(xDir, yDirUp, fine);
+            return;
+        }
 
         if (!gridArrowMoveMode)
         {
@@ -764,6 +780,64 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Стрелка по ВЫБРАННОМУ, но не зажатому предмету: один шаг по клетке или
+    /// один поворот — сразу, в этом же кадре. Сборку закрепляем тем же путём,
+    /// что и при переносе (защита джойнтов, блокировка поворота), смещаем
+    /// телепортом через те же гейты (стена, соседний предмет, подъём) и
+    /// отпускаем. Между нажатиями предмет обычный: падает, если под ним пусто.
+    /// </summary>
+    private void NudgeSelected(int xDir, int yDirUp, bool fine)
+    {
+        var grid = PlacementGrid.Instance;
+        var body = selectedBody;
+        if (grid == null || body == null) return;
+
+        grid.OnDragStarted(body.transform);
+        try
+        {
+            if (!gridArrowMoveMode)
+            {
+                RotateDragged(xDir, -yDirUp, fine);
+                return;
+            }
+
+            var cam = Camera.main;
+            if (cam == null) return;
+
+            Vector3 fwd = cam.transform.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 1e-6f) fwd = Vector3.forward;
+            fwd.Normalize();
+
+            Vector3 right = cam.transform.right;
+            right.y = 0f;
+            if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
+            right.Normalize();
+
+            float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
+            Vector3 delta = (right * (float)xDir + fwd * (float)yDirUp) * step;
+
+            // Обычный шаг сперва снапает центр масс к клетке: после физики предмет
+            // мог чуть съехать. Тонкий шаг — от текущего места, без снапа.
+            if (!fine)
+            {
+                Vector3 com = body.worldCenterOfMass;
+                Vector3 snapped = grid.SnapPosition(com, Vector3.up, null);
+                delta += new Vector3(snapped.x - com.x, 0f, snapped.z - com.z);
+            }
+
+            delta.y = 0f;
+            if (delta.sqrMagnitude < 1e-10f) return;
+
+            TryPinWithClimb(grid, body, delta, true, true);
+        }
+        finally
+        {
+            grid.OnDragEnded();
+        }
+    }
+
+    /// <summary>
     /// Поворачивает тащимый предмет на шаг (стрелки клавиатуры или кнопки
     /// панели DragRotateControls). Вся сборка (корпус + мать + стекло, всё,
     /// что в графе джойнтов) крутится вокруг ОДНОЙ точки — иначе детали
@@ -775,8 +849,11 @@ public class Raycast : MonoBehaviour
         if (!GridMode()) return;
         if (LockRotation) return;
 
-        var body = spring != null ? spring.connectedBody : null;
-        if (body == null || currentDrag == null) return;
+        // Тащимый предмет; если его не тащат — выбранный (см. NudgeSelected)
+        Rigidbody body = currentDrag != null
+            ? (spring != null ? spring.connectedBody : null)
+            : selectedBody;
+        if (body == null) return;
 
         // Ctrl/мелкие стрелки — уменьшенный шаг поворота
         float step = Mathf.Max(1f, fine ? rotateStep / 6f : rotateStep);
@@ -1047,8 +1124,12 @@ public class Raycast : MonoBehaviour
         return true;
     }
 
-    /// <summary>Резко смещает всю сборку на дельту (без сил).</summary>
-    private void ApplyPin(PlacementGrid grid, Vector3 delta)
+    /// <summary>
+    /// Резко смещает всю сборку на дельту (без сил). teleport — сразу меняет
+    /// позицию: для одиночного шага выбранного предмета, который закреплён в
+    /// этом же кадре и не дожидается шага физики.
+    /// </summary>
+    private void ApplyPin(PlacementGrid grid, Vector3 delta, bool teleport = false)
     {
         // MovePosition задаёт цель до следующего шага физики, и повторный вызов
         // её перезаписывает. Нулевой сдвиг не должен перетирать цель, которую
@@ -1064,7 +1145,16 @@ public class Raycast : MonoBehaviour
             var partRb = assembly[i];
             if (partRb == null) continue;
 
-            partRb.MovePosition(partRb.position + delta);
+            if (teleport)
+            {
+                partRb.position = partRb.position + delta;
+                partRb.WakeUp();
+            }
+            else
+            {
+                partRb.MovePosition(partRb.position + delta);
+            }
+
             partRb.velocity = Vector3.zero;
             partRb.angularVelocity = Vector3.zero;
         }
@@ -1115,11 +1205,12 @@ public class Raycast : MonoBehaviour
     /// высокое препятствие — скользим вплотную и останавливаемся в паре
     /// миллиметров (прислонить к стене/другому ПК впритык).
     /// </summary>
-    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
+    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep,
+        bool teleport = false)
     {
         if (PathClear(grid, body, delta, sweep))
         {
-            ApplyPin(grid, delta);
+            ApplyPin(grid, delta, teleport);
             return true;
         }
 
@@ -1130,7 +1221,7 @@ public class Raycast : MonoBehaviour
             up.y += climbs[i];
             if (PathClear(grid, body, up, sweep))
             {
-                ApplyPin(grid, up);
+                ApplyPin(grid, up, teleport);
                 return true;
             }
         }
@@ -1141,7 +1232,7 @@ public class Raycast : MonoBehaviour
             if (d < float.MaxValue && d > 0.01f)
             {
                 var slide = delta.normalized * Mathf.Max(0f, d - 0.004f);
-                ApplyPin(grid, slide);
+                ApplyPin(grid, slide, teleport);
                 return true;
             }
         }

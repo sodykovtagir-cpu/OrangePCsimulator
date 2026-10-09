@@ -26,6 +26,8 @@
 
 - On PC, the current arrow mode is shown in the bottom-left corner — «Move» or «Rotate» — with an «R — switch mode» hint. It is visible while the grid is on.
 
+- A selected item (outlined) can be moved and rotated with the arrow keys without holding the mouse button: one press — one cell or one turn. Clicking a wall, the floor or another fixed object clears the selection.
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.
