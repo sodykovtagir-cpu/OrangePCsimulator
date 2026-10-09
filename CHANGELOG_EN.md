@@ -112,7 +112,7 @@
 
 - Ctrl on PC and the small edge arrows on the phone panel — reduced step: movement is a fifth of a cell, rotation is 15° at the 90° step.
 
-- Two-stage grab: the first press only SELECTS the item — a teal outline appears around it (inverted hull over all meshes); the second press on the selected item starts the drag. Light items no longer get flung away by an accidental touch. Pressing empty space deselects.
+- Two-stage grab (grid mode only): the first press only SELECTS the item — a teal outline appears around it (inverted hull over all meshes); the second press on the selected item starts the drag. Light items no longer get flung away by an accidental touch. Pressing empty space deselects. Without the grid, grabbing works in one press as before.
 
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 

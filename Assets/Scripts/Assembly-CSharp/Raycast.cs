@@ -204,6 +204,9 @@ public class Raycast : MonoBehaviour
         // сетки. На ПК её нет — там поворот с клавиатуры.
         if (DragRotateControls.Instance != null)
             DragRotateControls.Instance.SetVisible(currentDrag != null && GridMode());
+
+        // Обводка выбора — тоже только в режиме сетки
+        if (!GridMode() && selectedBody != null) ClearSelection();
     }
 
     /// <summary>Включён ли режим сетки.</summary>
@@ -279,10 +282,12 @@ public class Raycast : MonoBehaviour
 
             if (hitRb && !hitRb.isKinematic && !hitRb.freezeRotation)
             {
-                // Двухступенчатый хват: первое нажатие только выбирает
-                // предмет (обводка), второе по выбранному — тащит. Лёгкие
-                // предметы не улетают от случайного касания.
-                if (!RemoveMode && currentDrag == null && selectedBody != hitRb)
+                // Двухступенчатый хват (только в режиме сетки): первое
+                // нажатие только выбирает предмет (обводка), второе по
+                // выбранному — тащит. Лёгкие предметы не улетают от
+                // случайного касания. Без сетки — хват сразу, как раньше.
+                if (GridMode() && !RemoveMode && currentDrag == null &&
+                    selectedBody != hitRb)
                 {
                     SelectBody(hitRb);
                     return;
