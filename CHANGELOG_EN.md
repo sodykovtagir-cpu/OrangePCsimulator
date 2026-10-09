@@ -96,6 +96,10 @@
 
 - Flipping no longer sinks the item below the floor or clips neighbours: before rotating, the assembly's post-rotation bounds are predicted, the bottom is auto-raised to the level the item stood on, and if the predicted bounds would touch anything the rotation is cancelled entirely.
 
+- Neighbours no longer explode while you drag: the penetration tolerance is reduced from 1.5 cm to 5 mm, and the gates now tell "standing on it" (floor/desk — not a block), "grazing" and "ramming into it" (block) apart. The kinematic assembly no longer ploughs into other PCs.
+
+- The item no longer launches on release: residual kinematic velocity from MovePosition is zeroed before isKinematic/constraints are restored (and in plain drag as well).
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.

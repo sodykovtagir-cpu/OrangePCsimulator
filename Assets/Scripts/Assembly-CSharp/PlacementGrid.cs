@@ -590,6 +590,12 @@ public class PlacementGrid : MonoBehaviour
                 lockBodies[i].constraints = lockOld[i];
             if (kinOld != null && i < kinOld.Length)
                 lockBodies[i].isKinematic = kinOld[i];
+
+            // Кинематика копит скорость от MovePosition — гасим её ДО того,
+            // как тело снова станет динамическим, иначе на отпускании ПК
+            // выстреливает и разлетается.
+            lockBodies[i].velocity = Vector3.zero;
+            lockBodies[i].angularVelocity = Vector3.zero;
         }
 
         lockBodies = null;

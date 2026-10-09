@@ -564,7 +564,7 @@ public class Raycast : MonoBehaviour
         // «что-то задевает» при перевороте.
         if (hasPred)
         {
-            const float skin = 0.015f;
+            const float skin = 0.005f;
             Vector3 half = pred.size * 0.5f - new Vector3(skin, skin, skin);
             if (half.x > 0f && half.y > 0f && half.z > 0f)
             {
@@ -579,6 +579,9 @@ public class Raycast : MonoBehaviour
                     var crb = col.attachedRigidbody;
                     if (crb != null && self.Contains(crb)) continue;
                     if (col.transform.IsChildOf(body.transform)) continue;
+
+                    // после поворота стоим НА нём (пол/стол) — не блок
+                    if (col.bounds.max.y <= pred.min.y + 0.02f) continue;
 
                     return; // не крутим — заденем
                 }
@@ -682,30 +685,40 @@ public class Raycast : MonoBehaviour
             if (assembly[i] != null) self.Add(assembly[i]);
         }
 
-        // Чек-бокс чуть сжат, чтобы простое касание (стоит на полу)
-        // не считалось «занято».
-        const float skin = 0.015f;
+        // Чек-бокс сжат на миллиметры: к соседу не влезаем вообще
+        // (иначе кинематик на скорости вминается в чужой ПК и рвёт его).
+        const float skin = 0.005f;
         Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
         if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
 
         // Проверка ПУТИ: не даём пролететь сквозь стену/кучу, даже когда
-        // цель за ними пустая (сильно вывел прицел — телепорт по пути
-        // всё равно упирался в препятствие). Sweep непрерывный — тонкие
-        // стены тоже не проскакивают.
+        // цель за ними пустая. Sweep непрерывный — тонкие стены тоже не
+        // проскакивают.
         if (sweep)
         {
-            var path = Physics.BoxCastAll(b.center, half, delta.normalized,
+            Vector3 dir = delta.normalized;
+            var path = Physics.BoxCastAll(b.center, half, dir,
                 Quaternion.identity, delta.magnitude, layer,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < path.Length; i++)
             {
-                var col = path[i].collider;
+                var hit = path[i];
+                var col = hit.collider;
                 if (col == null) continue;
 
                 var rb = col.attachedRigidbody;
                 if (rb != null && self.Contains(rb)) continue;
                 if (col.transform.IsChildOf(body.transform)) continue;
+
+                // стоим НА нём (пол/стол) — касание снизу не блок
+                if (col.bounds.max.y <= b.min.y + 0.02f) continue;
+
+                // идём по касательной — не врубаемся
+                if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
+
+                // контакт ровно в цели — это посадка на поверхность, не блок
+                if (hit.distance >= delta.magnitude - 0.02f) continue;
 
                 return false; // на пути препятствие
             }
@@ -722,6 +735,9 @@ public class Raycast : MonoBehaviour
             var rb = col.attachedRigidbody;
             if (rb != null && self.Contains(rb)) continue; // своя сборка
             if (col.transform.IsChildOf(body.transform)) continue;
+
+            // после шага стоим НА нём (пол/стол/осколок, который переехали)
+            if (col.bounds.max.y <= b.min.y + delta.y + 0.02f) continue;
 
             return false; // клетка занята
         }
@@ -1022,6 +1038,10 @@ public class Raycast : MonoBehaviour
                 rb.constraints = d.oldConstrains;
                 rb.drag = d.oldDrag;
                 rb.angularDrag = d.oldAngularDrag;
+                // гасим остаточную скорость от переноса — чтобы на
+                // отпускании предмет не выстреливал
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
                 // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
                 var latch = rb.GetComponent<DoorLatch>();
                 if (latch != null)
