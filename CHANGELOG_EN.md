@@ -92,6 +92,10 @@
 
 - No more "trail" of parts when dragging/rotating in grid mode: during the drag the whole assembly becomes kinematic — MovePosition/MoveRotation apply instantly, parts move in perfect sync with the case. isKinematic and constraints are restored on release.
 
+- The item no longer flies through walls and piles even when the aim is pulled far past them: not only the target cell but the WHOLE path is now checked (continuous box sweep) — thin walls no longer slip through either.
+
+- Flipping no longer sinks the item below the floor or clips neighbours: before rotating, the assembly's post-rotation bounds are predicted, the bottom is auto-raised to the level the item stood on, and if the predicted bounds would touch anything the rotation is cancelled entirely.
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.

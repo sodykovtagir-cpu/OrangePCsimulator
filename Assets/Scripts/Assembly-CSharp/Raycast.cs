@@ -509,9 +509,83 @@ public class Raycast : MonoBehaviour
 
         // Пивот — центр габарита всей сборки: крутим вокруг него.
         Vector3 pivot = body.worldCenterOfMass;
-        Bounds b;
-        if (grid != null && TryAssemblyBounds(grid, body, out b))
-            pivot = b.center;
+        Bounds cur;
+        bool hasBounds = grid != null && TryAssemblyBounds(grid, body, out cur);
+        if (hasBounds) pivot = cur.center;
+
+        var self = new HashSet<Rigidbody>();
+        if (assembly != null)
+        {
+            for (int i = 0; i < assembly.Length; i++)
+                if (assembly[i] != null) self.Add(assembly[i]);
+        }
+
+        // Предсказываем габарит сборки ПОСЛЕ поворота (повороты кратны 90°,
+        // поэтому бокс плотный) и подъём: низ после переворота не должен
+        // опуститься ниже уровня, на котором предмет стоял до поворота —
+        // иначе майнер проваливается под пол.
+        float minBefore = hasBounds ? cur.min.y : body.worldCenterOfMass.y;
+        Bounds pred = default(Bounds);
+        bool hasPred = false;
+
+        if (hasBounds && assembly != null)
+        {
+            for (int i = 0; i < assembly.Length; i++)
+            {
+                var rb = assembly[i];
+                if (rb == null) continue;
+
+                var cs = rb.GetComponentsInChildren<Collider>(true);
+                for (int j = 0; j < cs.Length; j++)
+                {
+                    if (cs[j] == null || !cs[j].enabled) continue;
+
+                    var cb = cs[j].bounds;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        Vector3 c = new Vector3(
+                            (k & 1) != 0 ? cb.max.x : cb.min.x,
+                            (k & 2) != 0 ? cb.max.y : cb.min.y,
+                            (k & 4) != 0 ? cb.max.z : cb.min.z);
+
+                        Vector3 p = pivot + worldDelta * (c - pivot);
+                        if (!hasPred) { pred = new Bounds(p, Vector3.zero); hasPred = true; }
+                        else pred.Encapsulate(p);
+                    }
+                }
+            }
+        }
+
+        float lift = hasPred ? Mathf.Max(0f, minBefore - pred.min.y) : 0f;
+        if (hasPred) pred.center += new Vector3(0f, lift, 0f);
+
+        // Гейт поворота: если предсказанный (приподнятый) габарит кого-то
+        // задевает — поворот отменяется целиком. Массивный предмет больше не
+        // «что-то задевает» при перевороте.
+        if (hasPred)
+        {
+            const float skin = 0.015f;
+            Vector3 half = pred.size * 0.5f - new Vector3(skin, skin, skin);
+            if (half.x > 0f && half.y > 0f && half.z > 0f)
+            {
+                var blocked = Physics.OverlapBox(pred.center, half,
+                    Quaternion.identity, layer, QueryTriggerInteraction.Ignore);
+
+                for (int i = 0; i < blocked.Length; i++)
+                {
+                    var col = blocked[i];
+                    if (col == null) continue;
+
+                    var crb = col.attachedRigidbody;
+                    if (crb != null && self.Contains(crb)) continue;
+                    if (col.transform.IsChildOf(body.transform)) continue;
+
+                    return; // не крутим — заденем
+                }
+            }
+        }
+
+        Vector3 up = new Vector3(0f, lift, 0f);
 
         if (assembly != null && assembly.Length > 1)
         {
@@ -521,7 +595,7 @@ public class Raycast : MonoBehaviour
                 if (rb == null) continue;
 
                 Quaternion next = worldDelta * rb.rotation;
-                Vector3 pos = pivot + worldDelta * (rb.position - pivot);
+                Vector3 pos = pivot + worldDelta * (rb.position - pivot) + up;
 
                 rb.MoveRotation(next);
                 rb.transform.rotation = next;
@@ -533,9 +607,12 @@ public class Raycast : MonoBehaviour
         }
         else
         {
+            Vector3 p0 = body.position;
             var next = worldDelta * body.rotation;
             body.MoveRotation(next);
             body.transform.rotation = next;
+            body.MovePosition(p0 + up);
+            body.transform.position = p0 + up;
             body.velocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
         }
@@ -591,7 +668,7 @@ public class Raycast : MonoBehaviour
     /// и другие предметы принимаются за препятствия. Сил не прикладываем —
     /// значит, ничего не ломаем, не проталкиваем и никуда не пролетаем.
     /// </summary>
-    private bool TryPinAssembly(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    private bool TryPinAssembly(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
     {
         if (delta.sqrMagnitude < 1e-9f) return true;
 
@@ -610,6 +687,29 @@ public class Raycast : MonoBehaviour
         const float skin = 0.015f;
         Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
         if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
+
+        // Проверка ПУТИ: не даём пролететь сквозь стену/кучу, даже когда
+        // цель за ними пустая (сильно вывел прицел — телепорт по пути
+        // всё равно упирался в препятствие). Sweep непрерывный — тонкие
+        // стены тоже не проскакивают.
+        if (sweep)
+        {
+            var path = Physics.BoxCastAll(b.center, half, delta.normalized,
+                Quaternion.identity, delta.magnitude, layer,
+                QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < path.Length; i++)
+            {
+                var col = path[i];
+                if (col == null) continue;
+
+                var rb = col.attachedRigidbody;
+                if (rb != null && self.Contains(rb)) continue;
+                if (col.transform.IsChildOf(body.transform)) continue;
+
+                return false; // на пути препятствие
+            }
+        }
 
         var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity, layer,
             QueryTriggerInteraction.Ignore);
@@ -645,16 +745,16 @@ public class Raycast : MonoBehaviour
     /// обломок на полу — приподнимаем цель, чтобы переехать через него.
     /// Высокое (стены, другие ПК, плиты) по-прежнему блокирует.
     /// </summary>
-    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
     {
-        if (TryPinAssembly(grid, body, delta)) return true;
+        if (TryPinAssembly(grid, body, delta, sweep)) return true;
 
         float[] climbs = { 0.25f, 0.5f, grid.cellSize };
         for (int i = 0; i < climbs.Length; i++)
         {
             var up = delta;
             up.y += climbs[i];
-            if (TryPinAssembly(grid, body, up)) return true;
+            if (TryPinAssembly(grid, body, up, sweep)) return true;
         }
 
         return false;
@@ -808,7 +908,7 @@ public class Raycast : MonoBehaviour
                         if (!sunk)
                             delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
 
-                        if (!TryPinWithClimb(grid, body, delta) && hasSurface && normal.y > 0.7f)
+                        if (!TryPinWithClimb(grid, body, delta, !sunk) && hasSurface && normal.y > 0.7f)
                         {
                             // С отснапанной высотой клетка занята — пробуем
                             // встать прямо на поверхность.
@@ -818,7 +918,7 @@ public class Raycast : MonoBehaviour
                             delta = (bodySnapped - comOffset) - body.position;
                             if (!sunk)
                                 delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
-                            TryPinWithClimb(grid, body, delta);
+                            TryPinWithClimb(grid, body, delta, !sunk);
                         }
                     }
 
