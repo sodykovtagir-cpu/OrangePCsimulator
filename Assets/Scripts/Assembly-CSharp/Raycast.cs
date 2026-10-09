@@ -509,7 +509,7 @@ public class Raycast : MonoBehaviour
 
         // Пивот — центр габарита всей сборки: крутим вокруг него.
         Vector3 pivot = body.worldCenterOfMass;
-        Bounds cur;
+        Bounds cur = default(Bounds);
         bool hasBounds = grid != null && TryAssemblyBounds(grid, body, out cur);
         if (hasBounds) pivot = cur.center;
 
