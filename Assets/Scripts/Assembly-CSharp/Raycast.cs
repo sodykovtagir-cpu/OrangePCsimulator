@@ -58,6 +58,13 @@ public class Raycast : MonoBehaviour
     private Vector3 pendingGridMove;
     private bool gridMoveInit;
 
+#if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
+    // Подпись режима стрелок в левом нижнем углу (только ПК).
+    private GameObject modeHint;
+    private Text modeHintName;
+    private Text modeHintTip;
+#endif
+
     // Двухступенчатый хват: первое нажатие — выбор с обводкой,
     // второе — перенос. Лёгкие предметы не сносит пружиной от
     // случайного касания.
@@ -131,6 +138,11 @@ public class Raycast : MonoBehaviour
         // Панель поворота предмета (стрелки) — создаём сразу, показываем при перетаскивании
         DragRotateControls.EnsureExists(this);
 
+#if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
+        // Подпись режима стрелок в левом нижнем углу (ПК)
+        CreateModeHint();
+#endif
+
         // Сетка целится тем же слоем и той же камерой, что и перетаскивание
         PlacementGrid.AimLayer = layer;
         PlacementGrid.AimCamera = cam;
@@ -157,6 +169,13 @@ public class Raycast : MonoBehaviour
     private void Update()
     {
 #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
+
+    // R — переключить режим стрелок «перемещение / поворот». Работает, пока
+    // включена сетка: и когда предмет только выбран, и когда он уже в руках.
+    // Раньше проверка сидела внутри переноса, и до захвата R не работала.
+    // Стоит первой, чтобы ранний выход из блока Fire её не пропускал.
+    if (GridMode() && !IsTypingInInputField() && Input.GetKeyDown(KeyCode.R))
+        ToggleArrowMode();
 
     if (InputManager.GetButtonDown("Fire"))
     {
@@ -185,12 +204,9 @@ public class Raycast : MonoBehaviour
             UpdateDistanceUI(currentDrag.distance);
         }
 
-        // Стрелки в режиме сетки: R переключает «перемещение/поворот»,
-        // Ctrl — уменьшенный шаг (и движения, и поворота).
-        if (GridMode())
+        // Стрелки в режиме сетки: Ctrl — уменьшенный шаг (и движения, и поворота).
+        if (GridMode() && !IsTypingInInputField())
         {
-            if (Input.GetKeyDown(KeyCode.R)) ToggleArrowMode();
-
             bool fine = Input.GetKey(KeyCode.LeftControl) ||
                         Input.GetKey(KeyCode.RightControl);
 
@@ -201,6 +217,10 @@ public class Raycast : MonoBehaviour
         }
     }
 
+#endif
+
+#if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
+        RefreshModeHint();
 #endif
 
         // Панель поворота (стрелки) видна только при перетаскивании в режиме
@@ -217,6 +237,104 @@ public class Raycast : MonoBehaviour
     {
         return PlacementGrid.Instance != null && PlacementGrid.Instance.SnapEnabled;
     }
+
+#if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
+    /// <summary>
+    /// Подпись режима стрелок в левом нижнем углу экрана: «Перемещение» или
+    /// «Поворот» и подсказка про R. Видна, пока включена сетка. Только ПК: на
+    /// телефоне в этом углу джойстик, а режим показывает кнопка панели поворота.
+    /// </summary>
+    private void CreateModeHint()
+    {
+        if (modeHint != null) return; // Unity-null: после смены сцены создадим заново
+
+        var canvas = DragRotateControls.FindHudCanvas();
+        if (canvas == null) return;
+
+        modeHint = new GameObject("GridModeHint", typeof(RectTransform));
+        modeHint.transform.SetParent(canvas.transform, false);
+        modeHint.hideFlags = HideFlags.DontSave;
+
+        var rect = (RectTransform)modeHint.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
+        rect.pivot = Vector2.zero;
+        rect.anchoredPosition = new Vector2(16f, 16f);
+        rect.sizeDelta = new Vector2(250f, 56f);
+
+        var bg = modeHint.AddComponent<Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.45f);
+        bg.raycastTarget = false; // подпись не должна перехватывать клики
+
+        // Шрифт — тот же, что у текста информации о предмете: в нём есть буквы
+        // языков, которые выбрал игрок. Если его нет — встроенный.
+        var font = detailText != null && detailText.font != null
+            ? detailText.font
+            : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        modeHintName = MakeModeHintText(modeHint.transform, font, 20, 26f, -4f, Color.white);
+        modeHintTip = MakeModeHintText(modeHint.transform, font, 13, 6f, -30f,
+            new Color(1f, 1f, 1f, 0.75f));
+
+        modeHint.SetActive(false);
+    }
+
+    private static Text MakeModeHintText(Transform parent, Font font, int size,
+        float bottomOffset, float topOffset, Color color)
+    {
+        var go = new GameObject("Text", typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = new Vector2(12f, bottomOffset);
+        rect.offsetMax = new Vector2(-12f, topOffset);
+
+        var text = go.AddComponent<Text>();
+        text.font = font;
+        text.fontSize = size;
+        text.alignment = TextAnchor.MiddleLeft;
+        text.color = color;
+        text.raycastTarget = false;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.6f);
+        outline.effectDistance = new Vector2(1f, -1f);
+
+        return text;
+    }
+
+    /// <summary>Обновляет подпись: показываем при включённой сетке, текст — по языку.</summary>
+    private void RefreshModeHint()
+    {
+        if (modeHint == null) return;
+
+        bool show = GridMode();
+        if (modeHint.activeSelf != show) modeHint.SetActive(show);
+        if (!show) return;
+
+        // Текст из таблицы переводов (Translate.txt): при смене языка подпись тоже меняется
+        modeHintName.text = Localization.GetText(
+            gridArrowMoveMode ? "Grid mode: move" : "Grid mode: rotate");
+        modeHintTip.text = Localization.GetText("Grid mode: R to switch");
+    }
+
+    /// <summary>
+    /// Печатают ли сейчас в текстовом поле (блокнот, редактор кода и т.п.).
+    /// Тогда R и стрелки — это ввод текста, а не управление сеткой.
+    /// </summary>
+    private static bool IsTypingInInputField()
+    {
+        var es = EventSystem.current;
+        if (es == null || es.currentSelectedGameObject == null) return false;
+
+        var field = es.currentSelectedGameObject.GetComponent<InputField>();
+        return field != null && field.isFocused;
+    }
+#endif
 
     private void UpdateDistanceUI(float distance)
     {

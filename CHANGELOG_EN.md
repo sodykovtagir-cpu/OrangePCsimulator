@@ -24,6 +24,8 @@
 
 - Orientation lock in grid mode: when you grab an item with the grid on, all its bodies get FreezeRotation — bumping the item won't flip or tilt it; only the arrows can rotate it. On release (or when the grid is turned off) the constraints are restored.
 
+- On PC, the current arrow mode is shown in the bottom-left corner — «Move» or «Rotate» — with an «R — switch mode» hint. It is visible while the grid is on.
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.
@@ -81,6 +83,8 @@
 - Translations for all new interface elements across the game's 42 languages.
 
 ## Fixed
+
+- On PC, R works again: it switches the arrow mode (move / rotate) at any time while the grid is on — before grabbing an item and while carrying it. Before, it only worked while an item was already in hand.
 
 - In grid mode a held item no longer drifts or flies off on its own. The snap target was computed from the pivot instead of the centre of mass, so every frame the item was shifted by the offset between the two — light and off-centre items were dragged to one side. Everything now uses the centre of mass: without arrow presses the item stays put, and an arrow step is no longer lost between physics steps.
 

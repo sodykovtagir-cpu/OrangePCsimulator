@@ -60,7 +60,8 @@ public class DragRotateControls : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    private static Canvas FindHudCanvas()
+    /// <summary>HUD-канвас игры (общий для панели поворота и подписи режима сетки).</summary>
+    public static Canvas FindHudCanvas()
     {
         var functions = FindObjectOfType<Functions>();
         if (functions != null)
@@ -144,7 +145,7 @@ public class DragRotateControls : MonoBehaviour
         lrect.offsetMax = Vector2.zero;
 
         modeText = labelGo.AddComponent<Text>();
-        modeText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        modeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         modeText.alignment = TextAnchor.MiddleCenter;
         modeText.fontSize = 13;
         modeText.color = Color.white;
