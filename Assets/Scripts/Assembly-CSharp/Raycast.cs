@@ -63,6 +63,7 @@ public class Raycast : MonoBehaviour
     private GameObject modeHint;
     private Text modeHintName;
     private Text modeHintTip;
+    private float nextModeHintTry;
 #endif
 
     // Двухступенчатый хват: первое нажатие — выбор с обводкой,
@@ -137,11 +138,6 @@ public class Raycast : MonoBehaviour
 
         // Панель поворота предмета (стрелки) — создаём сразу, показываем при перетаскивании
         DragRotateControls.EnsureExists(this);
-
-#if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
-        // Подпись режима стрелок в левом нижнем углу (ПК)
-        CreateModeHint();
-#endif
 
         // Сетка целится тем же слоем и той же камерой, что и перетаскивание
         PlacementGrid.AimLayer = layer;
@@ -307,14 +303,27 @@ public class Raycast : MonoBehaviour
         return text;
     }
 
-    /// <summary>Обновляет подпись: показываем при включённой сетке, текст — по языку.</summary>
+    /// <summary>
+    /// Обновляет подпись: видна при включённой сетке, текст — по языку. Создаём её
+    /// при первом включении сетки, а не в Start: хотбар ПК включает ControlRig в
+    /// своём Start, и порядок Start между объектами не гарантирован. Если HUD ещё
+    /// не найден, повторяем не чаще раза в полсекунды.
+    /// </summary>
     private void RefreshModeHint()
     {
-        if (modeHint == null) return;
+        bool gridOn = GridMode();
 
-        bool show = GridMode();
-        if (modeHint.activeSelf != show) modeHint.SetActive(show);
-        if (!show) return;
+        if (modeHint == null)
+        {
+            if (!gridOn || Time.unscaledTime < nextModeHintTry) return;
+
+            nextModeHintTry = Time.unscaledTime + 0.5f;
+            CreateModeHint();
+            if (modeHint == null) return;
+        }
+
+        if (modeHint.activeSelf != gridOn) modeHint.SetActive(gridOn);
+        if (!gridOn) return;
 
         // Текст из таблицы переводов (Translate.txt): при смене языка подпись тоже меняется
         modeHintName.text = Localization.GetText(
