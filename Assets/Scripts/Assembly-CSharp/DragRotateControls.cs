@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -15,6 +16,16 @@ public class DragRotateControls : MonoBehaviour
     private Raycast raycast;
     private GameObject panel;
     private Text modeText;
+
+    // Зажатая кнопка стрелки повторяет шаг, пока палец на ней
+    private const float HoldDelay = 0.3f;
+    private const float MoveRepeatInterval = 0.14f;
+    private const float RotateRepeatInterval = 0.35f;
+    private bool holdActive;
+    private int holdX;
+    private int holdY;
+    private bool holdFine;
+    private float holdNextAt;
 
     /// <summary>
     /// Создаёт панель, если её ещё нет (вызывается из Raycast.Start).
@@ -52,12 +63,46 @@ public class DragRotateControls : MonoBehaviour
         if (panel != null && panel.activeSelf != visible)
             panel.SetActive(visible);
 
+        if (!visible) StopHold();
         if (visible) RefreshLabel();
+    }
+
+    private void OnDisable()
+    {
+        StopHold();
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+    }
+
+    /// <summary>Пока кнопка стрелки зажата, шаг повторяется (как клавиша на ПК).</summary>
+    private void Update()
+    {
+        if (!holdActive || raycast == null) return;
+        if (Time.unscaledTime < holdNextAt) return;
+
+        raycast.ArrowInput(holdX, holdY, holdFine);
+        holdNextAt = Time.unscaledTime + (raycast.ArrowMoveMode ? MoveRepeatInterval : RotateRepeatInterval);
+    }
+
+    private void StartHold(int xDir, int yDirUp, bool fine)
+    {
+        if (raycast == null) return;
+
+        holdX = xDir;
+        holdY = yDirUp;
+        holdFine = fine;
+        holdActive = true;
+
+        raycast.ArrowInput(xDir, yDirUp, fine);
+        holdNextAt = Time.unscaledTime + HoldDelay;
+    }
+
+    private void StopHold()
+    {
+        holdActive = false;
     }
 
     /// <summary>HUD-канвас игры (общий для панели поворота и подписи режима сетки).</summary>
@@ -212,10 +257,19 @@ public class DragRotateControls : MonoBehaviour
     {
         if (button == null) return;
 
-        button.onClick.AddListener(() =>
-        {
-            if (raycast != null) raycast.ArrowInput(xDir, yDirUp, fine);
-        });
+        // Кнопку можно зажать: первый шаг — по нажатию, дальше повтор, пока палец на
+        // ней. onClick не используем: отпускание дало бы ещё один лишний шаг.
+        var trigger = button.gameObject.AddComponent<EventTrigger>();
+        AddPointerEntry(trigger, EventTriggerType.PointerDown, () => StartHold(xDir, yDirUp, fine));
+        AddPointerEntry(trigger, EventTriggerType.PointerUp, StopHold);
+        AddPointerEntry(trigger, EventTriggerType.PointerExit, StopHold);
+    }
+
+    private static void AddPointerEntry(EventTrigger trigger, EventTriggerType type, System.Action action)
+    {
+        var entry = new EventTrigger.Entry { eventID = type };
+        entry.callback.AddListener(_ => action());
+        trigger.triggers.Add(entry);
     }
 
     private static Sprite LoadArrowSprite()

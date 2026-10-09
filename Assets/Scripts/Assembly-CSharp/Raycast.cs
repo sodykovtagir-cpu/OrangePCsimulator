@@ -181,10 +181,10 @@ public class Raycast : MonoBehaviour
         bool fine = Input.GetKey(KeyCode.LeftControl) ||
                     Input.GetKey(KeyCode.RightControl);
 
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) ArrowInput(-1, 0, fine);
-        if (Input.GetKeyDown(KeyCode.RightArrow)) ArrowInput(1, 0, fine);
-        if (Input.GetKeyDown(KeyCode.UpArrow)) ArrowInput(0, 1, fine);
-        if (Input.GetKeyDown(KeyCode.DownArrow)) ArrowInput(0, -1, fine);
+        HoldArrow(KeyCode.LeftArrow, -1, 0, fine, 0);
+        HoldArrow(KeyCode.RightArrow, 1, 0, fine, 1);
+        HoldArrow(KeyCode.UpArrow, 0, 1, fine, 2);
+        HoldArrow(KeyCode.DownArrow, 0, -1, fine, 3);
     }
 
     if (InputManager.GetButtonDown("Fire"))
@@ -330,7 +330,11 @@ public class Raycast : MonoBehaviour
         // Текст из таблицы переводов (Translate.txt): при смене языка подпись тоже меняется
         modeHintName.text = Localization.GetText(
             gridArrowMoveMode ? "Grid mode: move" : "Grid mode: rotate");
-        modeHintTip.text = Localization.GetText("Grid mode: R to switch");
+        // Блокировка поворота (клавиша 2): в режиме поворота стрелки не крутят.
+        // Показываем её вместо подсказки про R, чтобы было видно, почему не крутится.
+        modeHintTip.text = !gridArrowMoveMode && LockRotation
+            ? Localization.GetText("Lock Rotation")
+            : Localization.GetText("Grid mode: R to switch");
     }
 
     /// <summary>
@@ -344,6 +348,29 @@ public class Raycast : MonoBehaviour
 
         var field = es.currentSelectedGameObject.GetComponent<InputField>();
         return field != null && field.isFocused;
+    }
+
+    // Зажатая стрелка повторяется, как клавиша в тексте: первый шаг — по нажатию,
+    // потом пауза и повтор. Поворот повторяется медленнее, чем перемещение.
+    private const float ArrowRepeatDelay = 0.3f;
+    private const float MoveRepeatInterval = 0.14f;
+    private const float RotateRepeatInterval = 0.35f;
+    private readonly float[] arrowNextAt = new float[4];
+
+    private void HoldArrow(KeyCode key, int xDir, int yDirUp, bool fine, int slot)
+    {
+        float now = Time.unscaledTime;
+
+        if (Input.GetKeyDown(key))
+        {
+            ArrowInput(xDir, yDirUp, fine);
+            arrowNextAt[slot] = now + ArrowRepeatDelay;
+        }
+        else if (Input.GetKey(key) && now >= arrowNextAt[slot])
+        {
+            ArrowInput(xDir, yDirUp, fine);
+            arrowNextAt[slot] = now + (ArrowMoveMode ? MoveRepeatInterval : RotateRepeatInterval);
+        }
     }
 #endif
 
@@ -860,30 +887,32 @@ public class Raycast : MonoBehaviour
         var grid = PlacementGrid.Instance;
         var assembly = grid != null ? grid.DragAssemblyBodies : null;
 
-        // Раскладываем ориентацию на рыскание и тангаж сами: стандартные
-        // eulerAngles возле вертикали врут — из-за них предмет при нажатии
-        // «вверх» падал на грань. Рыскание берём из вектора «вправо» (он
-        // корректен всегда), тангаж — из «вперёд» в системе рыскания.
+        // Ориентация — кратная 90° по осям коробки. Раньше поворот раскладывали на
+        // рыскание и тангаж: у корпуса, лежащего на боку («дыркой вверх»), правая
+        // ось вертикальна, рыскание вырождалось, крен терялся, и поворот шёл на 120°.
+        // Теперь база — ближайшая коробочная ориентация, а кувырок — на 90° вокруг
+        // горизонтальной оси коробки (см. TumbleAxis). Для стоящего корпуса итог
+        // тот же, что и раньше.
         var q = body.rotation;
-        Vector3 right = q * Vector3.right;
-        Vector3 fwd = q * Vector3.forward;
+        Quaternion qBase = fine ? q : SnapToBoxOrientation(q);
+        Quaternion target;
 
-        float yaw = Mathf.Atan2(-right.z, right.x) * Mathf.Rad2Deg;
-        Vector3 fLocal = Quaternion.Euler(0f, -yaw, 0f) * fwd;
-        float pitch = Mathf.Atan2(-fLocal.y, fLocal.z) * Mathf.Rad2Deg;
-
-        // Квантование: каждое нажатие ставит угол на ближайшее кратное шагу
-        // и добавляет ещё шаг: было 87° — нажал вправо → 180°, обратно → 90°.
         if (yawDir != 0)
-            yaw = Mathf.Round(yaw / step) * step + yawDir * step;
-        if (pitchDir != 0)
-            pitch = Mathf.Round(pitch / step) * step + pitchDir * step;
+        {
+            // Рыскание — вокруг мировой вертикали
+            target = Quaternion.AngleAxis(yawDir * step, Vector3.up) * qBase;
+        }
+        else if (pitchDir != 0)
+        {
+            Vector3 axis = TumbleAxis(qBase, CameraRightHorizontal());
+            // «вверх» (pitchDir < 0) — поднять переднюю грань, кувырок назад
+            target = Quaternion.AngleAxis(-pitchDir * step * TumbleSign(qBase, axis), axis) * qBase;
+        }
+        else
+        {
+            return;
+        }
 
-        // Euler(pitch, yaw, 0) = поворот вокруг вертикали на рыскание, затем
-        // наклон вокруг собственной правой оси на тангаж — ровно то, что
-        // делают стрелки. Последовательность «вверх»: стоит → смотрит вверх
-        // → вверх ногами → смотрит вниз → стоит; без падений на грань.
-        var target = Quaternion.Euler(pitch, yaw, 0f);
         var worldDelta = target * Quaternion.Inverse(q);
 
         // Пивот — центр габарита всей сборки: крутим вокруг него.
@@ -998,6 +1027,77 @@ public class Raycast : MonoBehaviour
             body.velocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
         }
+    }
+
+    // 24 коробочные ориентации (кратные 90° по всем осям). 64 комбинации углов Эйлера
+    // дают все 24; повторы не мешают.
+    private static Quaternion[] boxOrientations;
+
+    /// <summary>Ближайшая коробочная ориентация к q: поворот на 90° оставляет коробку коробкой.</summary>
+    private static Quaternion SnapToBoxOrientation(Quaternion q)
+    {
+        if (boxOrientations == null)
+        {
+            var list = new List<Quaternion>(64);
+            for (int x = 0; x < 4; x++)
+                for (int y = 0; y < 4; y++)
+                    for (int z = 0; z < 4; z++)
+                        list.Add(Quaternion.Euler(90f * x, 90f * y, 90f * z));
+            boxOrientations = list.ToArray();
+        }
+
+        Quaternion best = boxOrientations[0];
+        float bestDot = -1f;
+        for (int i = 0; i < boxOrientations.Length; i++)
+        {
+            float d = Mathf.Abs(Quaternion.Dot(q, boxOrientations[i]));
+            if (d > bestDot)
+            {
+                bestDot = d;
+                best = boxOrientations[i];
+            }
+        }
+        return best;
+    }
+
+    /// <summary>Горизонтальное «вправо» камеры — для выбора оси кувырка.</summary>
+    private static Vector3 CameraRightHorizontal()
+    {
+        var cam = Camera.main;
+        Vector3 r = cam != null ? cam.transform.right : Vector3.right;
+        r.y = 0f;
+        return r.sqrMagnitude < 1e-6f ? Vector3.right : r.normalized;
+    }
+
+    /// <summary>
+    /// Ось кувырка для стрелок вверх/вниз — горизонтальная ось коробки. Обычно это
+    /// правая ось (как и раньше). Если корпус лежит на боку, правая ось вертикальна:
+    /// тогда берём переднюю или верхнюю ось — ту, что ближе к «вправо» от камеры.
+    /// </summary>
+    private static Vector3 TumbleAxis(Quaternion qb, Vector3 camRightH)
+    {
+        Vector3 right = qb * Vector3.right;
+        if (Mathf.Abs(right.y) < 0.5f) return right;
+
+        Vector3 front = qb * Vector3.forward;
+        Vector3 top = qb * Vector3.up;
+        return Mathf.Abs(Vector3.Dot(front, camRightH)) >= Mathf.Abs(Vector3.Dot(top, camRightH))
+            ? front
+            : top;
+    }
+
+    /// <summary>
+    /// Направление кувырка: +1, если поворот на +90° вокруг оси поднимает переднюю
+    /// (или верхнюю) грань. Так «вверх» поднимает переднюю грань, как и раньше.
+    /// </summary>
+    private static float TumbleSign(Quaternion qb, Vector3 axis)
+    {
+        Vector3 front = qb * Vector3.forward;
+        Vector3 top = qb * Vector3.up;
+        Vector3 mf = Vector3.Cross(axis, front);
+        Vector3 mt = Vector3.Cross(axis, top);
+        Vector3 m = Mathf.Abs(mf.y) >= Mathf.Abs(mt.y) ? mf : mt;
+        return m.y >= 0f ? 1f : -1f;
     }
 
     /// <summary>

@@ -28,6 +28,8 @@
 
 - A selected item (outlined) can be moved and rotated with the arrow keys without holding the mouse button: one press — one cell or one turn. Clicking a wall, the floor or another fixed object clears the selection.
 
+- Arrows can be held: the step or turn repeats while the button is held (PC arrow keys; phone panel buttons).
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.
@@ -85,6 +87,10 @@
 - Translations for all new interface elements across the game's 42 languages.
 
 ## Fixed
+
+- Flipping a case that lies on its side («opening up») works: rotation used to be split into yaw and pitch, which degenerates for such a case, loses its roll and turns it 120° instead of 90°. Now the arrows always give exactly 90° and stand the case on a face. A standing case behaves as before.
+
+- When rotation lock is on (key 2), the arrows in rotate mode don't turn the item. The bottom-left label now shows it.
 
 - On PC, R works again: it switches the arrow mode (move / rotate) at any time while the grid is on — before grabbing an item and while carrying it. Before, it only worked while an item was already in hand.
 
