@@ -700,7 +700,7 @@ public class Raycast : MonoBehaviour
 
             for (int i = 0; i < path.Length; i++)
             {
-                var col = path[i];
+                var col = path[i].collider;
                 if (col == null) continue;
 
                 var rb = col.attachedRigidbody;
