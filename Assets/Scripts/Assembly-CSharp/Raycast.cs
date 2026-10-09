@@ -55,6 +55,13 @@ public class Raycast : MonoBehaviour
     private Vector3 pendingGridMove;
     private bool gridMoveInit;
 
+    // Двухступенчатый хват: первое нажатие — выбор с обводкой,
+    // второе — перенос. Лёгкие предметы не сносит пружиной от
+    // случайного касания.
+    private Rigidbody selectedBody;
+    private List<GameObject> outlineShells;
+    private Material outlineMat;
+
     [SerializeField]
     private bool showHint;
 
@@ -247,7 +254,12 @@ public class Raycast : MonoBehaviour
         if (c == null) return;
 
         var ray = c.ScreenPointToRay(pos);
-        if (!Physics.Raycast(ray, out var hit, maxDistance, layer)) return;
+        if (!Physics.Raycast(ray, out var hit, maxDistance, layer))
+        {
+            // Нажали в пустоту — снимаем выбор и обводку
+            if (currentDrag == null) ClearSelection();
+            return;
+        }
 
         if (dragRigidbody)
         {
@@ -267,6 +279,15 @@ public class Raycast : MonoBehaviour
 
             if (hitRb && !hitRb.isKinematic && !hitRb.freezeRotation)
             {
+                // Двухступенчатый хват: первое нажатие только выбирает
+                // предмет (обводка), второе по выбранному — тащит. Лёгкие
+                // предметы не улетают от случайного касания.
+                if (!RemoveMode && currentDrag == null && selectedBody != hitRb)
+                {
+                    SelectBody(hitRb);
+                    return;
+                }
+
                 if (!spring)
                 {
                     var go = new GameObject("Rigidbody dragger");
@@ -472,6 +493,94 @@ public class Raycast : MonoBehaviour
         }
 
         gridSpringApplied = false;
+    }
+
+    /// <summary>
+    /// Выбирает предмет БЕЗ захвата: рисует обводку (inverted hull) по всем
+    /// его мешам. Следующее нажатие по выбранному — настоящий перенос.
+    /// </summary>
+    private void SelectBody(Rigidbody rb)
+    {
+        ClearSelection();
+        selectedBody = rb;
+
+        if (outlineMat == null)
+        {
+            var sh = Shader.Find("Orange/Outline");
+            if (sh == null) return;
+            outlineMat = new Material(sh);
+        }
+
+        outlineShells = new List<GameObject>();
+
+        var filters = rb.GetComponentsInChildren<MeshFilter>(true);
+        for (int i = 0; i < filters.Length; i++)
+        {
+            var f = filters[i];
+            if (f == null || f.sharedMesh == null) continue;
+            AddShell(f.transform, f.sharedMesh, null);
+        }
+
+        var skins = rb.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        for (int i = 0; i < skins.Length; i++)
+        {
+            var s = skins[i];
+            if (s == null || s.sharedMesh == null) continue;
+            AddShell(s.transform, s.sharedMesh, s);
+        }
+    }
+
+    private void AddShell(Transform parent, Mesh mesh, SkinnedMeshRenderer skin)
+    {
+        var go = new GameObject("OutlineShell");
+        go.hideFlags = HideFlags.DontSave;
+
+        if (skin != null)
+        {
+            go.transform.SetParent(skin.transform.parent, false);
+            go.transform.localPosition = skin.transform.localPosition;
+            go.transform.localRotation = skin.transform.localRotation;
+            go.transform.localScale = skin.transform.localScale;
+
+            var sr = go.AddComponent<SkinnedMeshRenderer>();
+            sr.sharedMesh = mesh;
+            sr.rootBone = skin.rootBone;
+            sr.bones = skin.bones;
+            sr.sharedMaterial = outlineMat;
+            sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            sr.receiveShadows = false;
+        }
+        else
+        {
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = Vector3.one;
+
+            var mf = go.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = outlineMat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+        }
+
+        outlineShells.Add(go);
+    }
+
+    /// <summary>Снимает выбор и убирает обводку.</summary>
+    public void ClearSelection()
+    {
+        if (outlineShells != null)
+        {
+            for (int i = 0; i < outlineShells.Count; i++)
+            {
+                if (outlineShells[i] != null) Destroy(outlineShells[i]);
+            }
+        }
+
+        outlineShells = null;
+        selectedBody = null;
     }
 
     /// <summary>Стрелки сейчас перемещают (true) или поворачивают (false).</summary>

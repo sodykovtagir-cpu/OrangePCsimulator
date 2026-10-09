@@ -112,6 +112,8 @@
 
 - Ctrl on PC and the small edge arrows on the phone panel — reduced step: movement is a fifth of a cell, rotation is 15° at the 90° step.
 
+- Two-stage grab: the first press only SELECTS the item — a teal outline appears around it (inverted hull over all meshes); the second press on the selected item starts the drag. Light items no longer get flung away by an accidental touch. Pressing empty space deselects.
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.
