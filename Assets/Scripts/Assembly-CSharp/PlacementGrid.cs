@@ -386,7 +386,8 @@ public class PlacementGrid : MonoBehaviour
         var startRb = target.GetComponentInParent<Rigidbody>();
         if (startRb != null)
         {
-            pcBodies = CollectAssembly(startRb);
+            // Сборка по джойнтам + свободные предметы, которые лежат на ней
+            pcBodies = AddLooseStack(CollectAssembly(startRb));
             DragAssemblyBodies = pcBodies;
         }
 
@@ -404,6 +405,109 @@ public class PlacementGrid : MonoBehaviour
         if (SnapEnabled) ApplyRotationLock();
 
         if (visual != null) visual.aimMaskOverride = AimLayer;
+    }
+
+    /// <summary>Физический коллайдер: не триггер, включён и стоит на активном объекте.</summary>
+    public static bool IsSolidCollider(Collider c)
+    {
+        return c != null && c.enabled && !c.isTrigger && c.gameObject.activeInHierarchy;
+    }
+
+    /// <summary>
+    /// Габарит физических коллайдеров тела. Триггеры (зоны приближения, подсказки)
+    /// и выключенные части в габарит не входят — иначе соседние предметы «не двигаются».
+    /// </summary>
+    public static bool TrySolidBounds(Rigidbody rb, out Bounds b)
+    {
+        b = default(Bounds);
+        if (rb == null) return false;
+
+        bool has = false;
+        var cs = rb.GetComponentsInChildren<Collider>(true);
+        for (int j = 0; j < cs.Length; j++)
+        {
+            if (!IsSolidCollider(cs[j])) continue;
+
+            if (!has)
+            {
+                b = cs[j].bounds;
+                has = true;
+            }
+            else
+            {
+                b.Encapsulate(cs[j].bounds);
+            }
+        }
+
+        return has;
+    }
+
+    /// <summary>Тела, которые соединены джойнтом (сами или как соединённое): части конструкций.</summary>
+    private static HashSet<Rigidbody> JointedBodies()
+    {
+        var set = new HashSet<Rigidbody>();
+        var joints = FindObjectsOfType<Joint>();
+        for (int i = 0; i < joints.Length; i++)
+        {
+            var j = joints[i];
+            if (j == null) continue;
+
+            var own = j.GetComponent<Rigidbody>();
+            if (own != null) set.Add(own);
+            if (j.connectedBody != null) set.Add(j.connectedBody);
+        }
+        return set;
+    }
+
+    private const int MaxLooseStack = 24;
+
+    /// <summary>
+    /// Свободные предметы, которые лежат НА сборке (отвалившиеся крышки и планки,
+    /// мелочь сверху), едут вместе с ней. Иначе они стоят стеной на пути, и предмет
+    /// «не двигается». Части, соединённые джойнтами с конструкцией (петли и т.п.),
+    /// не трогаем — они остаются препятствием.
+    /// </summary>
+    private Rigidbody[] AddLooseStack(Rigidbody[] assembly)
+    {
+        if (assembly == null || assembly.Length == 0) return assembly;
+
+        var jointed = JointedBodies();
+        var set = new HashSet<Rigidbody>(assembly);
+        var list = new List<Rigidbody>(assembly);
+        var queue = new Queue<Rigidbody>(assembly);
+
+        while (queue.Count > 0 && list.Count < MaxLooseStack)
+        {
+            var rb = queue.Dequeue();
+
+            Bounds b;
+            if (!TrySolidBounds(rb, out b)) continue;
+
+            // Слой чуть выше верхней грани тела, в пределах его площади
+            Vector3 half = new Vector3(b.extents.x - 0.02f, 0.05f, b.extents.z - 0.02f);
+            if (half.x <= 0f || half.z <= 0f) continue;
+
+            Vector3 center = new Vector3(b.center.x, b.max.y + 0.05f, b.center.z);
+            var hits = Physics.OverlapBox(center, half, Quaternion.identity,
+                surfaceMask, QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < hits.Length && list.Count < MaxLooseStack; i++)
+            {
+                var col = hits[i];
+                if (col == null) continue;
+
+                var other = col.attachedRigidbody;
+                if (other == null || other.isKinematic) continue;
+                if (set.Contains(other) || jointed.Contains(other)) continue;
+                if (IsAimBlocker(col)) continue;
+
+                set.Add(other);
+                list.Add(other);
+                queue.Enqueue(other);
+            }
+        }
+
+        return list.ToArray();
     }
 
     /// <summary>

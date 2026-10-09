@@ -810,7 +810,7 @@ public class Raycast : MonoBehaviour
     /// Стрелка по ВЫБРАННОМУ, но не зажатому предмету: один шаг по клетке или
     /// один поворот — сразу, в этом же кадре. Сборку закрепляем тем же путём,
     /// что и при переносе (защита джойнтов, блокировка поворота), смещаем
-    /// телепортом через те же гейты (стена, соседний предмет, подъём) и
+    /// напрямую через те же гейты (стена, соседний предмет, подъём) и
     /// отпускаем. Между нажатиями предмет обычный: падает, если под ним пусто.
     /// </summary>
     private void NudgeSelected(int xDir, int yDirUp, bool fine)
@@ -856,7 +856,7 @@ public class Raycast : MonoBehaviour
             delta.y = 0f;
             if (delta.sqrMagnitude < 1e-10f) return;
 
-            TryPinWithClimb(grid, body, delta, true, true);
+            TryPinWithClimb(grid, body, delta, true);
         }
         finally
         {
@@ -915,7 +915,9 @@ public class Raycast : MonoBehaviour
 
         var worldDelta = target * Quaternion.Inverse(q);
 
-        // Пивот — центр габарита всей сборки: крутим вокруг него.
+        // Пивот — центр физического габарита всей сборки. Триггеры в него не входят:
+        // зона приближения у монитора раздувала габарит, и крышка «уезжала» вокруг
+        // далёкого пивота.
         Vector3 pivot = body.worldCenterOfMass;
         Bounds cur = default(Bounds);
         bool hasBounds = grid != null && TryAssemblyBounds(grid, body, out cur);
@@ -928,15 +930,12 @@ public class Raycast : MonoBehaviour
                 if (assembly[i] != null) self.Add(assembly[i]);
         }
 
-        // Предсказываем габарит сборки ПОСЛЕ поворота (повороты кратны 90°,
-        // поэтому бокс плотный) и подъём: низ после переворота не должен
-        // опуститься ниже уровня, на котором предмет стоял до поворота —
-        // иначе майнер проваливается под пол.
+        // Предсказываем габарит ПОСЛЕ поворота по точным углам коробочных коллайдеров
+        // (AABB-углы повёрнутого тела завышали габарит). Низ после поворота не должен
+        // опуститься ниже уровня, на котором предмет стоял до поворота.
         float minBefore = hasBounds ? cur.min.y : body.worldCenterOfMass.y;
-        Bounds pred = default(Bounds);
-        bool hasPred = false;
-
-        if (hasBounds && assembly != null)
+        var corners = new List<Vector3>();
+        if (assembly != null)
         {
             for (int i = 0; i < assembly.Length; i++)
             {
@@ -946,30 +945,31 @@ public class Raycast : MonoBehaviour
                 var cs = rb.GetComponentsInChildren<Collider>(true);
                 for (int j = 0; j < cs.Length; j++)
                 {
-                    if (cs[j] == null || !cs[j].enabled) continue;
-
-                    var cb = cs[j].bounds;
-                    for (int k = 0; k < 8; k++)
-                    {
-                        Vector3 c = new Vector3(
-                            (k & 1) != 0 ? cb.max.x : cb.min.x,
-                            (k & 2) != 0 ? cb.max.y : cb.min.y,
-                            (k & 4) != 0 ? cb.max.z : cb.min.z);
-
-                        Vector3 p = pivot + worldDelta * (c - pivot);
-                        if (!hasPred) { pred = new Bounds(p, Vector3.zero); hasPred = true; }
-                        else pred.Encapsulate(p);
-                    }
+                    if (PlacementGrid.IsSolidCollider(cs[j])) AddColliderCorners(cs[j], corners);
                 }
             }
         }
 
-        float lift = hasPred ? Mathf.Max(0f, minBefore - pred.min.y) : 0f;
-        if (hasPred) pred.center += new Vector3(0f, lift, 0f);
+        Bounds pred = default(Bounds);
+        bool hasPred = corners.Count > 0;
+        if (hasPred)
+        {
+            Vector3 mn = Vector3.positiveInfinity;
+            Vector3 mx = Vector3.negativeInfinity;
+            for (int i = 0; i < corners.Count; i++)
+            {
+                Vector3 p = pivot + worldDelta * (corners[i] - pivot);
+                mn = Vector3.Min(mn, p);
+                mx = Vector3.Max(mx, p);
+            }
+            pred = new Bounds((mn + mx) * 0.5f, mx - mn);
+        }
+
+        float predLift = hasPred ? Mathf.Max(0f, minBefore - pred.min.y) : 0f;
+        if (hasPred) pred.center += new Vector3(0f, predLift, 0f);
 
         // Гейт поворота: если предсказанный (приподнятый) габарит кого-то
-        // задевает — поворот отменяется целиком. Массивный предмет больше не
-        // «что-то задевает» при перевороте.
+        // задевает — поворот отменяется целиком.
         if (hasPred)
         {
             const float skin = 0.005f;
@@ -996,36 +996,39 @@ public class Raycast : MonoBehaviour
             }
         }
 
-        Vector3 up = new Vector3(0f, lift, 0f);
-
-        if (assembly != null && assembly.Length > 1)
+        // Поворот вокруг пивота — прямой записью трансформов. MoveRotation/MovePosition
+        // оставляли цель до следующего шага физики: если тело в этот момент становилось
+        // динамическим (отпустили кнопку), оно разгонялось и «взлетало».
+        var parts = assembly != null && assembly.Length > 0 ? assembly : new[] { body };
+        for (int i = 0; i < parts.Length; i++)
         {
-            for (int i = 0; i < assembly.Length; i++)
-            {
-                var rb = assembly[i];
-                if (rb == null) continue;
+            var rb = parts[i];
+            if (rb == null) continue;
 
-                Quaternion next = worldDelta * rb.rotation;
-                Vector3 pos = pivot + worldDelta * (rb.position - pivot) + up;
-
-                rb.MoveRotation(next);
-                rb.transform.rotation = next;
-                rb.MovePosition(pos);
-                rb.transform.position = pos;
-                rb.velocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            Quaternion next = worldDelta * rb.transform.rotation;
+            Vector3 pos = pivot + worldDelta * (rb.transform.position - pivot);
+            rb.transform.SetPositionAndRotation(pos, next);
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
         }
-        else
+        Physics.SyncTransforms();
+
+        // Подъём — по ФАКТИЧЕСКОМУ низу после поворота: низ остаётся на прежней высоте.
+        // Предсказанный подъём каждый раз немного завышал, и за несколько быстрых
+        // поворотов предмет «подкидывало» всё выше.
+        Bounds after;
+        if (hasBounds && grid != null && TryAssemblyBounds(grid, body, out after))
         {
-            Vector3 p0 = body.position;
-            var next = worldDelta * body.rotation;
-            body.MoveRotation(next);
-            body.transform.rotation = next;
-            body.MovePosition(p0 + up);
-            body.transform.position = p0 + up;
-            body.velocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
+            float lift = Mathf.Max(0f, minBefore - after.min.y);
+            if (lift > 0f)
+            {
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var rb = parts[i];
+                    if (rb != null) rb.transform.position += new Vector3(0f, lift, 0f);
+                }
+                Physics.SyncTransforms();
+            }
         }
     }
 
@@ -1101,6 +1104,37 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
+    /// Углы коллайдера в мире — для предсказания габарита после поворота. У коробки
+    /// берём её собственные углы (OBB), а не углы AABB: AABB завышал габарит.
+    /// </summary>
+    private static void AddColliderCorners(Collider c, List<Vector3> into)
+    {
+        var box = c as BoxCollider;
+        if (box != null)
+        {
+            Vector3 e = box.size * 0.5f;
+            for (int k = 0; k < 8; k++)
+            {
+                Vector3 local = box.center + new Vector3(
+                    (k & 1) != 0 ? e.x : -e.x,
+                    (k & 2) != 0 ? e.y : -e.y,
+                    (k & 4) != 0 ? e.z : -e.z);
+                into.Add(box.transform.TransformPoint(local));
+            }
+            return;
+        }
+
+        Bounds wb = c.bounds;
+        for (int k = 0; k < 8; k++)
+        {
+            into.Add(new Vector3(
+                (k & 1) != 0 ? wb.max.x : wb.min.x,
+                (k & 2) != 0 ? wb.max.y : wb.min.y,
+                (k & 4) != 0 ? wb.max.z : wb.min.z));
+        }
+    }
+
+    /// <summary>
     /// Габарит ВСЕЙ тащимой сборки (включая детали, которые держатся только
     /// джойнтами и не являются детьми корпуса — мать и т.п.).
     /// </summary>
@@ -1110,26 +1144,22 @@ public class Raycast : MonoBehaviour
         var assembly = grid.DragAssemblyBodies;
         if (assembly == null || assembly.Length == 0) return false;
 
+        // Только физические коллайдеры: триггеры (зоны приближения, подсказки) и
+        // выключенные части габарит не раздувают — иначе соседи «не двигаются».
         bool has = false;
         for (int i = 0; i < assembly.Length; i++)
         {
-            var rb = assembly[i];
-            if (rb == null) continue;
+            Bounds part;
+            if (!PlacementGrid.TrySolidBounds(assembly[i], out part)) continue;
 
-            var cs = rb.GetComponentsInChildren<Collider>(true);
-            for (int j = 0; j < cs.Length; j++)
+            if (!has)
             {
-                if (cs[j] == null || !cs[j].enabled) continue;
-
-                if (!has)
-                {
-                    b = cs[j].bounds;
-                    has = true;
-                }
-                else
-                {
-                    b.Encapsulate(cs[j].bounds);
-                }
+                b = part;
+                has = true;
+            }
+            else
+            {
+                b.Encapsulate(part);
             }
         }
 
@@ -1225,16 +1255,13 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Резко смещает всю сборку на дельту (без сил). teleport — сразу меняет
-    /// позицию: для одиночного шага выбранного предмета, который закреплён в
-    /// этом же кадре и не дожидается шага физики.
+    /// Смещает всю сборку на дельту (без сил). Двигаем трансформ и сразу
+    /// синхронизируем физику. MovePosition оставлял цель «висеть» до следующего
+    /// шага физики: если тело в этот момент становилось динамическим (отпустили
+    /// кнопку), цель разгоняла его вверх — отсюда «взлетающие» крышки.
     /// </summary>
-    private void ApplyPin(PlacementGrid grid, Vector3 delta, bool teleport = false)
+    private void ApplyPin(PlacementGrid grid, Vector3 delta)
     {
-        // MovePosition задаёт цель до следующего шага физики, и повторный вызов
-        // её перезаписывает. Нулевой сдвиг не должен перетирать цель, которую
-        // физика ещё не применила (шаг стрелки в прошлом кадре), — поэтому
-        // ничего не делаем.
         if (delta.sqrMagnitude < 1e-10f) return;
 
         var assembly = grid.DragAssemblyBodies;
@@ -1245,19 +1272,12 @@ public class Raycast : MonoBehaviour
             var partRb = assembly[i];
             if (partRb == null) continue;
 
-            if (teleport)
-            {
-                partRb.position = partRb.position + delta;
-                partRb.WakeUp();
-            }
-            else
-            {
-                partRb.MovePosition(partRb.position + delta);
-            }
-
+            partRb.transform.position += delta;
             partRb.velocity = Vector3.zero;
             partRb.angularVelocity = Vector3.zero;
         }
+
+        Physics.SyncTransforms();
     }
 
     /// <summary>Дистанция вдоль дельты до первого настоящего препятствия.</summary>
@@ -1305,12 +1325,11 @@ public class Raycast : MonoBehaviour
     /// высокое препятствие — скользим вплотную и останавливаемся в паре
     /// миллиметров (прислонить к стене/другому ПК впритык).
     /// </summary>
-    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep,
-        bool teleport = false)
+    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
     {
         if (PathClear(grid, body, delta, sweep))
         {
-            ApplyPin(grid, delta, teleport);
+            ApplyPin(grid, delta);
             return true;
         }
 
@@ -1321,7 +1340,7 @@ public class Raycast : MonoBehaviour
             up.y += climbs[i];
             if (PathClear(grid, body, up, sweep))
             {
-                ApplyPin(grid, up, teleport);
+                ApplyPin(grid, up);
                 return true;
             }
         }
@@ -1332,7 +1351,7 @@ public class Raycast : MonoBehaviour
             if (d < float.MaxValue && d > 0.01f)
             {
                 var slide = delta.normalized * Mathf.Max(0f, d - 0.004f);
-                ApplyPin(grid, slide, teleport);
+                ApplyPin(grid, slide);
                 return true;
             }
         }
@@ -1479,10 +1498,17 @@ public class Raycast : MonoBehaviour
                     if (body != null && hasSurface && normal.y > 0.7f)
                     {
                         float bottomOffset = body.worldCenterOfMass.y - AssemblyBoundsMinY(grid, body);
-                        float bottom = grid.snapHeight
-                            ? grid.SnapCoord(gridHit.point.y)
-                            : gridHit.point.y;
-                        if (bottom < gridHit.point.y - 0.02f) bottom = gridHit.point.y;
+
+                        // Низ — на поверхности. Линию сетки берём, только если она почти
+                        // совпадает с поверхностью. Раньше стол на 0.75 м поднимал предмет
+                        // до ближайшей линии сетки (1.0 м): он «левитировал» над столом.
+                        float surfaceY = gridHit.point.y;
+                        float bottom = surfaceY;
+                        if (grid.snapHeight)
+                        {
+                            float line = grid.SnapCoord(surfaceY);
+                            if (Mathf.Abs(line - surfaceY) <= 0.02f) bottom = line;
+                        }
                         bodySnapped.y = bottom + bottomOffset;
                     }
 

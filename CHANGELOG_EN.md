@@ -88,6 +88,14 @@
 
 ## Fixed
 
+- An item no longer «levitates» over a table in grid mode: its bottom is placed on the surface. Before, the grid line (0.5 m step) lifted it to the nearest line above — a box on a 0.75 m table went up to 1.0 m.
+
+- Lids and other parts no longer «fly up» or «drift» when rotated: the lift is computed from the real bounds after the turn, and move targets no longer wait for the next physics step (that's why a released lid used to be launched upward).
+
+- Loose items lying on the one you carry (fallen lids, planks, small stuff on top) now move along with it. Before, they stood like a wall in the path and the item «would not move». Parts still attached to a box by hinges remain obstacles.
+
+- Trigger zones (approach zones and similar) no longer inflate an item's bounds: neighbouring items standing close can move again.
+
 - Flipping a case that lies on its side («opening up») works: rotation used to be split into yaw and pitch, which degenerates for such a case, loses its roll and turns it 120° instead of 90°. Now the arrows always give exactly 90° and stand the case on a face. A standing case behaves as before.
 
 - When rotation lock is on (key 2), the arrows in rotate mode don't turn the item. The bottom-left label now shows it.
