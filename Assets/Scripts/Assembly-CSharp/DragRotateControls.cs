@@ -14,6 +14,7 @@ public class DragRotateControls : MonoBehaviour
 
     private Raycast raycast;
     private GameObject panel;
+    private Text modeText;
 
     /// <summary>
     /// Создаёт панель, если её ещё нет (вызывается из Raycast.Start).
@@ -50,6 +51,8 @@ public class DragRotateControls : MonoBehaviour
     {
         if (panel != null && panel.activeSelf != visible)
             panel.SetActive(visible);
+
+        if (visible) RefreshLabel();
     }
 
     private void OnDestroy()
@@ -99,17 +102,76 @@ public class DragRotateControls : MonoBehaviour
         panelRect.anchorMax = new Vector2(1f, 0f);
         panelRect.pivot = new Vector2(1f, 0f);
         panelRect.anchoredPosition = new Vector2(-16f, 96f);
-        panelRect.sizeDelta = new Vector2(160f, 160f);
+        panelRect.sizeDelta = new Vector2(240f, 208f);
 
-        // Стрелка в спрайте смотрит вверх; остальные кнопки повёрнуты
-        Wire(CreateButton(panel.transform, sprite, "RotateLeft", -52f, 0f, 90f), -1, 0);
-        Wire(CreateButton(panel.transform, sprite, "RotateUp", 0f, 52f, 0f), 0, -1);
-        Wire(CreateButton(panel.transform, sprite, "RotateRight", 52f, 0f, -90f), 1, 0);
-        Wire(CreateButton(panel.transform, sprite, "RotateDown", 0f, -52f, 180f), 0, 1);
+        // Главные стрелки: в режиме перемещения — ходят по клеткам,
+        // в режиме поворота — крутят. Стрелка в спрайте смотрит вверх;
+        // остальные кнопки повёрнуты.
+        Wire(CreateButton(panel.transform, sprite, "ArrowLeft", -64f, 0f, 90f, 48f), -1, 0, false);
+        Wire(CreateButton(panel.transform, sprite, "ArrowUp", 0f, 56f, 0f, 48f), 0, 1, false);
+        Wire(CreateButton(panel.transform, sprite, "ArrowRight", 64f, 0f, -90f, 48f), 1, 0, false);
+        Wire(CreateButton(panel.transform, sprite, "ArrowDown", 0f, -56f, 180f, 48f), 0, -1, false);
+
+        // Мелкие стрелки по краям: то же, но с уменьшенным шагом
+        // (аналог Ctrl на ПК).
+        Wire(CreateButton(panel.transform, sprite, "FineLeft", -104f, 0f, 90f, 30f), -1, 0, true);
+        Wire(CreateButton(panel.transform, sprite, "FineUp", 0f, 94f, 0f, 30f), 0, 1, true);
+        Wire(CreateButton(panel.transform, sprite, "FineRight", 104f, 0f, -90f, 30f), 1, 0, true);
+        Wire(CreateButton(panel.transform, sprite, "FineDown", 0f, -94f, 180f, 30f), 0, -1, true);
+
+        // Центральная кнопка — переключатель режима стрелок:
+        // перемещение / поворот (аналог R на ПК).
+        var tgo = new GameObject("ModeToggle", typeof(RectTransform));
+        tgo.transform.SetParent(panel.transform, false);
+
+        var trect = (RectTransform)tgo.transform;
+        trect.anchorMin = new Vector2(0.5f, 0.5f);
+        trect.anchorMax = new Vector2(0.5f, 0.5f);
+        trect.pivot = new Vector2(0.5f, 0.5f);
+        trect.anchoredPosition = Vector2.zero;
+        trect.sizeDelta = new Vector2(52f, 52f);
+
+        var tbg = tgo.AddComponent<Image>();
+        tbg.color = new Color(0f, 0f, 0f, 0.6f);
+
+        var labelGo = new GameObject("Label", typeof(RectTransform));
+        labelGo.transform.SetParent(tgo.transform, false);
+
+        var lrect = (RectTransform)labelGo.transform;
+        lrect.anchorMin = Vector2.zero;
+        lrect.anchorMax = Vector2.one;
+        lrect.offsetMin = Vector2.zero;
+        lrect.offsetMax = Vector2.zero;
+
+        modeText = labelGo.AddComponent<Text>();
+        modeText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        modeText.alignment = TextAnchor.MiddleCenter;
+        modeText.fontSize = 13;
+        modeText.color = Color.white;
+
+        var toggle = tgo.AddComponent<Button>();
+        toggle.targetGraphic = tbg;
+        toggle.onClick.AddListener(() =>
+        {
+            if (raycast != null)
+            {
+                raycast.ToggleArrowMode();
+                RefreshLabel();
+            }
+        });
+
+        RefreshLabel();
+    }
+
+    /// <summary>Подпись центральной кнопки: текущий режим стрелок.</summary>
+    private void RefreshLabel()
+    {
+        if (modeText == null) return;
+        modeText.text = raycast != null && !raycast.ArrowMoveMode ? "поворот" : "движ.";
     }
 
     private Button CreateButton(Transform parent, Sprite sprite, string name,
-        float x, float y, float zRotation)
+        float x, float y, float zRotation, float size)
     {
         var go = new GameObject(name, typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -119,7 +181,7 @@ public class DragRotateControls : MonoBehaviour
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(x, y);
-        rect.sizeDelta = new Vector2(48f, 48f);
+        rect.sizeDelta = new Vector2(size, size);
         rect.localRotation = Quaternion.Euler(0f, 0f, zRotation);
 
         // Подложка, чтобы стрелку было видно на любом фоне
@@ -145,13 +207,13 @@ public class DragRotateControls : MonoBehaviour
         return button;
     }
 
-    private void Wire(Button button, int yawDir, int pitchDir)
+    private void Wire(Button button, int xDir, int yDirUp, bool fine)
     {
         if (button == null) return;
 
         button.onClick.AddListener(() =>
         {
-            if (raycast != null) raycast.RotateDragged(yawDir, pitchDir);
+            if (raycast != null) raycast.ArrowInput(xDir, yDirUp, fine);
         });
     }
 

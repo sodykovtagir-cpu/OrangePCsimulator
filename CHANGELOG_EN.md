@@ -106,6 +106,12 @@
 
 - Adaptive grid: if the target cell is blocked by a tall obstacle, the item slides along the direction and leans FLUSH against it (a couple of mm) — you can lean it against a wall or another object.
 
+- Movement in grid mode is ARROWS-ONLY now: the item no longer follows the crosshair. On grab it snaps to the nearest cell, then every press is a cell step relative to the camera (up = away from you). The same gates apply: it won't enter a wall and can lean flush against walls/PCs.
+
+- R on PC and the center panel button on the phone toggle the arrows mode: "move / rotate" (the button label shows the current mode).
+
+- Ctrl on PC and the small edge arrows on the phone panel — reduced step: movement is a fifth of a cell, rotation is 15° at the 90° step.
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.

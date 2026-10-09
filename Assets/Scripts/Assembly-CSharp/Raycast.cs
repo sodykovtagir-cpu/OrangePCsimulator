@@ -49,6 +49,12 @@ public class Raycast : MonoBehaviour
     [SerializeField]
     private float rotateStep = 90f;
 
+    // Стрелки в режиме сетки: режим (перемещение/поворот) и накопленный
+    // горизонтальный шаг, который применит следующий кадр драга.
+    private bool gridArrowMoveMode = true;
+    private Vector3 pendingGridMove;
+    private bool gridMoveInit;
+
     [SerializeField]
     private bool showHint;
 
@@ -169,13 +175,19 @@ public class Raycast : MonoBehaviour
             UpdateDistanceUI(currentDrag.distance);
         }
 
-        // Поворот тащимого предмета обычными стрелками — только в режиме сетки
+        // Стрелки в режиме сетки: R переключает «перемещение/поворот»,
+        // Ctrl — уменьшенный шаг (и движения, и поворота).
         if (GridMode())
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) RotateDragged(-1, 0);
-            if (Input.GetKeyDown(KeyCode.RightArrow)) RotateDragged(1, 0);
-            if (Input.GetKeyDown(KeyCode.UpArrow)) RotateDragged(0, -1);
-            if (Input.GetKeyDown(KeyCode.DownArrow)) RotateDragged(0, 1);
+            if (Input.GetKeyDown(KeyCode.R)) ToggleArrowMode();
+
+            bool fine = Input.GetKey(KeyCode.LeftControl) ||
+                        Input.GetKey(KeyCode.RightControl);
+
+            if (Input.GetKeyDown(KeyCode.LeftArrow)) ArrowInput(-1, 0, fine);
+            if (Input.GetKeyDown(KeyCode.RightArrow)) ArrowInput(1, 0, fine);
+            if (Input.GetKeyDown(KeyCode.UpArrow)) ArrowInput(0, 1, fine);
+            if (Input.GetKeyDown(KeyCode.DownArrow)) ArrowInput(0, -1, fine);
         }
     }
 
@@ -462,13 +474,58 @@ public class Raycast : MonoBehaviour
         gridSpringApplied = false;
     }
 
+    /// <summary>Стрелки сейчас перемещают (true) или поворачивают (false).</summary>
+    public bool ArrowMoveMode { get { return gridArrowMoveMode; } }
+
+    /// <summary>R / кнопка панели: переключить режим стрелок.</summary>
+    public bool ToggleArrowMode()
+    {
+        gridArrowMoveMode = !gridArrowMoveMode;
+        return gridArrowMoveMode;
+    }
+
+    /// <summary>
+    /// Стрелки (клавиатура или панель): в режиме перемещения — шаг по клеткам
+    /// относительно камеры (вверх = от себя), Ctrl/мелкие стрелки — шаг в
+    /// пятую часть клетки; в режиме поворота — поворот (вверх = кувырок
+    /// назад). Движение резко, через те же гейты: стена не пустит,
+    /// к соседу можно прислонить впритык.
+    /// </summary>
+    public void ArrowInput(int xDir, int yDirUp, bool fine)
+    {
+        if (!GridMode() || currentDrag == null) return;
+
+        if (!gridArrowMoveMode)
+        {
+            RotateDragged(xDir, -yDirUp, fine);
+            return;
+        }
+
+        var grid = PlacementGrid.Instance;
+        var cam = Camera.main;
+        if (grid == null || cam == null) return;
+
+        Vector3 fwd = cam.transform.forward;
+        fwd.y = 0f;
+        if (fwd.sqrMagnitude < 1e-6f) fwd = Vector3.forward;
+        fwd.Normalize();
+
+        Vector3 right = cam.transform.right;
+        right.y = 0f;
+        if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
+        right.Normalize();
+
+        float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
+        pendingGridMove += (right * (float)xDir + fwd * (float)yDirUp) * step;
+    }
+
     /// <summary>
     /// Поворачивает тащимый предмет на шаг (стрелки клавиатуры или кнопки
     /// панели DragRotateControls). Вся сборка (корпус + мать + стекло, всё,
     /// что в графе джойнтов) крутится вокруг ОДНОЙ точки — иначе детали
     /// «крутятся на месте», джойнты растягиваются и при отпускании отлетают.
     /// </summary>
-    public void RotateDragged(int yawDir, int pitchDir)
+    public void RotateDragged(int yawDir, int pitchDir, bool fine = false)
     {
         // Стрелки поворачивают предмет только в режиме сетки
         if (!GridMode()) return;
@@ -477,7 +534,8 @@ public class Raycast : MonoBehaviour
         var body = spring != null ? spring.connectedBody : null;
         if (body == null || currentDrag == null) return;
 
-        float step = Mathf.Max(1f, rotateStep);
+        // Ctrl/мелкие стрелки — уменьшенный шаг поворота
+        float step = Mathf.Max(1f, fine ? rotateStep / 6f : rotateStep);
         var grid = PlacementGrid.Instance;
         var assembly = grid != null ? grid.DragAssemblyBodies : null;
 
@@ -939,11 +997,22 @@ public class Raycast : MonoBehaviour
 
                     if (body != null)
                     {
-                        // Раньше снапалась точка захвата — предмет висел на ней
-                        // углом и по клеткам не ходил. Теперь снапаем центр масс
-                        // тела, а точку захвата просто сдвигаем вместе с ним.
                         grabOffset = body.transform.TransformDirection(currentDrag.grabOffsetLocal);
-                        bodySnapped = grid.SnapPosition(point + grabOffset, normal, surface);
+
+                        // В режиме сетки предмет ходит ТОЛЬКО стрелками:
+                        // горизонталь — текущая позиция + накопленный шаг
+                        // стрелок (pendingGridMove), а не точка прицела.
+                        // Первый кадр — снап к ближайшей клетке.
+                        if (!gridMoveInit)
+                        {
+                            var s0 = grid.SnapPosition(body.position, Vector3.up, null);
+                            pendingGridMove += new Vector3(
+                                s0.x - body.position.x, 0f, s0.z - body.position.z);
+                            gridMoveInit = true;
+                        }
+
+                        bodySnapped = body.position + pendingGridMove;
+                        pendingGridMove = Vector3.zero;
                     }
                     else
                     {
@@ -1120,6 +1189,8 @@ public class Raycast : MonoBehaviour
 
             if (distanceObj) distanceObj.SetActive(false);
             currentDrag = null;
+            gridMoveInit = false;
+            pendingGridMove = Vector3.zero;
 
             if (showHint && slots != null)
             {
