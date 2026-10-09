@@ -569,7 +569,7 @@ public class Raycast : MonoBehaviour
             if (half.x > 0f && half.y > 0f && half.z > 0f)
             {
                 var blocked = Physics.OverlapBox(pred.center, half,
-                    Quaternion.identity, layer, QueryTriggerInteraction.Ignore);
+                    Quaternion.identity, grid.surfaceMask, QueryTriggerInteraction.Ignore);
 
                 for (int i = 0; i < blocked.Length; i++)
                 {
@@ -578,10 +578,10 @@ public class Raycast : MonoBehaviour
 
                     var crb = col.attachedRigidbody;
                     if (crb != null && self.Contains(crb)) continue;
-                    if (col.transform.IsChildOf(body.transform)) continue;
+                    if (grid.IsAimBlocker(col)) continue;
 
                     // после поворота стоим НА нём (пол/стол) — не блок
-                    if (col.bounds.max.y <= pred.min.y + 0.02f) continue;
+                    if (col.bounds.max.y <= pred.min.y + 0.06f) continue;
 
                     return; // не крутим — заденем
                 }
@@ -671,7 +671,14 @@ public class Raycast : MonoBehaviour
     /// и другие предметы принимаются за препятствия. Сил не прикладываем —
     /// значит, ничего не ломаем, не проталкиваем и никуда не пролетаем.
     /// </summary>
-    private bool TryPinAssembly(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
+    /// <summary>
+    /// Проверяет, можно ли сместить всю тащимую сборку на дельту: цель и путь
+    /// свободны. Сам ничего не двигает. Маска — surfaceMask (весь мир: стены,
+    /// пол, плиты — раньше гейты смотрели только в слой предметов и стены
+    /// «не видели», предмет выстреливал за стенку). Игрок и тащимый
+    /// игнорируются через IsAimBlocker.
+    /// </summary>
+    private bool PathClear(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
     {
         if (delta.sqrMagnitude < 1e-9f) return true;
 
@@ -681,24 +688,17 @@ public class Raycast : MonoBehaviour
         var assembly = grid.DragAssemblyBodies;
         var self = new HashSet<Rigidbody>();
         for (int i = 0; i < assembly.Length; i++)
-        {
             if (assembly[i] != null) self.Add(assembly[i]);
-        }
 
-        // Чек-бокс сжат на миллиметры: к соседу не влезаем вообще
-        // (иначе кинематик на скорости вминается в чужой ПК и рвёт его).
         const float skin = 0.005f;
         Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
         if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
 
-        // Проверка ПУТИ: не даём пролететь сквозь стену/кучу, даже когда
-        // цель за ними пустая. Sweep непрерывный — тонкие стены тоже не
-        // проскакивают.
         if (sweep)
         {
             Vector3 dir = delta.normalized;
             var path = Physics.BoxCastAll(b.center, half, dir,
-                Quaternion.identity, delta.magnitude, layer,
+                Quaternion.identity, delta.magnitude, grid.surfaceMask,
                 QueryTriggerInteraction.Ignore);
 
             for (int i = 0; i < path.Length; i++)
@@ -709,10 +709,10 @@ public class Raycast : MonoBehaviour
 
                 var rb = col.attachedRigidbody;
                 if (rb != null && self.Contains(rb)) continue;
-                if (col.transform.IsChildOf(body.transform)) continue;
+                if (grid.IsAimBlocker(col)) continue;
 
-                // стоим НА нём (пол/стол) — касание снизу не блок
-                if (col.bounds.max.y <= b.min.y + 0.02f) continue;
+                // стоим НА нём (пол/стол/мелкий обломок) — не блок
+                if (col.bounds.max.y <= b.min.y + 0.06f) continue;
 
                 // идём по касательной — не врубаемся
                 if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
@@ -724,8 +724,8 @@ public class Raycast : MonoBehaviour
             }
         }
 
-        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity, layer,
-            QueryTriggerInteraction.Ignore);
+        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity,
+            grid.surfaceMask, QueryTriggerInteraction.Ignore);
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -733,16 +733,24 @@ public class Raycast : MonoBehaviour
             if (col == null) continue;
 
             var rb = col.attachedRigidbody;
-            if (rb != null && self.Contains(rb)) continue; // своя сборка
-            if (col.transform.IsChildOf(body.transform)) continue;
+            if (rb != null && self.Contains(rb)) continue;
+            if (grid.IsAimBlocker(col)) continue;
 
-            // после шага стоим НА нём (пол/стол/осколок, который переехали)
-            if (col.bounds.max.y <= b.min.y + delta.y + 0.02f) continue;
+            // после шага стоим НА нём (пол/стол/перееханный обломок)
+            if (col.bounds.max.y <= b.min.y + delta.y + 0.06f) continue;
 
             return false; // клетка занята
         }
 
-        // Путь чист — резко встаём в клетку всей сборкой
+        return true;
+    }
+
+    /// <summary>Резко смещает всю сборку на дельту (без сил).</summary>
+    private void ApplyPin(PlacementGrid grid, Vector3 delta)
+    {
+        var assembly = grid.DragAssemblyBodies;
+        if (assembly == null) return;
+
         for (int i = 0; i < assembly.Length; i++)
         {
             var partRb = assembly[i];
@@ -752,25 +760,82 @@ public class Raycast : MonoBehaviour
             partRb.velocity = Vector3.zero;
             partRb.angularVelocity = Vector3.zero;
         }
+    }
 
-        return true;
+    /// <summary>Дистанция вдоль дельты до первого настоящего препятствия.</summary>
+    private float NearestBlockDistance(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    {
+        Bounds b;
+        if (!TryAssemblyBounds(grid, body, out b)) return float.MaxValue;
+
+        var assembly = grid.DragAssemblyBodies;
+        var self = new HashSet<Rigidbody>();
+        for (int i = 0; i < assembly.Length; i++)
+            if (assembly[i] != null) self.Add(assembly[i]);
+
+        const float skin = 0.005f;
+        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
+        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return float.MaxValue;
+
+        Vector3 dir = delta.normalized;
+        var path = Physics.BoxCastAll(b.center, half, dir,
+            Quaternion.identity, delta.magnitude, grid.surfaceMask,
+            QueryTriggerInteraction.Ignore);
+
+        float nearest = float.MaxValue;
+        for (int i = 0; i < path.Length; i++)
+        {
+            var hit = path[i];
+            var col = hit.collider;
+            if (col == null) continue;
+
+            var rb = col.attachedRigidbody;
+            if (rb != null && self.Contains(rb)) continue;
+            if (grid.IsAimBlocker(col)) continue;
+            if (col.bounds.max.y <= b.min.y + 0.06f) continue;
+            if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
+
+            if (hit.distance < nearest) nearest = hit.distance;
+        }
+
+        return nearest;
     }
 
     /// <summary>
-    /// TryPinAssembly + «ступенька»: если клетку блокирует маленький осколок/
-    /// обломок на полу — приподнимаем цель, чтобы переехать через него.
-    /// Высокое (стены, другие ПК, плиты) по-прежнему блокирует.
+    /// Резко по клеткам + адаптивное прислонение: клетка свободна — мгновенно
+    /// занимаем; низкая помеха (крышка m2, осколок) — переезжаем ступенькой;
+    /// высокое препятствие — скользим вплотную и останавливаемся в паре
+    /// миллиметров (прислонить к стене/другому ПК впритык).
     /// </summary>
     private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
     {
-        if (TryPinAssembly(grid, body, delta, sweep)) return true;
+        if (PathClear(grid, body, delta, sweep))
+        {
+            ApplyPin(grid, delta);
+            return true;
+        }
 
-        float[] climbs = { 0.25f, 0.5f, grid.cellSize };
+        float[] climbs = { 0.1f, 0.25f, 0.5f, grid.cellSize };
         for (int i = 0; i < climbs.Length; i++)
         {
             var up = delta;
             up.y += climbs[i];
-            if (TryPinAssembly(grid, body, up, sweep)) return true;
+            if (PathClear(grid, body, up, sweep))
+            {
+                ApplyPin(grid, up);
+                return true;
+            }
+        }
+
+        if (sweep)
+        {
+            float d = NearestBlockDistance(grid, body, delta);
+            if (d < float.MaxValue && d > 0.01f)
+            {
+                var slide = delta.normalized * Mathf.Max(0f, d - 0.004f);
+                ApplyPin(grid, slide);
+                return true;
+            }
         }
 
         return false;

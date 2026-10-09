@@ -100,6 +100,12 @@
 
 - The item no longer launches on release: residual kinematic velocity from MovePosition is zeroed before isKinematic/constraints are restored (and in plain drag as well).
 
+- The gates now see the WHOLE world (surfaceMask): before, they only looked at the items layer, so walls "didn't exist" — pull the aim past a wall and the item launched through it. The player and the dragged item are still ignored.
+
+- No more tripping on small stuff: m2 covers and debris up to ~6 cm are simply driven over without blocking.
+
+- Adaptive grid: if the target cell is blocked by a tall obstacle, the item slides along the direction and leans FLUSH against it (a couple of mm) — you can lean it against a wall or another object.
+
 - The grid no longer turns on by itself: PlayerPrefs persistence removed (a teardown bug inverted the saved setting, so the next launch started with the grid on). The grid is now always off by default and is enabled with G or the hotbar button.
 
 - In grid mode the item moves cell by cell SHARPLY without breaking anything around: a cell is occupied instantly, but only if it is free — walls, floor slabs and other objects block it (it is "afraid" of them). No forces are applied at all, so the item doesn't wreck PCs on touch and never flies through anything. Height: the item's bottom is placed on the snapped plane and never sinks into the floor.
