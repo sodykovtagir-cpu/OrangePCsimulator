@@ -1109,20 +1109,34 @@ public class Raycast : MonoBehaviour
         float predLift = hasPred ? Mathf.Max(0f, minBefore - pred.min.y) : 0f;
         if (hasPred) pred.center += new Vector3(0f, predLift, 0f);
 
-        // Гейт поворота: если предсказанный (приподнятый) габарит кого-то
-        // задевает — поворот отменяется целиком.
-        if (hasPred)
+        // Гейт поворота: проверяем каждый коллайдер сборки ОТДЕЛЬНО в его
+        // новом положении (собственные оси коробки, повёрнутые вокруг пивота).
+        // Общий AABB после поворота раздувался до габарита всей конструкции —
+        // на майнере это 11 метров, и поворот отменялся соседями, которых
+        // предмет не касался.
+        var boxes = new List<GridBox>(8);
+        if (grid != null && CollectGridBoxes(grid, boxes) && boxes.Count > 0)
         {
-            const float skin = 0.005f;
-            Vector3 half = pred.size * 0.5f - new Vector3(skin, skin, skin);
-            if (half.x > 0f && half.y > 0f && half.z > 0f)
+            for (int i = 0; i < boxes.Count; i++)
             {
-                var blocked = Physics.OverlapBox(pred.center, half,
-                    Quaternion.identity, grid.surfaceMask, QueryTriggerInteraction.Ignore);
+                var gb = boxes[i];
 
-                for (int i = 0; i < blocked.Length; i++)
+                Vector3 rotatedCenter = pivot + worldDelta * (gb.center - pivot);
+                rotatedCenter.y += predLift;
+                Quaternion rotatedRot = worldDelta * gb.rot;
+
+                Vector3 half = gb.half - new Vector3(SweepSkin, SweepSkin, SweepSkin);
+                if (half.x <= 0f || half.y <= 0f || half.z <= 0f) continue;
+
+                // Низ этого коллайдера после поворота: стоим на полке — не блок
+                float floorY = rotatedCenter.y - ProjectedHalfHeight(gb.half, rotatedRot) + GroundEpsilon;
+
+                var blocked = Physics.OverlapBox(rotatedCenter, half, rotatedRot,
+                    grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+                for (int j = 0; j < blocked.Length; j++)
                 {
-                    var col = blocked[i];
+                    var col = blocked[j];
                     if (col == null) continue;
 
                     var crb = col.attachedRigidbody;
@@ -1130,7 +1144,7 @@ public class Raycast : MonoBehaviour
                     if (grid.IsAimBlocker(col)) continue;
 
                     // после поворота стоим НА нём (пол/стол) — не блок
-                    if (col.bounds.max.y <= pred.min.y + GroundEpsilon) continue;
+                    if (col.bounds.max.y <= floorY) continue;
 
                     return; // не крутим — заденем
                 }
@@ -1391,89 +1405,185 @@ public class Raycast : MonoBehaviour
     {
         if (delta.sqrMagnitude < 1e-9f) return true;
 
-        Bounds b;
-        if (!TryAssemblyBounds(grid, body, out b)) return true;
+        var self = BuildSelfSet(grid);
 
-        var assembly = grid.DragAssemblyBodies;
-        var self = new HashSet<Rigidbody>();
-        for (int i = 0; i < assembly.Length; i++)
-            if (assembly[i] != null) self.Add(assembly[i]);
+        // Проверяем КАЖДЫЙ коллайдер сборки отдельно, а не один общий AABB.
+        //
+        // Почему так: общий AABB на корпусе с деталями сверху и на майнере
+        // раздувается до габарита всей конструкции (у майнера это 11 метров
+        // высотой). Пустой воздух между деталями при этом считался занятым,
+        // и шаг блокировался соседями, которых предмет даже не касался —
+        // ровно то, что было видно в логе «шаг заблокирован: BigMiner…».
+        // По коллайдерам проверка идёт по фактическим граням коробки.
+        var boxes = new List<GridBox>(8);
+        if (!CollectGridBoxes(grid, boxes)) return true;
 
-        const float skin = 0.005f;
-        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
-        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
-
-        // Низ, до которого сборка опустится В РЕЗУЛЬТАТЕ шага: то, что целиком
-        // ниже этой линии (+6 см запаса) — «пол», а не препятствие. Раньше свип
-        // сравнивал с текущим низом без учёта подъёма, и стол вплотную выше
-        // столешницы предмета (например, два разных стола) отсекал шаг с нулевой
-        // дистанцией — сборка «не двигалась» вообще.
-        float groundY = b.min.y + delta.y + GroundEpsilon;
-
-        // Касания в НАЧАЛЕ пути (мебель вплотную, предмет чуть провален в
-        // поверхность): свип стартует из них с дистанцией 0 и отсекает шаг.
-        // Решает целевая проверка ниже — она у всех одна.
-        HashSet<Collider> startTouch = null;
-        if (sweep)
+        for (int i = 0; i < boxes.Count; i++)
         {
-            var start = Physics.OverlapBox(b.center, half, Quaternion.identity,
+            var box = boxes[i];
+            Vector3 half = box.half - new Vector3(SweepSkin, SweepSkin, SweepSkin);
+            if (half.x <= 0f || half.y <= 0f || half.z <= 0f) continue;
+
+            // Низ ЭТОГО коллайдера после шага: всё, что целиком ниже — опора
+            float groundY = box.center.y - ProjectedHalfHeight(box.half, box.rot)
+                             + delta.y + GroundEpsilon;
+
+            // Уже касаемся этого коллайдера на старте — значит, предмет вплотную
+            // стоит/прислонился и оторваться обязан. Считать такое блокером
+            // нельзя: иначе прилипший к столу предмет нельзя сдвинуть НИКУДА.
+            var startTouch = Physics.OverlapBox(box.center, half, box.rot,
                 grid.surfaceMask, QueryTriggerInteraction.Ignore);
-            if (start.Length > 0)
+
+            if (sweep)
             {
-                startTouch = new HashSet<Collider>(start);
+                Vector3 dir = delta.normalized;
+                var path = Physics.BoxCastAll(box.center, half, dir, box.rot,
+                    delta.magnitude, grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+                for (int j = 0; j < path.Length; j++)
+                {
+                    var hit = path[j];
+                    var col = hit.collider;
+                    if (col == null) continue;
+
+                    bool touchingNow = false;
+                    for (int k = 0; k < startTouch.Length; k++)
+                        if (startTouch[k] == col) { touchingNow = true; break; }
+                    if (touchingNow) continue;
+
+                    var rb = col.attachedRigidbody;
+                    if (rb != null && self.Contains(rb)) continue;
+                    if (grid.IsAimBlocker(col)) continue;
+
+                    // стоим/опускаемся НА нём (пол/стол/мелкий обломок) — не блок
+                    if (col.bounds.max.y <= groundY) continue;
+
+                    // идём по касательной — не врубаемся
+                    if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
+
+                    // контакт ровно в цели — это посадка на поверхность, не блок
+                    if (hit.distance >= delta.magnitude - 0.02f) continue;
+
+                    return false; // на пути препятствие
+                }
             }
-        }
 
-        if (sweep)
-        {
-            Vector3 dir = delta.normalized;
-            var path = Physics.BoxCastAll(b.center, half, dir,
-                Quaternion.identity, delta.magnitude, grid.surfaceMask,
-                QueryTriggerInteraction.Ignore);
+            var hits = Physics.OverlapBox(box.center + delta, half, box.rot,
+                grid.surfaceMask, QueryTriggerInteraction.Ignore);
 
-            for (int i = 0; i < path.Length; i++)
+            for (int j = 0; j < hits.Length; j++)
             {
-                var hit = path[i];
-                var col = hit.collider;
+                var col = hits[j];
                 if (col == null) continue;
-                if (startTouch != null && startTouch.Contains(col)) continue;
+
+                bool touchingNow = false;
+                for (int k = 0; k < startTouch.Length; k++)
+                    if (startTouch[k] == col) { touchingNow = true; break; }
+                if (touchingNow) continue;
 
                 var rb = col.attachedRigidbody;
                 if (rb != null && self.Contains(rb)) continue;
                 if (grid.IsAimBlocker(col)) continue;
 
-                // стоим/опускаемся НА нём (пол/стол/мелкий обломок) — не блок
+                // после шага стоим НА нём (пол/стол/перееханный обломок)
                 if (col.bounds.max.y <= groundY) continue;
 
-                // идём по касательной — не врубаемся
-                if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
-
-                // контакт ровно в цели — это посадка на поверхность, не блок
-                if (hit.distance >= delta.magnitude - 0.02f) continue;
-
-                return false; // на пути препятствие
+                return false; // клетка занята
             }
         }
 
-        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity,
-            grid.surfaceMask, QueryTriggerInteraction.Ignore);
+        return true;
+    }
 
-        for (int i = 0; i < hits.Length; i++)
+    private const float SweepSkin = 0.005f;
+
+    /// <summary>Ориентированный бокс одного коллайдера сборки (центр, полуоси, поворот).</summary>
+    private struct GridBox
+    {
+        public Vector3 center;
+        public Vector3 half;
+        public Quaternion rot;
+    }
+
+    /// <summary>Множество тел текущей сборки — их коллайдеры не считаем препятствиями.</summary>
+    private static HashSet<Rigidbody> BuildSelfSet(PlacementGrid grid)
+    {
+        var self = new HashSet<Rigidbody>();
+        var assembly = grid.DragAssemblyBodies;
+        if (assembly == null) return self;
+
+        for (int i = 0; i < assembly.Length; i++)
+            if (assembly[i] != null) self.Add(assembly[i]);
+        return self;
+    }
+
+    /// <summary>
+    /// Собирает физические боксы всех коллайдеров сборки. Для BoxCollider берём
+    /// его СОБСТВЕННЫЕ оси (центр/размер в локальных координатах с учётом
+    /// масштаба) — так повёрнутая и наклонённая деталь проверяется по форме,
+    /// а не по раздутому AABB.
+    /// </summary>
+    private static bool CollectGridBoxes(PlacementGrid grid, List<GridBox> into)
+    {
+        into.Clear();
+
+        var assembly = grid.DragAssemblyBodies;
+        if (assembly == null || assembly.Length == 0) return false;
+
+        for (int i = 0; i < assembly.Length; i++)
         {
-            var col = hits[i];
-            if (col == null) continue;
+            var rb = assembly[i];
+            if (rb == null) continue;
 
-            var rb = col.attachedRigidbody;
-            if (rb != null && self.Contains(rb)) continue;
-            if (grid.IsAimBlocker(col)) continue;
+            var cols = rb.GetComponentsInChildren<Collider>(true);
+            for (int j = 0; j < cols.Length; j++)
+            {
+                var c = cols[j];
+                if (!PlacementGrid.IsSolidCollider(c)) continue;
 
-            // после шага стоим НА нём (пол/стол/перееханный обломок)
-            if (col.bounds.max.y <= b.min.y + delta.y + GroundEpsilon) continue;
+                var box = c as BoxCollider;
+                if (box != null)
+                {
+                    var t = box.transform;
+                    Vector3 scale = t.lossyScale;
+                    Vector3 half = Vector3.Scale(box.size, Abs(scale)) * 0.5f;
 
-            return false; // клетка занята
+                    GridBox gb;
+                    gb.center = t.TransformPoint(box.center);
+                    gb.half = half;
+                    gb.rot = t.rotation;
+                    into.Add(gb);
+                    continue;
+                }
+
+                // Остальные формы (меш, капсула, сфера) — их мировой AABB
+                GridBox gb;
+                gb.center = c.bounds.center;
+                gb.half = c.bounds.extents;
+                gb.rot = Quaternion.identity;
+                into.Add(gb);
+            }
         }
 
-        return true;
+        return into.Count > 0;
+    }
+
+    private static Vector3 Abs(Vector3 v)
+    {
+        return new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+    }
+
+    /// <summary>
+    /// Насколько бокс с такими полуосями и поворотом поднимается над своим
+    /// центром по вертикали. Для axis-aligned бокса это half.y, а для
+    /// повёрнутого — сумма проекций полуосей на мировую Y.
+    /// </summary>
+    private static float ProjectedHalfHeight(Vector3 half, Quaternion rot)
+    {
+        float x = Mathf.Abs((rot * Vector3.right).y);
+        float y = Mathf.Abs((rot * Vector3.up).y);
+        float z = Mathf.Abs((rot * Vector3.forward).y);
+        return x * half.x + y * half.y + z * half.z;
     }
 
     /// <summary>
@@ -1505,38 +1615,48 @@ public class Raycast : MonoBehaviour
     /// <summary>Дистанция вдоль дельты до первого настоящего препятствия.</summary>
     private float NearestBlockDistance(PlacementGrid grid, Rigidbody body, Vector3 delta)
     {
-        Bounds b;
-        if (!TryAssemblyBounds(grid, body, out b)) return float.MaxValue;
+        var self = BuildSelfSet(grid);
 
-        var assembly = grid.DragAssemblyBodies;
-        var self = new HashSet<Rigidbody>();
-        for (int i = 0; i < assembly.Length; i++)
-            if (assembly[i] != null) self.Add(assembly[i]);
-
-        const float skin = 0.005f;
-        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
-        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return float.MaxValue;
+        var boxes = new List<GridBox>(8);
+        if (!CollectGridBoxes(grid, boxes)) return float.MaxValue;
 
         Vector3 dir = delta.normalized;
-        var path = Physics.BoxCastAll(b.center, half, dir,
-            Quaternion.identity, delta.magnitude, grid.surfaceMask,
-            QueryTriggerInteraction.Ignore);
-
         float nearest = float.MaxValue;
-        for (int i = 0; i < path.Length; i++)
+
+        for (int i = 0; i < boxes.Count; i++)
         {
-            var hit = path[i];
-            var col = hit.collider;
-            if (col == null) continue;
+            var box = boxes[i];
+            Vector3 half = box.half - new Vector3(SweepSkin, SweepSkin, SweepSkin);
+            if (half.x <= 0f || half.y <= 0f || half.z <= 0f) continue;
 
-            var rb = col.attachedRigidbody;
-            if (rb != null && self.Contains(rb)) continue;
-            if (grid.IsAimBlocker(col)) continue;
-            // «пол» для этого шага — с учётом подъёма/падения, как в PathClear
-            if (col.bounds.max.y <= b.min.y + delta.y + GroundEpsilon) continue;
-            if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
+            float groundY = box.center.y - box.half.y + delta.y + GroundEpsilon;
 
-            if (hit.distance < nearest) nearest = hit.distance;
+            var startTouch = Physics.OverlapBox(box.center, half, box.rot,
+                grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+            var path = Physics.BoxCastAll(box.center, half, dir, box.rot,
+                delta.magnitude, grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+            for (int j = 0; j < path.Length; j++)
+            {
+                var hit = path[j];
+                var col = hit.collider;
+                if (col == null) continue;
+
+                bool touchingNow = false;
+                for (int k = 0; k < startTouch.Length; k++)
+                    if (startTouch[k] == col) { touchingNow = true; break; }
+                if (touchingNow) continue;
+
+                var rb = col.attachedRigidbody;
+                if (rb != null && self.Contains(rb)) continue;
+                if (grid.IsAimBlocker(col)) continue;
+                // «пол» для этого шага — с учётом подъёма/падения, как в PathClear
+                if (col.bounds.max.y <= groundY) continue;
+                if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
+
+                if (hit.distance < nearest) nearest = hit.distance;
+            }
         }
 
         return nearest;
@@ -1595,42 +1715,55 @@ public class Raycast : MonoBehaviour
     /// <summary>Пишет в консоль, какие коллайдеры заблокировали шаг сетки.</summary>
     private void LogGridBlocker(PlacementGrid grid, Rigidbody body, Vector3 delta)
     {
-        Bounds b;
-        if (!TryAssemblyBounds(grid, body, out b)) return;
+        var self = BuildSelfSet(grid);
 
-        const float skin = 0.005f;
-        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
-        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return;
-
-        var assembly = grid.DragAssemblyBodies;
-        var self = new HashSet<Rigidbody>();
-        if (assembly != null)
-            for (int i = 0; i < assembly.Length; i++)
-                if (assembly[i] != null) self.Add(assembly[i]);
-
-        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity,
-            grid.surfaceMask, QueryTriggerInteraction.Ignore);
+        var boxes = new List<GridBox>(8);
+        if (!CollectGridBoxes(grid, boxes)) return;
 
         var names = new List<string>(4);
-        float groundY = b.min.y + delta.y + GroundEpsilon;
-        for (int i = 0; i < hits.Length && names.Count < 4; i++)
+        string seen = null;
+
+        for (int i = 0; i < boxes.Count && names.Count < 4; i++)
         {
-            var col = hits[i];
-            if (col == null) continue;
+            var box = boxes[i];
+            Vector3 half = box.half - new Vector3(SweepSkin, SweepSkin, SweepSkin);
+            if (half.x <= 0f || half.y <= 0f || half.z <= 0f) continue;
 
-            var rb = col.attachedRigidbody;
-            if (rb != null && self.Contains(rb)) continue;
-            if (grid.IsAimBlocker(col)) continue;
-            if (col.bounds.max.y <= groundY) continue;
+            float groundY = box.center.y - box.half.y + delta.y + GroundEpsilon;
 
-            names.Add(col.name + " (maxY=" + col.bounds.max.y + ")");
+            var hits = Physics.OverlapBox(box.center + delta, half, box.rot,
+                grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+            for (int j = 0; j < hits.Length && names.Count < 4; j++)
+            {
+                var col = hits[j];
+                if (col == null) continue;
+
+                var rb = col.attachedRigidbody;
+                if (rb != null && self.Contains(rb)) continue;
+                if (grid.IsAimBlocker(col)) continue;
+                if (col.bounds.max.y <= groundY) continue;
+
+                // Один и тот же блокер с разных коллайдеров сборки — не спамим
+                if (col.name == seen) continue;
+                seen = col.name;
+
+                names.Add(col.name + " (maxY=" + col.bounds.max.y + ")");
+            }
         }
 
         if (names.Count == 0) return;
 
-        UnityEngine.Debug.Log(
-            "[Grid] шаг " + delta + " заблокирован: " + string.Join(", ", names));
+        // Не пишем одно и то же снова и снова: зажатая стрелка дала бы
+        // десятки одинаковых строк и забила консоль.
+        string msg = "[Grid] шаг " + delta + " заблокирован: " + string.Join(", ", names);
+        if (msg == lastBlockerLog) return;
+        lastBlockerLog = msg;
+
+        UnityEngine.Debug.Log(msg);
     }
+
+    private string lastBlockerLog;
 
 
     private IEnumerator DragObject()
