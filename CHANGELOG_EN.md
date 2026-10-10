@@ -30,6 +30,14 @@
 
 - Arrows can be held: the step or turn repeats while the button is held (PC arrow keys; phone panel buttons).
 
+- Arrow steps now go along the WORLD axes, not the camera direction: left/right — ±X, «forward»/«back» — ±Z. Previously, turning your view changed the direction the same item moved in.
+
+- While an item is selected or dragged with the grid on, its assembly is frozen (kinematic): physics can no longer move, rotate or drop it — between arrow presses the item neither wobbles, sinks, nor «disappears» during fast rotations. The lock is released on deselect, on grid off and when the drag ends.
+
+- Selection now visualizes the whole stack: the outline is drawn not only around the selected item but also around every part that will move with it (joint-connected parts and free items lying on top). The stack is refreshed automatically if something is placed on or taken off.
+
+- Furniture standing flush no longer blocks a step: the path check accounts for the actual lift height of the step and for contacts already present at the start (a table standing right next to you — even a neighbouring height within one cell — lets you step onto it or slide along the tabletop). If a step is fully blocked, the console logs which collider stood in the way.
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.

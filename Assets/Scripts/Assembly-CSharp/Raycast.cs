@@ -72,6 +72,8 @@ public class Raycast : MonoBehaviour
     private Rigidbody selectedBody;
     private List<GameObject> outlineShells;
     private Material outlineMat;
+    // id тел стопки, которые сейчас обведены (для перестройки при смене состава)
+    private int[] shellStackIds;
 
     [SerializeField]
     private bool showHint;
@@ -228,6 +230,18 @@ public class Raycast : MonoBehaviour
 
         // Обводка выбора — тоже только в режиме сетки
         if (!GridMode() && selectedBody != null) ClearSelection();
+
+        // Выбранный предмет уничтожили (удаление/смена сцены): снимаем выбор,
+        // иначе замок кинематики останется висеть вплоть до следующего клика.
+        if (selectedBody == null && shellStackIds != null) ClearSelection();
+    }
+
+    private void LateUpdate()
+    {
+        // Обводка всей стопки: если её состав изменился (что-то положили
+        // сверху / сняли) — перестроить. Дёшево: сравнение id раз в кадр.
+        if (selectedBody == null || !GridMode()) return;
+        SyncSelectionShells();
     }
 
     /// <summary>Включён ли режим сетки.</summary>
@@ -442,7 +456,12 @@ public class Raycast : MonoBehaviour
             // Нажали на то, что нельзя подвинуть (стена, пол, кинематика,
             // закреплённое тело) — выбор снимаем, как и при клике в пустоту.
             // Во время переноса кнопка зажата, сюда не попадаем.
-            bool movable = hitRb && !hitRb.isKinematic && !hitRb.freezeRotation;
+            // ВЫБРАННЫЙ предмет в режиме сетки тоже «нельзя подвинуть» с точки
+            // зрения физики (он заморожен кинематикой), но второй по нему клик
+            // — это захват, поэтому считаем его движимым.
+            bool movable = hitRb &&
+                (hitRb == selectedBody ||
+                 (!hitRb.isKinematic && !hitRb.freezeRotation));
             if (!movable && GridMode() && currentDrag == null) ClearSelection();
 
             if (movable)
@@ -666,22 +685,96 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Выбирает предмет БЕЗ захвата: рисует обводку (inverted hull) по всем
-    /// его мешам. Следующее нажатие по выбранному — настоящий перенос.
+    /// Выбирает предмет БЕЗ захвата: рисует обводку (inverted hull) по нему и
+    /// всем частям его стопки и замораживает сборку (кинематика — физика её не
+    /// трогает). Следующее нажатие по выбранному — настоящий перенос.
     /// </summary>
     private void SelectBody(Rigidbody rb)
     {
         ClearSelection();
         selectedBody = rb;
 
-        if (outlineMat == null)
-        {
-            var sh = Shader.Find("Orange/Outline");
-            if (sh == null) return;
-            outlineMat = new Material(sh);
-        }
+        // Физический замок выбора: пока предмет выбран в режиме сетки, его
+        // сборка кинематическая — физика не может ни сдвинуть, ни повернуть
+        // (гравитация, удары, «пропавший» при быстром повороте предмет).
+        // Сборка и обводка стопки живут до снятия выбора.
+        var grid = PlacementGrid.Instance;
+        if (grid != null) grid.OnDragStarted(rb.transform);
+
+        RebuildSelectionShells();
+    }
+
+    /// <summary>
+    /// Перерисовывает обводку: выбранный предмет И все части его стопки
+    /// (сборка по джойнтам + свободные предметы сверху) — видно, что именно
+    /// будет ехать вместе с ним. Состав стопки берём из сетки — поля
+    /// DragAssemblyBodies.
+    /// </summary>
+    private void RebuildSelectionShells()
+    {
+        DestroyShellObjects();
+        shellStackIds = null;
+
+        if (selectedBody == null) return;
+
+        var grid0 = PlacementGrid.Instance;
+        var asm0 = grid0 != null ? grid0.DragAssemblyBodies : null;
+        shellStackIds = asm0 != null && asm0.Length > 0
+            ? ToIds(asm0)
+            : new[] { selectedBody.GetInstanceID() };
+
+        if (!EnsureOutlineMat()) return;
 
         outlineShells = new List<GameObject>();
+        var covered = new List<Transform>();
+
+        // Выбранный — всегда первый: его обводим в любом случае.
+        ShellBody(selectedBody, covered);
+
+        if (asm0 != null)
+        {
+            for (int i = 0; i < asm0.Length; i++)
+            {
+                var part = asm0[i];
+                if (part != null && part != selectedBody) ShellBody(part, covered);
+            }
+        }
+    }
+
+    /// <summary>Ставит/проверяет материал обводки. false — шейдера нет в билде.</summary>
+    private bool EnsureOutlineMat()
+    {
+        if (outlineMat != null) return true;
+        var sh = Shader.Find("Orange/Outline");
+        if (sh == null) return false;
+        outlineMat = new Material(sh);
+        return true;
+    }
+
+    private static int[] ToIds(Rigidbody[] bodies)
+    {
+        var ids = new List<int>(bodies.Length);
+        for (int i = 0; i < bodies.Length; i++)
+            if (bodies[i] != null) ids.Add(bodies[i].GetInstanceID());
+        ids.Sort();
+        return ids.ToArray();
+    }
+
+    /// <summary>
+    /// Обводит все меши тела. Уже накрытые предками тела пропускаем — иначе
+    /// меш ребёнка обводится дважды (и от родителя, и от него самого).
+    /// </summary>
+    private void ShellBody(Rigidbody rb, List<Transform> covered)
+    {
+        if (rb == null) return;
+
+        var t = rb.transform;
+        for (int i = 0; i < covered.Count; i++)
+        {
+            var root = covered[i];
+            if (root != null && (t == root || t.IsChildOf(root))) return;
+        }
+        covered.Add(t);
 
         var filters = rb.GetComponentsInChildren<MeshFilter>(true);
         for (int i = 0; i < filters.Length; i++)
@@ -698,6 +791,43 @@ public class Raycast : MonoBehaviour
             if (s == null || s.sharedMesh == null) continue;
             AddShell(s.transform, s.sharedMesh, s);
         }
+    }
+
+    /// <summary>
+    /// Если состав стопки изменился (на предмет что-то положили/сняли) —
+    /// обводку перестраиваем. Дёшево: сравнение id раз в кадр.
+    /// </summary>
+    private void SyncSelectionShells()
+    {
+        if (selectedBody == null) return;
+
+        var grid = PlacementGrid.Instance;
+        var assembly = grid != null ? grid.DragAssemblyBodies : null;
+
+        int[] ids;
+        if (assembly != null && assembly.Length > 0) ids = ToIds(assembly);
+        else ids = new[] { selectedBody.GetInstanceID() };
+
+        var old = shellStackIds;
+        if (old != null && old.Length == ids.Length)
+        {
+            bool same = true;
+            for (int i = 0; i < old.Length; i++)
+                if (old[i] != ids[i]) { same = false; break; }
+            if (same) return;
+        }
+
+        RebuildSelectionShells();
+    }
+
+    private void DestroyShellObjects()
+    {
+        if (outlineShells == null) return;
+        for (int i = 0; i < outlineShells.Count; i++)
+        {
+            if (outlineShells[i] != null) Destroy(outlineShells[i]);
+        }
+        outlineShells = null;
     }
 
     private void AddShell(Transform parent, Mesh mesh, SkinnedMeshRenderer skin)
@@ -738,19 +868,21 @@ public class Raycast : MonoBehaviour
         outlineShells.Add(go);
     }
 
-    /// <summary>Снимает выбор и убирает обводку.</summary>
+    /// <summary>Снимает выбор: убирает обводку (всей стопки) и отпускает физический замок.</summary>
     public void ClearSelection()
     {
-        if (outlineShells != null)
-        {
-            for (int i = 0; i < outlineShells.Count; i++)
-            {
-                if (outlineShells[i] != null) Destroy(outlineShells[i]);
-            }
-        }
-
-        outlineShells = null;
+        DestroyShellObjects();
+        shellStackIds = null;
         selectedBody = null;
+
+        // Замок выбора держал PlacementGrid (OnDragStarted в SelectBody).
+        // Во время переноса (currentDrag) не трогаем — там свой жизненный
+        // цикл, замок отпустит End().
+        if (currentDrag == null)
+        {
+            var grid = PlacementGrid.Instance;
+            if (grid != null) grid.OnDragEnded();
+        }
     }
 
     /// <summary>Стрелки сейчас перемещают (true) или поворачивают (false).</summary>
@@ -765,10 +897,10 @@ public class Raycast : MonoBehaviour
 
     /// <summary>
     /// Стрелки (клавиатура или панель): в режиме перемещения — шаг по клеткам
-    /// относительно камеры (вверх = от себя), Ctrl/мелкие стрелки — шаг в
-    /// пятую часть клетки; в режиме поворота — поворот (вверх = кувырок
-    /// назад). Движение резко, через те же гейты: стена не пустит,
-    /// к соседу можно прислонить впритык.
+    /// в МИРОВЫХ осях (вправо = +X, «вперёд» = +Z), не зависимо от поворота
+    /// камеры, Ctrl/мелкие стрелки — шаг в пятую часть клетки; в режиме
+    /// поворота — поворот (вверх = кувырок назад). Движение резко, через те же
+    /// гейты: стена не пустит, к соседу можно прислонить впритык.
     /// </summary>
     public void ArrowInput(int xDir, int yDirUp, bool fine)
     {
@@ -789,29 +921,23 @@ public class Raycast : MonoBehaviour
         }
 
         var grid = PlacementGrid.Instance;
-        var cam = Camera.main;
-        if (grid == null || cam == null) return;
+        if (grid == null) return;
 
-        Vector3 fwd = cam.transform.forward;
-        fwd.y = 0f;
-        if (fwd.sqrMagnitude < 1e-6f) fwd = Vector3.forward;
-        fwd.Normalize();
-
-        Vector3 right = cam.transform.right;
-        right.y = 0f;
-        if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
-        right.Normalize();
-
+        // Мировые оси, а не камеры: влево/вправо — ±X, «вперёд»/«назад» —
+        // ±Z. Раньше шаг считался от направления камеры, и один и тот же
+        // клик стрелкой двигал предмет в разные стороны при повороте взгляда.
         float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
-        pendingGridMove += (right * (float)xDir + fwd * (float)yDirUp) * step;
+        pendingGridMove +=
+            (Vector3.right * (float)xDir + Vector3.forward * (float)yDirUp) * step;
     }
 
     /// <summary>
     /// Стрелка по ВЫБРАННОМУ, но не зажатому предмету: один шаг по клетке или
-    /// один поворот — сразу, в этом же кадре. Сборку закрепляем тем же путём,
-    /// что и при переносе (защита джойнтов, блокировка поворота), смещаем
-    /// напрямую через те же гейты (стена, соседний предмет, подъём) и
-    /// отпускаем. Между нажатиями предмет обычный: падает, если под ним пусто.
+    /// один поворот — сразу, в этом же кадре. Замок выбора (кинематика) уже
+    /// стоит с момента выделения — на время шага лишь подстраховываемся, что
+    /// сборка собрана, и НЕ отпускаем: между нажатиями предмет не падает,
+    /// не качается и не поворачивается от физики. Смещение — по мировым осям,
+    /// через те же гейты (стена, соседний предмет, подъём).
     /// </summary>
     private void NudgeSelected(int xDir, int yDirUp, bool fine)
     {
@@ -819,49 +945,34 @@ public class Raycast : MonoBehaviour
         var body = selectedBody;
         if (grid == null || body == null) return;
 
-        grid.OnDragStarted(body.transform);
-        try
+        // Подстраховка: замок должен быть (выбор уже заморозил сборку)
+        if (grid.DragAssemblyBodies == null || grid.DragTarget != body.transform)
+            grid.OnDragStarted(body.transform);
+
+        if (!gridArrowMoveMode)
         {
-            if (!gridArrowMoveMode)
-            {
-                RotateDragged(xDir, -yDirUp, fine);
-                return;
-            }
-
-            var cam = Camera.main;
-            if (cam == null) return;
-
-            Vector3 fwd = cam.transform.forward;
-            fwd.y = 0f;
-            if (fwd.sqrMagnitude < 1e-6f) fwd = Vector3.forward;
-            fwd.Normalize();
-
-            Vector3 right = cam.transform.right;
-            right.y = 0f;
-            if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
-            right.Normalize();
-
-            float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
-            Vector3 delta = (right * (float)xDir + fwd * (float)yDirUp) * step;
-
-            // Обычный шаг сперва снапает центр масс к клетке: после физики предмет
-            // мог чуть съехать. Тонкий шаг — от текущего места, без снапа.
-            if (!fine)
-            {
-                Vector3 com = body.worldCenterOfMass;
-                Vector3 snapped = grid.SnapPosition(com, Vector3.up, null);
-                delta += new Vector3(snapped.x - com.x, 0f, snapped.z - com.z);
-            }
-
-            delta.y = 0f;
-            if (delta.sqrMagnitude < 1e-10f) return;
-
-            TryPinWithClimb(grid, body, delta, true);
+            RotateDragged(xDir, -yDirUp, fine);
+            return;
         }
-        finally
+
+        // Мировые оси (как и при переносе): влево/вправо — ±X, «вперёд» — +Z
+        float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
+        Vector3 delta =
+            (Vector3.right * (float)xDir + Vector3.forward * (float)yDirUp) * step;
+
+        // Обычный шаг сперва снапает центр масс к клетке: после физики предмет
+        // мог чуть съехать. Тонкий шаг — от текущего места, без снапа.
+        if (!fine)
         {
-            grid.OnDragEnded();
+            Vector3 com = body.worldCenterOfMass;
+            Vector3 snapped = grid.SnapPosition(com, Vector3.up, null);
+            delta += new Vector3(snapped.x - com.x, 0f, snapped.z - com.z);
         }
+
+        delta.y = 0f;
+        if (delta.sqrMagnitude < 1e-10f) return;
+
+        TryPinWithClimb(grid, body, delta, true);
     }
 
     /// <summary>
@@ -881,6 +992,16 @@ public class Raycast : MonoBehaviour
             ? (spring != null ? spring.connectedBody : null)
             : selectedBody;
         if (body == null) return;
+
+        // Замок выбора: при выделении сборка уже собрана и заморожена, здесь
+        // лишь подстраховка (например, после смены сцены/сбоя состояния).
+        if (currentDrag == null)
+        {
+            var g0 = PlacementGrid.Instance;
+            if (g0 != null &&
+                (g0.DragAssemblyBodies == null || g0.DragTarget != body.transform))
+                g0.OnDragStarted(body.transform);
+        }
 
         // Ctrl/мелкие стрелки — уменьшенный шаг поворота
         float step = Mathf.Max(1f, fine ? rotateStep / 6f : rotateStep);
@@ -1203,6 +1324,27 @@ public class Raycast : MonoBehaviour
         Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
         if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return true;
 
+        // Низ, до которого сборка опустится В РЕЗУЛЬТАТЕ шага: то, что целиком
+        // ниже этой линии (+6 см запаса) — «пол», а не препятствие. Раньше свип
+        // сравнивал с текущим низом без учёта подъёма, и стол вплотную выше
+        // столешницы предмета (например, два разных стола) отсекал шаг с нулевой
+        // дистанцией — сборка «не двигалась» вообще.
+        float groundY = b.min.y + delta.y + 0.06f;
+
+        // Касания в НАЧАЛЕ пути (мебель вплотную, предмет чуть провален в
+        // поверхность): свип стартует из них с дистанцией 0 и отсекает шаг.
+        // Решает целевая проверка ниже — она у всех одна.
+        HashSet<Collider> startTouch = null;
+        if (sweep)
+        {
+            var start = Physics.OverlapBox(b.center, half, Quaternion.identity,
+                grid.surfaceMask, QueryTriggerInteraction.Ignore);
+            if (start.Length > 0)
+            {
+                startTouch = new HashSet<Collider>(start);
+            }
+        }
+
         if (sweep)
         {
             Vector3 dir = delta.normalized;
@@ -1215,13 +1357,14 @@ public class Raycast : MonoBehaviour
                 var hit = path[i];
                 var col = hit.collider;
                 if (col == null) continue;
+                if (startTouch != null && startTouch.Contains(col)) continue;
 
                 var rb = col.attachedRigidbody;
                 if (rb != null && self.Contains(rb)) continue;
                 if (grid.IsAimBlocker(col)) continue;
 
-                // стоим НА нём (пол/стол/мелкий обломок) — не блок
-                if (col.bounds.max.y <= b.min.y + 0.06f) continue;
+                // стоим/опускаемся НА нём (пол/стол/мелкий обломок) — не блок
+                if (col.bounds.max.y <= groundY) continue;
 
                 // идём по касательной — не врубаемся
                 if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
@@ -1310,7 +1453,8 @@ public class Raycast : MonoBehaviour
             var rb = col.attachedRigidbody;
             if (rb != null && self.Contains(rb)) continue;
             if (grid.IsAimBlocker(col)) continue;
-            if (col.bounds.max.y <= b.min.y + 0.06f) continue;
+            // «пол» для этого шага — с учётом подъёма/падения, как в PathClear
+            if (col.bounds.max.y <= b.min.y + delta.y + 0.06f) continue;
             if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
 
             if (hit.distance < nearest) nearest = hit.distance;
@@ -1356,7 +1500,51 @@ public class Raycast : MonoBehaviour
             }
         }
 
+        // Ни один вариант не прошёл — оставляем след в логе: кто именно
+        // стоит на пути (для разбора «предмет не двигается»).
+        LogGridBlocker(grid, body, delta);
+
         return false;
+    }
+
+    /// <summary>Пишет в консоль, какие коллайдеры заблокировали шаг сетки.</summary>
+    private void LogGridBlocker(PlacementGrid grid, Rigidbody body, Vector3 delta)
+    {
+        Bounds b;
+        if (!TryAssemblyBounds(grid, body, out b)) return;
+
+        const float skin = 0.005f;
+        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
+        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return;
+
+        var assembly = grid.DragAssemblyBodies;
+        var self = new HashSet<Rigidbody>();
+        if (assembly != null)
+            for (int i = 0; i < assembly.Length; i++)
+                if (assembly[i] != null) self.Add(assembly[i]);
+
+        var hits = Physics.OverlapBox(b.center + delta, half, Quaternion.identity,
+            grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+        var names = new List<string>(4);
+        float groundY = b.min.y + delta.y + 0.06f;
+        for (int i = 0; i < hits.Length && names.Count < 4; i++)
+        {
+            var col = hits[i];
+            if (col == null) continue;
+
+            var rb = col.attachedRigidbody;
+            if (rb != null && self.Contains(rb)) continue;
+            if (grid.IsAimBlocker(col)) continue;
+            if (col.bounds.max.y <= groundY) continue;
+
+            names.Add(col.name + " (maxY=" + col.bounds.max.y + ")");
+        }
+
+        if (names.Count == 0) return;
+
+        UnityEngine.Debug.Log(
+            "[Grid] шаг " + delta + " заблокирован: " + string.Join(", ", names));
     }
 
 
@@ -1647,7 +1835,10 @@ public class Raycast : MonoBehaviour
         // Обычную мягкую пружину вернём до того, как отпустим тело
         RestoreSpring();
 
-        if (PlacementGrid.Instance != null)
+        // OnDragEnded отпускает замок (кинематику) сборки. Вызываем его только
+        // когда был ПЕРЕНОС: отпускание кнопки после простого клика-выбора не
+        // должно размораживать выбранный предмет — его замок держит ClearSelection.
+        if (currentDrag != null && PlacementGrid.Instance != null)
             PlacementGrid.Instance.OnDragEnded();
 
         if (currentDrag != null)
@@ -1692,5 +1883,15 @@ public class Raycast : MonoBehaviour
         }
 
         if (detailText) detailText.text = "\n";
+
+        // Предмет всё ещё ВЫБРАН (только закончили перенос) — возвращаем замок
+        // выбора: пока включена сетка, физика не должна ни сдвинуть, ни повернуть
+        // его и между переносами. OnDragEnded выше его отпустил для чистоты
+        // восстановления констрейнтов/скоростей.
+        if (selectedBody != null && GridMode())
+        {
+            var grid = PlacementGrid.Instance;
+            if (grid != null) grid.OnDragStarted(selectedBody.transform);
+        }
     }
 }

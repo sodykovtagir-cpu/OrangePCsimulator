@@ -380,6 +380,11 @@ public class PlacementGrid : MonoBehaviour
 
         if (target == null) return;
 
+        // Уже заморожены текущим выбором/переносом (выбор → стрелки → захват):
+        // сборку заново не собираем, иначе сохранённые «старые» констрейнты и
+        // breakForce джойнтов перезаписались бы текущими (уже изменёнными).
+        if (lockBodies != null) return;
+
         // Сборка — не только дети по иерархии: мать стоит в слоте с
         // setParent: 0 и держится ТОЛЬКО FixedJoint. Собираем тела графом
         // джойнтов + иерархией, чтобы весь ПК ехал и крутился целиком.
@@ -600,6 +605,10 @@ public class PlacementGrid : MonoBehaviour
     /// </summary>
     private void ProtectAssemblyJoints()
     {
+        // Уже защищены (выбор → повторный OnDragStarted при захвате): повторно
+        // сохранять breakForce нельзя — он сейчас Infinity, «оригинал» потерялся бы.
+        if (pcJoints != null) return;
+
         var seen = new List<Joint>();
         for (int i = 0; i < pcBodies.Length; i++)
         {
@@ -653,12 +662,15 @@ public class PlacementGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// Блокирует ориентацию тащимого предмета в режиме сетки: физика больше не
-    /// может его повернуть или перевернуть от удара — ориентация меняется
-    /// только стрелками (RotateDragged). Ставит FreezeRotation всем телам
-    /// сборки и делает их кинематическими — MovePosition/MoveRotation
-    /// применяются мгновенно, без физического отставания и «шлейфа» деталей.
-    /// Сохранённые констрейнты и isKinematic вернёт ReleaseRotationLock.
+    /// Блокирует физику тащимого/выбранного предмета в режиме сетки: пока
+    /// включена сетка, сборка не может сдвинуться или повернуться от удара,
+    /// гравитации или другой физики — положение меняется только стрелками
+    /// (NudgeSelected / RotateDragged). Для этого тела делаются кинематическими:
+    /// кинематика и так блокирует и поворот, и смещение, поэтому констрейнты
+    /// НЕ трогаем — иначе «заморозка поворота» попала бы в состояния, которые
+    /// второй клик (захват) сохраняет как исходные, и после отпускания предмет
+    /// остался бы с вечным FreezeRotation. Сохранённые isKinematic вернёт
+    /// ReleaseRotationLock.
     /// </summary>
     private void ApplyRotationLock()
     {
@@ -677,7 +689,6 @@ public class PlacementGrid : MonoBehaviour
 
             lockOld[i] = bodies[i].constraints;
             kinOld[i] = bodies[i].isKinematic;
-            bodies[i].constraints |= RigidbodyConstraints.FreezeRotation;
             bodies[i].isKinematic = true;
         }
     }
