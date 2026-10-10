@@ -38,6 +38,14 @@
 
 - Furniture standing flush no longer blocks a step: the path check accounts for the actual lift height of the step and for contacts already present at the start (a table standing right next to you — even a neighbouring height within one cell — lets you step onto it or slide along the tabletop). If a step is fully blocked, the console logs which collider stood in the way.
 
+- Items no longer «fly off» when moved. Three causes, three fixes: (1) the step-over lift no longer leaves the item hanging — it is seated onto the support right below it, so holding the arrow key can't send it climbing higher and higher; (2) before an item is handed back to physics it is pushed out of whatever it got wedged into (table, wall, floor) — PhysX used to eject it at speed; (3) the «ground» tolerance shrank from 6 cm to 1.5 cm, so items no longer sink 6 cm into a neighbouring cabinet. The loose-stack limit is tightened too: at most 8 small parts ride along (was 24 with no size check), so moving a part on a dense mining rig no longer drags half the rig with it.
+
+- Bigger arrow buttons on phones, scaled to the screen: the project canvas has no CanvasScaler, so sizes are computed from the long screen edge and the device DPI (on 1080×2340 the buttons are roughly 1.6× bigger than before).
+
+- The arrow panel no longer disappears: it used to be built once in Start, and if the HUD wasn't ready yet it never appeared until the game was restarted. Building is now retried until it succeeds, works on iOS too, and if the arrow sprite fails to load the buttons are still built (with arrow glyphs) instead of silently destroying the panel.
+
+- Grid arrows added to the mobile control settings: the arrow pad now shows up in the mobile-controls layout screen, can be dragged and saved together with the joystick and hotbar, and the in-game panel picks up the saved position. The centre button label is now translated into 42 languages («Move» / «Rotate»).
+
 ### Developer tools
 
 - `tools/orange_forge.py` — a console tool for editing Unity scenes and prefabs without the editor: find nodes by name and path, deep-clone a subtree with all references, patch serialized fields and UnityEvent calls, insert new fields. It was used to add the grid button to every game scene and the bind row in the menu.

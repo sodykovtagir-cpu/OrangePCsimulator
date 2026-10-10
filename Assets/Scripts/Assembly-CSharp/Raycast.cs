@@ -107,6 +107,9 @@ public class Raycast : MonoBehaviour
     private Drag currentDrag;
     private PointerEventData pointer;
 
+    // Повторная попытка собрать панель стрелок, если в Start не вышло
+    private float nextArrowPanelTry;
+
     public PC.Component.Display selectedMonitor;
 
     public bool LockRotation { get; set; }
@@ -227,6 +230,15 @@ public class Raycast : MonoBehaviour
         // режиме сетки. На ПК её нет — там стрелки с клавиатуры.
         if (DragRotateControls.Instance != null)
             DragRotateControls.Instance.SetVisible(GridMode() && (currentDrag != null || selectedBody != null));
+
+        // Панель могла не собраться в Start (HUD ещё не был готов) — пробуем
+        // ещё раз, но не чаще раза в полсекунды. Раньше панель строилась один раз
+        // и при неудаче пропадала навсегда. На ПК EnsureExists сразу выходит.
+        if (Time.unscaledTime >= nextArrowPanelTry)
+        {
+            nextArrowPanelTry = Time.unscaledTime + 0.5f;
+            DragRotateControls.EnsureExists(this);
+        }
 
         // Обводка выбора — тоже только в режиме сетки
         if (!GridMode() && selectedBody != null) ClearSelection();
@@ -960,6 +972,10 @@ public class Raycast : MonoBehaviour
         Vector3 delta =
             (Vector3.right * (float)xDir + Vector3.forward * (float)yDirUp) * step;
 
+        // Просевший в стол/стену предмет сначала выталкиваем: иначе габарит
+        // считается от утопленной точки, и PhysX выстрелит его при отпускании.
+        PlacementGrid.UnstickAssembly(grid.DragAssemblyBodies, grid.surfaceMask);
+
         // Обычный шаг сперва снапает центр масс к клетке: после физики предмет
         // мог чуть съехать. Тонкий шаг — от текущего места, без снапа.
         if (!fine)
@@ -1007,6 +1023,10 @@ public class Raycast : MonoBehaviour
         float step = Mathf.Max(1f, fine ? rotateStep / 6f : rotateStep);
         var grid = PlacementGrid.Instance;
         var assembly = grid != null ? grid.DragAssemblyBodies : null;
+
+        // Поворот — тоже телепорт: сперва выталкиваем из просадки, иначе
+        // предмет уйдёт в пол/стол вместе с «застрявшей» частью.
+        if (grid != null) PlacementGrid.UnstickAssembly(assembly, grid.surfaceMask);
 
         // Ориентация — кратная 90° по осям коробки. Раньше поворот раскладывали на
         // рыскание и тангаж: у корпуса, лежащего на боку («дыркой вверх»), правая
@@ -1110,7 +1130,7 @@ public class Raycast : MonoBehaviour
                     if (grid.IsAimBlocker(col)) continue;
 
                     // после поворота стоим НА нём (пол/стол) — не блок
-                    if (col.bounds.max.y <= pred.min.y + 0.06f) continue;
+                    if (col.bounds.max.y <= pred.min.y + GroundEpsilon) continue;
 
                     return; // не крутим — заденем
                 }
@@ -1295,6 +1315,65 @@ public class Raycast : MonoBehaviour
         return b.min.y;
     }
 
+    // Допуск, в пределах которого коллайдер считается «полом под нами», а не
+    // препятствием. Раньше здесь было 0.06 м: предмет на 6 см влезал внутрь
+    // стола/тумбы, а потом физика выбрасывала его. Ступеньку теперь гасит
+    // посадка на опору (SettleAssembly), а просадку — выталкивание
+    // (PlacementGrid.UnstickAssembly), поэтому хватает контактного допуска PhysX.
+    private const float GroundEpsilon = 0.015f;
+
+    /// <summary>
+    /// Гасит подъём после шага «через препятствие»: предмет остаётся висеть
+    /// на высоте ступеньки, а в режиме сетки он кинематический и сам не упадёт
+    /// — при зажатой стрелке он так улетает всё выше и выше. Здесь ищем верхнюю
+    /// опору под сборкой (не дальше полутора клеток) и сажаем предмет на неё.
+    /// </summary>
+    private bool SettleAssembly(PlacementGrid grid, Rigidbody body)
+    {
+        Bounds b;
+        if (!TryAssemblyBounds(grid, body, out b)) return false;
+
+        const float skin = 0.005f;
+        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
+        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return false;
+
+        var assembly = grid.DragAssemblyBodies;
+        var self = new HashSet<Rigidbody>();
+        if (assembly != null)
+            for (int i = 0; i < assembly.Length; i++)
+                if (assembly[i] != null) self.Add(assembly[i]);
+
+        float maxDrop = Mathf.Max(grid.cellSize, 0.1f) * 1.5f;
+
+        var hits = Physics.BoxCastAll(b.center, half, Vector3.down, Quaternion.identity,
+            maxDrop, grid.surfaceMask, QueryTriggerInteraction.Ignore);
+
+        float best = -1f;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            var hit = hits[i];
+            var col = hit.collider;
+            if (col == null) continue;
+
+            var rb = col.attachedRigidbody;
+            if (rb != null && self.Contains(rb)) continue;
+            if (grid.IsAimBlocker(col)) continue;
+
+            // Опора сверху: пол, стол, полка. Стены (нормаль вбок) — не опора.
+            if (hit.normal.y < 0.7f) continue;
+            if (hit.distance < 0.005f) continue; // уже стоим на месте
+            if (hit.distance > best) best = hit.distance;
+        }
+
+        if (best < 0f) return false;
+
+        var drop = new Vector3(0f, -(best - 0.004f), 0f);
+        if (!PathClear(grid, body, drop, false)) return false;
+
+        ApplyPin(grid, drop);
+        return true;
+    }
+
     /// <summary>
     /// Резко (телепортом) смещает ВСЮ тащимую сборку на дельту — но только
     /// если в целевой позиции она ни с кем не пересекается: стены, перекрытия
@@ -1329,7 +1408,7 @@ public class Raycast : MonoBehaviour
         // сравнивал с текущим низом без учёта подъёма, и стол вплотную выше
         // столешницы предмета (например, два разных стола) отсекал шаг с нулевой
         // дистанцией — сборка «не двигалась» вообще.
-        float groundY = b.min.y + delta.y + 0.06f;
+        float groundY = b.min.y + delta.y + GroundEpsilon;
 
         // Касания в НАЧАЛЕ пути (мебель вплотную, предмет чуть провален в
         // поверхность): свип стартует из них с дистанцией 0 и отсекает шаг.
@@ -1389,7 +1468,7 @@ public class Raycast : MonoBehaviour
             if (grid.IsAimBlocker(col)) continue;
 
             // после шага стоим НА нём (пол/стол/перееханный обломок)
-            if (col.bounds.max.y <= b.min.y + delta.y + 0.06f) continue;
+            if (col.bounds.max.y <= b.min.y + delta.y + GroundEpsilon) continue;
 
             return false; // клетка занята
         }
@@ -1454,7 +1533,7 @@ public class Raycast : MonoBehaviour
             if (rb != null && self.Contains(rb)) continue;
             if (grid.IsAimBlocker(col)) continue;
             // «пол» для этого шага — с учётом подъёма/падения, как в PathClear
-            if (col.bounds.max.y <= b.min.y + delta.y + 0.06f) continue;
+            if (col.bounds.max.y <= b.min.y + delta.y + GroundEpsilon) continue;
             if (Vector3.Dot(dir, hit.normal) > -0.2f) continue;
 
             if (hit.distance < nearest) nearest = hit.distance;
@@ -1469,11 +1548,13 @@ public class Raycast : MonoBehaviour
     /// высокое препятствие — скользим вплотную и останавливаемся в паре
     /// миллиметров (прислонить к стене/другому ПК впритык).
     /// </summary>
-    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep)
+    private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep,
+        bool settle = true)
     {
         if (PathClear(grid, body, delta, sweep))
         {
             ApplyPin(grid, delta);
+            if (settle) SettleAssembly(grid, body);
             return true;
         }
 
@@ -1485,6 +1566,9 @@ public class Raycast : MonoBehaviour
             if (PathClear(grid, body, up, sweep))
             {
                 ApplyPin(grid, up);
+                // Подъём «ступенькой» не должен остаться висеть: предмет
+                // кинематический и сам не сядет на опору.
+                if (settle) SettleAssembly(grid, body);
                 return true;
             }
         }
@@ -1496,6 +1580,7 @@ public class Raycast : MonoBehaviour
             {
                 var slide = delta.normalized * Mathf.Max(0f, d - 0.004f);
                 ApplyPin(grid, slide);
+                if (settle) SettleAssembly(grid, body);
                 return true;
             }
         }
@@ -1527,7 +1612,7 @@ public class Raycast : MonoBehaviour
             grid.surfaceMask, QueryTriggerInteraction.Ignore);
 
         var names = new List<string>(4);
-        float groundY = b.min.y + delta.y + 0.06f;
+        float groundY = b.min.y + delta.y + GroundEpsilon;
         for (int i = 0; i < hits.Length && names.Count < 4; i++)
         {
             var col = hits[i];
@@ -1725,7 +1810,7 @@ public class Raycast : MonoBehaviour
                         if (!sunk)
                             delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
 
-                        if (!TryPinWithClimb(grid, body, delta, !sunk) && hasSurface && normal.y > 0.7f)
+                        if (!TryPinWithClimb(grid, body, delta, !sunk, false) && hasSurface && normal.y > 0.7f)
                         {
                             // С отснапанной высотой клетка занята — пробуем
                             // встать прямо на поверхность.
@@ -1735,7 +1820,7 @@ public class Raycast : MonoBehaviour
                             delta = (bodySnapped - comOffset) - body.position;
                             if (!sunk)
                                 delta.y = Mathf.Clamp(delta.y, -grid.cellSize, grid.cellSize);
-                            TryPinWithClimb(grid, body, delta, !sunk);
+                            TryPinWithClimb(grid, body, delta, !sunk, false);
                         }
                     }
 

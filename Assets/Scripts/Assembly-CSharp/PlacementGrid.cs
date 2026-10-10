@@ -464,13 +464,17 @@ public class PlacementGrid : MonoBehaviour
         return set;
     }
 
-    private const int MaxLooseStack = 24;
+    private const int MaxLooseStack = 8;
 
     /// <summary>
     /// Свободные предметы, которые лежат НА сборке (отвалившиеся крышки и планки,
     /// мелочь сверху), едут вместе с ней. Иначе они стоят стеной на пути, и предмет
     /// «не двигается». Части, соединённые джойнтами с конструкцией (петли и т.п.),
     /// не трогаем — они остаются препятствием.
+    ///
+    /// Список намеренно короткий и только по размеру: на плотной конструкции
+    /// (майнер, корпус со стопкой планок) в сборку иначе попадало всё подряд, и
+    /// предмет уезжал вместе с половиной конструкции.
     /// </summary>
     private Rigidbody[] AddLooseStack(Rigidbody[] assembly)
     {
@@ -506,6 +510,14 @@ public class PlacementGrid : MonoBehaviour
                 if (set.Contains(other) || jointed.Contains(other)) continue;
                 if (IsAimBlocker(col)) continue;
 
+                // Не тянем в сборку то, что заметно крупнее хозяина: это уже не
+                // «мелочь сверху», а соседняя конструкция — её двигать нельзя.
+                Bounds ob;
+                if (TrySolidBounds(other, out ob))
+                {
+                    if (ob.size.x > b.size.x * 1.05f || ob.size.z > b.size.z * 1.05f) continue;
+                }
+
                 set.Add(other);
                 list.Add(other);
                 queue.Enqueue(other);
@@ -513,6 +525,99 @@ public class PlacementGrid : MonoBehaviour
         }
 
         return list.ToArray();
+    }
+
+    /// <summary>
+    /// Выталкивает тела из геометрии, в которую они вклинились (шаг сетки,
+    /// поворот, просадка в стол). Вызывается ПЕРЕД возвратом тел в динамику:
+    /// иначе на следующем шаге PhysX «выстрелит» предмет из стены или столешницы
+    /// (тем глубже, чем глубже провалились) — это и есть «улетает».
+    ///
+    /// Толкаем строго вверх. Если препятствие сбоку — не лезем: такое лучше
+    /// запретить шагом (возвращаем false), чем засунуть предмет в стену.
+    /// </summary>
+    public static bool UnstickAssembly(Rigidbody[] bodies, LayerMask mask)
+    {
+        if (bodies == null || bodies.Length == 0) return false;
+
+        Physics.SyncTransforms();
+
+        var self = new HashSet<Rigidbody>();
+        for (int i = 0; i < bodies.Length; i++)
+            if (bodies[i] != null) self.Add(bodies[i]);
+
+        bool moved = false;
+
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            var rb = bodies[i];
+            if (rb == null) continue;
+
+            var cols = rb.GetComponentsInChildren<Collider>(true);
+            for (int c = 0; c < cols.Length; c++)
+            {
+                var a = cols[c];
+                // ComputePenetration умеет только выпуклые коллайдеры
+                if (!IsSolidCollider(a) || !a.convex) continue;
+
+                Bounds b = a.bounds;
+                b.Expand(0.01f);
+
+                var around = Physics.OverlapBox(b.center, b.extents, Quaternion.identity,
+                    mask, QueryTriggerInteraction.Ignore);
+
+                float up = 0f;
+                for (int j = 0; j < around.Length; j++)
+                {
+                    var o = around[j];
+                    if (o == null || o == a) continue;
+
+                    var orb = o.attachedRigidbody;
+                    if (orb != null && self.Contains(orb)) continue;
+                    // ComputePenetration требует выпуклые коллайдеры с обеих сторон
+                    if (!o.convex) continue;
+
+                    var player = Player.Instance;
+                    if (player != null && o.transform.IsChildOf(player.transform)) continue;
+
+                    Vector3 dir;
+                    float dist;
+                    if (!Physics.ComputePenetration(a, a.transform.position, a.transform.rotation,
+                            o, o.transform.position, o.transform.rotation, out dir, out dist))
+                        continue;
+                    if (dist <= 0.001f) continue;
+
+                    // Сбоку/снизу не разбираемся: такой контакт лучше не трогать,
+                    // предмет останется в текущем месте (шаг его заблокирует)
+                    if (dir.y < 0.3f) return false;
+
+                    if (dist > up) up = dist;
+                }
+
+                if (up > 0f)
+                {
+                    MoveBodiesUp(bodies, up + 0.002f);
+                    moved = true;
+                }
+            }
+        }
+
+        return moved;
+    }
+
+    private static void MoveBodiesUp(Rigidbody[] bodies, float dy)
+    {
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            var rb = bodies[i];
+            if (rb == null) continue;
+
+            rb.transform.position += new Vector3(0f, dy, 0f);
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        Physics.SyncTransforms();
     }
 
     /// <summary>
@@ -697,6 +802,11 @@ public class PlacementGrid : MonoBehaviour
     private void ReleaseRotationLock()
     {
         if (lockBodies == null) return;
+
+        // Перед возвратом в физику — вытолкнуть предмет из того, куда он
+        // вклинился. Иначе PhysX на следующем шаге выбросит его из стола/стены
+        // с большой скоростью: в режиме сетки предмет «улетает» при отпускании.
+        UnstickAssembly(lockBodies, surfaceMask);
 
         for (int i = 0; i < lockBodies.Length; i++)
         {

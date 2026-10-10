@@ -71,6 +71,11 @@ public class MobileCustomizeManager : MonoBehaviour
             return;
         }
 
+        // Стрелки сетки (перемещение/поворот) — тоже элемент раскладки: в игре
+        // панель создаётся кодом, здесь кладём её копию-превью, чтобы её можно
+        // было двигать и сохранять вместе с остальным управлением.
+        DragRotateControls.BuildPreview(controlsRoot);
+
         controls = controlsRoot.GetComponentsInChildren<MobileFreeDraggable>(true);
         adaptivePanels = controlsRoot.GetComponentsInChildren<MobileAdaptiveSlidePanel>(true);
     }
@@ -181,6 +186,11 @@ public class MobileCustomizeManager : MonoBehaviour
 
         if (editPanel != null)
             editPanel.SetActive(value);
+
+        // Панель стрелок сетки ловит нажатия только в режиме редактирования:
+        // иначе невидимый прямоугольник перехватывал бы клики по меню.
+        if (controlsRoot != null)
+            DragRotateControls.SetPreviewCatcher(controlsRoot, value);
 
         // ВАЖНО:
         // previewPanel не выключаем тут.

@@ -14,6 +14,19 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         get { return controlId; }
     }
 
+    /// <summary>
+    /// Инициализация для панелей, которые создаются кодом (стрелки сетки):
+    /// controlId и область, внутри которой элемент двигается. После Init
+    /// сразу подтягиваем сохранённую позицию — Awake уже отработал.
+    /// </summary>
+    public void Init(string id, RectTransform parent)
+    {
+        controlId = id;
+        if (parent != null) parentRect = parent;
+        EnsureRefs();
+        LoadPosition();
+    }
+
     [Header("Родительская область. В меню = PreviewMobileControlsPanel, в игре = MobileControlsPanel")]
     [SerializeField]
     private RectTransform parentRect;
