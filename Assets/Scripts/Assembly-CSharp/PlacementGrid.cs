@@ -528,6 +528,18 @@ public class PlacementGrid : MonoBehaviour
     }
 
     /// <summary>
+    /// Выпуклый ли коллайдер. Свойство convex есть только у MeshCollider
+    /// (у Box/Sphere/Capsule/Cylinder их и так всегда выпуклые), поэтому
+    /// проверяем именно MeshCollider — иначе код просто не собирался.
+    /// </summary>
+    private static bool IsConvex(Collider c)
+    {
+        if (c == null) return false;
+        var mesh = c as MeshCollider;
+        return mesh == null || mesh.convex;
+    }
+
+    /// <summary>
     /// Выталкивает тела из геометрии, в которую они вклинились (шаг сетки,
     /// поворот, просадка в стол). Вызывается ПЕРЕД возвратом тел в динамику:
     /// иначе на следующем шаге PhysX «выстрелит» предмет из стены или столешницы
@@ -547,6 +559,7 @@ public class PlacementGrid : MonoBehaviour
             if (bodies[i] != null) self.Add(bodies[i]);
 
         bool moved = false;
+        float lift = 0f;
 
         for (int i = 0; i < bodies.Length; i++)
         {
@@ -558,7 +571,7 @@ public class PlacementGrid : MonoBehaviour
             {
                 var a = cols[c];
                 // ComputePenetration умеет только выпуклые коллайдеры
-                if (!IsSolidCollider(a) || !a.convex) continue;
+                if (!IsSolidCollider(a) || !IsConvex(a)) continue;
 
                 Bounds b = a.bounds;
                 b.Expand(0.01f);
@@ -566,7 +579,6 @@ public class PlacementGrid : MonoBehaviour
                 var around = Physics.OverlapBox(b.center, b.extents, Quaternion.identity,
                     mask, QueryTriggerInteraction.Ignore);
 
-                float up = 0f;
                 for (int j = 0; j < around.Length; j++)
                 {
                     var o = around[j];
@@ -575,34 +587,58 @@ public class PlacementGrid : MonoBehaviour
                     var orb = o.attachedRigidbody;
                     if (orb != null && self.Contains(orb)) continue;
                     // ComputePenetration требует выпуклые коллайдеры с обеих сторон
-                    if (!o.convex) continue;
+                    if (!IsConvex(o)) continue;
 
                     var player = Player.Instance;
                     if (player != null && o.transform.IsChildOf(player.transform)) continue;
 
                     Vector3 dir;
                     float dist;
-                    if (!Physics.ComputePenetration(a, a.transform.position, a.transform.rotation,
-                            o, o.transform.position, o.transform.rotation, out dir, out dist))
-                        continue;
+                    if (!TryComputePenetration(a, o, out dir, out dist)) continue;
                     if (dist <= 0.001f) continue;
 
                     // Сбоку/снизу не разбираемся: такой контакт лучше не трогать,
                     // предмет останется в текущем месте (шаг его заблокирует)
                     if (dir.y < 0.3f) return false;
 
-                    if (dist > up) up = dist;
-                }
-
-                if (up > 0f)
-                {
-                    MoveBodiesUp(bodies, up + 0.002f);
-                    moved = true;
+                    if (dist > lift) lift = dist;
                 }
             }
         }
 
+        // Один общий подъём на всю сборку: показывать по частям нельзя —
+        // иначе соседние детали расходятся между собой.
+        if (lift > 0f)
+        {
+            MoveBodiesUp(bodies, lift + 0.002f);
+            moved = true;
+        }
+
         return moved;
+    }
+
+    /// <summary>
+    /// ComputePenetration в обёртке: PhysX бросает исключение на невыпуклых
+    /// и на «сложных» парах, а такое лучше просто пропустить, чем уронить
+    /// всю физику на кадр.
+    /// </summary>
+    private static bool TryComputePenetration(Collider a, Collider o,
+        out Vector3 dir, out float distance)
+    {
+        dir = Vector3.zero;
+        distance = 0f;
+
+        try
+        {
+            return Physics.ComputePenetration(a, a.transform.position, a.transform.rotation,
+                o, o.transform.position, o.transform.rotation, out dir, out distance);
+        }
+        catch (Exception)
+        {
+            dir = Vector3.zero;
+            distance = 0f;
+            return false;
+        }
     }
 
     private static void MoveBodiesUp(Rigidbody[] bodies, float dy)
