@@ -32,6 +32,15 @@ public class DragRotateControls : MonoBehaviour
     /// </summary>
     private const int HudSortingOrder = 5;
 
+    // Одна геометрия для игры и превью: между центром, крупными и мелкими
+    // стрелками остаётся 8–10 px * scale. Крайние кнопки помещаются в панель.
+    private const float PanelSize = 400f;
+    private const float BigArrowSize = 88f;
+    private const float BigArrowOffset = 88f;
+    private const float FineArrowSize = 52f;
+    private const float FineArrowOffset = 166f;
+    private const float ToggleSize = 68f;
+
     /// <summary>
     /// Задаёт слой отрисовки панели. Порядок в Unity определяется канвасом,
     /// а не порядком объектов: пока у панели своего Canvas не было, она
@@ -96,10 +105,6 @@ public class DragRotateControls : MonoBehaviour
     private bool holdFine;
     private float holdNextAt;
 
-    // Платформу проверяем один раз: на ПК панель не нужна, каждый кадр
-    // сканировать сцену незачем.
-    private static bool platformChecked;
-
     /// <summary>
     /// Создаёт панель, если её ещё нет (вызывается из Raycast). На ПК панель не
     /// собирается — там стрелки клавиатуры. В редакторе собирается, если
@@ -107,8 +112,10 @@ public class DragRotateControls : MonoBehaviour
     /// </summary>
     public static void EnsureExists(Raycast owner)
     {
-        if (Instance != null) return; // Unity-null: после смены сцены создадим заново
-        if (platformChecked) return;
+        // Instance уничтожается при выходе в меню. Отдельный статический
+        // «уже создавали» переживал смену сцен и навсегда запрещал новые
+        // стрелки при повторном заходе без перезапуска приложения.
+        if (Instance != null) return;
         if (!ShouldBuild()) return;
 
         var canvas = FindHudCanvas();
@@ -138,7 +145,6 @@ public class DragRotateControls : MonoBehaviour
         }
 
         Instance = controls;
-        platformChecked = true;
     }
 
     /// <summary>
@@ -250,15 +256,18 @@ public class DragRotateControls : MonoBehaviour
         // получалось 1.6–2.4, и панель в 300*s занимала почти пол-экрана.
         float shortSide = Mathf.Min(Screen.width, Screen.height);
 
-        // Ориентир: кнопка должна быть ~5% меньшей стороны, но не мельче
-        // читаемой и не крупнее 1.35 — иначе стрелки перекрывают друг друга.
+        // Ограничиваем масштаб до 1.35, чтобы панель не заслоняла остальной HUD;
+        // ниже базового размера допускаем только ради размещения на экране.
         float scale = shortSide / 1080f;
         scale = Mathf.Clamp(scale, 0.85f, 1.35f);
 
         float dpi = Screen.dpi;
         if (dpi > 1f) scale = Mathf.Clamp(scale, scale, dpi / 400f);
 
-        return Mathf.Clamp(scale, 0.85f, 1.35f);
+        // Вся панель, включая крайние кнопки, должна помещаться даже на
+        // маленьком дисплее; DPI не имеет права раздвинуть её за экран.
+        float fit = (shortSide - 24f) / PanelSize;
+        return Mathf.Max(0.1f, Mathf.Min(scale, fit));
     }
 
     private void Build(Canvas canvas)
@@ -276,7 +285,7 @@ public class DragRotateControls : MonoBehaviour
         panelRect.anchorMax = new Vector2(1f, 0f);
         panelRect.pivot = new Vector2(1f, 0f);
         panelRect.anchoredPosition = new Vector2(-16f, 96f);
-        panelRect.sizeDelta = new Vector2(300f * s, 300f * s);
+        panelRect.sizeDelta = new Vector2(PanelSize * s, PanelSize * s);
 
         // Прозрачная подложка-ловушка для перетаскивания в настройках.
         // В игре нажатия НЕ перехватываем: иначе пустая часть панели съедала бы
@@ -300,10 +309,10 @@ public class DragRotateControls : MonoBehaviour
         // Главные стрелки: в режиме перемещения — ходят по клеткам,
         // в режиме поворота — крутят. Стрелка в спрайте смотрит вверх;
         // остальные кнопки повёрнуты.
-        float big = 96f * s;
-        float gap = 72f * s;
-        float fine = 52f * s;
-        float fineGap = 132f * s;
+        float big = BigArrowSize * s;
+        float gap = BigArrowOffset * s;
+        float fine = FineArrowSize * s;
+        float fineGap = FineArrowOffset * s;
 
         Wire(CreateButton(panel.transform, sprite, "ArrowLeft", -gap, 0f, 90f, big, "←"), -1, 0, false);
         Wire(CreateButton(panel.transform, sprite, "ArrowUp", 0f, gap, 0f, big, "↑"), 0, 1, false);
@@ -319,7 +328,7 @@ public class DragRotateControls : MonoBehaviour
 
         // Центральная кнопка — переключатель режима стрелок:
         // перемещение / поворот (аналог R на ПК).
-        float toggleSize = 76f * s;
+        float toggleSize = ToggleSize * s;
         var tgo = new GameObject("ModeToggle", typeof(RectTransform));
         tgo.transform.SetParent(panel.transform, false);
 
@@ -508,12 +517,12 @@ public class DragRotateControls : MonoBehaviour
         rect.anchorMax = new Vector2(1f, 0f);
         rect.pivot = new Vector2(1f, 0f);
         rect.anchoredPosition = new Vector2(-16f, 96f);
-        rect.sizeDelta = new Vector2(300f * s, 300f * s);
+        rect.sizeDelta = new Vector2(PanelSize * s, PanelSize * s);
 
-        float big = 96f * s;
-        float gap = 72f * s;
-        float fine = 52f * s;
-        float fineGap = 132f * s;
+        float big = BigArrowSize * s;
+        float gap = BigArrowOffset * s;
+        float fine = FineArrowSize * s;
+        float fineGap = FineArrowOffset * s;
 
         // В настройках панель целиком тянется мышью/пальцем за любую точку.
         var catcher = panel.AddComponent<Image>();
@@ -541,7 +550,7 @@ public class DragRotateControls : MonoBehaviour
         trect.anchorMax = new Vector2(0.5f, 0.5f);
         trect.pivot = new Vector2(0.5f, 0.5f);
         trect.anchoredPosition = Vector2.zero;
-        trect.sizeDelta = new Vector2(76f * s, 76f * s);
+        trect.sizeDelta = new Vector2(ToggleSize * s, ToggleSize * s);
 
         var tbg = tgo.AddComponent<Image>();
         tbg.color = new Color(0f, 0f, 0f, 0.6f);
