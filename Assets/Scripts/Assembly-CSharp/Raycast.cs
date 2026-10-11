@@ -1155,16 +1155,21 @@ public class Raycast : MonoBehaviour
         // оставляли цель до следующего шага физики: если тело в этот момент становилось
         // динамическим (отпустили кнопку), оно разгонялось и «взлетало».
         var parts = assembly != null && assembly.Length > 0 ? assembly : new[] { body };
-        for (int i = 0; i < parts.Length; i++)
+        var roots = PlacementGrid.AssemblyRoots(parts);
+        // Transform-потомки уже повернутся вместе с корнем. Если применить
+        // worldDelta к каждому Rigidbody, GPU/CPU повернутся дважды и оторвутся.
+        for (int i = 0; i < roots.Length; i++)
         {
-            var rb = parts[i];
-            if (rb == null) continue;
-
+            var rb = roots[i];
             Quaternion next = worldDelta * rb.transform.rotation;
             Vector3 pos = pivot + worldDelta * (rb.transform.position - pivot);
             rb.transform.SetPositionAndRotation(pos, next);
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+        }
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (parts[i] == null) continue;
+            parts[i].velocity = Vector3.zero;
+            parts[i].angularVelocity = Vector3.zero;
         }
         Physics.SyncTransforms();
 
@@ -1177,11 +1182,8 @@ public class Raycast : MonoBehaviour
             float lift = Mathf.Max(0f, minBefore - after.min.y);
             if (lift > 0f)
             {
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    var rb = parts[i];
-                    if (rb != null) rb.transform.position += new Vector3(0f, lift, 0f);
-                }
+                for (int i = 0; i < roots.Length; i++)
+                    roots[i].transform.position += new Vector3(0f, lift, 0f);
                 Physics.SyncTransforms();
             }
         }
@@ -1599,14 +1601,16 @@ public class Raycast : MonoBehaviour
         var assembly = grid.DragAssemblyBodies;
         if (assembly == null) return;
 
+        // Установленная деталь — дочерний Transform другой детали. Двигаем
+        // лишь корни и не прибавляем delta второй раз её Rigidbody-потомкам.
+        foreach (var root in PlacementGrid.AssemblyRoots(assembly))
+            root.transform.position += delta;
+
         for (int i = 0; i < assembly.Length; i++)
         {
-            var partRb = assembly[i];
-            if (partRb == null) continue;
-
-            partRb.transform.position += delta;
-            partRb.velocity = Vector3.zero;
-            partRb.angularVelocity = Vector3.zero;
+            if (assembly[i] == null) continue;
+            assembly[i].velocity = Vector3.zero;
+            assembly[i].angularVelocity = Vector3.zero;
         }
 
         Physics.SyncTransforms();

@@ -728,17 +728,50 @@ public class PlacementGrid : MonoBehaviour
 
     private static void MoveBodiesUp(Rigidbody[] bodies, float dy)
     {
+        // Передвигаем только корни: движение Transform родителя уже сдвигает
+        // все его дочерние Rigidbody. Иначе комплектуха получает двойной подъём.
+        foreach (var rb in AssemblyRoots(bodies))
+            rb.transform.position += new Vector3(0f, dy, 0f);
+
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            if (bodies[i] == null) continue;
+            bodies[i].velocity = Vector3.zero;
+            bodies[i].angularVelocity = Vector3.zero;
+        }
+
+        Physics.SyncTransforms();
+    }
+
+    /// <summary>
+    /// Тела, чьего Rigidbody-предка нет в наборе. Джойнт без родства в
+    /// Transform — отдельный корень и двигается сам; вложенный GPU/CPU
+    /// уже едет вместе с материнкой. Работает при любом порядке в массиве.
+    /// </summary>
+    public static Rigidbody[] AssemblyRoots(Rigidbody[] bodies)
+    {
+        if (bodies == null) return new Rigidbody[0];
+
+        var transforms = new HashSet<Transform>();
+        for (int i = 0; i < bodies.Length; i++)
+            if (bodies[i] != null) transforms.Add(bodies[i].transform);
+
+        var roots = new List<Rigidbody>();
         for (int i = 0; i < bodies.Length; i++)
         {
             var rb = bodies[i];
             if (rb == null) continue;
 
-            rb.transform.position += new Vector3(0f, dy, 0f);
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            bool child = false;
+            for (var parent = rb.transform.parent; parent != null; parent = parent.parent)
+            {
+                if (!transforms.Contains(parent)) continue;
+                child = true;
+                break;
+            }
+            if (!child) roots.Add(rb);
         }
-
-        Physics.SyncTransforms();
+        return roots.ToArray();
     }
 
     /// <summary>
