@@ -58,6 +58,12 @@ public class Raycast : MonoBehaviour
     private Vector3 pendingGridMove;
     private bool gridMoveInit;
 
+    // Используется поворотом и на телефоне. Нельзя помещать эти поля внутрь
+    // #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL.
+    private Collider rotationBlocker;
+    private bool rotationMissingSupport;
+    private float nextRotationBlockLog;
+
 #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL
     // Подпись режима стрелок в левом нижнем углу (только ПК).
     private GameObject modeHint;
@@ -384,9 +390,6 @@ public class Raycast : MonoBehaviour
     private const float MoveRepeatInterval = 0.14f;
     private const float RotateRepeatInterval = 0.35f;
     private readonly float[] arrowNextAt = new float[4];
-    private Collider rotationBlocker;
-    private bool rotationMissingSupport;
-    private float nextRotationBlockLog;
 
     private void HoldArrow(KeyCode key, int xDir, int yDirUp, bool fine, int slot)
     {
