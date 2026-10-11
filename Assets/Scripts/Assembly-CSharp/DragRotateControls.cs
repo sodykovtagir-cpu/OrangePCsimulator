@@ -48,6 +48,10 @@ public class DragRotateControls : MonoBehaviour
 
         own.overrideSorting = true;
         own.sortingOrder = order;
+        // GraphicRaycaster родительского Canvas не обрабатывает графику
+        // вложенного Canvas. Без собственного raycaster стрелки видны,
+        // но касание проходит СКВОЗЬ них — и превью нельзя перетащить.
+        EnsureRaycaster(own);
 
         // Вложенные канвасы (если их создадут) — с тем же порядком
         var nested = panel.GetComponentsInChildren<Canvas>(true);
@@ -182,6 +186,11 @@ public class DragRotateControls : MonoBehaviour
     private void Update()
     {
         if (!holdActive || raycast == null) return;
+        if (Player.Instance != null && Player.Instance.pauseControls)
+        {
+            StopHold();
+            return;
+        }
         if (Time.unscaledTime < holdNextAt) return;
 
         raycast.ArrowInput(holdX, holdY, holdFine);
@@ -190,7 +199,7 @@ public class DragRotateControls : MonoBehaviour
 
     private void StartHold(int xDir, int yDirUp, bool fine)
     {
-        if (raycast == null) return;
+        if (raycast == null || (Player.Instance != null && Player.Instance.pauseControls)) return;
 
         holdX = xDir;
         holdY = yDirUp;
@@ -546,6 +555,7 @@ public class DragRotateControls : MonoBehaviour
         lrect.offsetMax = Vector2.zero;
 
         var text = labelGo.AddComponent<Text>();
+        text.raycastTarget = false;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.text = Localization.GetText("Grid: move");
         text.alignment = TextAnchor.MiddleCenter;

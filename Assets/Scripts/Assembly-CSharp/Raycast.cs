@@ -229,7 +229,9 @@ public class Raycast : MonoBehaviour
         // Панель поворота (стрелки) видна, пока предмет выбран или тащат его в
         // режиме сетки. На ПК её нет — там стрелки с клавиатуры.
         if (DragRotateControls.Instance != null)
-            DragRotateControls.Instance.SetVisible(GridMode() && (currentDrag != null || selectedBody != null));
+            DragRotateControls.Instance.SetVisible(
+                GridMode() && (currentDrag != null || selectedBody != null) &&
+                (Player.Instance == null || !Player.Instance.pauseControls));
 
         // Панель могла не собраться в Start (HUD ещё не был готов) — пробуем
         // ещё раз, но не чаще раза в полсекунды. Раньше панель строилась один раз
@@ -383,6 +385,7 @@ public class Raycast : MonoBehaviour
     private const float RotateRepeatInterval = 0.35f;
     private readonly float[] arrowNextAt = new float[4];
     private Collider rotationBlocker;
+    private bool rotationMissingSupport;
     private float nextRotationBlockLog;
 
     private void HoldArrow(KeyCode key, int xDir, int yDirUp, bool fine, int slot)
@@ -1063,6 +1066,7 @@ public class Raycast : MonoBehaviour
         }
 
         rotationBlocker = null;
+        rotationMissingSupport = false;
         if (TryRotateAssembly(body, grid, assembly, target)) return;
 
         // Высокую раму порой нельзя уложить в одну сторону: она упирается
@@ -1079,11 +1083,16 @@ public class Raycast : MonoBehaviour
             }
         }
 
-        if (rotationBlocker != null && Time.unscaledTime >= nextRotationBlockLog)
+        if (Time.unscaledTime >= nextRotationBlockLog &&
+            (rotationBlocker != null || rotationMissingSupport))
         {
             nextRotationBlockLog = Time.unscaledTime + 1.5f;
-            UnityEngine.Debug.Log($"[Grid] поворот заблокирован: " +
-                $"{rotationBlocker.name}. Переместите сборку от стены/края.");
+            if (rotationMissingSupport)
+                UnityEngine.Debug.Log("[Grid] поворот заблокирован: " +
+                    "часть основания окажется за краем пола.");
+            else
+                UnityEngine.Debug.Log($"[Grid] поворот заблокирован: " +
+                    $"{rotationBlocker.name}. Переместите сборку от стены/края.");
         }
     }
 
@@ -1146,9 +1155,9 @@ public class Raycast : MonoBehaviour
         // После кувырка нижняя грань может оказаться ВЫШЕ прежней: один лишь
         // положительный lift оставлял системник парить. Целимся в прежнюю
         // опору (пол/стол), а если её нет — хотя бы сохраняем высоту низа.
-        float groundY;
-        float landingY = grid != null && TryGroundHeight(grid, SafeDrop(grid), out groundY)
-            ? groundY + 0.004f : minBefore;
+        float groundY = float.NegativeInfinity;
+        bool wasGrounded = grid != null && TryGroundHeight(grid, SafeDrop(grid), out groundY);
+        float landingY = wasGrounded ? groundY + 0.004f : minBefore;
         float predShift = hasPred ? landingY - pred.min.y : 0f;
         if (hasPred) pred.center += new Vector3(0f, predShift, 0f);
 
@@ -1200,6 +1209,13 @@ public class Raycast : MonoBehaviour
         // динамическим (отпустили кнопку), оно разгонялось и «взлетало».
         var parts = assembly != null && assembly.Length > 0 ? assembly : new[] { body };
         var roots = PlacementGrid.AssemblyRoots(parts);
+        var beforePos = new Vector3[roots.Length];
+        var beforeRot = new Quaternion[roots.Length];
+        for (int i = 0; i < roots.Length; i++)
+        {
+            beforePos[i] = roots[i].transform.position;
+            beforeRot[i] = roots[i].transform.rotation;
+        }
         // Transform-потомки уже повернутся вместе с корнем. Если применить
         // worldDelta к каждому Rigidbody, GPU/CPU повернутся дважды и оторвутся.
         for (int i = 0; i < roots.Length; i++)
@@ -1230,6 +1246,20 @@ public class Raycast : MonoBehaviour
                     roots[i].transform.position += new Vector3(0f, correction, 0f);
                 Physics.SyncTransforms();
             }
+        }
+
+        // На краю второго этажа после кувырка низ может сместиться вбок:
+        // сохранение прежней высоты не означает, что под новым основанием
+        // вообще есть пол. Если не вся опорная грань над площадкой, откатываем
+        // ПОЗЫ корней (дочерние детали вернутся с ними), а не оставляем раму
+        // торчать половиной над пустотой.
+        if (wasGrounded && !HasFullSupportAtRest(grid, groundY))
+        {
+            for (int i = 0; i < roots.Length; i++)
+                roots[i].transform.SetPositionAndRotation(beforePos[i], beforeRot[i]);
+            Physics.SyncTransforms();
+            rotationMissingSupport = true;
+            return false;
         }
         return true;
     }
@@ -1480,8 +1510,31 @@ public class Raycast : MonoBehaviour
         return height > float.NegativeInfinity;
     }
 
+    /// <summary>После поворота проверяем ВСЮ нижнюю опорную грань.
+    /// Проверка исходной высоты пола не позволяет считать нижний этаж опорой.</summary>
+    private static bool HasFullSupportAtRest(PlacementGrid grid, float oldFloor)
+    {
+        Bounds b;
+        if (!TryContactBounds(grid, out b)) return true;
+        var self = BuildSelfSet(grid);
+        float ex = Mathf.Max(0f, b.extents.x - 0.025f);
+        float ez = Mathf.Max(0f, b.extents.z - 0.025f);
+        for (int x = -1; x <= 1; x += 2)
+        {
+            for (int z = -1; z <= 1; z += 2)
+            {
+                float floor;
+                if (!TryFloorAt(grid, self, b.center.x + x * ex,
+                    b.center.z + z * ez, b.min.y, SafeDrop(grid), out floor))
+                    return false;
+                if (floor < oldFloor - SafeDrop(grid)) return false;
+            }
+        }
+        return true;
+    }
+
     /// <summary>
-    /// Перед горизонтальным шагом проверяем опору у центра основания.
+    /// Перед горизонтальным шагом проверяем опору у передней грани основания.
     /// Отсутствие пола или перепад больше SafeDrop останавливает шаг, вместо
     /// того чтобы кинематический предмет завис за краем и упал при отпускании.
     /// Чисто вертикальное перемещение оставляем возможным.
@@ -1497,24 +1550,30 @@ public class Raycast : MonoBehaviour
         if (!TryContactBounds(grid, out b)) return true;
 
         var self = BuildSelfSet(grid);
-        // Опору требуем под центром ОСНОВАНИЯ, а не под передним краем:
-        // большой майнер может свешиваться, пока его база ещё стоит на полу.
-        // Небольшой отступ от края не даёт ему опрокинуться при отпускании.
+        // Проверяем не центр (он допускал наполовину свесить длинный майнер),
+        // а три точки его передней опорной грани. Последний большой шаг
+        // TryPinWithClimb ниже уменьшит бинарным поиском до края площадки.
         Vector3 dir = horizontal.normalized;
-        float inset = Mathf.Min(0.08f, Mathf.Min(b.extents.x, b.extents.z) * 0.25f);
-        // За один шаг клетка может пересечь узкую пропасть. Проверяем путь,
-        // чтобы не телепортироваться на следующую площадку через пустоту.
+        Vector3 side = new Vector3(-dir.z, 0f, dir.x);
+        float ex = Mathf.Max(0f, b.extents.x - 0.025f);
+        float ez = Mathf.Max(0f, b.extents.z - 0.025f);
+        float sideWidth = Mathf.Min(ex, ez) * 0.8f;
         int steps = Mathf.Max(1, Mathf.CeilToInt(horizontal.magnitude /
             Mathf.Max(0.1f, grid.cellSize * 0.5f)));
         for (int s = 1; s <= steps; s++)
         {
             float t = (float)s / steps;
-            Vector3 point = b.center + delta * t + dir * inset;
+            Vector3 front = b.center + delta * t +
+                new Vector3(dir.x * ex, 0f, dir.z * ez);
             float bottom = b.min.y + delta.y * t;
-            float floor;
-            if (!TryFloorAt(grid, self, point.x, point.z, bottom,
-                SafeDrop(grid), out floor)) return false;
-            if (floor < source - SafeDrop(grid)) return false;
+            for (int i = -1; i <= 1; i++)
+            {
+                Vector3 point = front + side * (i * sideWidth);
+                float floor;
+                if (!TryFloorAt(grid, self, point.x, point.z, bottom,
+                    SafeDrop(grid), out floor)) return false;
+                if (floor < source - SafeDrop(grid)) return false;
+            }
         }
         return true;
     }

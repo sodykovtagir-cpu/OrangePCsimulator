@@ -367,8 +367,11 @@ public class Main : MonoBehaviour
 
 	public void StopAllControl()
 	{
-		if (raycast == null) return;
-		raycast.End();
+		// Скрываем панель ДО показа паузы/диалогов: вложенный Canvas иначе
+		// рисуется поверх кнопок меню и перехватывает их касания.
+		if (DragRotateControls.Instance != null)
+			DragRotateControls.Instance.SetVisible(false);
+		if (raycast != null) raycast.End();
 		var player = Player.Instance;
 		if (player != null) player.pauseControls = true;
 		#if UNITY_STANDALONE
