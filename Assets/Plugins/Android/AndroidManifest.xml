@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.unity3d.player">
-    <!-- This is the Unity LIBRARY manifest. The generated launcher manifest
-         already declares MAIN/LAUNCHER and the normal/adaptive app icons.
-         Merge VIEW into the very same UnityPlayerActivity: no second icon. -->
+    <!-- UnityWebView's Gradle postprocessor AND Unity's deploy step expect a
+         MAIN/LAUNCHER intent here in the unityLibrary manifest. Add VIEW to
+         that SAME activity so Open with doesn't create another launcher icon.
+         The adaptive/legacy icons are still configured in PlayerSettings. -->
     <application>
         <activity android:name="com.unity3d.player.UnityPlayerActivity"
                   android:exported="true"
                   android:launchMode="singleTask"
                   android:theme="@style/UnityThemeSelector"
                   android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

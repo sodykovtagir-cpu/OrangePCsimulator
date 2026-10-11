@@ -38,9 +38,17 @@ assert activity.get(ns + 'exported') == 'true'
 assert activity.get(ns + 'launchMode') == 'singleTask'
 assert activity.get(ns + 'name') == 'com.unity3d.player.UnityPlayerActivity'
 filters = activity.findall('intent-filter')
-assert len(filters) == 1  # launcher/main remains Unity's; no duplicate app icon
-assert any(el.get(ns + 'name') == 'android.intent.action.VIEW' for el in filters[0].findall('action'))
-assert 'application/octet-stream' in [el.get(ns + 'mimeType') for el in filters[0].findall('data')]
+# UnityWebView's postprocessor searches the unityLibrary manifest for this
+# exact MAIN + LAUNCHER pair; without it SetHardwareAccelerated dereferences
+# null at UnityWebViewPostprocessBuild.cs:300, then Unity deploy can't launch.
+assert len(filters) == 2  # both intents on ONE activity, not a second icon
+launch, view = filters
+assert [a.get(ns + 'name') for a in launch.findall('action')] == ['android.intent.action.MAIN']
+assert [c.get(ns + 'name') for c in launch.findall('category')] == ['android.intent.category.LAUNCHER']
+assert any(el.get(ns + 'name') == 'android.intent.action.VIEW' for el in view.findall('action'))
+assert 'application/octet-stream' in [el.get(ns + 'mimeType') for el in view.findall('data')]
+plugin = (assets / 'Plugins/Editor/UnityWebViewPostprocessBuild.cs').read_text()
+assert 'GetActivityWithLaunchIntent()' in plugin and 'SetHardwareAccelerated(true)' in plugin
 assert 'useCustomMainManifest: 1' in settings
 java = (assets / 'Plugins/Android/OrangeSaveOpen.java').read_text()
 for guard in ('activity.getIntent()', 'activity.setIntent(new Intent(Intent.ACTION_MAIN))',
