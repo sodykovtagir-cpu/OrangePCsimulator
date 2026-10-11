@@ -1106,8 +1106,14 @@ public class Raycast : MonoBehaviour
             pred = new Bounds((mn + mx) * 0.5f, mx - mn);
         }
 
-        float predLift = hasPred ? Mathf.Max(0f, minBefore - pred.min.y) : 0f;
-        if (hasPred) pred.center += new Vector3(0f, predLift, 0f);
+        // После кувырка нижняя грань может оказаться ВЫШЕ прежней: один лишь
+        // положительный lift оставлял системник парить. Целимся в прежнюю
+        // опору (пол/стол), а если её нет — хотя бы сохраняем высоту низа.
+        float groundY;
+        float landingY = grid != null && TryGroundHeight(grid, SafeDrop(grid), out groundY)
+            ? groundY + 0.004f : minBefore;
+        float predShift = hasPred ? landingY - pred.min.y : 0f;
+        if (hasPred) pred.center += new Vector3(0f, predShift, 0f);
 
         // Гейт поворота: проверяем каждый коллайдер сборки ОТДЕЛЬНО в его
         // новом положении (собственные оси коробки, повёрнутые вокруг пивота).
@@ -1122,7 +1128,7 @@ public class Raycast : MonoBehaviour
                 var gb = boxes[i];
 
                 Vector3 rotatedCenter = pivot + worldDelta * (gb.center - pivot);
-                rotatedCenter.y += predLift;
+                rotatedCenter.y += predShift;
                 Quaternion rotatedRot = worldDelta * gb.rot;
 
                 Vector3 half = gb.half - new Vector3(SweepSkin, SweepSkin, SweepSkin);
@@ -1173,17 +1179,17 @@ public class Raycast : MonoBehaviour
         }
         Physics.SyncTransforms();
 
-        // Подъём — по ФАКТИЧЕСКОМУ низу после поворота: низ остаётся на прежней высоте.
-        // Предсказанный подъём каждый раз немного завышал, и за несколько быстрых
-        // поворотов предмет «подкидывало» всё выше.
+        // Корректируем ошибку предсказания по ФАКТИЧЕСКОМУ низу. Поправка
+        // бывает отрицательной: без этого после переворота предмет висел.
         Bounds after;
         if (hasBounds && grid != null && TryAssemblyBounds(grid, body, out after))
         {
-            float lift = Mathf.Max(0f, minBefore - after.min.y);
-            if (lift > 0f)
+            float correction = landingY - after.min.y;
+            if (Mathf.Abs(correction) > 0.001f &&
+                PathClear(grid, body, Vector3.up * correction, false))
             {
                 for (int i = 0; i < roots.Length; i++)
-                    roots[i].transform.position += new Vector3(0f, lift, 0f);
+                    roots[i].transform.position += new Vector3(0f, correction, 0f);
                 Physics.SyncTransforms();
             }
         }
@@ -1338,55 +1344,147 @@ public class Raycast : MonoBehaviour
     // (PlacementGrid.UnstickAssembly), поэтому хватает контактного допуска PhysX.
     private const float GroundEpsilon = 0.015f;
 
+    // Допустимая высота обычной ступеньки (0.75 м при клетке 0.5).
+    // Первый этаж под вторым здесь НЕ считается опорой.
+    private static float SafeDrop(PlacementGrid grid)
+    {
+        return Mathf.Max(grid.cellSize, 0.1f) * 1.5f;
+    }
+
+    /// <summary>Габарит частей, реально касающихся поверхности, а не всей
+    /// высокой фермы майнера с GPU наверху.</summary>
+    private static bool TryContactBounds(PlacementGrid grid, out Bounds contact)
+    {
+        contact = default(Bounds);
+        var bodies = grid.DragAssemblyBodies;
+        if (bodies == null) return false;
+
+        var all = new List<Bounds>();
+        float lowest = float.MaxValue;
+        foreach (var rb in bodies)
+        {
+            if (rb == null) continue;
+            foreach (var col in rb.GetComponentsInChildren<Collider>(true))
+            {
+                if (!PlacementGrid.IsSolidCollider(col) || col.attachedRigidbody != rb)
+                    continue;
+                var b = col.bounds;
+                all.Add(b);
+                lowest = Mathf.Min(lowest, b.min.y);
+            }
+        }
+        if (all.Count == 0) return false;
+
+        bool found = false;
+        foreach (var b in all)
+        {
+            if (b.min.y > lowest + 0.08f) continue;
+            if (!found) { contact = b; found = true; }
+            else contact.Encapsulate(b);
+        }
+        return found;
+    }
+
+    // Луч идёт ТОЛЬКО вниз от уровня подошвы. Пропускаем собственную сборку,
+    // игрока, триггеры и вертикальные поверхности. Не берём нижний этаж,
+    // если он дальше допустимого перепада.
+    private static bool TryFloorAt(PlacementGrid grid, HashSet<Rigidbody> self,
+        float x, float z, float bottomY, float maxDrop, out float floorY)
+    {
+        floorY = float.NegativeInfinity;
+        Vector3 start = new Vector3(x, bottomY + 0.25f, z);
+        var hits = Physics.RaycastAll(start, Vector3.down, maxDrop + 0.35f,
+            grid.surfaceMask, QueryTriggerInteraction.Ignore);
+        foreach (var hit in hits)
+        {
+            var col = hit.collider;
+            if (col == null || hit.normal.y < 0.7f) continue;
+            if (col.attachedRigidbody != null && self.Contains(col.attachedRigidbody)) continue;
+            if (grid.IsAimBlocker(col)) continue;
+            float y = hit.point.y;
+            if (y < bottomY - maxDrop || y > bottomY + 0.08f) continue;
+            floorY = Mathf.Max(floorY, y);
+        }
+        return floorY > float.NegativeInfinity;
+    }
+
+    private static bool TryGroundHeight(PlacementGrid grid, float maxDrop, out float height)
+    {
+        height = float.NegativeInfinity;
+        Bounds b;
+        if (!TryContactBounds(grid, out b)) return false;
+        var self = BuildSelfSet(grid);
+        float ex = Mathf.Max(0f, b.extents.x - 0.035f);
+        float ez = Mathf.Max(0f, b.extents.z - 0.035f);
+        for (int i = 0; i < 5; i++)
+        {
+            float x = b.center.x + (i == 0 ? 0f : (i % 2 == 0 ? ex : -ex));
+            float z = b.center.z + (i == 0 ? 0f : (i < 3 ? -ez : ez));
+            float y;
+            if (TryFloorAt(grid, self, x, z, b.min.y, maxDrop, out y))
+                height = Mathf.Max(height, y);
+        }
+        return height > float.NegativeInfinity;
+    }
+
     /// <summary>
-    /// Гасит подъём после шага «через препятствие»: предмет остаётся висеть
-    /// на высоте ступеньки, а в режиме сетки он кинематический и сам не упадёт
-    /// — при зажатой стрелке он так улетает всё выше и выше. Здесь ищем верхнюю
-    /// опору под сборкой (не дальше полутора клеток) и сажаем предмет на неё.
+    /// Перед горизонтальным шагом проверяем опору у ПЕРЕДНЕГО края предмета.
+    /// Отсутствие пола или перепад больше SafeDrop останавливает шаг, вместо
+    /// того чтобы кинематический предмет завис за краем и упал при отпускании.
+    /// Чисто вертикальное перемещение оставляем возможным.
     /// </summary>
+    private static bool HasDestinationSupport(PlacementGrid grid, Vector3 delta)
+    {
+        Vector3 horizontal = new Vector3(delta.x, 0f, delta.z);
+        if (horizontal.sqrMagnitude < 1e-8f) return true;
+
+        float source;
+        if (!TryGroundHeight(grid, SafeDrop(grid), out source)) return true;
+        Bounds b;
+        if (!TryContactBounds(grid, out b)) return true;
+
+        var self = BuildSelfSet(grid);
+        Vector3 dir = horizontal.normalized;
+        Vector3 side = new Vector3(-dir.z, 0f, dir.x);
+        float ex = Mathf.Max(0f, b.extents.x - 0.035f);
+        float ez = Mathf.Max(0f, b.extents.z - 0.035f);
+        float sideWidth = Mathf.Min(ex, ez) * 0.8f;
+        // Проверяем также путь между клетками: иначе тонкую щель можно
+        // перескочить одним телепортом, даже если в конце снова есть пол.
+        int steps = Mathf.Max(1, Mathf.CeilToInt(horizontal.magnitude /
+            Mathf.Max(0.1f, grid.cellSize * 0.5f)));
+        for (int s = 1; s <= steps; s++)
+        {
+            float t = (float)s / steps;
+            Vector3 front = b.center + delta * t +
+                new Vector3(dir.x * ex, 0f, dir.z * ez);
+            float bottom = b.min.y + delta.y * t;
+            for (int i = -1; i <= 1; i++)
+            {
+                Vector3 point = front + side * (i * sideWidth);
+                float floor;
+                if (!TryFloorAt(grid, self, point.x, point.z, bottom,
+                    SafeDrop(grid), out floor)) return false;
+                if (floor < source - SafeDrop(grid)) return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Сажает предмет на ближайшую опору, а не на самый нижний
+    /// коллайдер в BoxCast (который мог оказаться полом другого этажа).</summary>
     private bool SettleAssembly(PlacementGrid grid, Rigidbody body)
     {
         Bounds b;
-        if (!TryAssemblyBounds(grid, body, out b)) return false;
+        float floor;
+        if (!TryAssemblyBounds(grid, body, out b) ||
+            !TryGroundHeight(grid, SafeDrop(grid), out floor)) return false;
 
-        const float skin = 0.005f;
-        Vector3 half = b.size * 0.5f - new Vector3(skin, skin, skin);
-        if (half.x <= 0f || half.y <= 0f || half.z <= 0f) return false;
-
-        var assembly = grid.DragAssemblyBodies;
-        var self = new HashSet<Rigidbody>();
-        if (assembly != null)
-            for (int i = 0; i < assembly.Length; i++)
-                if (assembly[i] != null) self.Add(assembly[i]);
-
-        float maxDrop = Mathf.Max(grid.cellSize, 0.1f) * 1.5f;
-
-        var hits = Physics.BoxCastAll(b.center, half, Vector3.down, Quaternion.identity,
-            maxDrop, grid.surfaceMask, QueryTriggerInteraction.Ignore);
-
-        float best = -1f;
-        for (int i = 0; i < hits.Length; i++)
-        {
-            var hit = hits[i];
-            var col = hit.collider;
-            if (col == null) continue;
-
-            var rb = col.attachedRigidbody;
-            if (rb != null && self.Contains(rb)) continue;
-            if (grid.IsAimBlocker(col)) continue;
-
-            // Опора сверху: пол, стол, полка. Стены (нормаль вбок) — не опора.
-            if (hit.normal.y < 0.7f) continue;
-            if (hit.distance < 0.005f) continue; // уже стоим на месте
-            if (hit.distance > best) best = hit.distance;
-        }
-
-        if (best < 0f) return false;
-
-        var drop = new Vector3(0f, -(best - 0.004f), 0f);
-        if (!PathClear(grid, body, drop, false)) return false;
-
-        ApplyPin(grid, drop);
+        float dy = floor + 0.004f - b.min.y;
+        if (Mathf.Abs(dy) < 0.005f) return false;
+        var delta = Vector3.up * dy;
+        if (!PathClear(grid, body, delta, false)) return false;
+        ApplyPin(grid, delta);
         return true;
     }
 
@@ -1675,7 +1773,10 @@ public class Raycast : MonoBehaviour
     private bool TryPinWithClimb(PlacementGrid grid, Rigidbody body, Vector3 delta, bool sweep,
         bool settle = true)
     {
-        if (PathClear(grid, body, delta, sweep))
+        // Стена и обрыв — разные причины остановки: пустое место за краем
+        // PathClear считает свободным, но там нет поверхности для предмета.
+        bool edgeBlocked = !HasDestinationSupport(grid, delta);
+        if (!edgeBlocked && PathClear(grid, body, delta, sweep))
         {
             ApplyPin(grid, delta);
             if (settle) SettleAssembly(grid, body);
@@ -1687,7 +1788,7 @@ public class Raycast : MonoBehaviour
         {
             var up = delta;
             up.y += climbs[i];
-            if (PathClear(grid, body, up, sweep))
+            if (HasDestinationSupport(grid, up) && PathClear(grid, body, up, sweep))
             {
                 ApplyPin(grid, up);
                 // Подъём «ступенькой» не должен остаться висеть: предмет
@@ -1703,9 +1804,12 @@ public class Raycast : MonoBehaviour
             if (d < float.MaxValue && d > 0.01f)
             {
                 var slide = delta.normalized * Mathf.Max(0f, d - 0.004f);
-                ApplyPin(grid, slide);
-                if (settle) SettleAssembly(grid, body);
-                return true;
+                if (HasDestinationSupport(grid, slide))
+                {
+                    ApplyPin(grid, slide);
+                    if (settle) SettleAssembly(grid, body);
+                    return true;
+                }
             }
         }
 

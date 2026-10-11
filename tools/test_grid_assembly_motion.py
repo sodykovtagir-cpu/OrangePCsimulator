@@ -22,7 +22,7 @@ rotation = ray.split('// Поворот вокруг пивота — прямо
 for name, section in [('unstick', unstick), ('pin', pin), ('rotate', rotation)]:
     assert 'AssemblyRoots(' in section, f'{name}: must move roots only'
     assert 'velocity = Vector3.zero' in section, f'{name}: must clear every body velocity'
-assert 'roots[i].transform.position += new Vector3(0f, lift, 0f)' in ray
+assert 'roots[i].transform.position += new Vector3(0f, correction, 0f)' in ray
 
 # Demonstrate the previous failure: a child receives the parent's move and
 # then a second explicit move. Filtering roots gives exactly one delta.
