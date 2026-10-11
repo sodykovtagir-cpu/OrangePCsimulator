@@ -56,7 +56,6 @@ public class Raycast : MonoBehaviour
     // горизонтальный шаг, который применит следующий кадр драга.
     private bool gridArrowMoveMode = true;
     private Vector3 pendingGridMove;
-    private bool gridMoveInit;
 
     // Используется поворотом и на телефоне. Нельзя помещать эти поля внутрь
     // #if UNITY_STANDALONE || UNITY_EDITOR || UNITY_WEBGL.
@@ -908,6 +907,37 @@ public class Raycast : MonoBehaviour
     /// <summary>Стрелки сейчас перемещают (true) или поворачивают (false).</summary>
     public bool ArrowMoveMode { get { return gridArrowMoveMode; } }
 
+    /// <summary>
+    /// Ближайшая горизонтальная ось сетки к направлению взгляда. Пересчитываем
+    /// при КАЖДОЙ стрелке: обход предмета меняет управление, а угол 89° не
+    /// создаёт косой шаг. Не используем локальные оси повернутого предмета.
+    /// </summary>
+    private Vector3 GridForward()
+    {
+        var view = cam != null ? cam : Camera.main;
+        if (view == null) return Vector3.forward;
+        Vector3 f = view.transform.forward;
+        f.y = 0f;
+        if (f.sqrMagnitude < 1e-6f)
+        {
+            Vector3 r = view.transform.right;
+            f = Vector3.Cross(r, Vector3.up);
+        }
+        return Mathf.Abs(f.x) > Mathf.Abs(f.z)
+            ? (f.x >= 0f ? Vector3.right : Vector3.left)
+            : (f.z >= 0f ? Vector3.forward : Vector3.back);
+    }
+
+    private Vector3 GridRight()
+    {
+        return Vector3.Cross(Vector3.up, GridForward());
+    }
+
+    private Vector3 GridStep(int xDir, int yDirUp)
+    {
+        return GridRight() * xDir + GridForward() * yDirUp;
+    }
+
     /// <summary>R / кнопка панели: переключить режим стрелок.</summary>
     public bool ToggleArrowMode()
     {
@@ -916,11 +946,10 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Стрелки (клавиатура или панель): в режиме перемещения — шаг по клеткам
-    /// в МИРОВЫХ осях (вправо = +X, «вперёд» = +Z), не зависимо от поворота
-    /// камеры, Ctrl/мелкие стрелки — шаг в пятую часть клетки; в режиме
-    /// поворота — поворот (вверх = кувырок назад). Движение резко, через те же
-    /// гейты: стена не пустит, к соседу можно прислонить впритык.
+    /// Стрелки (клавиатура или панель): перемещение — по экрану относительно
+    /// текущей стороны камеры, но строго по мировым осям клеток X/Z. Мелкие
+    /// стрелки — пятая часть клетки. Поворот — вокруг вертикали или оси,
+    /// направленной вправо на экране. Проверки стены и полной опоры сохраняются.
     /// </summary>
     public void ArrowInput(int xDir, int yDirUp, bool fine)
     {
@@ -943,12 +972,11 @@ public class Raycast : MonoBehaviour
         var grid = PlacementGrid.Instance;
         if (grid == null) return;
 
-        // Мировые оси, а не камеры: влево/вправо — ±X, «вперёд»/«назад» —
-        // ±Z. Раньше шаг считался от направления камеры, и один и тот же
-        // клик стрелкой двигал предмет в разные стороны при повороте взгляда.
+        // Пересчитываем сторону камеры для каждого нажатия. Оси строго
+        // мировые X/Z (ближайшие 90°): 89° и 90° дают один и тот же шаг,
+        // а после обхода предмета стрелки смотрят с новой стороны.
         float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
-        pendingGridMove +=
-            (Vector3.right * (float)xDir + Vector3.forward * (float)yDirUp) * step;
+        pendingGridMove += GridStep(xDir, yDirUp) * step;
     }
 
     /// <summary>
@@ -975,23 +1003,14 @@ public class Raycast : MonoBehaviour
             return;
         }
 
-        // Мировые оси (как и при переносе): влево/вправо — ±X, «вперёд» — +Z
+        // Те же направления, что и у зажатого предмета. Начинаем от
+        // фактического положения, сохраняя смещение снапа к соседнему объекту.
         float step = fine ? grid.cellSize * 0.2f : grid.cellSize;
-        Vector3 delta =
-            (Vector3.right * (float)xDir + Vector3.forward * (float)yDirUp) * step;
+        Vector3 delta = GridStep(xDir, yDirUp) * step;
 
         // Просевший в стол/стену предмет сначала выталкиваем: иначе габарит
         // считается от утопленной точки, и PhysX выстрелит его при отпускании.
         PlacementGrid.UnstickAssembly(grid.DragAssemblyBodies, grid.surfaceMask);
-
-        // Обычный шаг сперва снапает центр масс к клетке: после физики предмет
-        // мог чуть съехать. Тонкий шаг — от текущего места, без снапа.
-        if (!fine)
-        {
-            Vector3 com = body.worldCenterOfMass;
-            Vector3 snapped = grid.SnapPosition(com, Vector3.up, null);
-            delta += new Vector3(snapped.x - com.x, 0f, snapped.z - com.z);
-        }
 
         delta.y = 0f;
         if (delta.sqrMagnitude < 1e-10f) return;
@@ -1049,19 +1068,22 @@ public class Raycast : MonoBehaviour
 
         if (yawDir != 0)
         {
-            // Рыскание — вокруг мировой вертикали
-            target = Quaternion.AngleAxis(yawDir * step, Vector3.up) * qBase;
+            // Передняя для игрока грань должна уйти по стрелке вправо/влево
+            // независимо от того, с какой стороны игрок смотрит на предмет.
+            target = Quaternion.AngleAxis(-yawDir * step, Vector3.up) * qBase;
         }
         else if (pitchDir != 0)
         {
-            axis = TumbleAxis(qBase, CameraRightHorizontal());
+            Vector3 screenRight = GridRight();
+            axis = TumbleAxis(qBase, screenRight);
             if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
             {
                 var other = OtherTumbleAxis(qBase, axis);
                 if (other.sqrMagnitude > 0.5f) axis = other;
             }
-            // «вверх» (pitchDir < 0) — поднять переднюю грань, кувырок назад
-            target = Quaternion.AngleAxis(-pitchDir * step * TumbleSign(qBase, axis), axis) * qBase;
+            // «Вверх» — верхняя грань от игрока, «вниз» — к игроку.
+            // Положительная ось выбрана по правой стороне экрана.
+            target = Quaternion.AngleAxis(-pitchDir * step, axis) * qBase;
         }
         else
         {
@@ -1298,30 +1320,26 @@ public class Raycast : MonoBehaviour
         return best;
     }
 
-    /// <summary>Горизонтальное «вправо» камеры — для выбора оси кувырка.</summary>
-    private static Vector3 CameraRightHorizontal()
-    {
-        var cam = Camera.main;
-        Vector3 r = cam != null ? cam.transform.right : Vector3.right;
-        r.y = 0f;
-        return r.sqrMagnitude < 1e-6f ? Vector3.right : r.normalized;
-    }
-
     /// <summary>
-    /// Ось кувырка для стрелок вверх/вниз — горизонтальная ось коробки. Обычно это
-    /// правая ось (как и раньше). Если корпус лежит на боку, правая ось вертикальна:
-    /// тогда берём переднюю или верхнюю ось — ту, что ближе к «вправо» от камеры.
+    /// Ось кувырка для стрелок вверх/вниз: горизонтальная ось коробки,
+    /// ближайшая к экранному «вправо». У стоящего и лежащего корпуса она
+    /// выбирается заново, а знак направлен по текущей стороне игрока.
     /// </summary>
-    private static Vector3 TumbleAxis(Quaternion qb, Vector3 camRightH)
+    private static Vector3 TumbleAxis(Quaternion qb, Vector3 screenRight)
     {
-        Vector3 right = qb * Vector3.right;
-        if (Mathf.Abs(right.y) < 0.5f) return right;
-
-        Vector3 front = qb * Vector3.forward;
-        Vector3 top = qb * Vector3.up;
-        return Mathf.Abs(Vector3.Dot(front, camRightH)) >= Mathf.Abs(Vector3.Dot(top, camRightH))
-            ? front
-            : top;
+        var axes = new[] { qb * Vector3.right, qb * Vector3.forward, qb * Vector3.up };
+        Vector3 best = screenRight;
+        float bestScore = -1f;
+        for (int i = 0; i < axes.Length; i++)
+        {
+            Vector3 axis = axes[i];
+            if (Mathf.Abs(axis.y) > 0.5f) continue;
+            float dot = Vector3.Dot(axis, screenRight);
+            if (Mathf.Abs(dot) <= bestScore) continue;
+            bestScore = Mathf.Abs(dot);
+            best = dot < 0f ? -axis : axis;
+        }
+        return best;
     }
 
     /// <summary>Вторая ось укладки: когда длинная сторона майнера упирается
@@ -2025,7 +2043,6 @@ public class Raycast : MonoBehaviour
 
         // Состояние сетки — на один перенос: прошлый перенос мог оборваться
         // без End() (цель уничтожена), и тогда старые значения не должны влиять.
-        gridMoveInit = false;
         pendingGridMove = Vector3.zero;
 
         if (distanceScroll)
@@ -2122,14 +2139,8 @@ public class Raycast : MonoBehaviour
                         // В режиме сетки предмет ходит ТОЛЬКО стрелками:
                         // горизонталь — текущая позиция + накопленный шаг
                         // стрелок (pendingGridMove), а не точка прицела.
-                        // Первый кадр — снап центра масс к ближайшей клетке.
-                        if (!gridMoveInit)
-                        {
-                            var s0 = grid.SnapPosition(com, Vector3.up, null);
-                            pendingGridMove += new Vector3(s0.x - com.x, 0f, s0.z - com.z);
-                            gridMoveInit = true;
-                        }
-
+                        // Не добавляем скачок к мировой сетке: объект мог уже
+                        // стоять в снапе вплотную к другому объекту.
                         bodySnapped = com + pendingGridMove;
                         pendingGridMove = Vector3.zero;
                     }
@@ -2328,7 +2339,6 @@ public class Raycast : MonoBehaviour
 
             if (distanceObj) distanceObj.SetActive(false);
             currentDrag = null;
-            gridMoveInit = false;
             pendingGridMove = Vector3.zero;
 
             if (showHint && slots != null)

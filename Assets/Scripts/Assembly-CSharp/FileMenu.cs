@@ -43,9 +43,22 @@ public class FileMenu : MonoBehaviour
 		Instance = this;
 	}
 
+	private void OnDestroy()
+	{
+		if (Instance == this) Instance = null;
+	}
+
 	private void Start()
 	{
+		RefreshFromDisk();
+	}
+
+	/// <summary>Refresh the list after picker / Android Files import.</summary>
+	public void RefreshFromDisk()
+	{
 		loads = new List<Load>();
+		for (int i = slotParent.childCount - 1; i >= 0; i--)
+			Destroy(slotParent.GetChild(i).gameObject);
 		string fpath = SaveUtility.GetFolderPath();
 		string pattern = "*" + SaveUtility.extension;
 		// get date list
@@ -295,38 +308,7 @@ public void Import()
 
 		try
 		{
-			string ext = System.IO.Path.GetExtension(path).ToLower();
-
-			if (ext == ".pc")
-			{
-				// Загружаем старый PC файл
-				DataLoader oldLoader = new DataLoader(path);
-				oldLoader.LoadFromPath();
-
-				// Создаем новый OPC файл
-				string newPath = SaveUtility.GetNewPath(
-					System.IO.Path.GetFileNameWithoutExtension(path)
-				);
-
-				DataLoader newLoader = new DataLoader(newPath, oldLoader.GameData);
-				newLoader.Content = oldLoader.Content;
-				newLoader.WriteToFile();
-			}
-			else if (ext == ".opc")
-			{
-				File.Copy(
-					path,
-					SaveUtility.GetNewPath(
-						System.IO.Path.GetFileNameWithoutExtension(path)
-					),
-					true
-				);
-			}
-			else
-			{
-				messageBox.Show("Unsupported file format.");
-				return;
-			}
+			SaveFileImport.Import(path, System.IO.Path.GetFileName(path));
 		}
 		catch
 		{
@@ -338,29 +320,7 @@ public void Import()
 			return;
 		}
 
-		// Обновляем список сохранений
-		loads = new List<Load>();
-
-		for (int i = 0; i < slotParent.childCount; i++)
-			Destroy(slotParent.GetChild(i).gameObject);
-
-		string fpath = SaveUtility.GetFolderPath();
-		string pattern = "*" + SaveUtility.extension;
-
-		Dictionary<string, DateTime> nList = new Dictionary<string, DateTime>();
-
-		foreach (var b in Directory.GetFiles(fpath, pattern))
-		{
-			DateTime f = File.GetLastWriteTime(b);
-			nList.Add(b, f);
-		}
-
-		var sort = nList.OrderByDescending(kvp => kvp.Value);
-
-		foreach (var j in sort)
-			AddSlot(j.Key);
-
-		empty.SetActive(loads.Count == 0);
+		RefreshFromDisk();
 	}
 
 	NativeFilePicker.PickFile(pickFileCallback, exts);

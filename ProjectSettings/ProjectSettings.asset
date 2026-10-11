@@ -258,7 +258,7 @@ PlayerSettings:
   clonedFromGUID: 00000000000000000000000000000000
   templatePackageId: 
   templateDefaultScene: 
-  useCustomMainManifest: 0
+  useCustomMainManifest: 1
   useCustomLauncherManifest: 0
   useCustomMainGradleTemplate: 0
   useCustomLauncherGradleManifest: 0
@@ -566,32 +566,44 @@ PlayerSettings:
       m_Height: 36
       m_Kind: 1
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 432
       m_Height: 432
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 324
       m_Height: 324
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 216
       m_Height: 216
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 162
       m_Height: 162
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 108
       m_Height: 108
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 683c8d4b4b6249c9979986d0d09960c5, type: 3}
+      - {fileID: 2800000, guid: 7469a122b4f84d17bee30978f475c6b5, type: 3}
       m_Width: 81
       m_Height: 81
       m_Kind: 2

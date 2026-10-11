@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.unity3d.player">
+    <!-- This is the Unity LIBRARY manifest. The generated launcher manifest
+         already declares MAIN/LAUNCHER and the normal/adaptive app icons.
+         Merge VIEW into the very same UnityPlayerActivity: no second icon. -->
+    <application>
+        <activity android:name="com.unity3d.player.UnityPlayerActivity"
+                  android:exported="true"
+                  android:launchMode="singleTask"
+                  android:theme="@style/UnityThemeSelector"
+                  android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-orange-pc-save" />
+                <data android:scheme="content" android:mimeType="application/x-opc" />
+                <data android:scheme="content" android:mimeType="application/x-pc" />
+                <!-- File managers often mark .pc/.opc as generic binary.
+                     Java checks the real display name before import. -->
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+                <data android:scheme="file" android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
+        </activity>
+    </application>
+</manifest>
