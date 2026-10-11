@@ -382,6 +382,8 @@ public class Raycast : MonoBehaviour
     private const float MoveRepeatInterval = 0.14f;
     private const float RotateRepeatInterval = 0.35f;
     private readonly float[] arrowNextAt = new float[4];
+    private Collider rotationBlocker;
+    private float nextRotationBlockLog;
 
     private void HoldArrow(KeyCode key, int xDir, int yDirUp, bool fine, int slot)
     {
@@ -1037,6 +1039,7 @@ public class Raycast : MonoBehaviour
         var q = body.rotation;
         Quaternion qBase = fine ? q : SnapToBoxOrientation(q);
         Quaternion target;
+        Vector3 axis = Vector3.zero;
 
         if (yawDir != 0)
         {
@@ -1045,7 +1048,12 @@ public class Raycast : MonoBehaviour
         }
         else if (pitchDir != 0)
         {
-            Vector3 axis = TumbleAxis(qBase, CameraRightHorizontal());
+            axis = TumbleAxis(qBase, CameraRightHorizontal());
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            {
+                var other = OtherTumbleAxis(qBase, axis);
+                if (other.sqrMagnitude > 0.5f) axis = other;
+            }
             // «вверх» (pitchDir < 0) — поднять переднюю грань, кувырок назад
             target = Quaternion.AngleAxis(-pitchDir * step * TumbleSign(qBase, axis), axis) * qBase;
         }
@@ -1054,7 +1062,36 @@ public class Raycast : MonoBehaviour
             return;
         }
 
-        var worldDelta = target * Quaternion.Inverse(q);
+        rotationBlocker = null;
+        if (TryRotateAssembly(body, grid, assembly, target)) return;
+
+        // Высокую раму порой нельзя уложить в одну сторону: она упирается
+        // в стену. Попробуем вторую горизонтальную ось коробки — без обхода
+        // проверки столкновений. Shift + стрелка сразу предпочитает её.
+        if (pitchDir != 0 && !fine)
+        {
+            Vector3 other = OtherTumbleAxis(qBase, axis);
+            if (other.sqrMagnitude > 0.5f)
+            {
+                Quaternion alternative = Quaternion.AngleAxis(
+                    -pitchDir * step * TumbleSign(qBase, other), other) * qBase;
+                if (TryRotateAssembly(body, grid, assembly, alternative)) return;
+            }
+        }
+
+        if (rotationBlocker != null && Time.unscaledTime >= nextRotationBlockLog)
+        {
+            nextRotationBlockLog = Time.unscaledTime + 1.5f;
+            UnityEngine.Debug.Log($"[Grid] поворот заблокирован: " +
+                $"{rotationBlocker.name}. Переместите сборку от стены/края.");
+        }
+    }
+
+    /// <summary>Проверить габариты и уложить всю сборку на опору.</summary>
+    private bool TryRotateAssembly(Rigidbody body, PlacementGrid grid,
+        Rigidbody[] assembly, Quaternion target)
+    {
+        var worldDelta = target * Quaternion.Inverse(body.rotation);
 
         // Пивот — центр физического габарита всей сборки. Триггеры в него не входят:
         // зона приближения у монитора раздувала габарит, и крышка «уезжала» вокруг
@@ -1152,7 +1189,8 @@ public class Raycast : MonoBehaviour
                     // после поворота стоим НА нём (пол/стол) — не блок
                     if (col.bounds.max.y <= floorY) continue;
 
-                    return; // не крутим — заденем
+                    rotationBlocker = col;
+                    return false; // реальное препятствие в выбранном направлении
                 }
             }
         }
@@ -1193,6 +1231,7 @@ public class Raycast : MonoBehaviour
                 Physics.SyncTransforms();
             }
         }
+        return true;
     }
 
     // 24 коробочные ориентации (кратные 90° по всем осям). 64 комбинации углов Эйлера
@@ -1250,6 +1289,20 @@ public class Raycast : MonoBehaviour
         return Mathf.Abs(Vector3.Dot(front, camRightH)) >= Mathf.Abs(Vector3.Dot(top, camRightH))
             ? front
             : top;
+    }
+
+    /// <summary>Вторая ось укладки: когда длинная сторона майнера упирается
+    /// в стену, можно лечь поперёк, не отключая проверку столкновений.</summary>
+    private static Vector3 OtherTumbleAxis(Quaternion qb, Vector3 first)
+    {
+        var axes = new[] { qb * Vector3.forward, qb * Vector3.up, qb * Vector3.right };
+        foreach (var axis in axes)
+        {
+            if (Mathf.Abs(axis.y) > 0.5f) continue;
+            if (Mathf.Abs(Vector3.Dot(first, axis)) > 0.5f) continue;
+            return axis;
+        }
+        return Vector3.zero;
     }
 
     /// <summary>
@@ -1428,7 +1481,7 @@ public class Raycast : MonoBehaviour
     }
 
     /// <summary>
-    /// Перед горизонтальным шагом проверяем опору у ПЕРЕДНЕГО края предмета.
+    /// Перед горизонтальным шагом проверяем опору у центра основания.
     /// Отсутствие пола или перепад больше SafeDrop останавливает шаг, вместо
     /// того чтобы кинематический предмет завис за краем и упал при отпускании.
     /// Чисто вертикальное перемещение оставляем возможным.
@@ -1444,29 +1497,24 @@ public class Raycast : MonoBehaviour
         if (!TryContactBounds(grid, out b)) return true;
 
         var self = BuildSelfSet(grid);
+        // Опору требуем под центром ОСНОВАНИЯ, а не под передним краем:
+        // большой майнер может свешиваться, пока его база ещё стоит на полу.
+        // Небольшой отступ от края не даёт ему опрокинуться при отпускании.
         Vector3 dir = horizontal.normalized;
-        Vector3 side = new Vector3(-dir.z, 0f, dir.x);
-        float ex = Mathf.Max(0f, b.extents.x - 0.035f);
-        float ez = Mathf.Max(0f, b.extents.z - 0.035f);
-        float sideWidth = Mathf.Min(ex, ez) * 0.8f;
-        // Проверяем также путь между клетками: иначе тонкую щель можно
-        // перескочить одним телепортом, даже если в конце снова есть пол.
+        float inset = Mathf.Min(0.08f, Mathf.Min(b.extents.x, b.extents.z) * 0.25f);
+        // За один шаг клетка может пересечь узкую пропасть. Проверяем путь,
+        // чтобы не телепортироваться на следующую площадку через пустоту.
         int steps = Mathf.Max(1, Mathf.CeilToInt(horizontal.magnitude /
             Mathf.Max(0.1f, grid.cellSize * 0.5f)));
         for (int s = 1; s <= steps; s++)
         {
             float t = (float)s / steps;
-            Vector3 front = b.center + delta * t +
-                new Vector3(dir.x * ex, 0f, dir.z * ez);
+            Vector3 point = b.center + delta * t + dir * inset;
             float bottom = b.min.y + delta.y * t;
-            for (int i = -1; i <= 1; i++)
-            {
-                Vector3 point = front + side * (i * sideWidth);
-                float floor;
-                if (!TryFloorAt(grid, self, point.x, point.z, bottom,
-                    SafeDrop(grid), out floor)) return false;
-                if (floor < source - SafeDrop(grid)) return false;
-            }
+            float floor;
+            if (!TryFloorAt(grid, self, point.x, point.z, bottom,
+                SafeDrop(grid), out floor)) return false;
+            if (floor < source - SafeDrop(grid)) return false;
         }
         return true;
     }
@@ -1793,6 +1841,29 @@ public class Raycast : MonoBehaviour
                 ApplyPin(grid, up);
                 // Подъём «ступенькой» не должен остаться висеть: предмет
                 // кинематический и сам не сядет на опору.
+                if (settle) SettleAssembly(grid, body);
+                return true;
+            }
+        }
+
+        if (edgeBlocked && new Vector2(delta.x, delta.z).sqrMagnitude > 1e-8f)
+        {
+            // Последняя клетка обычно слишком большая: вместо остановки за
+            // полметра от обрыва подъезжаем к последней поддерживаемой точке.
+            // Каждую половину проверяем и на пол, и на столкновения.
+            float lo = 0f;
+            float hi = 1f;
+            for (int i = 0; i < 10; i++)
+            {
+                float mid = (lo + hi) * 0.5f;
+                Vector3 candidate = delta * mid;
+                if (HasDestinationSupport(grid, candidate) &&
+                    PathClear(grid, body, candidate, sweep)) lo = mid;
+                else hi = mid;
+            }
+            if (lo * delta.magnitude > 0.01f)
+            {
+                ApplyPin(grid, delta * lo);
                 if (settle) SettleAssembly(grid, body);
                 return true;
             }

@@ -22,8 +22,13 @@ assert 'hit.normal.y < 0.7f' in probe and 'self.Contains(col.attachedRigidbody)'
 assert 'y < bottomY - maxDrop' in probe and 'y > bottomY + 0.08f' in probe
 assert 'QueryTriggerInteraction.Ignore' in probe
 assert 'horizontal.sqrMagnitude' in edge and 'for (int s = 1; s <= steps; s++)' in edge
+assert 'Vector3 point = b.center + delta * t + dir * inset' in edge
 assert 'if (!TryFloorAt(' in edge and 'floor < source - SafeDrop(grid)' in edge
+assert 'if (edgeBlocked && new Vector2(delta.x, delta.z)' in move
+assert 'HasDestinationSupport(grid, candidate)' in move and 'ApplyPin(grid, delta * lo)' in move
 assert 'if (!edgeBlocked && PathClear' in move
+assert 'OtherTumbleAxis(qBase, axis)' in rotate and 'TryRotateAssembly(body, grid, assembly, alternative)' in rotate
+assert 'rotationBlocker = col;' in rotate
 assert 'if (HasDestinationSupport(grid, up) && PathClear' in move
 assert 'if (HasDestinationSupport(grid, slide))' in move
 
@@ -31,4 +36,10 @@ assert 'if (HasDestinationSupport(grid, slide))' in move
 # balcony is outside the allowed 0.75m drop. No real physics is emulated here.
 max_drop, upper, stair, lower = .75, 4., 3.75, 1.
 assert upper - stair <= max_drop and upper - lower > max_drop
-print('PASS: signed floor landing, step tolerance, edge probing and all motion paths')
+# При правой кромке x=5 проверка ПЕРЕДНЕЙ грани (center+half=5.1)
+# запрещала даже первый шаг, хотя центр основания ещё на площадке.
+center, half, edge_x, inset = 3.9, 1.2, 5., .08
+assert center + half >= edge_x
+assert center + .5 + inset < edge_x  # один шаг теперь возможен
+assert center + 1.5 + inset > edge_x  # следующий блокируется / укорачивается
+print('PASS: signed floor landing, near-edge overhang, partial steps and tilt fallback')
