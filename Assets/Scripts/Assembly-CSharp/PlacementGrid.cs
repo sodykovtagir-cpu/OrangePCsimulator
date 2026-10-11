@@ -464,7 +464,7 @@ public class PlacementGrid : MonoBehaviour
         return set;
     }
 
-    private const int MaxLooseStack = 8;
+    private const int MaxLooseStack = 24;
 
     /// <summary>
     /// Свободные предметы, которые лежат НА сборке (отвалившиеся крышки и планки,
@@ -476,6 +476,84 @@ public class PlacementGrid : MonoBehaviour
     /// (майнер, корпус со стопкой планок) в сборку иначе попадало всё подряд, и
     /// предмет уезжал вместе с половиной конструкции.
     /// </summary>
+    /// <summary>
+    /// Детали, оказавшиеся ВНУТРИ корпуса (комплектуха в корпусе ПК).
+    ///
+    /// Раньше свободные детали искались только тонким слоем НАД верхней
+    /// гранью тела. В корпусе компьютера комплектуха лежит внутри, и в сборку
+    /// не попадала: корпус двигался, а детали оставались позади. Материнка
+    /// держалась на джойнте и потому вставала верно — отсюда «материнка
+    /// правильно, остальное отстаёт».
+    ///
+    /// Берём тела, чей габарит целиком помещается в габарит уже собранной
+    /// сборки: соседи рядом не подходят — они снаружи.
+    /// </summary>
+    private void AddContainedParts(List<Rigidbody> list, HashSet<Rigidbody> set,
+        HashSet<Rigidbody> jointed)
+    {
+        // Габарит растёт по мере добавления, поэтому повторяем несколько раз:
+        // нашли деталь внутри корпуса → габарит вырос → нашли следующую.
+        for (int pass = 0; pass < 3 && list.Count < MaxLooseStack; pass++)
+        {
+            Bounds union;
+            if (!UnionSolidBounds(list, out union)) return;
+
+            Vector3 pad = Vector3.one * 0.03f;
+            Bounds probe = new Bounds(union.center, union.size + pad);
+            if (probe.extents.x <= 0f || probe.extents.y <= 0f || probe.extents.z <= 0f) return;
+
+            var cols = Physics.OverlapBox(probe.center, probe.extents, Quaternion.identity,
+                surfaceMask, QueryTriggerInteraction.Ignore);
+
+            bool added = false;
+            for (int i = 0; i < cols.Length && list.Count < MaxLooseStack; i++)
+            {
+                var col = cols[i];
+                if (col == null) continue;
+
+                var other = col.attachedRigidbody;
+                if (other == null || other.isKinematic) continue;
+                if (set.Contains(other) || jointed.Contains(other)) continue;
+                if (IsAimBlocker(col)) continue;
+
+                Bounds ob;
+                if (!TrySolidBounds(other, out ob)) continue;
+
+                // Должна лежать ВНУТРИ: центр внутри габарита с учётом её
+                // собственных полуразмеров. Сосед рядом сюда не попадёт.
+                Vector3 d = ob.center - probe.center;
+                Vector3 e = ob.extents + Vector3.one * 0.02f;
+                if (Mathf.Abs(d.x) > probe.extents.x - e.x) continue;
+                if (Mathf.Abs(d.y) > probe.extents.y - e.y) continue;
+                if (Mathf.Abs(d.z) > probe.extents.z - e.z) continue;
+
+                set.Add(other);
+                list.Add(other);
+                added = true;
+            }
+
+            if (!added) return; // больше нечего находить
+        }
+    }
+
+    /// <summary>Общий габарит твёрдых коллайдеров набора тел.</summary>
+    private static bool UnionSolidBounds(List<Rigidbody> bodies, out Bounds b)
+    {
+        b = default(Bounds);
+        bool first = true;
+
+        for (int i = 0; i < bodies.Count; i++)
+        {
+            Bounds t;
+            if (!TrySolidBounds(bodies[i], out t)) continue;
+
+            if (first) { b = t; first = false; }
+            else b.Encapsulate(t);
+        }
+
+        return !first;
+    }
+
     private Rigidbody[] AddLooseStack(Rigidbody[] assembly)
     {
         if (assembly == null || assembly.Length == 0) return assembly;
@@ -523,6 +601,9 @@ public class PlacementGrid : MonoBehaviour
                 queue.Enqueue(other);
             }
         }
+
+        // Комплектуха, лежащая ВНУТРИ корпуса: слой сверху её не находит.
+        AddContainedParts(list, set, jointed);
 
         return list.ToArray();
     }

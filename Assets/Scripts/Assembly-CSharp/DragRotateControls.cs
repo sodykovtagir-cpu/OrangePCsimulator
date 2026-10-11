@@ -26,6 +26,56 @@ public class DragRotateControls : MonoBehaviour
     /// <summary>controlId для раскладки мобильного управления.</summary>
     public const string LayoutId = "GridArrows";
 
+    /// <summary>
+    /// Слой панели стрелок. Меню паузы и диалоги рисуются выше обычного HUD,
+    /// поэтому стрелки держим низко — иначе они висели поверх «Выход» и «Ок».
+    /// </summary>
+    private const int HudSortingOrder = 5;
+
+    /// <summary>
+    /// Задаёт слой отрисовки панели. Порядок в Unity определяется канвасом,
+    /// а не порядком объектов: пока у панели своего Canvas не было, она
+    /// рисовалась вместе с HUD-канвасом и всплывала поверх меню паузы.
+    /// Поэтому вешаем на панель вложенный канвас с overrideSorting — всё
+    /// внутри (кроме собственных канвасов) рисуется с этим порядком.
+    /// </summary>
+    private static void SetHudLayer(GameObject panel, int order)
+    {
+        if (panel == null) return;
+
+        var own = panel.GetComponent<Canvas>();
+        if (own == null) own = panel.AddComponent<Canvas>();
+
+        own.overrideSorting = true;
+        own.sortingOrder = order;
+
+        // Вложенные канвасы (если их создадут) — с тем же порядком
+        var nested = panel.GetComponentsInChildren<Canvas>(true);
+        for (int i = 0; i < nested.Length; i++)
+        {
+            var c = nested[i];
+            if (c == null || c == own) continue;
+
+            c.overrideSorting = true;
+            c.sortingOrder = order;
+        }
+    }
+
+    /// <summary>Гарантирует, что на канвасе есть GraphicRaycaster.</summary>
+    /// <remarks>
+    /// Без него канвас рисуется, но не участвует в обработке нажатий: стрелки
+    /// видны, а нажатия уходили мимо них в игру. Raycaster добавляет
+    /// MonitorReceiver только на канвасы мониторов — на HUD-канвасе его могло
+    /// не оказаться вовсе.
+    /// </remarks>
+    private static void EnsureRaycaster(Canvas canvas)
+    {
+        if (canvas == null) return;
+        if (canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>() != null) return;
+
+        canvas.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+    }
+
     public static DragRotateControls Instance { get; private set; }
 
     private Raycast raycast;
@@ -59,6 +109,9 @@ public class DragRotateControls : MonoBehaviour
 
         var canvas = FindHudCanvas();
         if (canvas == null) return; // попробуем в следующем кадре
+
+        // Стрелки должны ловить нажатия — без raycaster канвас только рисуется.
+        EnsureRaycaster(canvas);
 
         var go = new GameObject("DragRotateControls", typeof(RectTransform));
         go.transform.SetParent(canvas.transform, false);
@@ -183,13 +236,20 @@ public class DragRotateControls : MonoBehaviour
     /// </summary>
     public static float UiScale()
     {
-        float longSide = Mathf.Max(Screen.width, Screen.height);
-        float scale = longSide / 1440f; // 1440 — типичный телефон по длинной стороне
+        // Размер считаем от КОРОТКОЙ стороны экрана, а не от длинной.
+        // Раньше бралась длинная (на телефоне 2340) и делилась на 1440 —
+        // получалось 1.6–2.4, и панель в 300*s занимала почти пол-экрана.
+        float shortSide = Mathf.Min(Screen.width, Screen.height);
+
+        // Ориентир: кнопка должна быть ~5% меньшей стороны, но не мельче
+        // читаемой и не крупнее 1.35 — иначе стрелки перекрывают друг друга.
+        float scale = shortSide / 1080f;
+        scale = Mathf.Clamp(scale, 0.85f, 1.35f);
 
         float dpi = Screen.dpi;
-        if (dpi > 1f) scale = Mathf.Max(scale, dpi / 260f);
+        if (dpi > 1f) scale = Mathf.Clamp(scale, scale, dpi / 400f);
 
-        return Mathf.Clamp(scale, 1f, 2.4f);
+        return Mathf.Clamp(scale, 0.85f, 1.35f);
     }
 
     private void Build(Canvas canvas)
@@ -215,6 +275,13 @@ public class DragRotateControls : MonoBehaviour
         var catcher = panel.AddComponent<Image>();
         catcher.color = new Color(0f, 0f, 0f, 0f);
         catcher.raycastTarget = MobileCustomizeManager.EditMode;
+
+        // Порядок отрисовки: панель стрелок — игровой HUD, она должна быть ПОД
+        // меню паузы и прочими диалогами. Раньше порядок не задавался, и панель
+        // то оказывалась поверх «Прогресс бутериан», то под ним — в зависимости
+        // от порядка объектов в канвасе. Отрисовка идёт по sortingOrder, поэтому
+        // задаём его явно и низким.
+        SetHudLayer(panel, HudSortingOrder);
 
         // Панель — часть раскладки мобильного управления: её можно двигать
         // в «Настройки управления», положение сохранится и переживёт сцену.
@@ -267,6 +334,7 @@ public class DragRotateControls : MonoBehaviour
         lrect.offsetMax = Vector2.zero;
 
         modeText = labelGo.AddComponent<Text>();
+        modeText.raycastTarget = false;
         modeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         modeText.alignment = TextAnchor.MiddleCenter;
         modeText.fontSize = Mathf.RoundToInt(17f * s);
@@ -337,6 +405,11 @@ public class DragRotateControls : MonoBehaviour
             arrow.sprite = sprite;
             arrow.color = Color.white;
             arrow.preserveAspect = true;
+
+            // Нажатие ловит EventTrigger на самой кнопке. Если картинка-стрелка
+            // тоже raycast-цель, GraphicRaycaster отдаёт касание ей, до
+            // EventTrigger дело не доходит — и стрелка «не нажималась».
+            arrow.raycastTarget = false;
         }
         else
         {
@@ -351,6 +424,7 @@ public class DragRotateControls : MonoBehaviour
             glyphRect.offsetMax = Vector2.zero;
 
             var text = glyphGo.AddComponent<Text>();
+            text.raycastTarget = false;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.text = fallbackGlyph;
             text.alignment = TextAnchor.MiddleCenter;
@@ -436,6 +510,11 @@ public class DragRotateControls : MonoBehaviour
         var catcher = panel.AddComponent<Image>();
         catcher.color = new Color(0f, 0f, 0f, 0f);
         catcher.raycastTarget = true;
+
+        // Превью — часть окна настроек: оно должно лежать ПОВЕРХ его содержимого,
+        // но под верхним соём меню. Раньше порядок не задавался, и превью
+        // «уезжало» за пределы окна на элементы, которые рисуются позже.
+        SetHudLayer(panel, HudSortingOrder + 1);
 
         AddPreviewArrow(panel.transform, sprite, "ArrowLeft", -gap, 0f, 90f, big, "←");
         AddPreviewArrow(panel.transform, sprite, "ArrowUp", 0f, gap, 0f, big, "↑");
@@ -535,6 +614,9 @@ public class DragRotateControls : MonoBehaviour
             arrow.sprite = sprite;
             arrow.color = Color.white;
             arrow.preserveAspect = true;
+            // Превью ловит нажатия только в настройках раскладки; в игре эти
+            // картинки не должны перехватывать касания.
+            arrow.raycastTarget = MobileCustomizeManager.EditMode;
         }
         else
         {
@@ -547,6 +629,7 @@ public class DragRotateControls : MonoBehaviour
             glyphRect.offsetMax = Vector2.zero;
 
             var text = glyphGo.AddComponent<Text>();
+            text.raycastTarget = false;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.text = glyph;
             text.alignment = TextAnchor.MiddleCenter;
