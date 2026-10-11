@@ -1,43 +1,33 @@
 #!/usr/bin/env python3
-"""Generate the Android-only layered OPC icon; legacy PC icon stays untouched.
+"""Render the user's exact pixel-letter SVG as the Android adaptive foreground.
 
-Needs Pillow. Each layer is 432x432 (108dp at xxxhdpi). Foreground artwork
-stays within the central 288px safe area so circular/squircle masks won't crop
-OPC. Unity resizes these two source textures for the other adaptive slots.
+The ordinary PC launcher icon is intentionally untouched. Source artwork:
+tools/artwork/android_adaptive_foreground.svg. Export size: 432x432 px (xxxhdpi).
+Requires Pillow and either ImageMagick (magick) or cairosvg for SVG rendering.
 """
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+import shutil
+import subprocess
+from PIL import Image
 
 root = Path(__file__).resolve().parents[1]
+svg = root / 'tools' / 'artwork' / 'android_adaptive_foreground.svg'
 out = root / 'Assets' / 'AndroidIcons'
 out.mkdir(exist_ok=True)
-scale = 3  # antialias typography and rounded corners
-size = 432
-orange = (255, 120, 0, 255)
-white = (255, 255, 255, 255)
+foreground = out / 'AdaptiveForeground.png'
 
-def rect(draw, bounds, radius, fill):
-    draw.rounded_rectangle(tuple(v * scale for v in bounds), radius=radius * scale, fill=fill)
+# ImageMagick renders the supplied paths and round corners without converting
+# the in-game-style pixel lettering into a system font or redrawing the logo.
+if shutil.which('magick'):
+    subprocess.run(['magick', '-background', 'none', '-density', '216',
+                    str(svg), '-resize', '432x432', '-depth', '8',
+                    'PNG32:' + str(foreground)], check=True)
+else:
+    import cairosvg
+    cairosvg.svg2png(url=str(svg), write_to=str(foreground),
+                     output_width=432, output_height=432)
 
-background = Image.new('RGBA', (size * scale, size * scale), (43, 43, 43, 255))
-background.resize((size, size), Image.Resampling.LANCZOS).save(out / 'OPCAdaptiveBackground.png')
-
-fg = Image.new('RGBA', background.size, (0, 0, 0, 0))
-draw = ImageDraw.Draw(fg)
-# Same orange tile, two right blocks and rows as the original logo, but with
-# room for three letters. Do not use the original PC JPEG as a foreground: its
-# square charcoal backdrop would prevent adaptive masking and parallax.
-rect(draw, (82, 91, 246, 278), 22, orange)
-rect(draw, (260, 91, 347, 153), 18, orange)
-rect(draw, (82, 292, 219, 343), 17, orange)
-for y in (196, 234, 272, 310):
-    rect(draw, (261, y, 347, y + 17), 8, orange)
-font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 48 * scale)
-# Center the OPC mark within the main tile, not within the launcher mask.
-bbox = draw.textbbox((0, 0), 'OPC', font=font)
-width = bbox[2] - bbox[0]
-height = bbox[3] - bbox[1]
-draw.text(((164 * scale - width / 2) - bbox[0],
-           (185 * scale - height / 2) - bbox[1]), 'OPC', font=font, fill=white)
-fg.resize((size, size), Image.Resampling.LANCZOS).save(out / 'OPCAdaptiveForeground.png')
-print('Generated separate OPC foreground and charcoal background; legacy icon unchanged')
+# Separate background is needed for Android's adaptive mask. Do not bake it
+# into the foreground: that would make a rectangular tile under round masks.
+Image.new('RGBA', (432, 432), (43, 43, 43, 255)).save(out / 'AdaptiveBackground.png')
+print('Generated exact SVG foreground and separate dark adaptive background')

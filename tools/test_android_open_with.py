@@ -10,8 +10,8 @@ from PIL import Image
 root = Path(__file__).resolve().parents[1]
 settings = (root / 'ProjectSettings/ProjectSettings.asset').read_text()
 assets = root / 'Assets'
-fg = assets / 'AndroidIcons/OPCAdaptiveForeground.png'
-bg = assets / 'AndroidIcons/OPCAdaptiveBackground.png'
+fg = assets / 'AndroidIcons/AdaptiveForeground.png'
+bg = assets / 'AndroidIcons/AdaptiveBackground.png'
 fid = fg.with_suffix('.png.meta').read_text().split('guid: ')[1].splitlines()[0]
 bid = bg.with_suffix('.png.meta').read_text().split('guid: ')[1].splitlines()[0]
 section = settings.split('  m_BuildTargetPlatformIcons:')[1].split('  m_BuildTargetBatching:')[0]
@@ -23,6 +23,13 @@ for path in (fg, bg):
     with Image.open(path) as image:
         assert image.size == (432, 432) and image.mode == 'RGBA'
 assert Image.open(fg).getpixel((0, 0))[3] == 0  # true separated foreground
+artwork = ET.parse(root / 'tools/artwork/android_adaptive_foreground.svg').getroot()
+svg = '{http://www.w3.org/2000/svg}'
+assert artwork.attrib['viewBox'] == '0 0 640 640'
+assert len(artwork.findall(svg + 'path')) == 8  # user's pixel-letter outlines
+assert len(artwork.findall(svg + 'rect')) == 7  # original tile and bars
+assert all(node.get('fill') == 'white' for node in artwork.findall(svg + 'path'))
+assert 'android_adaptive_foreground.svg' in (root / 'tools/generate_android_adaptive_icon.py').read_text()
 
 manifest = ET.parse(assets / 'Plugins/Android/AndroidManifest.xml').getroot()
 ns = '{http://schemas.android.com/apk/res/android}'
@@ -47,4 +54,4 @@ bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()
 assert 'SaveFileImport.Import(path, System.IO.Path.GetFileName(path))' in file_menu
 assert 'SaveFileImport.Import(cached, name)' in bridge
 assert 'FileMenu.Instance.RefreshFromDisk()' in bridge
-print('PASS: legacy icon retained, layered OPC icon configured, Android Open with imports validated .pc/.opc')
+print('PASS: legacy icon retained, layered source SVG icon configured, Android Open with imports validated .pc/.opc')
