@@ -91,10 +91,31 @@ public class SaveManager : MonoBehaviour
 
             var data = new JObject();
             foreach (var save in item.GetComponents<ISave>()) save.ToData(data);
+
+            // Transform/FixedJoint/Connector не сериализуются в .opc. Запоминаем
+            // слот явно, иначе после загрузки остаётся только плата, а детали
+            // не прикрепляются: OnTriggerEnter для созданного внутри слота
+            // предмета Unity не гарантирует.
+            int hostId = 0;
+            string slotPath = null;
+            var connector = item.GetComponent<Connector>();
+            if (connector != null && connector.slot != null)
+            {
+                var slot = connector.slot;
+                var host = slot.GetComponentInParent<Item>();
+                if (host != null && host != item && host.Id != 0)
+                {
+                    hostId = host.Id;
+                    slotPath = GetSlotPath(host.transform, slot.transform);
+                }
+            }
+
             items.Add(new
             {
                 spawnId = item.spawnId,
                 id = item.Id,
+                hostId = hostId,
+                slotPath = slotPath,
                 pos = new { x = item.transform.position.x, y = item.transform.position.y, z = item.transform.position.z },
                 rot = new { x = item.transform.rotation.x, y = item.transform.rotation.y, z = item.transform.rotation.z, w = item.transform.rotation.w },
                 data = data
@@ -168,6 +189,8 @@ public class SaveManager : MonoBehaviour
         }
 
         var scObj = new List<Tuple<ISave[], JObject>>();
+        var restored = new List<Tuple<ItemData, Item>>();
+        var restoredById = new Dictionary<int, Item>();
 
         if (cdat.itemData != null && cdat.itemData.Length > 0)
         {
@@ -217,6 +240,8 @@ public class SaveManager : MonoBehaviour
                     {
                         item.Id = it.id;
                         Main.Instance.AddItem(it.id, item);
+                        restored.Add(Tuple.Create(it, item));
+                        if (it.id != 0) restoredById[it.id] = item;
                     }
                     JObject savePayload = null;
                     if (it.data != null)
@@ -251,13 +276,119 @@ public class SaveManager : MonoBehaviour
                     if (saver == null) throw new NullReferenceException(nameof(ISave));
                     if (data != null) saver.FromData(data);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.LogWarning($"Save: failed to restore {saver}: {ex}");
                     failCount++;
                 }
             }
         }
+
+        // Сначала корпуса и платы, потом их дочерние детали (CPU/RAM/GPU).
+        // Ни триггер, ни FixedJoint, ни Connector не переживают сериализацию.
+        for (int pass = 0; pass < restored.Count; pass++)
+        {
+            bool changed = false;
+            foreach (var pair in restored)
+            {
+                var saved = pair.Item1;
+                var item = pair.Item2;
+                if (item == null || item.GetComponent<Connector>() != null) continue;
+                if (saved.hostId == 0 || string.IsNullOrEmpty(saved.slotPath)) continue;
+                if (!restoredById.TryGetValue(saved.hostId, out var host) || host == null) continue;
+                // Дочерний слот должен принадлежать уже прикреплённому хозяину.
+                if (host == item || (HasSavedHost(restored, host) &&
+                    host.GetComponent<Connector>() == null)) continue;
+
+                var slot = FindSavedSlot(host, saved.slotPath);
+                if (slot != null && slot.TryAttach(item)) changed = true;
+            }
+            if (!changed) break;
+        }
+
+        // Старые .opc не содержат hostId/slotPath. Только если деталь
+        // практически совпадает с insertPos, восстанавливаем крепление.
+        // Свободно лежащую рядом с корпусом вещь не притягиваем.
+        foreach (var pair in restored)
+        {
+            if (pair.Item2 == null || pair.Item2.GetComponent<Connector>() != null) continue;
+            if (pair.Item1.hostId != 0)
+            {
+                // Префаб мог измениться с момента записи: тогда старый путь
+                // невалиден, но деталь ещё можно узнать по точной позиции.
+                if (restoredById.TryGetValue(pair.Item1.hostId, out var host))
+                    TryRestoreLegacySlot(pair.Item2, restored, host);
+                if (pair.Item2.GetComponent<Connector>() == null)
+                {
+                    Debug.LogWarning($"Save: could not reconnect {pair.Item1.spawnId} " +
+                        $"to host {pair.Item1.hostId}, slot {pair.Item1.slotPath}");
+                    failCount++;
+                }
+            }
+            else TryRestoreLegacySlot(pair.Item2, restored);
+        }
         return failCount;
+    }
+
+    private static bool HasSavedHost(List<Tuple<ItemData, Item>> restored, Item item)
+    {
+        foreach (var pair in restored)
+            if (pair.Item2 == item) return pair.Item1.hostId != 0;
+        return false;
+    }
+
+    // Путь по индексам дочерних Transform внутри префаба хозяина. В отличие
+    // от target он различает несколько одинаковых RAM/GPU-слотов.
+    private static string GetSlotPath(Transform host, Transform slot)
+    {
+        var indices = new List<string>();
+        for (var t = slot; t != null && t != host; t = t.parent)
+            indices.Add(t.GetSiblingIndex().ToString());
+        if (slot != host && !slot.IsChildOf(host)) return null;
+        indices.Reverse();
+        return string.Join("/", indices.ToArray());
+    }
+
+    private static Slot FindSavedSlot(Item host, string path)
+    {
+        if (host == null || string.IsNullOrEmpty(path)) return null;
+        var t = host.transform;
+        foreach (var part in path.Split('/'))
+        {
+            if (!int.TryParse(part, out int index) || index < 0 || index >= t.childCount)
+                return null;
+            t = t.GetChild(index);
+        }
+        var slot = t.GetComponent<Slot>();
+        // Не позволяем старому пути переназначить чужую деталь/дочерний слот.
+        return slot != null && slot.GetComponentInParent<Item>() == host ? slot : null;
+    }
+
+    private static void TryRestoreLegacySlot(Item item, List<Tuple<ItemData, Item>> restored,
+        Item expectedHost = null)
+    {
+        if (item == null) return;
+        Slot best = null;
+        float nearest = 0.02f * 0.02f;
+        foreach (var pair in restored)
+        {
+            var host = pair.Item2;
+            if (host == null || host == item ||
+                (expectedHost != null && host != expectedHost)) continue;
+            foreach (var slot in host.GetComponentsInChildren<Slot>(true))
+            {
+                if (slot == null || slot.IsUsing || slot.InsertPosition == null) continue;
+                if (slot.GetComponentInParent<Item>() != host) continue;
+                if (!item.CompareTag(slot.target) || !slot.IsMatch(item.Match)) continue;
+
+                var pos = slot.InsertPosition.position + item.transform.TransformVector(item.SlotOffset);
+                float d = (item.transform.position - pos).sqrMagnitude;
+                if (d >= nearest) continue;
+                nearest = d;
+                best = slot;
+            }
+        }
+        if (best != null) best.TryAttach(item);
     }
 
     /// <summary>
@@ -318,7 +449,9 @@ public class SaveManager : MonoBehaviour
     /// расстояние копеечное. Порог намеренно маленький: два одинаковых
     /// монитора, честно поставленных игроком рядом, должны остаться оба.
     /// </remarks>
-    private const float DuplicateRadius = 0.05f;
+    // 5 см склеивали соседние DIMM/GPU (расстояние между слотами бывает меньше).
+    // Настоящие старые дубликаты из коробки стоят практически в одной точке.
+    private const float DuplicateRadius = 0.001f;
 
     /// <summary>
     /// Уже восстанавливали такой же предмет в этой же точке?

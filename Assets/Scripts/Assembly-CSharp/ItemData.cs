@@ -14,4 +14,9 @@ public class ItemData
 	public Quaternion rot;
 
 	public JObject data;
+
+	// Необязательная связь с занятым слотом. Старые .opc без этих полей
+	// продолжают загружаться (hostId == 0).
+	public int hostId;
+	public string slotPath;
 }

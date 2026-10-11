@@ -99,6 +99,9 @@ public class Slot : MonoBehaviour
 	/// </summary>
 	public bool IsUsing => isUsing;
 
+	/// <summary>Точная поза установки для восстановления старых сохранений.</summary>
+	public Transform InsertPosition => insertPos;
+
 	/// <summary>
 	/// Установить деталь в слот напрямую, минуя триггер.
 	///
