@@ -1542,25 +1542,25 @@ public class Raycast : MonoBehaviour
                 if (!PlacementGrid.IsSolidCollider(c)) continue;
 
                 var box = c as BoxCollider;
+
+                GridBox gb;
                 if (box != null)
                 {
                     var t = box.transform;
                     Vector3 scale = t.lossyScale;
-                    Vector3 half = Vector3.Scale(box.size, Abs(scale)) * 0.5f;
 
-                    GridBox gb;
                     gb.center = t.TransformPoint(box.center);
-                    gb.half = half;
+                    gb.half = Vector3.Scale(box.size, Abs(scale)) * 0.5f;
                     gb.rot = t.rotation;
-                    into.Add(gb);
-                    continue;
+                }
+                else
+                {
+                    // Остальные формы (меш, капсула, сфера) — их мировой AABB
+                    gb.center = c.bounds.center;
+                    gb.half = c.bounds.extents;
+                    gb.rot = Quaternion.identity;
                 }
 
-                // Остальные формы (меш, капсула, сфера) — их мировой AABB
-                GridBox gb;
-                gb.center = c.bounds.center;
-                gb.half = c.bounds.extents;
-                gb.rot = Quaternion.identity;
                 into.Add(gb);
             }
         }
