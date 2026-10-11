@@ -30,4 +30,11 @@ else:
 # Separate background is needed for Android's adaptive mask. Do not bake it
 # into the foreground: that would make a rectangular tile under round masks.
 Image.new('RGBA', (432, 432), (43, 43, 43, 255)).save(out / 'AdaptiveBackground.png')
-print('Generated exact SVG foreground and separate dark adaptive background')
+source_fg = Image.open(foreground).convert('RGBA')
+source_bg = Image.open(out / 'AdaptiveBackground.png').convert('RGBA')
+for size in (324, 216, 162, 108, 81):
+    source_fg.resize((size, size), Image.Resampling.LANCZOS).save(
+        out / f'AdaptiveForeground_{size}.png')
+    source_bg.resize((size, size), Image.Resampling.LANCZOS).save(
+        out / f'AdaptiveBackground_{size}.png')
+print('Generated supplied SVG at all six Android adaptive icon densities')

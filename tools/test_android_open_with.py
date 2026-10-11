@@ -10,19 +10,38 @@ from PIL import Image
 root = Path(__file__).resolve().parents[1]
 settings = (root / 'ProjectSettings/ProjectSettings.asset').read_text()
 assets = root / 'Assets'
-fg = assets / 'AndroidIcons/AdaptiveForeground.png'
-bg = assets / 'AndroidIcons/AdaptiveBackground.png'
-fid = fg.with_suffix('.png.meta').read_text().split('guid: ')[1].splitlines()[0]
-bid = bg.with_suffix('.png.meta').read_text().split('guid: ')[1].splitlines()[0]
 section = settings.split('  m_BuildTargetPlatformIcons:')[1].split('  m_BuildTargetBatching:')[0]
 android = section.split('  - m_BuildTarget: Android\n')[1]
-assert android.count('m_Kind: 2') == 6
-assert android.count(f'guid: {fid}') == android.count(f'guid: {bid}') == 6
-assert 'b7905c449a3be404ea0bd4e199dd22b5' in settings  # legacy PC stays
-for path in (fg, bg):
-    with Image.open(path) as image:
-        assert image.size == (432, 432) and image.mode == 'RGBA'
-assert Image.open(fg).getpixel((0, 0))[3] == 0  # true separated foreground
+import re
+slots = re.findall(r'    - m_Textures:\n((?:      - \{[^\n]+\}\n)+)      m_Width: (\d+)\n      m_Height: (\d+)\n      m_Kind: (\d+)', android)
+assert len(slots) == 18, 'all six Legacy, Round and Adaptive slots must be filled'
+legacy_guid = 'b7905c449a3be404ea0bd4e199dd22b5'
+for textures, width, height, kind in slots:
+    size = int(width)
+    assert size == int(height)
+    guids = re.findall(r'guid: ([0-9a-f]{32})', textures)
+    if int(kind) in (0, 1):
+        assert guids == [legacy_guid], 'keep the original PC icon in Legacy/Round'
+    else:
+        assert int(kind) == 2 and len(guids) == 2
+        suffix = '' if size == 432 else '_' + str(size)
+        for layer, guid in [('Foreground', guids[0]), ('Background', guids[1])]:
+            path = assets / ('AndroidIcons/Adaptive' + layer + suffix + '.png')
+            assert path.exists()
+            assert 'guid: ' + guid in path.with_suffix('.png.meta').read_text()
+            with Image.open(path) as im:
+                assert im.size == (size, size) and im.mode == 'RGBA'
+                if layer == 'Foreground':
+                    assert im.getpixel((round(size * 128 / 640), round(size * 130 / 640)))[3] > 200
+                else:
+                    assert im.getpixel((0, 0))[3] == 255
+        assert Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')).getpixel((0, 0))[3] == 0
+assert sum(int(slot[3]) == 2 for slot in slots) == 6
+editor = (assets / 'Editor/EnsureAndroidIcons.cs').read_text()
+for required in ('IPreprocessBuildWithReport', 'AndroidPlatformIconKind.Legacy',
+                 'AndroidPlatformIconKind.Round', 'AndroidPlatformIconKind.Adaptive',
+                 'PlayerSettings.SetPlatformIcons', 'icons[i].SetTextures(new[] { foreground, background })'):
+    assert required in editor, required
 artwork = ET.parse(root / 'tools/artwork/android_adaptive_foreground.svg').getroot()
 svg = '{http://www.w3.org/2000/svg}'
 assert artwork.attrib['viewBox'] == '0 0 640 640'
