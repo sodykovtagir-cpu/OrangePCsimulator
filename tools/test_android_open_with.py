@@ -25,29 +25,30 @@ for textures, width, height, kind in slots:
     else:
         assert int(kind) == 2 and len(guids) == 2
         suffix = '' if size == 432 else '_' + str(size)
-        for layer, guid in [('Foreground', guids[0]), ('Background', guids[1])]:
+        # Unity Player Settings screenshot confirms: slot 0 Background, slot 1 Foreground.
+        for layer, guid in [('Background', guids[0]), ('Foreground', guids[1])]:
             path = assets / ('AndroidIcons/Adaptive' + layer + suffix + '.png')
             assert path.exists()
             assert 'guid: ' + guid in path.with_suffix('.png.meta').read_text()
             with Image.open(path) as im:
                 assert im.size == (size, size) and im.mode == 'RGBA'
                 if layer == 'Foreground':
-                    assert im.getpixel((round(size * 128 / 640), round(size * 130 / 640)))[3] > 200
+                    assert im.getpixel((round(size * 128 / 640), round(size * 130 / 640))) == (255, 255, 255, 255)
                 else:
-                    assert im.getpixel((0, 0))[3] == 255
+                    assert im.getpixel((0, 0)) == (0, 0, 0, 255)
         assert Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')).getpixel((0, 0))[3] == 0
 assert sum(int(slot[3]) == 2 for slot in slots) == 6
 editor = (assets / 'Editor/EnsureAndroidIcons.cs').read_text()
 for required in ('IPreprocessBuildWithReport', 'AndroidPlatformIconKind.Legacy',
                  'AndroidPlatformIconKind.Round', 'AndroidPlatformIconKind.Adaptive',
-                 'PlayerSettings.SetPlatformIcons', 'icons[i].SetTextures(new[] { foreground, background })'):
+                 'PlayerSettings.SetPlatformIcons', 'icons[i].SetTextures(new[] { background, foreground })'):
     assert required in editor, required
 artwork = ET.parse(root / 'tools/artwork/android_adaptive_foreground.svg').getroot()
 svg = '{http://www.w3.org/2000/svg}'
 assert artwork.attrib['viewBox'] == '0 0 640 640'
-assert len(artwork.findall(svg + 'path')) == 8  # user's pixel-letter outlines
+assert len(artwork.findall(svg + 'path')) == 0  # no lettering on adaptive icon
 assert len(artwork.findall(svg + 'rect')) == 7  # original tile and bars
-assert all(node.get('fill') == 'white' for node in artwork.findall(svg + 'path'))
+assert all(node.get('fill') == 'white' for node in artwork.findall(svg + 'rect'))
 assert 'android_adaptive_foreground.svg' in (root / 'tools/generate_android_adaptive_icon.py').read_text()
 
 manifest = ET.parse(assets / 'Plugins/Android/AndroidManifest.xml').getroot()
@@ -81,4 +82,4 @@ bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()
 assert 'SaveFileImport.Import(path, System.IO.Path.GetFileName(path))' in file_menu
 assert 'SaveFileImport.Import(cached, name)' in bridge
 assert 'FileMenu.Instance.RefreshFromDisk()' in bridge
-print('PASS: legacy icon retained, layered source SVG icon configured, Android Open with imports validated .pc/.opc')
+print('PASS: legacy PC icon kept; adaptive layers ordered black background / white text-free foreground; Open with validated')

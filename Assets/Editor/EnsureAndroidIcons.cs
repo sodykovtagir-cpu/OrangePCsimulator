@@ -37,11 +37,13 @@ public sealed class EnsureAndroidIcons : IPreprocessBuildWithReport
             if (foreground.width != size || foreground.height != size ||
                 background.width != size || background.height != size)
                 throw new BuildFailedException("Android adaptive icon has wrong size: " + size);
-            // Layer 0 = foreground, layer 1 = background.
-            icons[i].SetTextures(new[] { foreground, background });
+            // Unity's Android icon inspector uses layer 0 = Background,
+            // layer 1 = Foreground (verified in the Player Settings preview).
+            // Reversing these rendered only the background on the launcher.
+            icons[i].SetTextures(new[] { background, foreground });
         }
         PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Adaptive, icons);
-        Debug.Log("Android launcher icons: original PC legacy/round + six adaptive foreground/background pairs.");
+        Debug.Log("Android launcher icons: original PC legacy/round + six black-background/white-foreground pairs.");
     }
 
     private static Texture2D Load(string path)
