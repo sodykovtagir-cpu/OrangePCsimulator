@@ -43,7 +43,7 @@ public sealed class EnsureAndroidIcons : IPreprocessBuildWithReport
             icons[i].SetTextures(new[] { background, foreground });
         }
         PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Adaptive, icons);
-        Debug.Log("Android launcher icons: original PC legacy/round + six black-background/white-foreground pairs.");
+        Debug.Log("Android launcher icons: original PC legacy/round + six black-background/orange-foreground pairs.");
     }
 
     private static Texture2D Load(string path)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source guards for Android adaptive OPC icon and external save import.
+"""Source guards for normal-color and themed Android icons, plus save import.
 
 These do not replace an actual Unity 2022.3 Android build/Files app smoke test.
 """
@@ -33,11 +33,28 @@ for textures, width, height, kind in slots:
             with Image.open(path) as im:
                 assert im.size == (size, size) and im.mode == 'RGBA'
                 if layer == 'Foreground':
-                    assert im.getpixel((round(size * 128 / 640), round(size * 130 / 640))) == (255, 255, 255, 255)
+                    assert im.getpixel((round(size * 260 / 640), round(size * 260 / 640))) == (253, 121, 2, 255)
                 else:
                     assert im.getpixel((0, 0)) == (0, 0, 0, 255)
         assert Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')).getpixel((0, 0))[3] == 0
 assert sum(int(slot[3]) == 2 for slot in slots) == 6
+mono = assets / 'AndroidIcons/AdaptiveMonochrome.png'
+with Image.open(mono) as monochrome:
+    monochrome = monochrome.convert('RGBA')
+    assert monochrome.size == (432, 432)
+    assert monochrome.getpixel((176, 176)) == (255, 255, 255, 255)
+    # Entire glyph is inside the Android circular safe zone, even for motion.
+    painted = [(x, y) for y in range(432) for x in range(432)
+               if monochrome.getpixel((x, y))[3] > 10]
+    assert max(((x - 216) ** 2 + (y - 216) ** 2) ** .5 / 216 for x, y in painted) < .60
+assert Image.open(assets / 'AndroidIcons/AdaptiveForeground.png').getpixel((176, 176))[:3] == (253, 121, 2)
+postprocess = (assets / 'Editor/AndroidThemedIconPostprocess.cs').read_text()
+for required in ('IPostGenerateGradleAndroidProject', 'launcher", "src", "main", "res',
+                 'doc.Root.Name.LocalName != "adaptive-icon"',
+                 'new XElement("monochrome"', 'folder.Substring(0, folder.Length - 3) + "v33"',
+                 'orange_pc_monochrome.png'):
+    assert required in postprocess, required
+assert 'doc.Save(Path.Combine(v33Folder, Path.GetFileName(file)))' in postprocess
 editor = (assets / 'Editor/EnsureAndroidIcons.cs').read_text()
 for required in ('IPreprocessBuildWithReport', 'AndroidPlatformIconKind.Legacy',
                  'AndroidPlatformIconKind.Round', 'AndroidPlatformIconKind.Adaptive',
@@ -82,4 +99,4 @@ bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()
 assert 'SaveFileImport.Import(path, System.IO.Path.GetFileName(path))' in file_menu
 assert 'SaveFileImport.Import(cached, name)' in bridge
 assert 'FileMenu.Instance.RefreshFromDisk()' in bridge
-print('PASS: legacy PC icon kept; adaptive layers ordered black background / white text-free foreground; Open with validated')
+print('PASS: orange normal icon, inset monochrome v33 layer, original legacy icon and Open with guards')
