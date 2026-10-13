@@ -14,6 +14,8 @@ manager = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/DeviceManag
 terminal = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/Terminal.cs')
 miner = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/Miner.cs')
 automation = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/DeviceAutomation.cs')
+assert 'using OperatingSystem = PC.Component.Software.OS.OperatingSystem;' in automation
+assert 'using System;' not in automation  # Unity also exposes System.OperatingSystem
 editor = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/TextEditor.cs')
 installer = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/Installer.cs')
 ready = read('Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs')

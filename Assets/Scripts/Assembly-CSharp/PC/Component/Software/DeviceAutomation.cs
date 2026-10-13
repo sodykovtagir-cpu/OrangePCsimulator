@@ -1,6 +1,5 @@
-using System;
 using System.Collections;
-using PC.Component.Software.OS;
+using OperatingSystem = PC.Component.Software.OS.OperatingSystem;
 using UnityEngine;
 
 namespace PC.Component.Software
