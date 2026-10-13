@@ -51,6 +51,10 @@ for required in ('Build script  1/3', 'Build script  2/3', 'Build script  3/3',
                  'System ID (hex)', 'Saved', 'DeviceAutomation.All()', 'All: Bitcoin',
                  'All: Money', 'All: Video', 'remote-all ', '".tmn"', 'AutorunConfig.AppendCommand'):
     assert required in manager, required
+# Unity UGUI permits just one Graphic (Image or Text) per GameObject.
+label = manager.split('private Text Label(')[1].split('private Button Button(')[0]
+assert 'NewRect("Label"' in label and 'AddComponent<Text>()' in label
+assert 'Box("Label"' not in label and 'AddComponent<Image>()' not in label
 # No prefab link ambiguity: the cloned chrome has a unique script GUID; originals unchanged.
 assert 'appName: My Devices' in read('Assets/Resources/apps/MyDevices.prefab')
 for new in ('DeviceManager.cs', 'DeviceAutomation.cs', 'OS/AutorunConfig.cs'):

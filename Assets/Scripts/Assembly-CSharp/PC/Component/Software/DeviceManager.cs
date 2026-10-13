@@ -300,9 +300,9 @@ namespace PC.Component.Software
 
         // Small Unity UI primitives: prefab carries window chrome; all controls
         // are runtime-generated so there are no missing serialized callbacks.
-        private RectTransform Box(string name, Transform parent, float x, float y, float w, float h, Color color)
+        private RectTransform NewRect(string name, Transform parent, float x, float y, float w, float h)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
             go.layer = 5;
             var rect = go.GetComponent<RectTransform>();
             rect.SetParent(parent, false);
@@ -310,13 +310,21 @@ namespace PC.Component.Software
             rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(x, -y);
             rect.sizeDelta = new Vector2(w, h);
-            go.GetComponent<Image>().color = color;
+            return rect;
+        }
+
+        private RectTransform Box(string name, Transform parent, float x, float y, float w, float h, Color color)
+        {
+            var rect = NewRect(name, parent, x, y, w, h);
+            rect.gameObject.AddComponent<Image>().color = color;
             return rect;
         }
 
         private Text Label(string text, float x, float y, float w, float h, int size, Transform parent = null)
         {
-            var rect = Box("Label", parent != null ? parent : panel, x, y, w, h, Color.clear);
+            // UI Text and Image are both Graphic components: they must be on
+            // separate GameObjects. A label needs only a RectTransform + Text.
+            var rect = NewRect("Label", parent != null ? parent : panel, x, y, w, h);
             var result = rect.gameObject.AddComponent<Text>();
             result.font = font;
             result.fontSize = size;
