@@ -102,10 +102,7 @@ MonoBehaviour:
   output: {fileID: 114131013980538264}
   inputObj: {fileID: 1967829495958877}
   input: {fileID: 114913946310028343}
-  help: "beep (frequency) (time)\r\ndelay (time)\r\nshutdown\r\nclose\nclear\r\r\nsystem-id\nremote
-    (system-id) startup [start computer]\r\nremote (system-id) shutdown [shutdown
-    computer]\r\nremote (system-id) open (name) [open software by name]\r\n\rhide-input\n\n(use
-    \"\" to include spaces)"
+  help: "system-id\nrun \"script.tmn\"\nopen \"path\"\nlaunch \"App Name\" [args]\nremote <ID> startup|shutdown|open \"path\"|bitcoin|cash|video|app \"App Name\"|file \"path\"\nremote-all bitcoin|cash|video\ndelay <ms>  clear  close  shutdown\n(beep, hide-input and // comments also supported)"
   frequency: 1
   sampleRate: 44100
   waveLengthInSeconds: 2

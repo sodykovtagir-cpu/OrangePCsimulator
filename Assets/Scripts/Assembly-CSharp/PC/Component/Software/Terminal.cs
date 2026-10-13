@@ -49,6 +49,7 @@ namespace PC.Component.Software
 		private bool newline;
 
 		private bool hideInput;
+        private int scriptDepth;
 
 		private Regex regex = new Regex(" (?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
 
@@ -142,7 +143,7 @@ namespace PC.Component.Software
 			{
 				var line = lines[i];
 				if (line == null) continue;
-				if (line.StartsWith("//")) continue;
+				if (line.TrimStart().StartsWith("//")) continue;
 				yield return StartCoroutine(RunCommand(line));
 			}
 
@@ -242,10 +243,48 @@ namespace PC.Component.Software
 				var board = system != null ? system.Board : null;
 				if (board != null) board.Explode();
 			}
+            else if (cmd == "remote-all")
+            {
+                string action = command.Count > 0 ? command.Dequeue() : "";
+                int count = DeviceAutomation.RunAll(system, action);
+                WriteLine("Scheduled " + count + " devices (" + action + ")");
+            }
 			else if (cmd == "remote")
 			{
 				RemoteComputer(command);
 			}
+            else if (cmd == "launch")
+            {
+                string app = command.Count > 0 ? command.Dequeue() : "";
+                string args = string.Join(" ", command.ToArray());
+                WriteLine(system != null && system.TryLaunchApp(app, args) ? "Launched " + app : "Cannot launch " + app);
+            }
+            else if (cmd == "open" || cmd == "run")
+            {
+                string path = command.Count > 0 ? command.Dequeue() : "";
+                File file;
+                if (cmd == "run" && path == "boot.bin") { /* required boot directive, already validated */ }
+                else if (system == null || system.FileManager == null ||
+                         !system.FileManager.TryGetFile(0, path, out file) || file == null)
+                    WriteLine("File not found: " + path);
+                else if (cmd == "run" && file.Extension() == ".tmn")
+                {
+                    if (scriptDepth >= 4) WriteLine("Script nesting limit reached");
+                    else
+                    {
+                        scriptDepth++;
+                        foreach (var commandLine in (file.content ?? "").Replace("\r", "").Split('\n'))
+                            if (!string.IsNullOrWhiteSpace(commandLine) && !commandLine.TrimStart().StartsWith("//"))
+                                yield return StartCoroutine(RunCommand(commandLine));
+                        scriptDepth--;
+                    }
+                }
+                else if (cmd == "run" && string.Equals(file.Extension(), ".lua", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!system.RunLua(file.content, null)) WriteLine("Cannot run Lua: " + path);
+                }
+                else if (!system.OpenFile(file)) WriteLine("Cannot open: " + path);
+            }
 			else if (cmd == "shutdown")
 			{
 				var os = system;
@@ -271,11 +310,31 @@ namespace PC.Component.Software
 			int id;
 			try { id = Convert.ToInt32(hex, 16); }
 			catch (FormatException) { return; }
+            catch (OverflowException) { return; }
 
 			var os = system;
 			if (os == null) return;
 
-			string msg = "The computer cannot be used!";
+            string msg = "The computer cannot be used!";
+            if (os.SystemId == id)
+            {
+                string localAction = command.Count > 0 ? command.Dequeue() : "";
+                if (localAction == "startup") msg = "This computer is running!";
+                else if (localAction == "bitcoin" || localAction == "cash" || localAction == "video"
+                    || localAction == "app" || localAction == "file" || localAction == "shutdown")
+                {
+                    string argument = command.Count > 0 ? command.Dequeue() : "";
+                    msg = DeviceAutomation.Run(os, os.Board, localAction, argument)
+                        ? "Scheduled " + localAction + " on this computer!" : "Action failed";
+                }
+                else if (localAction == "open")
+                {
+                    RunOnSystem(localAction, command, os);
+                    return;
+                }
+                WriteLine(msg);
+                return;
+            }
 			if (os.SystemId != id)
 			{
 				var boards = FindObjectsOfType<Motherboard>();
@@ -302,6 +361,13 @@ namespace PC.Component.Software
 								msg = $"Computer {id:X8} is running!";
 							}
 						}
+                        else if (next == "bitcoin" || next == "cash" || next == "video"
+                                 || next == "app" || next == "file")
+                        {
+                            string argument = command.Count > 0 ? command.Dequeue() : "";
+                            bool scheduled = DeviceAutomation.Run(this.system, mb, next, argument);
+                            msg = scheduled ? $"Scheduled {next} on {id:X8}!" : $"Cannot start {next} on {id:X8}!";
+                        }
 						else
 						{
 							var ros = mb.System as OS.OperatingSystem;

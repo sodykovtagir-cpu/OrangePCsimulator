@@ -127,7 +127,12 @@ namespace PC.Component.Software.OS
 			storage.files = new List<File>();
 
 			var boot = new File("System/boot.bin", "pcos", true, minimumSpace);
-			if (FileManager != null) FileManager.Create(index, boot);
+			if (FileManager != null)
+            {
+                FileManager.Create(index, boot);
+                FileManager.Create(index, new File(AutorunConfig.Path, AutorunConfig.Default));
+                FileManager.Create(index, new File(AutorunConfig.Marker, "1", true));
+            }
 
 			var presets = preinstalledApps;
 			if (presets != null)

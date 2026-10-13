@@ -92,6 +92,8 @@ namespace PC.Component.Software.OS
 
         private bool busy;
         private bool error;
+        private bool faultPending;
+        private bool startupCommandsRan;
         private bool startMenuOpened;
         private Coroutine startMenuRoutine;
         private bool running;
@@ -251,6 +253,16 @@ namespace PC.Component.Software.OS
             if (user != null) user.SetActive(false);
             if (loading != null) loading.SetActive(true);
 
+            // Backwards-compatible first boot: install a config only for disks
+            // that predate this feature. Once marked, missing lines stay missing.
+            AutorunConfig.Ensure(FileManager);
+            string autorun = AutorunConfig.Read(FileManager);
+            if (!AutorunConfig.HasLine(autorun, "run boot.bin"))
+            {
+                yield return FreezeThenFault(); // before the OS loads
+                yield break;
+            }
+
             // Косметика не имеет права останавливать загрузку: исключение
             // внутри корутины обрывает её целиком, и система зависает на
             // экране запуска с чистой консолью.
@@ -297,6 +309,12 @@ namespace PC.Component.Software.OS
 
             float wait = storageScore > 0 ? 10000f / storageScore : 0f;
             if (wait > 0f) yield return new UnityEngine.WaitForSeconds(wait);
+
+            if (!AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init user"))
+            {
+                yield return FreezeThenFault(); // at the OS -> login transition
+                yield break;
+            }
 
             if (startup != null) startup.SetActive(false);
 
@@ -390,6 +408,28 @@ namespace PC.Component.Software.OS
             {
                 startMenuAnimator.SetBool("Open", false);
             }
+
+            if (!startupCommandsRan)
+            {
+                startupCommandsRan = true;
+                var commands = AutorunConfig.UserCommands(AutorunConfig.Read(FileManager));
+                if (commands.Length > 0)
+                {
+                    // The very same command interpreter handles .tmn scripts
+                    // and interactive Terminal. It opens briefly, then closes.
+                    EnsureTerminalForAutorun();
+                    TryLaunchApp("Terminal", string.Join("\n", commands));
+                }
+            }
+        }
+
+        private void EnsureTerminalForAutorun()
+        {
+            if (IsAppInstalled("Terminal") || appPrefabs == null || FileManager == null) return;
+            App prefab;
+            if (!appPrefabs.TryGetValue("Terminal", out prefab) || prefab == null) return;
+            var file = new File("Terminal.exe", "", true, prefab.size);
+            if (FileManager.Create(0, file)) AddApp("Terminal");
         }
 
         // Установка внутриигровой картинки как обои
@@ -571,6 +611,30 @@ namespace PC.Component.Software.OS
             if (board != null) board.PowerOff(false);
         }
 
+        // A missing devices line is dormant until a device is actually used.
+        // The pause deliberately shows the frozen screen before the BSOD.
+        public bool RequireDevices()
+        {
+            if (error || faultPending) return false;
+            if (AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init devices")) return true;
+            StartCoroutine(FreezeThenFault());
+            return false;
+        }
+
+        protected override void OnHardwareAdded(Hardware hardware)
+        {
+            if (hardware is Storage) RequireDevices(); // USB / removable disk
+        }
+
+        private IEnumerator FreezeThenFault()
+        {
+            if (faultPending || error) yield break;
+            faultPending = true;
+            if (desktop != null) desktop.blocksRaycasts = false;
+            yield return new WaitForSecondsRealtime(1.3f);
+            Fault();
+        }
+
         public override void Fault()
         {
             if (error) return;
@@ -695,6 +759,7 @@ namespace PC.Component.Software.OS
 
             RefreshDesktopIcon();
             EnsureViewer();
+            EnsureDeviceManager();
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
         }
 
@@ -718,6 +783,18 @@ namespace PC.Component.Software.OS
 
             if (!IsAppInstalled("Viewer"))
                 AddApp("Viewer");
+        }
+
+        private void EnsureDeviceManager()
+        {
+            App prefab;
+            if (FileManager == null || appPrefabs == null ||
+                !appPrefabs.TryGetValue("Device Manager", out prefab) || prefab == null) return;
+            if (!FileManager.Exists(0, "Device Manager.exe"))
+                FileManager.Create(0, new File("Device Manager.exe", "", false,
+                    prefab.size > 0 ? prefab.size : 203));
+            AddApp("Device Manager");
+            RefreshDesktopIcon();
         }
 
         private void EnsureLuaEditor()
@@ -1045,6 +1122,19 @@ namespace PC.Component.Software.OS
             var ext = file.Extension();
             App prefab = null;
 
+            if (string.Equals(ext, ".conf", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!IsAppInstalled("Text Editor", out prefab) || prefab == null)
+                {
+                    ShowRequires("Text Editor");
+                    return false;
+                }
+                LaunchApp(prefab, file.content ?? "");
+                var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                if (editor != null) editor.OpenDocument(file);
+                return true;
+            }
+
             if (ext == ".exe")
             {
                 var name = file.NameWithoutExtension();
@@ -1083,6 +1173,11 @@ namespace PC.Component.Software.OS
             }
 
             LaunchApp(app, file.content ?? "");
+            if (app.AppName == "Text Editor")
+            {
+                var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                if (editor != null) editor.OpenDocument(file);
+            }
             return true;
         }
 
@@ -1161,7 +1256,8 @@ namespace PC.Component.Software.OS
             if (string.IsNullOrEmpty(ext)) return false;
             return ext.Equals(".txt", StringComparison.OrdinalIgnoreCase)
                 || ext.Equals(".lua", StringComparison.OrdinalIgnoreCase)
-                || ext.Equals(".tmn", StringComparison.OrdinalIgnoreCase);
+                || ext.Equals(".tmn", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".conf", StringComparison.OrdinalIgnoreCase);
         }
 
         private App FindInstalledAppForExtension(string ext)

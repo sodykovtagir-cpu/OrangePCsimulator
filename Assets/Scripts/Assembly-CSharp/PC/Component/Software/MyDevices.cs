@@ -45,7 +45,7 @@ namespace PC.Component.Software
 		{
 			base.Open(content);
 			var sys = system;
-			if (sys == null) return;
+			if (sys == null || !sys.RequireDevices()) return;
 
 			var devices = sys.ListInstalledDevices();
 			if (devices == null) return;

@@ -36,6 +36,21 @@ namespace PC.Component.Software
 		private bool bitcoinMode;
 
 		private float revenue;
+        private bool initialized;
+
+        // Launch parameters: "bitcoin" (BTC), "cash"/"money" (dollars).
+        // Open is called before Start on newly instantiated Unity windows.
+        public override void Open(string content)
+        {
+            base.Open(content);
+            if (string.Equals(content, "bitcoin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(content, "btc", StringComparison.OrdinalIgnoreCase))
+                bitcoinMode = true;
+            else if (string.Equals(content, "cash", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(content, "money", StringComparison.OrdinalIgnoreCase))
+                bitcoinMode = false;
+            if (initialized) ChangeMode(bitcoinMode);
+        }
 
 		protected override void Start()
 		{
@@ -69,7 +84,8 @@ namespace PC.Component.Software
 				}
 			}
 
-			ChangeMode(false);
+            initialized = true;
+			ChangeMode(bitcoinMode);
 			StartCoroutine(Digging());
 		}
 

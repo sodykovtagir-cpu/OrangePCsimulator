@@ -390,6 +390,11 @@ namespace PC
 			// Загрузчик: именно его ищет Bios, content обязан быть "pcos".
 			if (!disk.ContainsFile("System/boot.bin"))
 				disk.AddFile(new File("System/boot.bin", "pcos", true, systemSize));
+            if (!disk.ContainsFile(PC.Component.Software.OS.AutorunConfig.Path))
+                disk.AddFile(new File(PC.Component.Software.OS.AutorunConfig.Path,
+                    PC.Component.Software.OS.AutorunConfig.Default));
+            if (!disk.ContainsFile(PC.Component.Software.OS.AutorunConfig.Marker))
+                disk.AddFile(new File(PC.Component.Software.OS.AutorunConfig.Marker, "1", true));
 
 			if (preinstalledApps == null) return;
 

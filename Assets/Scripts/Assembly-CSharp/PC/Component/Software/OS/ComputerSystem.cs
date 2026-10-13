@@ -61,7 +61,10 @@ namespace PC.Component.Software.OS
 		{
 			if (AllStorage == null) return;
 			if (hardware is Storage s) AllStorage.Add(s);
+            OnHardwareAdded(hardware);
 		}
+
+        protected virtual void OnHardwareAdded(Hardware hardware) { }
 
 		public void RemoveHardware(Hardware hardware)
 		{
