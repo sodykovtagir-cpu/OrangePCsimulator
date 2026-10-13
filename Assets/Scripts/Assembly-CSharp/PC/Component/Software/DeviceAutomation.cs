@@ -1,5 +1,4 @@
 using System.Collections;
-using OperatingSystem = PC.Component.Software.OS.OperatingSystem;
 using UnityEngine;
 
 namespace PC.Component.Software
@@ -19,7 +18,7 @@ namespace PC.Component.Software
         public static bool Supports(Motherboard board, string app)
         {
             if (board == null) return false;
-            var os = board.System as OperatingSystem;
+            var os = board.System as global::PC.Component.Software.OS.OperatingSystem;
             if (os != null && os.Ready) return os.IsAppInstalled(app);
             var drives = board.GetHardwares(HardwareType.Drive);
             if (drives == null) return false;
@@ -28,7 +27,7 @@ namespace PC.Component.Software
             return false;
         }
 
-        public static int RunAll(OperatingSystem source, string action)
+        public static int RunAll(global::PC.Component.Software.OS.OperatingSystem source, string action)
         {
             string app = action == "video" ? "Video Player" : "EZ Mining";
             if (action != "video" && action != "bitcoin" && action != "cash") return 0;
@@ -41,14 +40,14 @@ namespace PC.Component.Software
             return count;
         }
 
-        public static bool Run(OperatingSystem source, Motherboard board, string action, string argument = "")
+        public static bool Run(global::PC.Component.Software.OS.OperatingSystem source, Motherboard board, string action, string argument = "")
         {
             if (source == null || board == null) return false;
             if (action == "startup")
                 return board.Running || string.IsNullOrEmpty(board.Boot());
             if (action == "shutdown")
             {
-                var os = board.System as OperatingSystem;
+                var os = board.System as global::PC.Component.Software.OS.OperatingSystem;
                 if (os == null || !os.Ready) return false;
                 os.PowerClicked();
                 return true;
@@ -68,10 +67,10 @@ namespace PC.Component.Software
         private static IEnumerator WhenReady(Motherboard board, string action, string argument)
         {
             float deadline = Time.realtimeSinceStartup + 45f;
-            OperatingSystem os = null;
+            global::PC.Component.Software.OS.OperatingSystem os = null;
             while (board != null && board.Running && Time.realtimeSinceStartup < deadline)
             {
-                os = board.System as OperatingSystem;
+                os = board.System as global::PC.Component.Software.OS.OperatingSystem;
                 if (os != null && os.Ready) break;
                 yield return new WaitForSecondsRealtime(0.25f);
             }
