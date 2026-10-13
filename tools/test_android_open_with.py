@@ -5,7 +5,7 @@ These do not replace an actual Unity 2022.3 Android build/Files app smoke test.
 """
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from PIL import Image
+from PIL import Image, ImageChops
 
 root = Path(__file__).resolve().parents[1]
 settings = (root / 'ProjectSettings/ProjectSettings.asset').read_text()
@@ -41,10 +41,19 @@ for textures, width, height, kind in slots:
             with Image.open(path) as im:
                 assert im.size == (size, size) and im.mode == 'RGBA'
                 if layer == 'Foreground':
-                    assert im.getpixel((round(size * 260 / 640), round(size * 260 / 640))) == (253, 121, 2, 255)
+                    assert im.getpixel((round(size * 155 / 432), round(size * 155 / 432)))[0] > 240  # orange PC mark
+                    assert im.getpixel((round(size * 150 / 432), round(size * 180 / 432)))[0] > 240  # white lettering
+                    shadow = im.getpixel((round(size * 315 / 432), round(size * 300 / 432)))
+                    assert max(shadow[:3]) < 65 and shadow[3] > 245, 'long shadow survives scaling'
                 else:
-                    assert im.getpixel((0, 0)) == (0, 0, 0, 255)
-        assert Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')).getpixel((0, 0))[3] == 0
+                    assert im.getpixel((0, 0)) == (92, 92, 92, 255)
+        with Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')) as fg:
+            assert fg.getpixel((0, 0))[3] == 0
+            if size == 432:
+                with Image.open(assets / 'AndroidIcons/AdaptiveBackground.png') as bg:
+                    combined = Image.alpha_composite(bg.convert('RGBA'), fg.convert('RGBA')).convert('RGB')
+                with Image.open(root / 'tools/artwork/Roundadapted.png') as supplied:
+                    assert ImageChops.difference(combined, supplied.convert('RGB')).getbbox() is None
 assert [sum(int(slot[3]) == kind for slot in slots) for kind in (0, 1, 2)] == [6, 6, 6]
 assert 'Roundadapted.png' in (root / 'tools/generate_android_round_icon.py').read_text()
 mono = assets / 'AndroidIcons/AdaptiveMonochrome.png'
@@ -56,7 +65,8 @@ with Image.open(mono) as monochrome:
     painted = [(x, y) for y in range(432) for x in range(432)
                if monochrome.getpixel((x, y))[3] > 10]
     assert max(((x - 216) ** 2 + (y - 216) ** 2) ** .5 / 216 for x, y in painted) < .60
-assert Image.open(assets / 'AndroidIcons/AdaptiveForeground.png').getpixel((176, 176))[:3] == (253, 121, 2)
+assert Image.open(assets / 'AndroidIcons/AdaptiveForeground.png').getpixel((150, 180))[:3] == (255, 255, 255)
+assert 'Roundadapted.png' in (root / 'tools/generate_android_adaptive_icon.py').read_text()
 postprocess = (assets / 'Editor/AndroidThemedIconPostprocess.cs').read_text()
 for required in ('IPostGenerateGradleAndroidProject', 'launcher", "src", "main", "res',
                  'doc.Root.Name.LocalName != "adaptive-icon"',
@@ -110,4 +120,4 @@ bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()
 assert 'SaveFileImport.Import(path, System.IO.Path.GetFileName(path))' in file_menu
 assert 'SaveFileImport.Import(cached, name)' in bridge
 assert 'FileMenu.Instance.RefreshFromDisk()' in bridge
-print('PASS: supplied Round icon at six sizes, color Adaptive, themed monochrome, original Legacy and Open with guards')
+print('PASS: supplied Round and matching shadowed Adaptive at six sizes, separate themed glyph, Legacy and Open with guards')
