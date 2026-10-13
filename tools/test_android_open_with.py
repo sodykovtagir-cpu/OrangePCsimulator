@@ -20,8 +20,16 @@ for textures, width, height, kind in slots:
     size = int(width)
     assert size == int(height)
     guids = re.findall(r'guid: ([0-9a-f]{32})', textures)
-    if int(kind) in (0, 1):
-        assert guids == [legacy_guid], 'keep the original PC icon in Legacy/Round'
+    if int(kind) == 0:
+        assert guids == [legacy_guid], 'keep the original PC icon in Legacy'
+    elif int(kind) == 1:
+        path = assets / f'AndroidIcons/RoundIcon_{size}.png'
+        assert len(guids) == 1 and 'guid: ' + guids[0] in path.with_suffix('.png.meta').read_text()
+        with Image.open(path) as im:
+            assert im.size == (size, size) and im.mode == 'RGB'
+            with Image.open(root / 'tools/artwork/Roundadapted.png') as supplied:
+                assert im.tobytes() == supplied.convert('RGB').resize(
+                    (size, size), Image.Resampling.LANCZOS).tobytes()
     else:
         assert int(kind) == 2 and len(guids) == 2
         suffix = '' if size == 432 else '_' + str(size)
@@ -37,7 +45,8 @@ for textures, width, height, kind in slots:
                 else:
                     assert im.getpixel((0, 0)) == (0, 0, 0, 255)
         assert Image.open(assets / ('AndroidIcons/AdaptiveForeground' + suffix + '.png')).getpixel((0, 0))[3] == 0
-assert sum(int(slot[3]) == 2 for slot in slots) == 6
+assert [sum(int(slot[3]) == kind for slot in slots) for kind in (0, 1, 2)] == [6, 6, 6]
+assert 'Roundadapted.png' in (root / 'tools/generate_android_round_icon.py').read_text()
 mono = assets / 'AndroidIcons/AdaptiveMonochrome.png'
 with Image.open(mono) as monochrome:
     monochrome = monochrome.convert('RGBA')
@@ -60,6 +69,8 @@ for required in ('IPreprocessBuildWithReport', 'AndroidPlatformIconKind.Legacy',
                  'AndroidPlatformIconKind.Round', 'AndroidPlatformIconKind.Adaptive',
                  'PlayerSettings.SetPlatformIcons', 'icons[i].SetTextures(new[] { background, foreground })'):
     assert required in editor, required
+assert 'AssignRoundIcons();' in editor and '"Assets/AndroidIcons/RoundIcon_" + size + ".png"' in editor
+assert 'AssignSingleLayer(AndroidPlatformIconKind.Round, original)' not in editor
 artwork = ET.parse(root / 'tools/artwork/android_adaptive_foreground.svg').getroot()
 svg = '{http://www.w3.org/2000/svg}'
 assert artwork.attrib['viewBox'] == '0 0 640 640'
@@ -99,4 +110,4 @@ bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()
 assert 'SaveFileImport.Import(path, System.IO.Path.GetFileName(path))' in file_menu
 assert 'SaveFileImport.Import(cached, name)' in bridge
 assert 'FileMenu.Instance.RefreshFromDisk()' in bridge
-print('PASS: orange normal icon, inset monochrome v33 layer, original legacy icon and Open with guards')
+print('PASS: supplied Round icon at six sizes, color Adaptive, themed monochrome, original Legacy and Open with guards')

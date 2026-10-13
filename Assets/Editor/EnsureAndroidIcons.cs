@@ -20,7 +20,7 @@ public sealed class EnsureAndroidIcons : IPreprocessBuildWithReport
 
         var original = Load("Assets/Sprite/orange PC simulator.jpg");
         AssignSingleLayer(AndroidPlatformIconKind.Legacy, original);
-        AssignSingleLayer(AndroidPlatformIconKind.Round, original);
+        AssignRoundIcons();
 
         var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Adaptive);
         if (icons == null || icons.Length == 0)
@@ -43,7 +43,23 @@ public sealed class EnsureAndroidIcons : IPreprocessBuildWithReport
             icons[i].SetTextures(new[] { background, foreground });
         }
         PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Adaptive, icons);
-        Debug.Log("Android launcher icons: original PC legacy/round + six black-background/orange-foreground pairs.");
+        Debug.Log("Android launcher icons: original PC legacy, supplied Round artwork and six adaptive color pairs.");
+    }
+
+    private static void AssignRoundIcons()
+    {
+        var slots = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Round);
+        if (slots == null || slots.Length == 0)
+            throw new BuildFailedException("Missing Android Round icon slots.");
+        for (int i = 0; i < slots.Length; i++)
+        {
+            int size = slots[i].width;
+            var round = Load("Assets/AndroidIcons/RoundIcon_" + size + ".png");
+            if (round.width != size || round.height != slots[i].height)
+                throw new BuildFailedException("Android Round icon has wrong size: " + size);
+            slots[i].SetTexture(round, 0);
+        }
+        PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, AndroidPlatformIconKind.Round, slots);
     }
 
     private static Texture2D Load(string path)
