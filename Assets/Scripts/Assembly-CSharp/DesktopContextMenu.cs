@@ -105,7 +105,10 @@ namespace PC.Component.Software
 
             var pointer = new PointerEventData(EventSystem.current);
             pointer.position = screenPos;
-            EventSystem.current.RaycastAll(pointer, results);
+            if (RemoteDesk.ForwardingSystem == operatingSystem && RemoteDesk.ForwardingRaycaster != null)
+                RemoteDesk.ForwardingRaycaster.Raycast(pointer, results);
+            else
+                EventSystem.current.RaycastAll(pointer, results);
             return results;
         }
 
@@ -196,6 +199,7 @@ namespace PC.Component.Software
         {
             var os = operatingSystem;
             if (os == null) return false;
+            if (RemoteDesk.ForwardingSystem == os) return true;
 
             var board = os.Board;
             var monitor = board != null ? board.monitor : null;
@@ -476,6 +480,7 @@ namespace PC.Component.Software
 
             if (manager.SelectedCount > 0)
             {
+                AddMenuItem(menuPanel, "Open selected in RemoteDesk", manager.OpenInRemoteDesk);
                 AddMenuItem(menuPanel, "Power on selected", () => manager.RunSelected("startup"));
                 AddMenuItem(menuPanel, "EZ: Bitcoin (selected)", () => manager.RunSelected("bitcoin"));
                 AddMenuItem(menuPanel, "EZ: Money (selected)", () => manager.RunSelected("cash"));

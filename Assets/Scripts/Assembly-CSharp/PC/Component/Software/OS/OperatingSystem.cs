@@ -143,6 +143,9 @@ namespace PC.Component.Software.OS
 
         public int SystemId => Board.Id;
 
+        /// <summary>The attached monitor canvas, captured temporarily by RemoteDesk.</summary>
+        public Canvas RemoteCanvas => GetDesktopCanvas();
+
         protected override void BootSystem()
         {
             var apps = Resources.LoadAll<App>("apps");
@@ -760,6 +763,7 @@ namespace PC.Component.Software.OS
             RefreshDesktopIcon();
             EnsureViewer();
             EnsureDeviceManager();
+            EnsureRemoteDesk();
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
         }
 
@@ -794,6 +798,18 @@ namespace PC.Component.Software.OS
                 FileManager.Create(0, new File("Device Manager.exe", "", false,
                     prefab.size > 0 ? prefab.size : 203));
             AddApp("Device Manager");
+            RefreshDesktopIcon();
+        }
+
+        private void EnsureRemoteDesk()
+        {
+            App prefab;
+            if (FileManager == null || appPrefabs == null ||
+                !appPrefabs.TryGetValue("RemoteDesk", out prefab) || prefab == null) return;
+            if (!FileManager.Exists(0, "RemoteDesk.exe"))
+                FileManager.Create(0, new File("RemoteDesk.exe", "", false,
+                    prefab.size > 0 ? prefab.size : 280));
+            AddApp("RemoteDesk");
             RefreshDesktopIcon();
         }
 
