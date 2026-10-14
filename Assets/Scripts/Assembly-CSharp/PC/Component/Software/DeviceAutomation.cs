@@ -15,6 +15,31 @@ namespace PC.Component.Software
 
         public static Motherboard[] All() => UnityEngine.Object.FindObjectsOfType<Motherboard>();
 
+        // A Mini_ITX/ATX board is used by both kinds of device. Identify the
+        // chassis through its external slots, which Case attaches to the board
+        // when the board is plugged in. Never classify by motherboard.name.
+        public static bool IsMiner(Motherboard board)
+        {
+            if (board == null) return false;
+            Case chassis = null;
+            foreach (var slot in board.GetSlots(HardwareType.GPU))
+            {
+                if (slot == null) continue;
+                chassis = slot.GetComponentInParent<Case>();
+                if (chassis != null) break;
+            }
+            if (chassis == null)
+                foreach (var slot in board.GetSlots(HardwareType.Drive))
+                {
+                    if (slot == null) continue;
+                    chassis = slot.GetComponentInParent<Case>();
+                    if (chassis != null) break;
+                }
+            if (chassis == null) chassis = board.GetComponentInParent<Case>();
+            return chassis != null && (chassis.name.StartsWith("Miner", System.StringComparison.OrdinalIgnoreCase)
+                || chassis.name.StartsWith("BigMiner", System.StringComparison.OrdinalIgnoreCase));
+        }
+
         public static bool Supports(Motherboard board, string app)
         {
             if (board == null) return false;

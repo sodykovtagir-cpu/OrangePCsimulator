@@ -55,6 +55,32 @@ for required in ('Build script  1/3', 'Build script  2/3', 'Build script  3/3',
 label = manager.split('private Text Label(')[1].split('private Button Button(')[0]
 assert 'NewRect("Label"' in label and 'AddComponent<Text>()' in label
 assert 'Box("Label"' not in label and 'AddComponent<Image>()' not in label
+# The body follows the PCOS window on maximize/restore instead of scaling a dark,
+# fixed-width panel; controls/list resize and short wizard forms scroll.
+assert 'panel.anchorMin = Vector2.zero' in manager and 'panel.anchorMax = Vector2.one' in manager
+assert 'panel.offsetMin = new Vector2(8f, 8f)' in manager
+assert 'panel.offsetMax = new Vector2(-8f, -40f)' in manager
+assert 'panel.localScale = Vector3.one' in manager
+assert 'lastPanelSize = size' in manager and 'private void LateUpdate()' in manager
+assert 'MakeList(152, Mathf.Max(45f, H - 250f), W - 28f)' in manager
+assert 'MakeFormScroll(39, 322)' in manager and 'MakeFormScroll(39, 290)' in manager
+assert 'result.color = Ink' in label and 'highlighted ? Accent : Control' in manager
+assert 'private enum DeviceKind { All, PCs, Miners }' in manager
+assert 'RenderFilters(37)' in manager and 'RenderFilters(42)' in manager
+assert 'Visible(board.Id, board)' in manager and 'Visible(id, DeviceAutomation.Find(id))' in manager
+assert 'minerIds = new List<int>(minerIds)' in manager and 'pcIds = new List<int>(pcIds)' in manager
+assert 'if (!Visible(id, board)) continue;' in manager
+# Global presets must NOT use the registry or the current PC/miner tab.
+run_all = automation.split('public static int RunAll(')[1].split('public static bool Run(')[0]
+assert 'foreach (var board in All())' in run_all and 'Supports(board, app)' in run_all
+assert 'filter' not in manager.split('private void Preset(')[1].split('private void Discover(')[0]
+kind = automation.split('public static bool IsMiner(')[1].split('public static bool Supports(')[0]
+assert 'GetComponentInParent<Case>()' in kind and 'HardwareType.GPU' in kind
+assert '"Miner"' in kind and '"BigMiner"' in kind and 'board.name' not in kind
+case_guid = re.search(r'^guid: ([0-9a-f]{32})$',
+    (root / 'Assets/Scripts/Assembly-CSharp/PC/Component/Case.cs.meta').read_text(), re.M).group(1)
+for chassis in ('Miner', 'BigMiner'):
+    assert case_guid in read(f'Assets/Resources/components/{chassis}.prefab')
 # No prefab link ambiguity: the cloned chrome has a unique script GUID; originals unchanged.
 assert 'appName: My Devices' in read('Assets/Resources/apps/MyDevices.prefab')
 for new in ('DeviceManager.cs', 'DeviceAutomation.cs', 'OS/AutorunConfig.cs'):
