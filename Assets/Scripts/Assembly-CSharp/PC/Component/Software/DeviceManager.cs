@@ -39,11 +39,13 @@ namespace PC.Component.Software
         private InputField scriptNameInput;
         private Toggle autorun;
         private Font font;
-        // Match the white PCOS window and its grey controls / blue highlight.
-        private static readonly Color Background = new Color(.96f, .97f, .98f, 1f);
-        private static readonly Color Control = new Color(.89f, .91f, .93f, 1f);
-        private static readonly Color Ink = new Color(.15f, .19f, .23f, 1f);
-        private static readonly Color Accent = new Color(.4f, .74f, 1f, 1f);
+        // File Manager and the other PCOS windows use a white surface, neutral
+        // grey buttons and a pale selected control rather than blue panels.
+        private static readonly Color Background = Color.white;
+        private static readonly Color Control = new Color(.69f, .69f, .69f, 1f);
+        private static readonly Color Selected = new Color(.96f, .96f, .96f, 1f);
+        private static readonly Color Ink = new Color(.08f, .08f, .08f, 1f);
+        private static Sprite roundedButton;
         private float W => panel.rect.width;
         private float H => panel.rect.height;
 
@@ -190,22 +192,24 @@ namespace PC.Component.Software
 
         private void RenderHome()
         {
-            Label("Device Manager", 14, 5, W - 28, 28, 18);
-            RenderFilters(37);
+            // The window chrome already displays "Device Manager". Like the
+            // File Manager, begin with controls and label only the content area.
+            RenderFilters(10);
             float four = (W - 46f) / 4f;
-            Button("Build script", 14, 74, four, 31, () => { stage = 1; Render(); }, true);
-            Button("All: Bitcoin", 20 + four, 74, four, 31, () => Preset("bitcoin"));
-            Button("All: Money", 26 + four * 2, 74, four, 31, () => Preset("cash"));
-            Button("All: Video", 32 + four * 3, 74, four, 31, () => Preset("video"));
+            Button("Build script", 14, 50, four, 31, () => { stage = 1; Render(); });
+            Button("All: Bitcoin", 20 + four, 50, four, 31, () => Preset("bitcoin"));
+            Button("All: Money", 26 + four * 2, 50, four, 31, () => Preset("cash"));
+            Button("All: Video", 32 + four * 3, 50, four, 31, () => Preset("video"));
             float inputWidth = (W - 28) * .30f;
             float small = (W - 28 - inputWidth - 24) / 4f;
-            idInput = Input("System ID (hex)", 14, 113, inputWidth, 31);
+            idInput = Input("System ID (hex)", 14, 90, inputWidth, 31);
             idInput.text = idText;
-            Button("Add ID", 20 + inputWidth, 113, small, 31, AddId);
-            Button("Discover", 26 + inputWidth + small, 113, small, 31, Discover);
-            Button("Remove", 32 + inputWidth + small * 2, 113, small, 31, RemoveSelected);
-            Button("Refresh", 38 + inputWidth + small * 3, 113, small, 31, Render);
-            MakeList(152, Mathf.Max(45f, H - 250f), W - 28f);
+            Button("Add ID", 20 + inputWidth, 90, small, 31, AddId);
+            Button("Discover", 26 + inputWidth + small, 90, small, 31, Discover);
+            Button("Remove", 32 + inputWidth + small * 2, 90, small, 31, RemoveSelected);
+            Button("Refresh", 38 + inputWidth + small * 3, 90, small, 31, Render);
+            Label("Devices", 14, 128, W - 28, 27, 18);
+            MakeList(161, Mathf.Max(45f, H - 259f), W - 28f);
             foreach (int id in registered)
             {
                 int selectedId = id;
@@ -455,10 +459,46 @@ namespace PC.Component.Software
             return result;
         }
 
+        private static Sprite RoundedButton()
+        {
+            if (roundedButton != null) return roundedButton;
+            const int side = 20;
+            const float radius = 6f;
+            var texture = new Texture2D(side, side, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            for (int y = 0; y < side; y++)
+                for (int x = 0; x < side; x++)
+                {
+                    float dx = Mathf.Max(0f, radius - Mathf.Min(x + .5f, side - x - .5f));
+                    float dy = Mathf.Max(0f, radius - Mathf.Min(y + .5f, side - y - .5f));
+                    float alpha = Mathf.Clamp01(radius + .5f - Mathf.Sqrt(dx * dx + dy * dy));
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            texture.Apply();
+            roundedButton = Sprite.Create(texture, new Rect(0, 0, side, side),
+                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect,
+                new Vector4(radius, radius, radius, radius));
+            return roundedButton;
+        }
+
         private Button Button(string label, float x, float y, float w, float h,
             UnityEngine.Events.UnityAction click, bool highlighted = false)
         {
-            var rect = Box(label, controlHost, x, y, w, h, highlighted ? Accent : Control);
+            var rect = Box(label, controlHost, x, y, w, h, Control);
+            var image = rect.GetComponent<Image>();
+            image.sprite = RoundedButton();
+            image.type = Image.Type.Sliced;
+            if (highlighted)
+            {
+                // The native PCOS toolbar marks the active button with a pale
+                // inset and grey outline, not a saturated blue background.
+                var face = Box("Selected face", rect, 2, 2, w - 4, h - 4, Selected);
+                var inset = face.GetComponent<Image>();
+                inset.sprite = image.sprite;
+                inset.type = Image.Type.Sliced;
+                inset.raycastTarget = false;
+            }
             var button = rect.gameObject.AddComponent<Button>();
             button.onClick.AddListener(click);
             Label(label, 4, 0, w - 8, h, w < 75 ? 12 : 14, rect).alignment = TextAnchor.MiddleCenter;
@@ -467,7 +507,14 @@ namespace PC.Component.Software
 
         private InputField Input(string placeholder, float x, float y, float w, float h)
         {
-            var rect = Box("Input", controlHost, x, y, w, h, Color.white);
+            var rect = Box("Input", controlHost, x, y, w, h, Control);
+            var border = rect.GetComponent<Image>();
+            border.sprite = RoundedButton();
+            border.type = Image.Type.Sliced;
+            var face = Box("Input surface", rect, 2, 2, w - 4, h - 4, Color.white).GetComponent<Image>();
+            face.sprite = border.sprite;
+            face.type = Image.Type.Sliced;
+            face.raycastTarget = false;
             var input = rect.gameObject.AddComponent<InputField>();
             var text = Label("", 7, 0, w - 14, h, 15, rect);
             var hint = Label(placeholder, 7, 0, w - 14, h, 14, rect);
@@ -480,7 +527,7 @@ namespace PC.Component.Software
         private Toggle Toggle(string caption, float x, float y)
         {
             var box = Box("Checkbox", controlHost, x, y, 28, 28, Control);
-            var check = Box("Check", box, 6, 6, 16, 16, Color.green);
+            var check = Box("Check", box, 6, 6, 16, 16, Ink);
             var toggle = box.gameObject.AddComponent<Toggle>();
             toggle.targetGraphic = box.GetComponent<Image>();
             toggle.graphic = check.GetComponent<Image>();
@@ -526,8 +573,8 @@ namespace PC.Component.Software
         {
             int row = listContent.childCount;
             var rect = Box("Row", listContent, 0, row * 43, listWidth - 4, 41,
-                selected ? new Color(.79f, .89f, .98f, 1f) :
-                row % 2 == 0 ? new Color(.94f, .95f, .97f, 1f) : Color.white);
+                selected ? new Color(.86f, .86f, .86f, 1f) :
+                row % 2 == 0 ? new Color(.96f, .96f, .96f, 1f) : Color.white);
             var button = rect.gameObject.AddComponent<Button>();
             button.onClick.AddListener(click);
             Label(label, 8, 0, listWidth - 24, 40, 13, rect);

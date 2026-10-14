@@ -62,11 +62,15 @@ assert 'panel.offsetMin = new Vector2(8f, 8f)' in manager
 assert 'panel.offsetMax = new Vector2(-8f, -40f)' in manager
 assert 'panel.localScale = Vector3.one' in manager
 assert 'lastPanelSize = size' in manager and 'private void LateUpdate()' in manager
-assert 'MakeList(152, Mathf.Max(45f, H - 250f), W - 28f)' in manager
+assert 'MakeList(161, Mathf.Max(45f, H - 259f), W - 28f)' in manager
 assert 'MakeFormScroll(39, 322)' in manager and 'MakeFormScroll(39, 290)' in manager
-assert 'result.color = Ink' in label and 'highlighted ? Accent : Control' in manager
+assert 'result.color = Ink' in label and 'Background = Color.white' in manager
+assert 'Label("Device Manager"' not in manager and 'Label("Devices", 14, 128' in manager
+assert 'RoundedButton()' in manager and 'image.type = Image.Type.Sliced' in manager
+assert 'highlighted ? Accent : Control' not in manager and 'Color.green' not in manager
+assert 'selected ? new Color(.86f, .86f, .86f, 1f)' in manager
 assert 'private enum DeviceKind { All, PCs, Miners }' in manager
-assert 'RenderFilters(37)' in manager and 'RenderFilters(42)' in manager
+assert 'RenderFilters(10)' in manager and 'RenderFilters(42)' in manager
 assert 'Visible(board.Id, board)' in manager and 'Visible(id, DeviceAutomation.Find(id))' in manager
 assert 'minerIds = new List<int>(minerIds)' in manager and 'pcIds = new List<int>(pcIds)' in manager
 assert 'if (!Visible(id, board)) continue;' in manager
