@@ -28,7 +28,13 @@ def body(text, name):
 
 assert 'public class RemoteDesk : App' in app
 assert 'public class RemoteDeskSurface : MonoBehaviour' in surface
-assert 'public Canvas RemoteCanvas => GetDesktopCanvas()' in os
+assert 'public Canvas RemoteCanvas' in os
+remote_canvas = body(os, 'public Canvas RemoteCanvas')
+assert 'GetDesktopCanvas()' in remote_canvas
+assert 'new GameObject("RemoteDesk virtual display"' in remote_canvas
+assert 'desktopRect.SetParent(virtualRemoteCanvas.transform, false)' in remote_canvas
+assert 'virtualRemoteCanvas.renderMode = RenderMode.WorldSpace' in remote_canvas
+assert 'if (!Ready || Board == null || Board.monitor != null) return null;' in remote_canvas
 assert 'EnsureRemoteDesk();' in os
 assert 'appPrefabs.TryGetValue("RemoteDesk", out prefab)' in os
 assert 'system.TryLaunchApp("RemoteDesk", string.Join(",", ids.ToArray()))' in manager
@@ -45,10 +51,15 @@ assert 'Application.targetFrameRate' not in app and 'Time.captureFramerate' not 
 assert 'system.Fault();' in body(app, 'public override void Open(string content)')
 assert 'viewers[i].DisconnectSystem(system)' in app
 assert 'session.os.Ready' in body(app, 'private void LateUpdate()')
-assert 'captureCamera.Render()' in app and 'RenderTexture(640, 360' in app
+assert 'captureCamera.Render()' in app and 'new RenderTexture(640, height' in app
 capture = body(app, 'private void OnRemoteCanvas(Session session, Action action)')
-assert 'finally' in capture and 'canvas.renderMode = mode' in capture
-assert 'canvas.worldCamera = camera' in capture and 'root.sizeDelta = rootSize' in capture
+assert 'finally' in capture and 'canvas.worldCamera = original' in capture
+assert not re.search(r'canvas\.renderMode\s*=(?!=)', capture)
+renderer = body(app, 'private void Capture(Session session)')
+assert not re.search(r'canvas\.renderMode\s*=(?!=)', renderer)
+assert 'captureCamera.Render();' in renderer and 'displayCamera.Render();' in renderer
+assert 'Graphics.Blit(texture, session.frame)' in renderer
+assert 'rect.GetWorldCorners(screenCorners)' in body(app, 'private void ConfigureCamera(Session session)')
 assert 'new List<RaycastResult>()' in app and 'session.raycaster.Raycast(evt, hits)' in app
 for signal in ('pointerDownHandler', 'pointerUpHandler', 'pointerClickHandler',
                'beginDragHandler', 'dragHandler', 'endDragHandler', 'scrollHandler'):
@@ -60,9 +71,18 @@ assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position)' in 
 assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
 assert 'focusWatermark = Label(' in body(app, 'private void BuildUi()')
 assert 'Label(' not in body(app, 'private void RefreshLayout()').split('for (int i = 0; i < sessions.Count; i++)')[0]
-assert 'focusWatermark.gameObject.SetActive(!premium && focusedId != 0)' in app
+layout = body(app, 'private void RefreshLayout()')
+assert 'focusWatermark.gameObject.SetActive(!premium && focused)' in layout
+assert 'heading.gameObject.SetActive(!focused)' in layout
+for name in ('idInput', 'connectButton', 'gridButton', 'statusText'):
+    assert name + '.gameObject.SetActive(!focused)' in layout
+assert 'backButton.gameObject.SetActive(focused)' in layout
+assert '"Close", "Maximize", "Minimize"' in layout and 'button.gameObject.SetActive(!focused)' in layout
+assert 'focusRect.offsetMin = Vector2.zero' in layout
+assert 'focusViewport.offsetMin = Vector2.zero' in layout
+assert 'Button("X", card,' in layout and '() => Disconnect(chosen)' in layout
 assert 'AspectRatioFitter.AspectMode.FitInParent' in app
-assert 'int cols =' in body(app, 'private void RefreshLayout()')
+assert 'int cols =' in layout
 
 prefab = project / 'Assets/Resources/apps/RemoteDesk.prefab'
 raw = prefab.read_text()

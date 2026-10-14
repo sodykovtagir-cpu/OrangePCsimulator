@@ -143,8 +143,57 @@ namespace PC.Component.Software.OS
 
         public int SystemId => Board.Id;
 
-        /// <summary>The attached monitor canvas, captured temporarily by RemoteDesk.</summary>
-        public Canvas RemoteCanvas => GetDesktopCanvas();
+        // A headless PC still owns a real PCOS desktop. Attach its existing UI
+        // (not a copy) to an offscreen world-space canvas when RemoteDesk needs it.
+        private Canvas virtualRemoteCanvas;
+        private static int nextRemoteSlot;
+
+        public Canvas RemoteCanvas
+        {
+            get
+            {
+                var attached = GetDesktopCanvas();
+                if (attached != null) return attached;
+                if (!Ready || Board == null || Board.monitor != null) return null;
+                if (virtualRemoteCanvas == null)
+                {
+                    var go = new GameObject("RemoteDesk virtual display", typeof(RectTransform),
+                        typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+                    go.layer = 5;
+                    var rect = (RectTransform)go.transform;
+                    rect.SetParent(Board.transform, false);
+                    // Keep headless desktops out of the playable room. Individual
+                    // slots prevent another headless PC from appearing in this RT.
+                    rect.position = new Vector3(10000f + nextRemoteSlot++ * 10f, 10000f, 10000f);
+                    rect.rotation = Quaternion.identity;
+                    rect.sizeDelta = new Vector2(840f, 500f);
+                    rect.localScale = Vector3.one * .002f;
+                    virtualRemoteCanvas = go.GetComponent<Canvas>();
+                    virtualRemoteCanvas.renderMode = RenderMode.WorldSpace;
+                    virtualRemoteCanvas.worldCamera = Camera.main;
+                    var scaler = go.GetComponent<CanvasScaler>();
+                    scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                }
+                var desktopRect = transform as RectTransform;
+                if (desktopRect != null)
+                {
+                    desktopRect.SetParent(virtualRemoteCanvas.transform, false);
+                    desktopRect.anchorMin = Vector2.zero;
+                    desktopRect.anchorMax = Vector2.one;
+                    desktopRect.pivot = new Vector2(.5f, .5f);
+                    desktopRect.anchoredPosition = Vector2.zero;
+                    desktopRect.sizeDelta = Vector2.zero;
+                    desktopRect.localScale = Vector3.one;
+                    desktopRect.localRotation = Quaternion.identity;
+                }
+                return virtualRemoteCanvas;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (virtualRemoteCanvas != null) Destroy(virtualRemoteCanvas.gameObject);
+        }
 
         protected override void BootSystem()
         {

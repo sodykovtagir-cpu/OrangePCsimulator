@@ -42,6 +42,7 @@ namespace PC.Component.Software
         private Button connectButton;
         private Button gridButton;
         private Button proButton;
+        private Button backButton;
         private Text statusText;
         private Text heading;
         private GameObject gridPage;
@@ -55,6 +56,7 @@ namespace PC.Component.Software
         private bool premium;
         private bool built;
         private bool capturing;
+        private readonly Vector3[] screenCorners = new Vector3[4];
         private Vector2 lastSize;
         private int lastTotal = -1;
         private string status = "Enter a system ID or import the Device Manager selection.";
@@ -167,12 +169,27 @@ namespace PC.Component.Software
             var session = new Session {
                 id = id, board = board, os = remote, canvas = canvas,
                 raycaster = raycaster,
-                frame = new RenderTexture(640, 360, 16, RenderTextureFormat.ARGB32)
+                frame = CreateFrame(canvas)
             };
-            session.frame.Create();
             sessions.Add(session);
             status = "Connected to " + id.ToString("X8") + ".";
             RefreshLayout();
+        }
+
+        private static RenderTexture CreateFrame(Canvas canvas)
+        {
+            int height = 360;
+            // Textured monitors already render to their own RT; preserve their
+            // true aspect ratio rather than stretching a 2:1 screen to 16:9.
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera &&
+                canvas.worldCamera != null && canvas.worldCamera.targetTexture != null)
+            {
+                var source = canvas.worldCamera.targetTexture;
+                height = Mathf.Clamp(Mathf.RoundToInt(640f * source.height / source.width), 180, 720);
+            }
+            var frame = new RenderTexture(640, height, 16, RenderTextureFormat.ARGB32);
+            frame.Create();
+            return frame;
         }
 
         private void ConnectEntered()
@@ -198,9 +215,9 @@ namespace PC.Component.Software
             if (focusedId == session.id) focusedId = 0;
         }
 
-        private void RemoveFocused()
+        private void Disconnect(int id)
         {
-            var session = sessions.Find(s => s.id == focusedId);
+            var session = sessions.Find(s => s.id == id);
             if (session != null) RemoveSession(session);
             RefreshLayout();
         }
@@ -231,9 +248,27 @@ namespace PC.Component.Software
             {
                 var session = sessions[i];
                 if (session.board == null || session.os == null || !session.os.Ready ||
-                    session.canvas == null || session.board.System != session.os ||
-                    session.os.RemoteCanvas != session.canvas)
+                    session.board.System != session.os)
                 { RemoveSession(session); RefreshLayout(); continue; }
+                var liveCanvas = session.os.RemoteCanvas;
+                if (liveCanvas == null)
+                { RemoveSession(session); RefreshLayout(); continue; }
+                if (liveCanvas != session.canvas)
+                {
+                    if (session.desktopIcon != null) session.desktopIcon.EndRemoteDrag();
+                    session.canvas = liveCanvas;
+                    session.raycaster = liveCanvas.GetComponent<GraphicRaycaster>();
+                    if (session.raycaster == null)
+                    { RemoveSession(session); RefreshLayout(); continue; }
+                    var previousFrame = session.frame;
+                    session.frame = CreateFrame(liveCanvas);
+                    if (previousFrame != null) { previousFrame.Release(); Destroy(previousFrame); }
+                    session.pointer = null;
+                    session.desktopIcon = null;
+                    session.pressed = null;
+                    session.dragged = null;
+                    RefreshLayout();
+                }
                 if (now < session.nextFrame) continue;
                 // One shared refresh budget across all attached PCs/miners.
                 session.nextFrame = now + Mathf.Max(1, ActiveConnections) / SharedFramesPerSecond;
@@ -245,68 +280,95 @@ namespace PC.Component.Software
         {
             if (captureCamera != null) return;
             var go = new GameObject("RemoteDesk offscreen camera");
-            go.transform.position = new Vector3(10000, 10000, 10000);
-            go.transform.rotation = Quaternion.identity;
             captureCamera = go.AddComponent<Camera>();
             captureCamera.enabled = false;
+            captureCamera.orthographic = true;
             captureCamera.clearFlags = CameraClearFlags.SolidColor;
             captureCamera.backgroundColor = Color.black;
-            captureCamera.cullingMask = 1 << 5; // Unity UI layer only.
-            captureCamera.nearClipPlane = .05f;
-            captureCamera.farClipPlane = 10f;
+            captureCamera.cullingMask = 1 << 5; // UI layer only.
+            captureCamera.nearClipPlane = .01f;
+        }
+
+        // Render the EXISTING world-space UI from in front of its rectangle.
+        // Changing a monitor's Canvas.renderMode each frame broke both its own
+        // display and our texture; never change that mode for capture/input.
+        private void ConfigureCamera(Session session)
+        {
+            EnsureCamera();
+            var rect = session.canvas.transform as RectTransform;
+            if (rect == null) return;
+            rect.GetWorldCorners(screenCorners);
+            Vector3 right = screenCorners[3] - screenCorners[0];
+            Vector3 up = screenCorners[1] - screenCorners[0];
+            Vector3 normal = Vector3.Cross(right, up).normalized;
+            if (normal.sqrMagnitude < .5f) normal = rect.forward;
+            float width = right.magnitude;
+            float height = up.magnitude;
+            float depth = Mathf.Max(width, height) * 2f + .5f;
+            captureCamera.transform.position = (screenCorners[0] + screenCorners[2]) * .5f + normal * depth;
+            captureCamera.transform.rotation = Quaternion.LookRotation(-normal, up.normalized);
+            captureCamera.orthographicSize = Mathf.Max(height * .5f,
+                width * session.frame.height / (2f * session.frame.width)) * 1.01f;
+            captureCamera.farClipPlane = depth + Mathf.Max(width, height) + 1f;
         }
 
         private void OnRemoteCanvas(Session session, Action action)
         {
             if (capturing || session == null || session.canvas == null) return;
-            EnsureCamera();
             capturing = true;
             var canvas = session.canvas;
-            var mode = canvas.renderMode;
-            var camera = canvas.worldCamera;
-            float distance = canvas.planeDistance;
-            var root = canvas.transform as RectTransform;
-            Vector2 rootSize = root != null ? root.sizeDelta : Vector2.zero;
-            Vector2 rootPosition = root != null ? root.anchoredPosition : Vector2.zero;
-            Vector2 rootAnchorMin = root != null ? root.anchorMin : Vector2.zero;
-            Vector2 rootAnchorMax = root != null ? root.anchorMax : Vector2.zero;
-            Vector2 rootPivot = root != null ? root.pivot : Vector2.zero;
-            var texture = captureCamera.targetTexture;
+            var original = canvas.worldCamera;
             try
             {
-                captureCamera.targetTexture = session.frame;
-                canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                canvas.worldCamera = captureCamera;
-                canvas.planeDistance = 1f;
-                Canvas.ForceUpdateCanvases();
+                if (canvas.renderMode == RenderMode.WorldSpace)
+                {
+                    ConfigureCamera(session);
+                    captureCamera.targetTexture = session.frame;
+                    canvas.worldCamera = captureCamera; // raycaster only; no mode change
+                }
                 action();
             }
             finally
             {
-                canvas.renderMode = mode;
-                canvas.worldCamera = camera;
-                canvas.planeDistance = distance;
-                if (root != null)
-                {
-                    root.anchorMin = rootAnchorMin;
-                    root.anchorMax = rootAnchorMax;
-                    root.pivot = rootPivot;
-                    root.sizeDelta = rootSize;
-                    root.anchoredPosition = rootPosition;
-                }
-                captureCamera.targetTexture = texture;
-                Canvas.ForceUpdateCanvases();
+                if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+                    canvas.worldCamera = original;
+                if (captureCamera != null) captureCamera.targetTexture = null;
                 capturing = false;
             }
         }
 
         private void Capture(Session session)
         {
-            OnRemoteCanvas(session, () => captureCamera.Render());
+            var canvas = session.canvas;
+            Canvas.ForceUpdateCanvases();
+            if (canvas.renderMode == RenderMode.WorldSpace)
+            {
+                ConfigureCamera(session);
+                try
+                {
+                    captureCamera.targetTexture = session.frame;
+                    captureCamera.Render();
+                }
+                finally { captureCamera.targetTexture = null; }
+            }
+            else
+            {
+                // TexturedMonitor/Projector own a camera and an RT. Re-render
+                // that camera and copy its pixels; taking it over makes the
+                // physical monitor show a blank frame.
+                var displayCamera = canvas.worldCamera;
+                var texture = displayCamera != null ? displayCamera.targetTexture : null;
+                if (texture != null && displayCamera != captureCamera)
+                {
+                    if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
+                        displayCamera.Render();
+                    Graphics.Blit(texture, session.frame);
+                }
+            }
         }
 
         // Called by RemoteDeskSurface. Forward actual UGUI click/drag/scroll
-        // events to the remote OS while its canvas is mapped to the preview RT.
+        // to the remote OS in the camera's pixel coordinate space.
         public void Forward(int id, PointerEventData source, RectTransform surface, string phase)
         {
             var session = sessions.Find(s => s.id == id);
@@ -317,7 +379,12 @@ namespace PC.Component.Software
                 source.position, source.pressEventCamera, out local)) return;
             float u = Mathf.Clamp01(Mathf.InverseLerp(surface.rect.xMin, surface.rect.xMax, local.x));
             float v = Mathf.Clamp01(Mathf.InverseLerp(surface.rect.yMin, surface.rect.yMax, local.y));
-            Vector2 pos = new Vector2(u * session.frame.width, v * session.frame.height);
+            // Textured monitors raycast in THEIR camera's RT pixel space.
+            var eventTexture = session.canvas.renderMode == RenderMode.ScreenSpaceCamera &&
+                session.canvas.worldCamera != null ? session.canvas.worldCamera.targetTexture : null;
+            int eventWidth = eventTexture != null ? eventTexture.width : session.frame.width;
+            int eventHeight = eventTexture != null ? eventTexture.height : session.frame.height;
+            Vector2 pos = new Vector2(u * eventWidth, v * eventHeight);
             OnRemoteCanvas(session, () =>
             {
                 var previousSystem = ForwardingSystem;
@@ -435,6 +502,9 @@ namespace PC.Component.Software
             var title = transform.Find("Title");
             var t = title != null ? title.GetComponent<Text>() : null;
             font = t != null ? t.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+            backButton = Button("Back", transform, 220, 8, 100, 30,
+                () => { focusedId = 0; RefreshLayout(); });
+            backButton.gameObject.SetActive(false);
             panel = Box("RemoteDesk UI", transform, 8, 40, 604, 490, Color.white);
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.one;
@@ -459,16 +529,7 @@ namespace PC.Component.Software
             view.Init(this, 0);
             focusWatermark = Label("RemoteDesk FREE", focusImage.transform, 10, 10, 440, 38, 24);
             focusWatermark.alignment = TextAnchor.MiddleCenter;
-            var back = Button("Back to grid", focusRect, 0, 287, 136, 32,
-                () => { focusedId = 0; RefreshLayout(); });
-            var disconnect = Button("Disconnect", focusRect, 145, 287, 120, 32, RemoveFocused);
-            foreach (var item in new[] { back, disconnect })
-            {
-                var rt = item.GetComponent<RectTransform>();
-                rt.anchorMin = rt.anchorMax = Vector2.zero;
-                rt.pivot = Vector2.zero;
-                rt.anchoredPosition = new Vector2(item == back ? 0 : 145, 4);
-            }
+            focusWatermark.color = new Color(1f, 1f, 1f, .5f);
             gridViewport = Box("Grid viewport", gridPage.transform, 0, 0, 576, 280, Color.white);
             gridViewport.gameObject.AddComponent<RectMask2D>();
             gridContent = NewRect("Connected devices", gridViewport, 0, 0, 576, 0);
@@ -491,12 +552,35 @@ namespace PC.Component.Software
         private void RefreshLayout()
         {
             if (!built || panel == null) return;
+            var selected = sessions.Find(s => s.id == focusedId);
+            if (focusedId != 0 && selected == null) focusedId = 0;
+            bool focused = selected != null;
             float width = W - 28f;
             bool compact = W < 535f;
             heading.text = premium ? "Pro - unlimited, no watermark" :
                 "Free - watermark and 5 connections";
             heading.rectTransform.sizeDelta = new Vector2(width, 32);
-            proButton.gameObject.SetActive(!premium);
+            heading.gameObject.SetActive(!focused);
+            idInput.gameObject.SetActive(!focused);
+            connectButton.gameObject.SetActive(!focused);
+            gridButton.gameObject.SetActive(!focused);
+            proButton.gameObject.SetActive(!focused && !premium);
+            statusText.gameObject.SetActive(!focused);
+            backButton.gameObject.SetActive(focused);
+            // Full control shows the system title and Back only. Restore the
+            // normal window chrome as soon as the user returns to the grid.
+            foreach (string chrome in new[] { "Close", "Maximize", "Minimize" })
+            {
+                var button = transform.Find(chrome);
+                if (button != null) button.gameObject.SetActive(!focused);
+            }
+            if (focused)
+            {
+                var window = transform as RectTransform;
+                Place(backButton.GetComponent<RectTransform>(),
+                    window != null ? Mathf.Min(220f, Mathf.Max(160f, window.rect.width - 230f)) : 220f,
+                    8, 100, 30);
+            }
             float connectWidth = compact ? Mathf.Min(94, Mathf.Max(60, W * .28f)) : 94;
             float connectX = compact ? W - connectWidth - 14 : 175;
             Place(idInput.GetComponent<RectTransform>(), 14, 43,
@@ -509,13 +593,14 @@ namespace PC.Component.Software
             UpdateStatus();
             var gridRect = (RectTransform)gridPage.transform;
             var focusRect = (RectTransform)focusPage.transform;
-            foreach (var rt in new[] { gridRect, focusRect })
-            {
-                rt.anchorMin = Vector2.zero;
-                rt.anchorMax = Vector2.one;
-                rt.offsetMin = new Vector2(14, 52);
-                rt.offsetMax = new Vector2(-14, compact ? -166 : -115);
-            }
+            gridRect.anchorMin = Vector2.zero;
+            gridRect.anchorMax = Vector2.one;
+            gridRect.offsetMin = new Vector2(14, 52);
+            gridRect.offsetMax = new Vector2(-14, compact ? -166 : -115);
+            focusRect.anchorMin = Vector2.zero;
+            focusRect.anchorMax = Vector2.one;
+            focusRect.offsetMin = Vector2.zero;
+            focusRect.offsetMax = Vector2.zero;
             gridViewport.anchorMin = Vector2.zero;
             gridViewport.anchorMax = Vector2.one;
             gridViewport.offsetMin = Vector2.zero;
@@ -526,14 +611,16 @@ namespace PC.Component.Software
             gridContent.anchoredPosition = Vector2.zero;
             focusViewport.anchorMin = Vector2.zero;
             focusViewport.anchorMax = Vector2.one;
-            focusViewport.offsetMin = new Vector2(0, 42);
+            focusViewport.offsetMin = Vector2.zero;
             focusViewport.offsetMax = Vector2.zero;
-            focusPage.SetActive(focusedId != 0);
-            gridPage.SetActive(focusedId == 0);
-            var selected = sessions.Find(s => s.id == focusedId);
-            focusImage.texture = selected != null ? selected.frame : null;
+            focusPage.SetActive(focused);
+            gridPage.SetActive(!focused);
+            focusImage.texture = focused ? selected.frame : null;
+            if (focused)
+                focusImage.GetComponent<AspectRatioFitter>().aspectRatio =
+                    (float)selected.frame.width / selected.frame.height;
             var surface = focusImage.GetComponent<RemoteDeskSurface>();
-            if (surface != null) surface.Init(this, focusedId);
+            if (surface != null) surface.Init(this, focused ? focusedId : 0);
             for (int i = gridContent.childCount - 1; i >= 0; --i)
             {
                 var row = gridContent.GetChild(i);
@@ -551,20 +638,31 @@ namespace PC.Component.Software
                 int chosen = s.id;
                 var card = Box("Remote " + chosen.ToString("X8"), gridContent,
                     (i % cols) * (tileW + 8), (i / cols) * (tileH + 8), tileW, tileH, Grey);
-                var image = NewRect("Live view", card, 4, 4, tileW - 8, tileH - 41).gameObject.AddComponent<RawImage>();
+                var previewArea = Box("Live area", card, 4, 4, tileW - 8, tileH - 41, Color.black);
+                previewArea.GetComponent<Image>().raycastTarget = false;
+                var image = NewRect("Live view", previewArea, 0, 0, tileW - 8, tileH - 41)
+                    .gameObject.AddComponent<RawImage>();
                 image.texture = s.frame;
                 image.raycastTarget = false;
+                var previewFit = image.gameObject.AddComponent<AspectRatioFitter>();
+                previewFit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                previewFit.aspectRatio = (float)s.frame.width / s.frame.height;
                 var hit = card.gameObject.AddComponent<Button>();
                 hit.onClick.AddListener(() => { focusedId = chosen; RefreshLayout(); });
                 Label(chosen.ToString("X8") + "   " + (DeviceAutomation.IsMiner(s.board) ? "MINER" : "PC"),
-                    card, 5, tileH - 35, tileW - 10, 30, 14);
-                if (!premium) Label("RemoteDesk FREE", card, 8, tileH / 2 - 20, tileW - 16, 40, 16)
-                    .alignment = TextAnchor.MiddleCenter;
+                    card, 5, tileH - 35, tileW - 46, 30, 14);
+                Button("X", card, tileW - 35, tileH - 35, 30, 30, () => Disconnect(chosen));
+                if (!premium)
+                {
+                    var tileMark = Label("RemoteDesk FREE", card, 8, tileH / 2 - 20, tileW - 16, 40, 16);
+                    tileMark.alignment = TextAnchor.MiddleCenter;
+                    tileMark.color = new Color(1f, 1f, 1f, .5f);
+                }
             }
             gridContent.sizeDelta = new Vector2(0, Mathf.Ceil(sessions.Count / (float)cols) * (tileH + 8));
             // Keep one non-interactive watermark instead of creating another
             // Text every time a tile or window size changes.
-            focusWatermark.gameObject.SetActive(!premium && focusedId != 0);
+            focusWatermark.gameObject.SetActive(!premium && focused);
             var markRect = focusWatermark.rectTransform;
             markRect.anchorMin = new Vector2(0, 1);
             markRect.anchorMax = Vector2.one;
