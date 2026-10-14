@@ -175,11 +175,10 @@ namespace PC.Component.Software
             if (!Input.GetMouseButtonDown(1))
                 return;
 
-            if (IsPointerOverEmptyPane(Input.mousePosition))
-            {
-                var menu = DesktopContextMenu.For(this);
-                if (menu != null) menu.ShowExplorerMenu(this, Input.mousePosition);
-            }
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null && menu.CanReceiveAppPointer(this, Input.mousePosition)
+                && IsPointerOverEmptyPane(Input.mousePosition))
+                menu.ShowExplorerMenu(this, Input.mousePosition);
         }
 
         private bool IsPointerOverEmptyPane(Vector2 screenPos)
@@ -641,7 +640,7 @@ namespace PC.Component.Software
                 return;
 
             var context = DesktopContextMenu.For(this);
-            if (context != null && !context.CanReceivePointer(eventData.position)) return;
+            if (context != null && !context.CanReceiveAppPointer(explorer, eventData.position)) return;
             activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             isPointerDown = true;
@@ -675,7 +674,7 @@ namespace PC.Component.Software
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
             var menu = DesktopContextMenu.For(explorer != null ? (UnityEngine.Component)explorer : this);
-            if (menu != null)
+            if (menu != null && menu.CanReceiveAppPointer(explorer, pointerDownPos))
                 menu.ShowExplorerMenu(explorer, pointerDownPos);
         }
     }
@@ -703,7 +702,7 @@ namespace PC.Component.Software
                 return;
 
             var context = DesktopContextMenu.For(this);
-            if (context != null && !context.CanReceivePointer(eventData.position)) return;
+            if (context != null && !context.CanReceiveAppPointer(GetComponentInParent<FileManager>(), eventData.position)) return;
             activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             isPointerDown = true;
@@ -728,7 +727,7 @@ namespace PC.Component.Software
             if (eventData.button != PointerEventData.InputButton.Right) return;
             openedMenu = true;
             var menu = DesktopContextMenu.For(this);
-            if (menu != null)
+            if (menu != null && menu.CanReceiveAppPointer(GetComponentInParent<FileManager>(), eventData.position))
                 menu.ShowFileMenu(file, eventData.position);
         }
 
@@ -747,7 +746,7 @@ namespace PC.Component.Software
             isPointerDown = false;
             PointerInput.ConsumedClick = true;
             var menu = DesktopContextMenu.For(this);
-            if (menu != null)
+            if (menu != null && menu.CanReceiveAppPointer(GetComponentInParent<FileManager>(), pointerDownPos))
                 menu.ShowFileMenu(file, pointerDownPos);
         }
     }

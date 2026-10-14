@@ -94,7 +94,7 @@ namespace PC.Component.Software
                 isPointerDown = false;
                 PointerInput.ConsumedClick = true;
                 var menu = DesktopContextMenu.For(this);
-                if (menu != null && File != null)
+                if (menu != null && File != null && menu.CanReceiveDesktopPointer(current))
                     menu.ShowFileMenu(File, current);
             }
         }
@@ -105,7 +105,7 @@ namespace PC.Component.Software
                 return;
 
             var menu = DesktopContextMenu.For(this);
-            if (menu != null && !menu.CanReceivePointer(eventData.position)) return;
+            if (menu != null && !menu.CanReceiveDesktopPointer(eventData.position)) return;
             activePointerId = eventData.pointerId;
             PointerInput.ConsumedClick = false;
             pointerDownTime = Time.unscaledTime;
@@ -131,10 +131,11 @@ namespace PC.Component.Software
             if (eventData.dragging) return;
             if (DesktopIconDragger.IsDragging) return;
             if (openedMenu || PointerInput.ConsumedClick) return;
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null && !menu.CanReceiveDesktopPointer(eventData.position)) return;
 
             if (eventData.button == PointerEventData.InputButton.Right)
             {
-                var menu = DesktopContextMenu.For(this);
                 if (menu != null && File != null)
                     menu.ShowFileMenu(File, eventData.position);
                 return;

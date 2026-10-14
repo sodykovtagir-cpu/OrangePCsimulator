@@ -2185,6 +2185,26 @@ namespace PC.Component.Software.OS
                 RefreshStartMenu();
         }
 
+        /// <summary>Top visible PCOS window at a pointer, even if its content has no raycast Graphic.</summary>
+        public App TopWindowAtScreenPoint(Vector2 screenPosition, Camera eventCamera)
+        {
+            if (appParent == null) return null;
+            // UI raycasts can pass through a window's transparent content and
+            // hit a desktop icon/background. Window geometry is authoritative.
+            for (int i = appParent.childCount - 1; i >= 0; i--)
+            {
+                var child = appParent.GetChild(i);
+                if (child == null || !child.gameObject.activeInHierarchy) continue;
+                var app = child.GetComponent<App>();
+                if (app == null || !app.isActiveAndEnabled || app.IsMinimized) continue;
+                var window = child as RectTransform;
+                if (window != null && RectTransformUtility.RectangleContainsScreenPoint(
+                    window, screenPosition, eventCamera))
+                    return app;
+            }
+            return null;
+        }
+
         public bool BlocksDesktopMenu(GameObject go)
         {
             if (go == null) return false;

@@ -305,6 +305,8 @@ namespace PC.Component.Software
         public void ShowRowMenu(int id, Vector2 screenPos)
         {
             if (stage != 0) return;
+            var menu = DesktopContextMenu.For(this);
+            if (menu == null || !menu.CanReceiveAppPointer(this, screenPos)) return;
             // Right-clicking a member of a multiselection keeps the whole set.
             if (!selection.Contains(id)) { selection.Clear(); selection.Add(id); Render(); }
             ShowQuickMenu(screenPos);
@@ -314,7 +316,8 @@ namespace PC.Component.Software
         {
             if (stage != 0 || !gameObject.activeInHierarchy) return;
             var menu = DesktopContextMenu.For(this);
-            if (menu != null) menu.ShowDeviceManagerMenu(this, screenPos);
+            if (menu != null && menu.CanReceiveAppPointer(this, screenPos))
+                menu.ShowDeviceManagerMenu(this, screenPos);
         }
 
         public void ClearSelection() { selection.Clear(); Render(); }

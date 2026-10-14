@@ -153,10 +153,29 @@ namespace PC.Component.Software
             return os != null && os != operatingSystem;
         }
 
+        private App WindowAt(Vector2 screenPos)
+        {
+            EnsureRefs();
+            return operatingSystem != null
+                ? operatingSystem.TopWindowAtScreenPoint(screenPos, GetEventCamera()) : null;
+        }
+
+        public bool CanReceiveAppPointer(App app, Vector2 screenPos)
+        {
+            EnsureRefs();
+            return app != null && PointerHitsThisOs(screenPos) && WindowAt(screenPos) == app;
+        }
+
         public bool CanReceivePointer(Vector2 screenPos)
         {
             EnsureRefs();
             return PointerHitsThisOs(screenPos);
+        }
+
+        public bool CanReceiveDesktopPointer(Vector2 screenPos)
+        {
+            EnsureRefs();
+            return PointerHitsThisOs(screenPos) && WindowAt(screenPos) == null;
         }
 
         /// <summary>
@@ -221,6 +240,7 @@ namespace PC.Component.Software
 
         private bool CanOpenMenuAt(Vector2 screenPos)
         {
+            if (WindowAt(screenPos) != null) return false;
             var results = RaycastAt(screenPos);
             if (results.Count == 0 || PointerInput.HasBlockingGameControls(results))
                 return false;
@@ -266,6 +286,11 @@ namespace PC.Component.Software
         {
             if (!PointerHitsThisOs(screenPos) || IsPointerOverMenu(screenPos))
                 return;
+
+            // Do not search raycast hits *behind* a window: Video Player and
+            // other apps may have non-raycast content over desktop icons.
+            // File/Device Manager provide their own window-specific menus.
+            if (WindowAt(screenPos) != null) return;
 
             var icon = FindFileIconAt(screenPos);
             if (icon != null)
@@ -365,6 +390,9 @@ namespace PC.Component.Software
         public void ShowDesktopMenu(Vector2 screenPos, bool skipDesktopCheck)
         {
             CloseMenu();
+            // Both right-click and long-press call this (the latter skips the
+            // desktop raycast check). Neither may open through an app window.
+            if (WindowAt(screenPos) != null) return;
             lastMenuTime = Time.unscaledTime;
 
             if (!PrepareMenu(screenPos, skipDesktopCheck))

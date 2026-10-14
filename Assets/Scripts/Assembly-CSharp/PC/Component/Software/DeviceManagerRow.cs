@@ -31,7 +31,7 @@ namespace PC.Component.Software
         {
             if (!PointerInput.IsPrimary(data)) return;
             var menu = DesktopContextMenu.For(this);
-            if (menu != null && !menu.CanReceivePointer(data.position)) return;
+            if (menu != null && !menu.CanReceiveAppPointer(manager, data.position)) return;
             held = true;
             menuOpened = false;
             pointerId = data.pointerId;
@@ -48,6 +48,8 @@ namespace PC.Component.Software
         public void OnPointerClick(PointerEventData data)
         {
             if (manager == null || data == null) return;
+            var menu = DesktopContextMenu.For(this);
+            if (menu != null && !menu.CanReceiveAppPointer(manager, data.position)) return;
             if (data.button == PointerEventData.InputButton.Right)
                 manager.ShowRowMenu(systemId, data.position);
             else if (PointerInput.IsPrimary(data) && !menuOpened && !PointerInput.ConsumedClick)
