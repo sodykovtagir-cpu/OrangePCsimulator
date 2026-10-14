@@ -47,37 +47,81 @@ for required in ('remote-all', 'cmd == "launch"', 'cmd == "open" || cmd == "run"
                  'scriptDepth >= 4', 'DeviceAutomation.Run(this.system, mb, next, argument)',
                  'os.SystemId == id', 'system.RunLua(file.content, null)'):
     assert required in terminal, required
-for required in ('Build script  1/3', 'Build script  2/3', 'Build script  3/3',
-                 'System ID (hex)', 'Saved', 'DeviceAutomation.All()', 'All: Bitcoin',
-                 'All: Money', 'All: Video', 'remote-all ', '".tmn"', 'AutorunConfig.AppendCommand'):
-    assert required in manager, required
-# Unity UGUI permits just one Graphic (Image or Text) per GameObject.
-label = manager.split('private Text Label(')[1].split('private Button Button(')[0]
-assert 'NewRect("Label"' in label and 'AddComponent<Text>()' in label
-assert 'Box("Label"' not in label and 'AddComponent<Image>()' not in label
-# The body follows the PCOS window on maximize/restore instead of scaling a dark,
-# fixed-width panel; controls/list resize and short wizard forms scroll.
-assert 'panel.anchorMin = Vector2.zero' in manager and 'panel.anchorMax = Vector2.one' in manager
-assert 'panel.offsetMin = new Vector2(8f, 8f)' in manager
-assert 'panel.offsetMax = new Vector2(-8f, -40f)' in manager
-assert 'panel.localScale = Vector3.one' in manager
-assert 'lastPanelSize = size' in manager and 'private void LateUpdate()' in manager
-assert 'MakeList(161, Mathf.Max(45f, H - 259f), W - 28f)' in manager
-assert 'MakeFormScroll(39, 322)' in manager and 'MakeFormScroll(39, 290)' in manager
-assert 'result.color = Ink' in label and 'Background = Color.white' in manager
-assert 'Label("Device Manager"' not in manager and 'Label("Devices", 14, 128' in manager
-assert 'RoundedButton()' in manager and 'image.type = Image.Type.Sliced' in manager
-assert 'highlighted ? Accent : Control' not in manager and 'Color.green' not in manager
-assert 'selected ? new Color(.86f, .86f, .86f, 1f)' in manager
-assert 'private enum DeviceKind { All, PCs, Miners }' in manager
-assert 'RenderFilters(10)' in manager and 'RenderFilters(42)' in manager
-assert 'Visible(board.Id, board)' in manager and 'Visible(id, DeviceAutomation.Find(id))' in manager
-assert 'minerIds = new List<int>(minerIds)' in manager and 'pcIds = new List<int>(pcIds)' in manager
-assert 'if (!Visible(id, board)) continue;' in manager
-# Global presets must NOT use the registry or the current PC/miner tab.
+# Layout and controls must be real, editable objects in the Unity prefab.
+from test_localization import docs, references
+objects = docs(root / 'Assets/Resources/apps/DeviceManager.prefab')
+by_name = {v['m_Name']: (fid, v) for fid, (typ, v) in objects.items() if typ == 1}
+manager_component = next(v for typ, v in objects.values()
+    if typ == 114 and v.get('m_Script', {}).get('guid') ==
+    'f47a1261e8294beaaa969284b739411c')
+required_fields = ('body', 'homePage', 'targetPage', 'actionPage', 'exportPage',
+    'homeAll', 'homePCs', 'homeMiners', 'selectVisibleButton', 'homeScroll',
+    'homeRows', 'homeStatus', 'targetAll', 'targetPCs', 'targetMiners',
+    'targetSelectVisible', 'targetRows', 'targetCount', 'actionButtons',
+    'worldToggle', 'argumentInput', 'autorun', 'scriptNameInput', 'rowTemplate')
+for field in required_fields:
+    value = manager_component[field]
+    links = value if isinstance(value, list) else [value]
+    assert links and all(link['fileID'] in objects for link in links), field
+assert len(manager_component['actionButtons']) == 6
+for field in ('homeAll','homePCs','homeMiners','buildButton','selectVisibleButton',
+              'discoverButton','removeButton','targetSelectVisible','targetBack',
+              'actionBack','exportButton'):
+    assert objects[manager_component[field]['fileID']][1]['m_Script']['guid'] == '4e29b1a8efbd4b44bb3f3716e73f07ff', field
+for field in ('idInput','argumentInput','scriptNameInput'):
+    assert objects[manager_component[field]['fileID']][1]['m_Script']['guid'] == 'd199490a83bb2b844b9695cbf13b01ef', field
+for field in ('worldToggle','autorun'):
+    assert objects[manager_component[field]['fileID']][1]['m_Script']['guid'] == '9085046f02f69544eb97fd06b6048fe2', field
+assert objects[manager_component['body']['fileID']][0] == 224
+assert all(by_name[page][1]['m_IsActive'] == 0 for page in ('Targets','Action','Export','Row Template — edit for all list entries'))
+assert by_name['Home'][1]['m_IsActive'] == 1
+assert 'Scroll View' not in by_name and 'Refresh' not in by_name  # retired wireless UI
+for fid, (typ, value) in objects.items():
+    # No two Graphic components (Text/Image) on the same GameObject.
+    if typ != 1: continue
+    scripts = [objects[c['component']['fileID']][1].get('m_Script', {}).get('guid')
+               for c in value['m_Component'] if objects[c['component']['fileID']][0] == 114]
+    assert not {'fe87c0e1cc204ed48ad3b37840f39efc',
+                '5f7201a12d95ffc409449d95f23cf332'} <= set(scripts), value['m_Name']
+for typ, value in objects.values():
+    for link in references(value):
+        if link.get('fileID', 0) != 0 and not link.get('guid'):
+            assert link['fileID'] in objects, link
+assert 'm_Name: Manager UI' in prefab and 'm_Name: Row Template' in prefab
+assert 'All: Bitcoin' not in prefab and 'All: Money' not in prefab and 'All: Video' not in prefab
+# Lists pin their content to the top; changing content height cannot jump its first row.
+for name in ('Content for Home list', 'Content for Targets list'):
+    content = by_name[name][1]
+    rt = objects[content['m_Component'][0]['component']['fileID']][1]
+    assert rt['m_Pivot']['y'] == 1 and rt['m_AnchoredPosition']['y'] == 0
+home_children = objects[manager_component['homePage']['fileID']][1]['m_Component'][0]['component']['fileID']
+home_rect = objects[home_children][1]
+home_names = {objects[objects[c['fileID']][1]['m_GameObject']['fileID']][1]['m_Name']
+              for c in home_rect['m_Children']}
+assert {'buildButton', 'selectVisibleButton', 'discoverButton', 'removeButton', 'refreshButton'} <= home_names
+assert all('EZ:' not in name and 'Power on' not in name for name in home_names)
+row_component = objects[manager_component['rowTemplate']['fileID']][1]
+assert row_component['m_Script']['guid'] == 'a6797268eb4f4cfdaf3af7584db313e0'
+assert all(row_component[field]['fileID'] in objects for field in ('background', 'label'))
+assert 'Button(' not in manager and 'NewRect(' not in manager and 'MakeList(' not in manager
+assert 'Instantiate(rowTemplate, parent)' in manager and 'selection.Add(id)' in manager
+assert 'if (Visible(id, DeviceAutomation.Find(id)))' in manager
+assert 'DeviceAutomation.RunAll(system, what)' in manager
+assert 'body == null || rowTemplate == null' in manager
+assert 'remote-all ' in manager and 'AutorunConfig.AppendCommand' in manager
+row = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/DeviceManagerRow.cs')
+pane = read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/DeviceManagerPane.cs')
+menu = read('Assets/Scripts/Assembly-CSharp/DesktopContextMenu.cs')
+assert 'IPointerClickHandler' in row and 'PointerInput.LongPress' in row
+assert 'class DeviceManagerPane' in pane and 'PointerInput.LongPress' in pane
+assert 'ShowDeviceManagerMenu' in menu and 'AddMenuItemWithSubmenu(menuPanel, "All suitable devices"' in menu
+for action_name in ('startup','bitcoin','cash','video','shutdown'):
+    assert 'manager.RunSelected("'+action_name+'")' in menu
+assert all('manager.RunGlobal("'+x+'")' in menu for x in ('bitcoin','cash','video'))
+# World actions never depend on registry, visible tab or current selection.
 run_all = automation.split('public static int RunAll(')[1].split('public static bool Run(')[0]
 assert 'foreach (var board in All())' in run_all and 'Supports(board, app)' in run_all
-assert 'filter' not in manager.split('private void Preset(')[1].split('private void Discover(')[0]
+assert 'filter' not in manager.split('public void RunGlobal(')[1].split('private void Export(')[0]
 kind = automation.split('public static bool IsMiner(')[1].split('public static bool Supports(')[0]
 assert 'GetComponentInParent<Case>()' in kind and 'HardwareType.GPU' in kind
 assert '"Miner"' in kind and '"BigMiner"' in kind and 'board.name' not in kind
@@ -87,10 +131,10 @@ for chassis in ('Miner', 'BigMiner'):
     assert case_guid in read(f'Assets/Resources/components/{chassis}.prefab')
 # No prefab link ambiguity: the cloned chrome has a unique script GUID; originals unchanged.
 assert 'appName: My Devices' in read('Assets/Resources/apps/MyDevices.prefab')
-for new in ('DeviceManager.cs', 'DeviceAutomation.cs', 'OS/AutorunConfig.cs'):
+for new in ('DeviceManager.cs', 'DeviceManagerRow.cs', 'DeviceManagerPane.cs', 'DeviceAutomation.cs', 'OS/AutorunConfig.cs'):
     source = code / new
     guid = re.search(r'^guid: ([0-9a-f]{32})$', source.with_suffix('.cs.meta').read_text(), re.M).group(1)
     assert len(guid) == 32
     if source.name == 'DeviceManager.cs':
         assert guid in prefab
-print('PASS: separate device manager, world presets, .tmn export/autorun, EZ mining args, staged BSOD')
+print('PASS: prefab-editable Device Manager, multiselection/context actions, world presets, .tmn/autorun')

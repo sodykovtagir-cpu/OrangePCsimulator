@@ -439,6 +439,30 @@ namespace PC.Component.Software
             PositionMenu(menuRect, screenPos);
         }
 
+        /// <summary>File Manager's popup style reused for Device Manager actions.</summary>
+        public void ShowDeviceManagerMenu(DeviceManager manager, Vector2 screenPos)
+        {
+            if (manager == null) return;
+            CloseMenu();
+            if (!PrepareMenu(screenPos, true)) return;
+
+            if (manager.SelectedCount > 0)
+            {
+                AddMenuItem(menuPanel, "Power on selected", () => manager.RunSelected("startup"));
+                AddMenuItem(menuPanel, "EZ: Bitcoin (selected)", () => manager.RunSelected("bitcoin"));
+                AddMenuItem(menuPanel, "EZ: Money (selected)", () => manager.RunSelected("cash"));
+                AddMenuItem(menuPanel, "Video Player (selected)", () => manager.RunSelected("video"));
+                AddMenuItem(menuPanel, "Power off selected", () => manager.RunSelected("shutdown"));
+                AddMenuItem(menuPanel, "Clear selection", manager.ClearSelection);
+            }
+            AddMenuItemWithSubmenu(menuPanel, "All suitable devices", new (string, System.Action)[] {
+                ("EZ: Bitcoin (world)", () => manager.RunGlobal("bitcoin")),
+                ("EZ: Money (world)", () => manager.RunGlobal("cash")),
+                ("Video Player (world)", () => manager.RunGlobal("video"))
+            });
+            PositionMenu(menuRect, screenPos);
+        }
+
         public void ShowExplorerMenu(FileManager explorer, Vector2 screenPos)
         {
             if (explorer == null) return;
