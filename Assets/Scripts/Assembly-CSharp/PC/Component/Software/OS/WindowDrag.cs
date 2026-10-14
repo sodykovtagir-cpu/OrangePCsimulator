@@ -15,7 +15,6 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
     private RectTransform window;
     private RectTransform parentRect;
     private Canvas canvas;
-    private Camera uiCamera;
     private Vector2 pointerOffset;
 
     // Эффект артефактов монитора: окно стирает выпавшие блоки видеопамяти.
@@ -43,9 +42,6 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
         {
             parentRect = window.parent as RectTransform;
             canvas = window.GetComponentInParent<Canvas>();
-
-            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                uiCamera = canvas.worldCamera;
         }
     }
 
@@ -55,8 +51,12 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
 
         window.SetAsLastSibling();
 
+        // The canvas may be temporarily mapped to RemoteDesk's render camera.
+        // Use its CURRENT camera, not the one cached when the window opened.
+        var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera : null;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            window, eventData.position, uiCamera, out pointerOffset);
+            window, eventData.position, eventCamera, out pointerOffset);
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -68,8 +68,10 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
             return;
 
         Vector2 localPointerPos;
+        var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera : null;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                parentRect, eventData.position, uiCamera, out localPointerPos))
+                parentRect, eventData.position, eventCamera, out localPointerPos))
             return;
 
         // Сначала ставим окно под курсор, затем жёстко удерживаем ЗАГОЛОВОК внутри.

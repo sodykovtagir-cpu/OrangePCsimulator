@@ -322,6 +322,19 @@ namespace PC.Component.Software
 
         public void ClearSelection() { selection.Clear(); Render(); }
 
+        public void OpenInRemoteDesk()
+        {
+            if (system == null || selection.Count == 0) return;
+            var ids = new List<string>();
+            foreach (int id in selection)
+                if (registered.Contains(id)) ids.Add(id.ToString("X8"));
+            if (!system.TryLaunchApp("RemoteDesk", string.Join(",", ids.ToArray())))
+            {
+                status = "RemoteDesk is not installed on this PC";
+                Render();
+            }
+        }
+
         private void SelectVisible()
         {
             foreach (int id in registered)

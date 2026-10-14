@@ -17,6 +17,7 @@ namespace PC.Component.Software
         private Vector2 pointerDownPos;
         private bool hasDragged;
         private bool pointerDownReceived;
+        private bool remotePointerActive;
         private RenderMode pointerDownRenderMode;
         private Vector2 pointerDownViewportSize;
 
@@ -55,7 +56,7 @@ namespace PC.Component.Software
                 Init();
                 return;
             }
-            if (!pointerDownReceived) return;
+            if (!pointerDownReceived || remotePointerActive) return;
 
             // If focus/viewport changes mid-drag, finish at the last desktop position.
             // Do not reinterpret the old pointer using the new monitor's camera/scale.
@@ -93,6 +94,43 @@ namespace PC.Component.Software
                 if (isDragging) OnDragEnd();
                 else ResetPointerState();
             }
+        }
+
+        // RemoteDesk forwards screen coordinates while the remote canvas is
+        // mapped to its render camera. Input.mousePosition is the LOCAL cursor
+        // and must never be used to move a remotely controlled desktop icon.
+        public void BeginRemoteDrag()
+        {
+            // OnPointerDown has already been delivered via ExecuteEvents.
+            if (pointerDownReceived) remotePointerActive = true;
+        }
+
+        public void MoveRemoteDrag(Vector2 position)
+        {
+            if (!remotePointerActive || !pointerDownReceived || parentRect == null) return;
+            if (!hasDragged && Vector2.Distance(position, pointerDownPos) > PointerInput.Slop)
+            {
+                hasDragged = true;
+                isDragging = true;
+                IsDragging = true;
+                Vector2 origin;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, position, GetRenderCamera(), out origin))
+                    dragOffset = origin - rectTransform.anchoredPosition;
+            }
+            if (!isDragging) return;
+            Vector2 local;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect, position, GetRenderCamera(), out local))
+                rectTransform.anchoredPosition = local - dragOffset;
+        }
+
+        public void EndRemoteDrag()
+        {
+            if (!remotePointerActive) return;
+            if (isDragging) OnDragEnd();
+            else ResetPointerState();
+            remotePointerActive = false;
         }
 
         private void ResetPointerState()
