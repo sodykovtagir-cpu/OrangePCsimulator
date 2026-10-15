@@ -30,7 +30,10 @@ namespace PC.Component.Software
         {
             if (string.IsNullOrEmpty(ext)) return false;
             return ext.Equals(".pic", StringComparison.OrdinalIgnoreCase)
-                || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase);
+                || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".png", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase);
         }
 
         public override void Open(string content)

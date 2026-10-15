@@ -1230,6 +1230,11 @@ namespace PC.Component.Software.OS
             if (prefab != null)
             {
                 LaunchApp(prefab, file.content ?? "");
+                if (prefab.AppName == "Text Editor")
+                {
+                    var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                    if (editor != null) editor.OpenDocument(file);
+                }
                 return true;
             }
 
@@ -1300,7 +1305,8 @@ namespace PC.Component.Software.OS
 
             void Add(string name)
             {
-                if (string.IsNullOrEmpty(name) || !appPrefabs.TryGetValue(name, out var app) || app == null)
+                if (string.IsNullOrEmpty(name) || !IsAppInstalled(name) ||
+                    !appPrefabs.TryGetValue(name, out var app) || app == null)
                     return;
                 if (!result.Contains(app))
                     result.Add(app);
@@ -1316,9 +1322,8 @@ namespace PC.Component.Software.OS
                 if (match) Add(app.AppName);
             }
 
-            if (ext.Equals(".pic", StringComparison.OrdinalIgnoreCase)
-                || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase))
-                Add("Viewer");
+            // Prefer the built-in viewer over unrelated editors for photos.
+            if (ViewerSupports(ext)) Add("Viewer");
 
             if (IsTextLikeExtension(ext))
             {
@@ -1338,9 +1343,24 @@ namespace PC.Component.Software.OS
                 || ext.Equals(".conf", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool ViewerSupports(string ext)
+        {
+            return string.Equals(ext, ".pic", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".mov", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase);
+        }
+
         private App FindInstalledAppForExtension(string ext)
         {
             if (string.IsNullOrEmpty(ext) || appPrefabs == null || installedApps == null) return null;
+            // Viewer ships with PCOS, but its prefab does not declare FileName.
+            // CanOpenExtension must participate in the *installed* lookup too.
+            App viewer;
+            if (ViewerSupports(ext) && IsAppInstalled("Viewer") &&
+                appPrefabs.TryGetValue("Viewer", out viewer) && viewer != null)
+                return viewer;
 
             for (int i = 0; i < installedApps.Count; i++)
             {
@@ -1349,7 +1369,18 @@ namespace PC.Component.Software.OS
                 if (string.Equals(installed.FileName, ext, StringComparison.OrdinalIgnoreCase))
                     return installed;
             }
-
+            // If Lua Editor was not installed, text-like documents are still
+            // readable through the installed Text Editor (without auto-installing Lua).
+            App textEditor;
+            if (IsTextLikeExtension(ext) && IsAppInstalled("Text Editor") &&
+                appPrefabs.TryGetValue("Text Editor", out textEditor) && textEditor != null)
+                return textEditor;
+            for (int i = 0; i < installedApps.Count; i++)
+            {
+                App installed;
+                if (appPrefabs.TryGetValue(installedApps[i], out installed) &&
+                    installed != null && installed.CanOpenExtension(ext)) return installed;
+            }
             return null;
         }
 
@@ -1378,8 +1409,8 @@ namespace PC.Component.Software.OS
             {
                 var app = kvp.Value;
                 if (app == null) continue;
-                if (string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase))
-                    return app;
+                if (string.Equals(app.FileName, ext, StringComparison.OrdinalIgnoreCase) ||
+                    app.CanOpenExtension(ext)) return app;
             }
 
             return null;

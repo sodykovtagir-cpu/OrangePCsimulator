@@ -11,7 +11,7 @@ public class ListView : MonoBehaviour
 	[SerializeField]
 	private Transform itemParent;
 
-	private int selectedIndex;
+	private int selectedIndex = -1;
 
 	private List<ListViewElement> items = new List<ListViewElement>();
 
@@ -80,7 +80,11 @@ public class ListView : MonoBehaviour
 	{
 		if (items == null) return;
 		foreach (var e in items)
-			if (e != null && e.gameObject != null) Destroy(e.gameObject);
+			if (e != null && e.gameObject != null)
+			{
+				e.gameObject.SetActive(false);
+				Destroy(e.gameObject);
+			}
 		items.Clear();
 		if (selectedIndex != -1)
 		{

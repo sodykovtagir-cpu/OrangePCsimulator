@@ -5,115 +5,145 @@ using UnityEngine.UI;
 
 namespace PC.Component.Software.OS
 {
-	public class OpenDialog : MonoBehaviour
-	{
-		[SerializeField]
-		private OperatingSystem system;
+    /// <summary>Shared PCOS picker: folders are navigable in every app that uses SelectFile.</summary>
+    public class OpenDialog : MonoBehaviour
+    {
+        [SerializeField] private OperatingSystem system;
+        [SerializeField] private ListView listView;
+        [SerializeField] private Button selectButton;
 
-		[SerializeField]
-		private ListView listView;
+        // Null is the synthetic ".." parent entry; actual folders are File entries.
+        private File[] files;
+        private string[] extensions;
+        private string currentFolder = "";
+        private Action<File> fileSelected;
+        private int lastClick = -1;
+        private float lastClickTime;
 
-		[SerializeField]
-		private Button selectButton;
+        private void Awake()
+        {
+            if (listView != null) listView.SelectedIndexChanged += SelectedIndexChanged;
+        }
 
-		private File[] files;
+        private void SelectedIndexChanged(int index)
+        {
+            if (selectButton != null)
+                selectButton.interactable = files != null && index >= 0 && index < files.Length;
+            // Double-click/double-tap enters folders; single-click and Select
+            // still work on touch devices. Never send a folder to an app.
+            if (files == null || index < 0 || index >= files.Length) return;
+            if (index == lastClick && Time.unscaledTime - lastClickTime < .35f &&
+                (files[index] == null || files[index].isFolder))
+            {
+                Enter(index);
+                return;
+            }
+            lastClick = index;
+            lastClickTime = Time.unscaledTime;
+        }
 
-		private Action<File> fileSelected;
+        public void SelectFile(string extension, Action<File> selected)
+        {
+            SelectFile(new[] { extension }, selected);
+        }
 
-		private void Awake()
-		{
-			if (listView != null) listView.SelectedIndexChanged += SelectedIndexChanged;
-		}
+        public void SelectFile(string[] filters, Action<File> selected)
+        {
+            fileSelected = selected;
+            extensions = filters;
+            currentFolder = "";
+            Fill();
+            gameObject.SetActive(true);
+            transform.SetAsLastSibling();
+        }
 
-		private void SelectedIndexChanged(int index)
-		{
-			var lv = listView;
-			var btn = selectButton;
-			if (lv != null && btn != null) btn.interactable = lv.SelectedIndex != -1;
-		}
+        private void Fill()
+        {
+            var lv = listView;
+            if (lv == null) return;
+            files = null;
+            lastClick = -1;
+            lv.Clear();
+            if (selectButton != null) selectButton.interactable = false;
 
-		public void SelectFile(string extension, Action<File> fileSelected)
-		{
-			SelectFile(new[] { extension }, fileSelected);
-		}
+            var sys = system;
+            var all = sys != null ? sys.AllStorage : null;
+            var storage = all != null && all.Count > 0 ? all[0] : null;
+            var source = storage != null ? storage.files : null;
+            if (source == null) return;
 
-		public void SelectFile(string[] extensions, Action<File> fileSelected)
-		{
-			this.fileSelected = fileSelected;
+            var entries = new List<File>();
+            if (!string.IsNullOrEmpty(currentFolder))
+            {
+                entries.Add(null);
+                lv.Add(new ListViewItem("../  Back (" + currentFolder + ")", null));
+            }
+            bool any = extensions == null || extensions.Length == 0;
+            if (!any)
+                foreach (string filter in extensions)
+                    if (filter == "*") { any = true; break; }
 
-			var lv = listView;
-			if (lv == null) return;
-			lv.Clear();
+            // List only immediate children; folders stay visible even when the
+            // requested file type is filtered out, so nested files are reachable.
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var f in source)
+                {
+                    if (f == null || f.hidden || string.IsNullOrEmpty(f.path)) continue;
+                    int slash = f.path.LastIndexOf('/');
+                    string parent = slash < 0 ? "" : f.path.Substring(0, slash);
+                    if (!string.Equals(parent, currentFolder, StringComparison.Ordinal)) continue;
+                    if (f.isFolder != (pass == 0)) continue;
+                    if (!f.isFolder && !any && !MatchesAny(f.Extension(), extensions)) continue;
+                    entries.Add(f);
+                    string name = slash < 0 ? f.path : f.path.Substring(slash + 1);
+                    lv.Add(new ListViewItem(f.isFolder ? "[Folder] " + name : name,
+                        sys.GetFileSprite(f.path)));
+                }
+            files = entries.ToArray();
+        }
 
-			var sys = system;
-			if (sys == null) return;
+        private static bool MatchesAny(string ext, string[] filters)
+        {
+            if (filters == null) return false;
+            foreach (string filter in filters)
+                if (string.Equals(ext, filter, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
 
-			var all = sys.AllStorage;
-			if (all == null || all.Count == 0) return;
+        private bool Enter(int index)
+        {
+            var entries = files;
+            if (entries == null || index < 0 || index >= entries.Length) return false;
+            var folder = entries[index];
+            if (folder != null && !folder.isFolder) return false;
+            if (folder != null) currentFolder = folder.path;
+            else
+            {
+                int slash = currentFolder.LastIndexOf('/');
+                currentFolder = slash < 0 ? "" : currentFolder.Substring(0, slash);
+            }
+            Fill();
+            return true;
+        }
 
-			var storage = all[0];
-			var src = storage != null ? storage.files : null;
-			if (src == null) return;
+        public void Select()
+        {
+            int index = listView != null ? listView.SelectedIndex : -1;
+            if (Enter(index)) return;
+            var entries = files;
+            if (entries == null || index < 0 || index >= entries.Length) return;
+            var picked = entries[index];
+            if (picked == null || picked.isFolder) return;
+            gameObject.SetActive(false);
+            var callback = fileSelected;
+            fileSelected = null;
+            if (callback != null) callback(picked);
+        }
 
-			var list = new List<File>();
-			bool any = extensions == null || extensions.Length == 0;
-			if (!any)
-			{
-				for (int i = 0; i < extensions.Length; i++)
-				{
-					if (extensions[i] == "*") { any = true; break; }
-				}
-			}
-
-			for (int i = 0; i < src.Count; i++)
-			{
-				var f = src[i];
-				if (f == null || f.hidden) continue;
-				if (any || MatchesAny(f.Extension(), extensions)) list.Add(f);
-			}
-
-			files = list.ToArray();
-
-			for (int i = 0; i < files.Length; i++)
-			{
-				var f = files[i];
-				var icon = sys.GetFileSprite(f.path);
-				lv.Add(new ListViewItem(f.path, icon));
-			}
-
-			var go = gameObject;
-			if (go != null) go.SetActive(true);
-		}
-
-		private static bool MatchesAny(string ext, string[] extensions)
-		{
-			if (extensions == null) return false;
-			for (int i = 0; i < extensions.Length; i++)
-			{
-				if (string.Equals(ext, extensions[i], StringComparison.OrdinalIgnoreCase))
-					return true;
-			}
-			return false;
-		}
-
-		public void Select()
-		{
-			var cb = fileSelected;
-			if (cb != null)
-			{
-				var lv = listView;
-				var arr = files;
-				int i = lv != null ? lv.SelectedIndex : -1;
-				if (arr != null && i >= 0 && i < arr.Length) cb(arr[i]);
-			}
-			var go = gameObject;
-			if (go != null) go.SetActive(false);
-		}
-
-		public void Cancel()
-		{
-			var go = gameObject;
-			if (go != null) go.SetActive(false);
-		}
-	}
+        public void Cancel()
+        {
+            fileSelected = null;
+            gameObject.SetActive(false);
+        }
+    }
 }

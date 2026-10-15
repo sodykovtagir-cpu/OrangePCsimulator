@@ -129,9 +129,15 @@ upload = body(app, 'private void Upload()')
 assert 'system.SelectFile("*", source =>' in upload
 assert 'int destinationId = chosen.id' in upload
 assert 'source.isFolder' in upload and 'source.content ?? ""' in upload
-assert 'target.os.FileManager.Create(0, copy)' in upload
-assert 'target.os.RefreshDesktopIcon()' in upload
 assert 'new File(name, content, false,' in upload
+assert 'StartCoroutine(UploadProgress(destinationId, copy))' in upload
+progress = body(app, 'private IEnumerator UploadProgress(')
+assert 'bar.CallProgressBar(' in progress and 'bar.SetProgress(' in progress
+assert 'uploadCancelled' in progress and 'CompleteUpload(id, copy)' in progress
+complete = body(app, 'private void CompleteUpload(')
+assert 'target.os.FileManager.Create(0, copy)' in complete
+assert 'target.os.RefreshDesktopIcon()' in complete
+assert 'target.os.Ready' in complete
 for name in ('idInput', 'connectButton', 'statusText'):
     assert name + '.gameObject.SetActive(!focused)' in layout
 assert 'gridButton' not in app

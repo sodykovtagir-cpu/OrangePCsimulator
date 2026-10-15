@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using PC.Component.Software.OS;
 using UnityEngine;
@@ -55,6 +56,8 @@ namespace PC.Component.Software
         private Button proButton;
         private Button backButton;
         private Button uploadButton;
+        private Coroutine transfer;
+        private bool uploadCancelled;
         private Text statusText;
         private bool promoShownThisLaunch;
         private GameObject gridPage;
@@ -141,7 +144,7 @@ namespace PC.Component.Software
             }
         }
 
-        private static bool IsControlled(global::PC.Component.Software.OS.OperatingSystem os)
+        internal static bool IsControlled(global::PC.Component.Software.OS.OperatingSystem os)
         {
             foreach (var viewer in viewers)
                 if (viewer != null)
@@ -381,28 +384,16 @@ namespace PC.Component.Software
 
         private void Upload()
         {
+            if (transfer != null || system == null) return;
             var chosen = sessions.Find(s => s.id == focusedId);
-            if (chosen == null || chosen.os == null || !chosen.os.Ready || system == null) return;
+            if (chosen == null || chosen.os == null || !chosen.os.Ready) return;
             int destinationId = chosen.id;
-            // Use the owning PCOS's existing picker, not the host phone/PC
-            // filesystem. Capture the destination so focus changes while the
-            // picker is open cannot silently send a file to another machine.
+            // The shared PCOS picker now supports nested folders for all apps.
+            // Capture the destination to prevent focus changes from redirecting it.
             system.SelectFile("*", source =>
             {
                 if (this == null || system == null || source == null) return;
-                if (source.isFolder)
-                {
-                    system.ShowMessageBox("Upload", "Select a file, not a folder.");
-                    return;
-                }
-                var target = sessions.Find(s => s.id == destinationId);
-                if (target == null || target.os == null || !target.os.Ready ||
-                    target.board == null || target.board.System != target.os ||
-                    target.os.FileManager == null)
-                {
-                    system.ShowMessageBox("Upload", "The remote PC is no longer connected.");
-                    return;
-                }
+                if (source.isFolder) return;
                 string name = source.path ?? "";
                 int slash = Mathf.Max(name.LastIndexOf('/'), name.LastIndexOf('\\'));
                 if (slash >= 0) name = name.Substring(slash + 1);
@@ -412,20 +403,74 @@ namespace PC.Component.Software
                     return;
                 }
                 string content = source.content ?? "";
-                // Create is non-destructive: Storage.AddFile chooses a unique
-                // (1), (2), ... name when that desktop already has the file.
                 var copy = new File(name, content, false,
                     source.size > 0 ? source.size : content.Length);
-                if (!target.os.FileManager.Create(0, copy))
+                if (copy.size >= 256 * 1024 && system.ProgressBar != null)
                 {
-                    system.ShowMessageBox("Upload", "Not enough space on the remote PC.");
-                    return;
+                    uploadCancelled = false;
+                    transfer = StartCoroutine(UploadProgress(destinationId, copy));
                 }
-                target.os.RefreshDesktopIcon();
-                status = "Uploaded " + copy.path + " to " + destinationId.ToString("X8") + ".";
-                if (statusText != null) UpdateStatus();
-                target.nextFrame = 0f;
+                else CompleteUpload(destinationId, copy);
             });
+        }
+
+        private IEnumerator UploadProgress(int id, File copy)
+        {
+            var bar = system != null ? system.ProgressBar : null;
+            if (bar == null) { CompleteUpload(id, copy); transfer = null; yield break; }
+            uploadButton.interactable = false;
+            bar.CallProgressBar("Uploading " + copy.path + "...", new Color(.25f, .75f, 1f),
+                () => uploadCancelled = true);
+            bar.SetProgress(0f);
+            float elapsed = 0f;
+            float duration = Mathf.Clamp(copy.size / 262144f, 1.5f, 8f);
+            while (elapsed < duration && !uploadCancelled)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                bar.SetProgress(Mathf.Clamp01(elapsed / duration));
+                yield return null;
+            }
+            if (!uploadCancelled)
+            {
+                bar.SetProgress(1f);
+                bar.CloseProgressBar();
+                CompleteUpload(id, copy);
+            }
+            uploadButton.interactable = true;
+            transfer = null;
+        }
+
+        private void CompleteUpload(int destinationId, File copy)
+        {
+            var target = sessions.Find(s => s.id == destinationId);
+            if (target == null || target.os == null || !target.os.Ready ||
+                target.board == null || target.board.System != target.os ||
+                target.os.FileManager == null)
+            {
+                system.ShowMessageBox("Upload", "The remote PC is no longer connected.");
+                return;
+            }
+            // Create never overwrites a destination file; Storage.AddFile
+            // chooses a distinct (1), (2), ... name for collisions.
+            if (!target.os.FileManager.Create(0, copy))
+            {
+                system.ShowMessageBox("Upload", "Not enough space on the remote PC.");
+                return;
+            }
+            target.os.RefreshDesktopIcon();
+            status = "Uploaded " + copy.path + " to " + destinationId.ToString("X8") + ".";
+            if (statusText != null) UpdateStatus();
+            target.nextFrame = 0f;
+        }
+
+        private void CancelUpload()
+        {
+            if (transfer == null) return;
+            uploadCancelled = true;
+            StopCoroutine(transfer);
+            transfer = null;
+            if (system != null && system.ProgressBar != null) system.ProgressBar.CloseProgressBar();
+            if (uploadButton != null) uploadButton.interactable = true;
         }
 
         private void DisconnectSystem(global::PC.Component.Software.OS.OperatingSystem remote)
@@ -454,8 +499,21 @@ namespace PC.Component.Software
             RefreshLayout();
         }
 
+        public override void Minimize()
+        {
+            CancelUpload();
+            base.Minimize();
+        }
+
+        public override void Close()
+        {
+            CancelUpload();
+            base.Close();
+        }
+
         private void OnDestroy()
         {
+            CancelUpload();
             viewers.Remove(this);
             for (int i = sessions.Count - 1; i >= 0; i--) RemoveSession(sessions[i]);
             if (captureCamera != null) Destroy(captureCamera.gameObject);
@@ -463,6 +521,7 @@ namespace PC.Component.Software
 
         public override void OnSystemStop()
         {
+            CancelUpload();
             viewers.Remove(this);
             for (int i = sessions.Count - 1; i >= 0; i--) RemoveSession(sessions[i]);
             base.OnSystemStop();
@@ -705,6 +764,8 @@ namespace PC.Component.Software
                     var hits = new List<RaycastResult>();
                     session.raycaster.Raycast(evt, hits);
                     GameObject hit = hits.Count > 0 ? hits[0].gameObject : null;
+                    var remoteMenu = DesktopContextMenu.For(session.os);
+                    if (phase == "down" && remoteMenu != null) remoteMenu.CloseIfOutside(hit);
                     evt.pointerCurrentRaycast = hits.Count > 0 ? hits[0] : new RaycastResult();
                     evt.pointerEnter = hit;
                     if (phase == "down")

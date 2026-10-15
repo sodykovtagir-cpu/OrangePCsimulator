@@ -334,6 +334,13 @@ namespace PC.Component.Software
 
         private void Update()
         {
+            // Physical mouse coordinates are not remote desktop coordinates.
+            // RemoteDesk dispatches the corresponding pointer events itself.
+            if (operatingSystem != null && RemoteDesk.IsControlled(operatingSystem))
+            {
+                if (Input.GetKeyDown(KeyCode.Escape)) CloseMenu();
+                return;
+            }
             if (menuPanel != null || renamePanel != null)
             {
                 if (Input.GetKeyDown(KeyCode.Escape))
@@ -563,6 +570,11 @@ namespace PC.Component.Software
             return true;
         }
 
+        public void CloseIfOutside(GameObject hit)
+        {
+            if (menuPanel != null && !IsMenuElement(hit)) CloseMenu();
+        }
+
         public void CloseMenu()
         {
             CancelInvoke(nameof(CloseSubmenuIfNotHovered));
@@ -752,6 +764,10 @@ namespace PC.Component.Software
 
         private void CloseSubmenuIfNotHovered()
         {
+            // A PCOS shown inside RemoteDesk needs forwarded pointer coordinates;
+            // Input.mousePosition belongs to the viewing OS and would hide the
+            // submenu just as the user tries to click an app.
+            if (operatingSystem != null && RemoteDesk.IsControlled(operatingSystem)) return;
             if (EventSystem.current == null)
                 return;
 
