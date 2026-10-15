@@ -792,28 +792,29 @@ namespace PC.Component.Software.OS
                 return;
             }
 
-            var storage = all[0];
-            var files = storage != null ? storage.files : null;
-            if (files != null)
-            {
-                for (int i = 0; i < files.Count; i++)
-                {
-                    var f = files[i];
-                    if (f == null) continue;
-                    if (string.Equals(f.Extension(), ".exe"))
-                    {
-                        if (LuaAppPackage.IsPackage(f.content)) continue;
-                        var name = f.NameWithoutExtension();
-                        AddApp(name);
-                    }
-                }
-            }
-
+            RegisterInstalledExecutables();
             RefreshDesktopIcon();
             EnsureViewer();
             EnsureDeviceManager();
             EnsureRemoteDesk();
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
+        }
+
+        /// <summary>Register known PCOS apps copied onto this disk while it is running.
+        /// A desktop .exe is the installed app; no Downloader purchase is needed again.</summary>
+        private void RegisterInstalledExecutables()
+        {
+            var files = GetDesktopStorageFiles();
+            if (files == null || installedApps == null || appPrefabs == null) return;
+            foreach (var file in files)
+            {
+                if (file == null || file.isFolder || string.IsNullOrEmpty(file.path) ||
+                    file.path.IndexOf('/') >= 0 || file.path.IndexOf('\\') >= 0 ||
+                    !string.Equals(file.Extension(), ".exe", StringComparison.OrdinalIgnoreCase) ||
+                    LuaAppPackage.IsPackage(file.content)) continue;
+                var name = file.NameWithoutExtension();
+                if (appPrefabs.ContainsKey(name) && !installedApps.Contains(name)) AddApp(name);
+            }
         }
 
         private void EnsureViewer()
@@ -912,6 +913,7 @@ namespace PC.Component.Software.OS
             if (string.IsNullOrEmpty(name) || appPrefabs == null) return false;
             App prefab;
             if (!appPrefabs.TryGetValue(name, out prefab) || prefab == null) return false;
+            if (!IsAppInstalled(name)) RegisterInstalledExecutables();
             if (!IsAppInstalled(name)) return false;
             LaunchApp(prefab, content ?? "");
             return true;
@@ -1051,7 +1053,7 @@ namespace PC.Component.Software.OS
                 UnityEngine.Debug.LogErrorFormat("App ({0}) not found!", name);
                 return;
             }
-            installedApps.Add(name);
+            if (!installedApps.Contains(name)) installedApps.Add(name);
         }
 
         private void AddFileIcon(File file)
@@ -1213,9 +1215,10 @@ namespace PC.Component.Software.OS
                 return true;
             }
 
-            if (ext == ".exe")
+            if (string.Equals(ext, ".exe", StringComparison.OrdinalIgnoreCase))
             {
                 var name = file.NameWithoutExtension();
+                if (!IsAppInstalled(name)) RegisterInstalledExecutables();
                 if (IsAppInstalled(name, out prefab) && prefab != null)
                 {
                     LaunchApp(prefab, file.content ?? "");
@@ -1823,6 +1826,7 @@ namespace PC.Component.Software.OS
             if (!fileRefreshPending && Time.unscaledTime < nextFileSystemScan) return;
             nextFileSystemScan = Time.unscaledTime + FileSystemScanInterval;
             if (!fileRefreshPending && !desktopFileSnapshot.HasChanged(GetDesktopStorageFiles())) return;
+            RegisterInstalledExecutables();
             RefreshDesktopIcon();
             RefreshRunningFileManagers();
             // Explorer may create missing folder entries while refreshing. Do not

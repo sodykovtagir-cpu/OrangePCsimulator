@@ -30,5 +30,14 @@ assert 'public override bool CanOpenExtension' in viewer
 assert 'RemoteDesk.IsControlled(operatingSystem)' in menu
 assert 'CloseIfOutside(GameObject hit)' in menu
 assert 'remoteMenu.CloseIfOutside(hit)' in remote
-print('PASS: navigable shared picker, installed app associations, Viewer defaults and remote context menu')
+# A transferred known .exe must be registered immediately, not demand its own
+# installation until the next OS boot. Packaged Lua executables remain separate.
+assert 'private void RegisterInstalledExecutables()' in os
+assert 'file.path.IndexOf(\'/\') >= 0' in os
+assert 'LuaAppPackage.IsPackage(file.content)) continue' in os
+assert 'appPrefabs.ContainsKey(name) && !installedApps.Contains(name)' in os
+assert 'RegisterInstalledExecutables();\n            RefreshDesktopIcon();' in os
+assert 'if (!IsAppInstalled(name)) RegisterInstalledExecutables();' in os
+assert 'if (!installedApps.Contains(name)) installedApps.Add(name);' in os
+print('PASS: navigable picker, file associations, Viewer defaults, transferred apps and remote context menu')
 print('NOTE: Unity Play Mode required for dialog/navigation and pointer UI verification')
