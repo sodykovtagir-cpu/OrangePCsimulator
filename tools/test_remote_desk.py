@@ -59,7 +59,15 @@ renderer = body(app, 'private void Capture(Session session)')
 assert not re.search(r'canvas\.renderMode\s*=(?!=)', renderer)
 assert 'captureCamera.Render();' in renderer and 'displayCamera.Render();' in renderer
 assert 'Graphics.Blit(texture, session.frame)' in renderer
-assert 'rect.GetWorldCorners(screenCorners)' in body(app, 'private void ConfigureCamera(Session session)')
+camera_setup = body(app, 'private void ConfigureCamera(Session session)')
+assert 'rect.GetWorldCorners(screenCorners)' in camera_setup
+assert ' - normal * depth' in camera_setup and 'Quaternion.LookRotation(normal, up.normalized)' in camera_setup
+assert 'ConnectionsPath = "System/RemoteDesk.connections"' in app
+assert 'JsonUtility.FromJson<SavedConnections>' in body(app, 'private void LoadSaved()')
+assert 'fm.Write(0, ConnectionsPath' in body(app, 'private void SaveConnections()')
+assert 'savedIds.Remove(id)' in body(app, 'private void RemoveSaved(int id)')
+assert 'string result = board.Boot();' in body(app, 'private void Wake(int id)')
+assert 'ReconnectSaved();' in body(app, 'private void LateUpdate()')
 assert 'new List<RaycastResult>()' in app and 'session.raycaster.Raycast(evt, hits)' in app
 for signal in ('pointerDownHandler', 'pointerUpHandler', 'pointerClickHandler',
                'beginDragHandler', 'dragHandler', 'endDragHandler', 'scrollHandler'):
@@ -70,17 +78,21 @@ assert 'RemoteDesk.ForwardingSystem == os' in menu
 assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position)' in dragger
 assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
 assert 'focusWatermark = Label(' in body(app, 'private void BuildUi()')
-assert 'Label(' not in body(app, 'private void RefreshLayout()').split('for (int i = 0; i < sessions.Count; i++)')[0]
+assert 'Label(' not in body(app, 'private void RefreshLayout()').split('for (int i = 0; i < savedIds.Count; i++)')[0]
 layout = body(app, 'private void RefreshLayout()')
 assert 'focusWatermark.gameObject.SetActive(!premium && focused)' in layout
-assert 'heading.gameObject.SetActive(!focused)' in layout
-for name in ('idInput', 'connectButton', 'gridButton', 'statusText'):
+assert 'windowTitle.text = premium ? "RemoteDesk- Pro" : "RemoteDesk"' in layout
+assert 'heading.gameObject.SetActive(!focused && !premium)' in layout
+for name in ('idInput', 'connectButton', 'statusText'):
     assert name + '.gameObject.SetActive(!focused)' in layout
+assert 'gridButton' not in app
 assert 'backButton.gameObject.SetActive(focused)' in layout
-assert '"Close", "Maximize", "Minimize"' in layout and 'button.gameObject.SetActive(!focused)' in layout
+assert '"Close", "Maximize", "Minimize"' in layout and 'button.gameObject.SetActive(true)' in layout
 assert 'focusRect.offsetMin = Vector2.zero' in layout
 assert 'focusViewport.offsetMin = Vector2.zero' in layout
-assert 'Button("X", card,' in layout and '() => Disconnect(chosen)' in layout
+assert 'Button("X", card,' in layout and '() => RemoveSaved(chosen)' in layout
+assert 'Button("Wake", card,' in layout and '() => Wake(chosen)' in layout
+assert 'for (int i = 0; i < savedIds.Count; i++)' in layout
 assert 'AspectRatioFitter.AspectMode.FitInParent' in app
 assert 'int cols =' in layout
 

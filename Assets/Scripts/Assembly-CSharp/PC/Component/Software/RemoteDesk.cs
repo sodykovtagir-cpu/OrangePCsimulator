@@ -26,7 +26,14 @@ namespace PC.Component.Software
             public DesktopIconDragger desktopIcon;
         }
 
+        [Serializable]
+        private sealed class SavedConnections
+        {
+            public List<int> ids = new List<int>();
+        }
+
         private const string LicensePath = "System/RemoteDesk.license";
+        private const string ConnectionsPath = "System/RemoteDesk.connections";
         private const int FreeLimit = 5;
         private const float SharedFramesPerSecond = 24f;
         private static readonly List<RemoteDesk> viewers = new List<RemoteDesk>();
@@ -35,12 +42,15 @@ namespace PC.Component.Software
         internal static global::PC.Component.Software.OS.OperatingSystem ForwardingSystem { get; private set; }
         internal static GraphicRaycaster ForwardingRaycaster { get; private set; }
         private readonly List<Session> sessions = new List<Session>();
+        private readonly List<int> savedIds = new List<int>();
+        private bool savedLoaded;
+        private float nextReconnect;
+        private Text windowTitle;
         private RectTransform panel;
         private RectTransform gridContent;
         private RectTransform gridViewport;
         private InputField idInput;
         private Button connectButton;
-        private Button gridButton;
         private Button proButton;
         private Button backButton;
         private Text statusText;
@@ -91,10 +101,12 @@ namespace PC.Component.Software
             if (old != null) old.gameObject.SetActive(false);
             if (!built) BuildUi();
             premium = HasLicense();
+            if (!savedLoaded) LoadSaved();
             if (!viewers.Contains(this)) viewers.Add(this);
             if (!string.IsNullOrEmpty(content))
                 foreach (string id in content.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries))
                     Connect(id);
+            ReconnectSaved();
             RefreshLayout();
         }
 
@@ -139,8 +151,58 @@ namespace PC.Component.Software
             BitcoinManager.Bitcoin -= 5f;
             BitcoinManager.Save();
             premium = true;
-            status = "RemoteDesk Pro activated on this PC.";
+            status = "";
             RefreshLayout();
+        }
+
+        private void LoadSaved()
+        {
+            savedLoaded = true;
+            File file;
+            if (system == null || system.FileManager == null ||
+                !system.FileManager.TryGetFile(0, ConnectionsPath, out file) || file == null) return;
+            try
+            {
+                var saved = JsonUtility.FromJson<SavedConnections>(file.content);
+                if (saved == null || saved.ids == null) return;
+                foreach (int id in saved.ids)
+                    if (id != 0 && id != system.SystemId && !savedIds.Contains(id)) savedIds.Add(id);
+            }
+            catch (Exception) { status = "Saved connections could not be read."; }
+        }
+
+        private void SaveConnections()
+        {
+            var fm = system != null ? system.FileManager : null;
+            if (fm == null) return;
+            var file = fm.Write(0, ConnectionsPath,
+                JsonUtility.ToJson(new SavedConnections { ids = new List<int>(savedIds) }));
+            if (file != null) file.hidden = true;
+        }
+
+        private bool Attach(int id, Motherboard board)
+        {
+            if (sessions.Exists(s => s.id == id)) return true;
+            if (!premium && sessions.Count >= FreeLimit) return false;
+            var remote = board != null ? board.System as global::PC.Component.Software.OS.OperatingSystem : null;
+            if (remote == null || !remote.Ready) return false;
+            var canvas = remote.RemoteCanvas;
+            var raycaster = canvas != null ? canvas.GetComponent<GraphicRaycaster>() : null;
+            if (raycaster == null) return false;
+            sessions.Add(new Session {
+                id = id, board = board, os = remote, canvas = canvas,
+                raycaster = raycaster, frame = CreateFrame(canvas)
+            });
+            return true;
+        }
+
+        private void ReconnectSaved()
+        {
+            bool changed = false;
+            foreach (int id in savedIds)
+                if (!sessions.Exists(s => s.id == id))
+                    changed |= Attach(id, DeviceAutomation.Find(id));
+            if (changed) RefreshLayout();
         }
 
         private void Connect(string input)
@@ -148,31 +210,43 @@ namespace PC.Component.Software
             if (string.IsNullOrEmpty(input)) return;
             int id;
             if (!int.TryParse(input.Trim(), System.Globalization.NumberStyles.HexNumber,
-                System.Globalization.CultureInfo.InvariantCulture, out id))
+                System.Globalization.CultureInfo.InvariantCulture, out id) || id == 0)
             { status = "Invalid hexadecimal system ID."; return; }
-            if (id == 0) { status = "System ID 00000000 is not valid."; return; }
-            if (sessions.Exists(s => s.id == id)) return;
-            if (!premium && sessions.Count >= FreeLimit)
-            { status = "Free edition: at most 5 connected devices. Upgrade for 5 BTC."; return; }
             var board = DeviceAutomation.Find(id);
             if (board == null || board == system.Board)
             { status = "Device not found or cannot connect to this PC itself."; return; }
-            var remote = board.System as global::PC.Component.Software.OS.OperatingSystem;
-            if (remote == null || !remote.Ready)
-            { status = "Remote PCOS must be powered on and ready."; return; }
-            var canvas = remote.RemoteCanvas;
-            if (canvas == null)
-            { status = "Remote device has no connected display."; return; }
-            var raycaster = canvas.GetComponent<GraphicRaycaster>();
-            if (raycaster == null)
-            { status = "Remote display does not accept pointer input."; return; }
-            var session = new Session {
-                id = id, board = board, os = remote, canvas = canvas,
-                raycaster = raycaster,
-                frame = CreateFrame(canvas)
-            };
-            sessions.Add(session);
-            status = "Connected to " + id.ToString("X8") + ".";
+            if (!savedIds.Contains(id))
+            {
+                savedIds.Add(id);
+                SaveConnections();
+            }
+            if (sessions.Exists(s => s.id == id))
+                status = "Already connected to " + id.ToString("X8") + ".";
+            else if (!board.Running)
+                status = "Saved " + id.ToString("X8") + ". Device is offline; use Wake.";
+            else if (Attach(id, board))
+                status = "Connected to " + id.ToString("X8") + ".";
+            else if (!premium && sessions.Count >= FreeLimit)
+                status = "Saved device. Free edition allows 5 active connections.";
+            else
+                status = "Saved device. Waiting for PCOS to finish booting.";
+            RefreshLayout();
+        }
+
+        private void Wake(int id)
+        {
+            var board = DeviceAutomation.Find(id);
+            if (board == null)
+                status = "Saved device not found in this world.";
+            else if (board.Running)
+                status = "Device is running; waiting for PCOS to boot.";
+            else
+            {
+                string result = board.Boot();
+                status = board.Running ? "Wake sent; waiting for PCOS." :
+                    "Cannot wake this device: " + result;
+            }
+            nextReconnect = 0f;
             RefreshLayout();
         }
 
@@ -215,10 +289,12 @@ namespace PC.Component.Software
             if (focusedId == session.id) focusedId = 0;
         }
 
-        private void Disconnect(int id)
+        private void RemoveSaved(int id)
         {
             var session = sessions.Find(s => s.id == id);
             if (session != null) RemoveSession(session);
+            if (savedIds.Remove(id)) SaveConnections();
+            status = "Removed " + id.ToString("X8") + ".";
             RefreshLayout();
         }
 
@@ -242,8 +318,12 @@ namespace PC.Component.Software
             var size = panel.rect.size;
             if (Vector2.Distance(size, lastSize) > 1f) { lastSize = size; RefreshLayout(); }
             if (lastTotal != ActiveConnections) UpdateStatus();
-            if (sessions.Count == 0) return;
             float now = Time.unscaledTime;
+            if (now >= nextReconnect)
+            {
+                nextReconnect = now + 1f;
+                ReconnectSaved();
+            }
             for (int i = sessions.Count - 1; i >= 0; i--)
             {
                 var session = sessions[i];
@@ -305,8 +385,11 @@ namespace PC.Component.Software
             float width = right.magnitude;
             float height = up.magnitude;
             float depth = Mathf.Max(width, height) * 2f + .5f;
-            captureCamera.transform.position = (screenCorners[0] + screenCorners[2]) * .5f + normal * depth;
-            captureCamera.transform.rotation = Quaternion.LookRotation(-normal, up.normalized);
+            // The physical UI faces the opposite side of its world-space
+            // rectangle. Capturing from +normal mirrored text and caused the
+            // GraphicRaycaster to discard clicks as back-facing graphics.
+            captureCamera.transform.position = (screenCorners[0] + screenCorners[2]) * .5f - normal * depth;
+            captureCamera.transform.rotation = Quaternion.LookRotation(normal, up.normalized);
             captureCamera.orthographicSize = Mathf.Max(height * .5f,
                 width * session.frame.height / (2f * session.frame.width)) * 1.01f;
             captureCamera.farClipPlane = depth + Mathf.Max(width, height) + 1f;
@@ -500,8 +583,8 @@ namespace PC.Component.Software
         {
             built = true;
             var title = transform.Find("Title");
-            var t = title != null ? title.GetComponent<Text>() : null;
-            font = t != null ? t.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+            windowTitle = title != null ? title.GetComponent<Text>() : null;
+            font = windowTitle != null ? windowTitle.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
             backButton = Button("Back", transform, 220, 8, 100, 30,
                 () => { focusedId = 0; RefreshLayout(); });
             backButton.gameObject.SetActive(false);
@@ -514,8 +597,7 @@ namespace PC.Component.Software
             heading = Label("Freeware edition", panel, 14, 4, 570, 32, 16);
             idInput = InputField("System ID (hex)", panel, 14, 43, 155, 33);
             connectButton = Button("Connect", panel, 175, 43, 94, 33, ConnectEntered);
-            gridButton = Button("Grid", panel, 275, 43, 74, 33, () => { focusedId = 0; RefreshLayout(); });
-            proButton = Button("Buy Pro - 5 BTC", panel, 355, 43, 160, 33, Purchase);
+            proButton = Button("Buy Pro - 5 BTC", panel, 275, 43, 160, 33, Purchase);
             statusText = Label("", panel, 14, 81, 700, 28, 13);
             gridPage = Box("Grid page", panel, 14, 115, 576, 280, Surface).gameObject;
             focusPage = Box("Focus page", panel, 14, 115, 576, 280, Surface).gameObject;
@@ -557,22 +639,20 @@ namespace PC.Component.Software
             bool focused = selected != null;
             float width = W - 28f;
             bool compact = W < 535f;
-            heading.text = premium ? "Pro - unlimited, no watermark" :
-                "Free - watermark and 5 connections";
+            if (windowTitle != null) windowTitle.text = premium ? "RemoteDesk- Pro" : "RemoteDesk";
+            heading.text = "Free - watermark and 5 connections";
             heading.rectTransform.sizeDelta = new Vector2(width, 32);
-            heading.gameObject.SetActive(!focused);
+            heading.gameObject.SetActive(!focused && !premium);
             idInput.gameObject.SetActive(!focused);
             connectButton.gameObject.SetActive(!focused);
-            gridButton.gameObject.SetActive(!focused);
             proButton.gameObject.SetActive(!focused && !premium);
             statusText.gameObject.SetActive(!focused);
             backButton.gameObject.SetActive(focused);
-            // Full control shows the system title and Back only. Restore the
-            // normal window chrome as soon as the user returns to the grid.
+            // Keep the native title and window controls in the full view.
             foreach (string chrome in new[] { "Close", "Maximize", "Minimize" })
             {
                 var button = transform.Find(chrome);
-                if (button != null) button.gameObject.SetActive(!focused);
+                if (button != null) button.gameObject.SetActive(true);
             }
             if (focused)
             {
@@ -586,9 +666,8 @@ namespace PC.Component.Software
             Place(idInput.GetComponent<RectTransform>(), 14, 43,
                 compact ? Mathf.Max(45, connectX - 20) : 155, 33);
             Place(connectButton.GetComponent<RectTransform>(), connectX, 43, connectWidth, 33);
-            Place(gridButton.GetComponent<RectTransform>(), compact ? 14 : 275, compact ? 83 : 43, 74, 33);
-            Place(proButton.GetComponent<RectTransform>(), compact ? 94 : 355, compact ? 83 : 43,
-                compact ? Mathf.Max(70, W - 108) : 160, 33);
+            Place(proButton.GetComponent<RectTransform>(), compact ? 14 : 275, compact ? 83 : 43,
+                compact ? Mathf.Max(70, W - 28) : 160, 33);
             Place(statusText.rectTransform, 14, compact ? 121 : 81, width, compact ? 38 : 28);
             UpdateStatus();
             var gridRect = (RectTransform)gridPage.transform;
@@ -632,34 +711,49 @@ namespace PC.Component.Software
             int cols = totalWidth > 780 ? 4 : totalWidth > 510 ? 3 : totalWidth > 270 ? 2 : 1;
             float tileW = (totalWidth - (cols - 1) * 8) / cols;
             float tileH = tileW * 9f / 16f + 38f;
-            for (int i = 0; i < sessions.Count; i++)
+            for (int i = 0; i < savedIds.Count; i++)
             {
-                var s = sessions[i];
-                int chosen = s.id;
+                int chosen = savedIds[i];
+                var session = sessions.Find(item => item.id == chosen);
+                var board = session != null ? session.board : DeviceAutomation.Find(chosen);
                 var card = Box("Remote " + chosen.ToString("X8"), gridContent,
                     (i % cols) * (tileW + 8), (i / cols) * (tileH + 8), tileW, tileH, Grey);
                 var previewArea = Box("Live area", card, 4, 4, tileW - 8, tileH - 41, Color.black);
                 previewArea.GetComponent<Image>().raycastTarget = false;
-                var image = NewRect("Live view", previewArea, 0, 0, tileW - 8, tileH - 41)
-                    .gameObject.AddComponent<RawImage>();
-                image.texture = s.frame;
-                image.raycastTarget = false;
-                var previewFit = image.gameObject.AddComponent<AspectRatioFitter>();
-                previewFit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-                previewFit.aspectRatio = (float)s.frame.width / s.frame.height;
-                var hit = card.gameObject.AddComponent<Button>();
-                hit.onClick.AddListener(() => { focusedId = chosen; RefreshLayout(); });
-                Label(chosen.ToString("X8") + "   " + (DeviceAutomation.IsMiner(s.board) ? "MINER" : "PC"),
-                    card, 5, tileH - 35, tileW - 46, 30, 14);
-                Button("X", card, tileW - 35, tileH - 35, 30, 30, () => Disconnect(chosen));
-                if (!premium)
+                if (session != null)
                 {
-                    var tileMark = Label("RemoteDesk FREE", card, 8, tileH / 2 - 20, tileW - 16, 40, 16);
-                    tileMark.alignment = TextAnchor.MiddleCenter;
-                    tileMark.color = new Color(1f, 1f, 1f, .5f);
+                    var image = NewRect("Live view", previewArea, 0, 0, tileW - 8, tileH - 41)
+                        .gameObject.AddComponent<RawImage>();
+                    image.texture = session.frame;
+                    image.raycastTarget = false;
+                    var previewFit = image.gameObject.AddComponent<AspectRatioFitter>();
+                    previewFit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                    previewFit.aspectRatio = (float)session.frame.width / session.frame.height;
+                    var hit = card.gameObject.AddComponent<Button>();
+                    hit.onClick.AddListener(() => { focusedId = chosen; RefreshLayout(); });
+                    if (!premium)
+                    {
+                        var tileMark = Label("RemoteDesk FREE", card, 8, tileH / 2 - 20, tileW - 16, 40, 16);
+                        tileMark.alignment = TextAnchor.MiddleCenter;
+                        tileMark.color = new Color(1f, 1f, 1f, .5f);
+                    }
                 }
+                else
+                {
+                    var os = board != null ? board.System as global::PC.Component.Software.OS.OperatingSystem : null;
+                    string state = board == null ? "NOT FOUND" : !board.Running ? "OFFLINE" :
+                        os != null && os.Ready && !premium && sessions.Count >= FreeLimit ? "FREE LIMIT" : "BOOTING";
+                    var label = Label(state, previewArea, 8, 5, tileW - 24, 33, 15);
+                    label.color = Color.white;
+                    if (board != null && !board.Running)
+                        Button("Wake", card, 8, tileH - 77, 68, 29, () => Wake(chosen));
+                }
+                Label(chosen.ToString("X8") + "   " +
+                    (board == null ? "DEVICE" : DeviceAutomation.IsMiner(board) ? "MINER" : "PC"),
+                    card, 5, tileH - 35, tileW - 46, 30, 14);
+                Button("X", card, tileW - 35, tileH - 35, 30, 30, () => RemoveSaved(chosen));
             }
-            gridContent.sizeDelta = new Vector2(0, Mathf.Ceil(sessions.Count / (float)cols) * (tileH + 8));
+            gridContent.sizeDelta = new Vector2(0, Mathf.Ceil(savedIds.Count / (float)cols) * (tileH + 8));
             // Keep one non-interactive watermark instead of creating another
             // Text every time a tile or window size changes.
             focusWatermark.gameObject.SetActive(!premium && focused);
