@@ -84,12 +84,26 @@ assert 'RemoteDesk.ForwardingRaycaster.Raycast(pointer, results)' in menu
 assert 'RemoteDesk.ForwardingSystem == os' in menu
 assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position)' in dragger
 assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
-assert 'focusWatermark = Label(' in body(app, 'private void BuildUi()')
+build_ui = body(app, 'private void BuildUi()')
+assert 'focusWatermark = Label(' in build_ui
+assert 'proButton = Button("Купить", transform, 220, 8, 100, 30, ShowPromotion)' in build_ui
+assert 'idInput = InputField("System ID (hex)", panel, 14, 8' in build_ui
+assert 'connectButton = Button("Connect", panel, 175, 8' in build_ui
 assert 'Label(' not in body(app, 'private void RefreshLayout()').split('for (int i = 0; i < savedIds.Count; i++)')[0]
 layout = body(app, 'private void RefreshLayout()')
 assert 'focusWatermark.gameObject.SetActive(!premium && focused)' in layout
 assert 'windowTitle.text = premium ? "RemoteDesk- Pro" : "RemoteDesk"' in layout
-assert 'heading.gameObject.SetActive(!focused && !premium)' in layout
+assert 'gridRect.offsetMax = new Vector2(-14, -87)' in layout
+promo = body(app, 'private void ShowPromotion()')
+assert 'Resources.Load<Texture2D>("RemoteDesk/pro_banner")' in promo
+assert 'Button("Купить", poster, 0, 0, 100, 34, Purchase)' in promo
+assert 'Button("X", shade, 0, 0, 34, 34, ClosePromotion)' in promo
+assert 'promoPanel != null' in promo
+assert 'promoShownThisLaunch' in body(app, 'public override void Open(string content)')
+assert 'ClosePromotion();' in body(app, 'private void Purchase()')
+assert 'proButton = Button("Buy Pro' not in app
+assert 'heading' not in layout
+assert 'proButton.gameObject.SetActive(!focused && !premium)' in layout
 for name in ('idInput', 'connectButton', 'statusText'):
     assert name + '.gameObject.SetActive(!focused)' in layout
 assert 'gridButton' not in app
@@ -119,5 +133,9 @@ assert names['Close']['m_IsActive'] == 1
 for path in (prefab, src / 'PC/Component/Software/RemoteDesk.cs',
              src / 'PC/Component/Software/RemoteDeskSurface.cs'):
     assert path.with_name(path.name + '.meta').exists(), path
-print('PASS: RemoteDesk installation, license/limits, FPS, capture/input, BSOD and prefab static checks')
+poster = project / 'Assets/Resources/RemoteDesk/pro_banner.png'
+assert poster.exists() and poster.with_name(poster.name + '.meta').exists()
+assert poster.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
+assert 'nPOTScale: 0' in poster.with_name(poster.name + '.meta').read_text()
+print('PASS: RemoteDesk installation, Pro banner/purchase, FPS, capture/input and prefab checks')
 print('NOTE: Unity Editor/Play Mode required for pixels, raycast alignment, drag and keyboard verification')

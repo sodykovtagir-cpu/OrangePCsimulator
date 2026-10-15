@@ -54,7 +54,9 @@ namespace PC.Component.Software
         private Button proButton;
         private Button backButton;
         private Text statusText;
-        private Text heading;
+        private GameObject promoPanel;
+        private Text promoMessage;
+        private bool promoShownThisLaunch;
         private GameObject gridPage;
         private GameObject focusPage;
         private RectTransform focusViewport;
@@ -109,6 +111,11 @@ namespace PC.Component.Software
                     Connect(id);
             ReconnectSaved();
             RefreshLayout();
+            if (!premium && !promoShownThisLaunch)
+            {
+                promoShownThisLaunch = true;
+                ShowPromotion();
+            }
         }
 
         private static int ActiveConnections
@@ -139,20 +146,94 @@ namespace PC.Component.Software
                 license != null && license.content == "RemoteDesk Pro v1";
         }
 
+        private void ShowPromotion()
+        {
+            if (premium || !built || promoPanel != null) return;
+            promoShownThisLaunch = true;
+            var shade = Box("RemoteDesk Pro offer", transform, 0, 0, 100, 100,
+                new Color(0f, 0f, 0f, .78f));
+            shade.anchorMin = Vector2.zero;
+            shade.anchorMax = Vector2.one;
+            shade.offsetMin = Vector2.zero;
+            shade.offsetMax = Vector2.zero;
+            promoPanel = shade.gameObject;
+
+            var poster = NewRect("Pro banner", shade, 0, 0, 400, 560);
+            poster.anchorMin = poster.anchorMax = new Vector2(.5f, .5f);
+            poster.pivot = new Vector2(.5f, .5f);
+            poster.anchoredPosition = Vector2.zero;
+            var texture = Resources.Load<Texture2D>("RemoteDesk/pro_banner");
+            var image = poster.gameObject.AddComponent<RawImage>();
+            image.texture = texture;
+            var fitter = poster.gameObject.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fitter.aspectRatio = texture != null ? (float)texture.width / texture.height : 1718f / 2400f;
+
+            // The gray rectangle labeled 'кнопка' is artwork, not an actual
+            // control. Cover it precisely with a working UGUI purchase button.
+            var buy = Button("Купить", poster, 0, 0, 100, 34, Purchase);
+            var buyRect = buy.GetComponent<RectTransform>();
+            buyRect.anchorMin = new Vector2(.53f, .015f);
+            buyRect.anchorMax = new Vector2(.982f, .122f);
+            buyRect.offsetMin = buyRect.offsetMax = Vector2.zero;
+            var caption = buy.GetComponentInChildren<Text>();
+            if (caption != null)
+            {
+                caption.fontSize = 21;
+                var captionRect = caption.rectTransform;
+                captionRect.anchorMin = Vector2.zero;
+                captionRect.anchorMax = Vector2.one;
+                captionRect.offsetMin = captionRect.offsetMax = Vector2.zero;
+            }
+            promoMessage = Label("", poster, 0, 0, 100, 32, 16);
+            promoMessage.color = Color.black;
+            promoMessage.alignment = TextAnchor.MiddleCenter;
+            var messageRect = promoMessage.rectTransform;
+            messageRect.anchorMin = new Vector2(.52f, .127f);
+            messageRect.anchorMax = new Vector2(.98f, .17f);
+            messageRect.offsetMin = messageRect.offsetMax = Vector2.zero;
+
+            var close = Button("X", shade, 0, 0, 34, 34, ClosePromotion);
+            var closeRect = close.GetComponent<RectTransform>();
+            closeRect.anchorMin = closeRect.anchorMax = Vector2.one;
+            closeRect.pivot = Vector2.one;
+            closeRect.anchoredPosition = new Vector2(-8, -8);
+        }
+
+        private void ClosePromotion()
+        {
+            if (promoPanel == null) return;
+            promoPanel.SetActive(false);
+            Destroy(promoPanel);
+            promoPanel = null;
+            promoMessage = null;
+        }
+
         private void Purchase()
         {
             if (premium) return;
             if (BitcoinManager.Bitcoin < 5f)
-            { status = "Pro costs 5 BTC. Insufficient balance."; RefreshLayout(); return; }
+            {
+                status = "Pro costs 5 BTC. Insufficient balance.";
+                if (promoMessage != null) promoMessage.text = "Недостаточно BTC";
+                RefreshLayout();
+                return;
+            }
             var fm = system != null ? system.FileManager : null;
             var file = fm != null ? fm.Write(0, LicensePath, "RemoteDesk Pro v1") : null;
             if (file == null || file.content != "RemoteDesk Pro v1")
-            { status = "Cannot save the license to this PC."; RefreshLayout(); return; }
+            {
+                status = "Cannot save the license to this PC.";
+                if (promoMessage != null) promoMessage.text = "Не удалось сохранить лицензию";
+                RefreshLayout();
+                return;
+            }
             file.hidden = true;
             BitcoinManager.Bitcoin -= 5f;
             BitcoinManager.Save();
             premium = true;
             status = "";
+            ClosePromotion();
             RefreshLayout();
         }
 
@@ -696,19 +777,18 @@ namespace PC.Component.Software
             backButton = Button("Back", transform, 220, 8, 100, 30,
                 () => { focusedId = 0; RefreshLayout(); });
             backButton.gameObject.SetActive(false);
+            proButton = Button("Купить", transform, 220, 8, 100, 30, ShowPromotion);
             panel = Box("RemoteDesk UI", transform, 8, 40, 604, 490, Color.white);
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.one;
             panel.pivot = new Vector2(.5f, .5f);
             panel.offsetMin = new Vector2(8f, 8f);
             panel.offsetMax = new Vector2(-8f, -40f);
-            heading = Label("Freeware edition", panel, 14, 4, 570, 32, 16);
-            idInput = InputField("System ID (hex)", panel, 14, 43, 155, 33);
-            connectButton = Button("Connect", panel, 175, 43, 94, 33, ConnectEntered);
-            proButton = Button("Buy Pro - 5 BTC", panel, 275, 43, 160, 33, Purchase);
-            statusText = Label("", panel, 14, 81, 700, 28, 13);
-            gridPage = Box("Grid page", panel, 14, 115, 576, 280, Surface).gameObject;
-            focusPage = Box("Focus page", panel, 14, 115, 576, 280, Surface).gameObject;
+            idInput = InputField("System ID (hex)", panel, 14, 8, 155, 33);
+            connectButton = Button("Connect", panel, 175, 8, 94, 33, ConnectEntered);
+            statusText = Label("", panel, 14, 49, 700, 30, 13);
+            gridPage = Box("Grid page", panel, 14, 87, 576, 280, Surface).gameObject;
+            focusPage = Box("Focus page", panel, 14, 87, 576, 280, Surface).gameObject;
             var focusRect = focusPage.GetComponent<RectTransform>();
             focusViewport = Box("Screen area", focusRect, 0, 0, 576, 238, Color.black);
             focusImage = NewRect("Remote desktop", focusViewport, 0, 0, 576, 238).gameObject.AddComponent<RawImage>();
@@ -748,9 +828,6 @@ namespace PC.Component.Software
             float width = W - 28f;
             bool compact = W < 535f;
             if (windowTitle != null) windowTitle.text = premium ? "RemoteDesk- Pro" : "RemoteDesk";
-            heading.text = "Free - watermark and 5 connections";
-            heading.rectTransform.sizeDelta = new Vector2(width, 32);
-            heading.gameObject.SetActive(!focused && !premium);
             idInput.gameObject.SetActive(!focused);
             connectButton.gameObject.SetActive(!focused);
             proButton.gameObject.SetActive(!focused && !premium);
@@ -762,28 +839,24 @@ namespace PC.Component.Software
                 var button = transform.Find(chrome);
                 if (button != null) button.gameObject.SetActive(true);
             }
-            if (focused)
-            {
-                var window = transform as RectTransform;
-                Place(backButton.GetComponent<RectTransform>(),
-                    window != null ? Mathf.Min(220f, Mathf.Max(160f, window.rect.width - 230f)) : 220f,
-                    8, 100, 30);
-            }
+            var window = transform as RectTransform;
+            float headerX = window != null ?
+                Mathf.Min(220f, Mathf.Max(160f, window.rect.width - 230f)) : 220f;
+            Place(backButton.GetComponent<RectTransform>(), headerX, 8, 100, 30);
+            Place(proButton.GetComponent<RectTransform>(), headerX, 8, 100, 30);
             float connectWidth = compact ? Mathf.Min(94, Mathf.Max(60, W * .28f)) : 94;
             float connectX = compact ? W - connectWidth - 14 : 175;
-            Place(idInput.GetComponent<RectTransform>(), 14, 43,
+            Place(idInput.GetComponent<RectTransform>(), 14, 8,
                 compact ? Mathf.Max(45, connectX - 20) : 155, 33);
-            Place(connectButton.GetComponent<RectTransform>(), connectX, 43, connectWidth, 33);
-            Place(proButton.GetComponent<RectTransform>(), compact ? 14 : 275, compact ? 83 : 43,
-                compact ? Mathf.Max(70, W - 28) : 160, 33);
-            Place(statusText.rectTransform, 14, compact ? 121 : 81, width, compact ? 38 : 28);
+            Place(connectButton.GetComponent<RectTransform>(), connectX, 8, connectWidth, 33);
+            Place(statusText.rectTransform, 14, 49, width, 30);
             UpdateStatus();
             var gridRect = (RectTransform)gridPage.transform;
             var focusRect = (RectTransform)focusPage.transform;
             gridRect.anchorMin = Vector2.zero;
             gridRect.anchorMax = Vector2.one;
-            gridRect.offsetMin = new Vector2(14, 52);
-            gridRect.offsetMax = new Vector2(-14, compact ? -166 : -115);
+            gridRect.offsetMin = new Vector2(14, 14);
+            gridRect.offsetMax = new Vector2(-14, -87);
             focusRect.anchorMin = Vector2.zero;
             focusRect.anchorMax = Vector2.one;
             focusRect.offsetMin = Vector2.zero;
