@@ -57,6 +57,10 @@ namespace PC.Component
 		/// </summary>
 		public int ArtifactLevel { get; private set; }
 
+        // Volatile per-boot clock ratio. Hardware damage remains persisted by
+        // Hardware/ArtifactLevel; merely previewing a clock does not damage it.
+        public float OverclockRatio { get; set; } = 1f;
+
 		/// <summary>Карта повреждена, но ещё выдаёт изображение.</summary>
 		public bool Artifacting
 		{
@@ -74,8 +78,9 @@ namespace PC.Component
 		{
 			get
 			{
-				if (ArtifactLevel <= 0) return 0f;
-				return Mathf.Clamp01((float)ArtifactLevel / MaxArtifactLevel);
+                    float wear = Mathf.Clamp01((float)ArtifactLevel / MaxArtifactLevel);
+                    float clock = Mathf.Clamp01((OverclockRatio - 1.15f) / .7f);
+                    return Mathf.Max(wear, clock);
 			}
 		}
 
@@ -154,12 +159,12 @@ namespace PC.Component
 		public bool FailsUnderLoad()
 		{
 			if (Damaged) return false;
-			if (ArtifactLevel <= 0) return false;
-
-			if (Random.value >= loadFailureChance * ArtifactStrength) return false;
-
-			AddArtifactLevel(1);
-			return true;
+            if (ArtifactStrength <= 0f) return false;
+            if (Random.value >= loadFailureChance * ArtifactStrength) return false;
+            // Thermal/impact damage is persistent; an unstable clock by itself
+            // causes a crash, not permanent damage until the extreme threshold.
+            if (ArtifactLevel > 0) AddArtifactLevel(1);
+            return true;
 		}
 
 		public override void ToData(JObject jObject)

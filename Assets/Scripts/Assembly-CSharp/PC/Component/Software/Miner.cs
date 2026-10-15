@@ -69,8 +69,9 @@ namespace PC.Component.Software
 			{
 				for (int i = 0; i < gpus.Count; i++)
 				{
-					var h = gpus[i];
-					if (h != null) score += h.Score;
+                    var h = gpus[i];
+                    if (h != null) score += Mathf.RoundToInt(h.Score *
+                        PC.Component.Software.OS.OverclockBoot.GpuMultiplier(board));
 				}
 			}
 
