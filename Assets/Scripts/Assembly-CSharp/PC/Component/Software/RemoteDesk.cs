@@ -68,6 +68,7 @@ namespace PC.Component.Software
         private bool capturing;
         private readonly Vector3[] screenCorners = new Vector3[4];
         private Vector2 lastSize;
+        private Vector2 lastViewportSize;
         private int lastTotal = -1;
         private string status = "Enter a system ID or import the Device Manager selection.";
 
@@ -250,20 +251,68 @@ namespace PC.Component.Software
             RefreshLayout();
         }
 
-        private static RenderTexture CreateFrame(Canvas canvas)
+        // The focused desktop has the viewport's aspect, not the attached
+        // monitor's aspect. Only that stream needs a larger RT in Pro.
+        private Vector2Int FrameSize(Canvas canvas, bool focused)
         {
-            int height = 360;
-            // Textured monitors already render to their own RT; preserve their
-            // true aspect ratio rather than stretching a 2:1 screen to 16:9.
-            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera &&
-                canvas.worldCamera != null && canvas.worldCamera.targetTexture != null)
+            float aspect = 16f / 9f;
+            if (focused && focusViewport != null && focusViewport.rect.height > 1f)
+                aspect = Mathf.Max(.25f, focusViewport.rect.width / focusViewport.rect.height);
+            else if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+            {
+                var rect = canvas.transform as RectTransform;
+                if (rect != null && rect.rect.height > 1f) aspect = rect.rect.width / rect.rect.height;
+            }
+            else if (canvas != null && canvas.worldCamera != null && canvas.worldCamera.targetTexture != null)
             {
                 var source = canvas.worldCamera.targetTexture;
-                height = Mathf.Clamp(Mathf.RoundToInt(640f * source.height / source.width), 180, 720);
+                aspect = (float)source.width / source.height;
             }
-            var frame = new RenderTexture(640, height, 16, RenderTextureFormat.ARGB32);
+            aspect = Mathf.Clamp(aspect, .25f, 5f);
+            int maxWidth = premium && focused ? Mathf.Clamp(Screen.width, 1280, 1920) : 640;
+            int maxHeight = premium && focused ? Mathf.Clamp(Screen.height, 720, 2048) : 960;
+            int width = Mathf.Max(128, Mathf.Min(maxWidth, Mathf.RoundToInt(maxHeight * aspect)));
+            int height = Mathf.Max(128, Mathf.RoundToInt(width / aspect));
+            return new Vector2Int(width, height);
+        }
+
+        private RenderTexture CreateFrame(Canvas canvas, bool focused = false)
+        {
+            var size = FrameSize(canvas, focused);
+            var frame = new RenderTexture(size.x, size.y, 16, RenderTextureFormat.ARGB32);
+            frame.filterMode = FilterMode.Bilinear;
             frame.Create();
             return frame;
+        }
+
+        private void ResizeStreams()
+        {
+            foreach (var session in sessions)
+            {
+                var wanted = FrameSize(session.canvas, session.id == focusedId);
+                if (session.frame != null && session.frame.width == wanted.x &&
+                    session.frame.height == wanted.y) continue;
+                if (session.desktopIcon != null) session.desktopIcon.EndRemoteDrag();
+                session.desktopIcon = null;
+                session.pointer = null;
+                session.pressed = null;
+                session.dragged = null;
+                session.dragging = false;
+                var old = session.frame;
+                session.frame = CreateFrame(session.canvas, session.id == focusedId);
+                if (old != null) { old.Release(); Destroy(old); }
+                session.nextFrame = 0f;
+            }
+        }
+
+        private Vector2 FocusedDesktopSize()
+        {
+            var view = focusViewport != null ? focusViewport.rect.size : Vector2.zero;
+            if (view.x < 1f || view.y < 1f) return new Vector2(800f, 500f);
+            // This is CanvasScaler's Expand rule for PCOS's 800x500 reference:
+            // the logical area grows along the wider screen dimension.
+            float scale = Mathf.Min(view.x / 800f, view.y / 500f);
+            return view / Mathf.Max(.0001f, scale);
         }
 
         private void ConnectEntered()
@@ -316,7 +365,9 @@ namespace PC.Component.Software
         {
             if (!built || panel == null || !gameObject.activeInHierarchy) return;
             var size = panel.rect.size;
-            if (Vector2.Distance(size, lastSize) > 1f) { lastSize = size; RefreshLayout(); }
+            if (Vector2.Distance(size, lastSize) > 1f ||
+                Vector2.Distance(focusViewport.rect.size, lastViewportSize) > 1f)
+            { lastSize = size; RefreshLayout(); }
             if (lastTotal != ActiveConnections) UpdateStatus();
             float now = Time.unscaledTime;
             if (now >= nextReconnect)
@@ -390,32 +441,60 @@ namespace PC.Component.Software
             // GraphicRaycaster to discard clicks as back-facing graphics.
             captureCamera.transform.position = (screenCorners[0] + screenCorners[2]) * .5f - normal * depth;
             captureCamera.transform.rotation = Quaternion.LookRotation(normal, up.normalized);
-            captureCamera.orthographicSize = Mathf.Max(height * .5f,
-                width * session.frame.height / (2f * session.frame.width)) * 1.01f;
+            captureCamera.orthographicSize = height * .5f;
             captureCamera.farClipPlane = depth + Mathf.Max(width, height) + 1f;
+            // Monitor prefabs use non-uniform world scaling. Fit the complete
+            // UI rectangle into the RT rather than letterboxing/cropping it.
+            // Input raycasts use this same projection while the layout is lent.
+            captureCamera.projectionMatrix = Matrix4x4.Ortho(-width * .5f, width * .5f,
+                -height * .5f, height * .5f, captureCamera.nearClipPlane,
+                captureCamera.farClipPlane);
         }
 
+        // Borrow the canvas only for this synchronous operation. The physical
+        // monitor returns to its original dimensions/camera before Unity draws
+        // the next game frame. The OS object itself is never cloned or moved.
         private void OnRemoteCanvas(Session session, Action action)
         {
             if (capturing || session == null || session.canvas == null) return;
             capturing = true;
             var canvas = session.canvas;
-            var original = canvas.worldCamera;
+            var root = canvas.transform as RectTransform;
+            bool world = canvas.renderMode == RenderMode.WorldSpace;
+            bool fit = session.id == focusedId && focusViewport != null &&
+                focusViewport.rect.width > 1f && focusViewport.rect.height > 1f;
+            var originalSize = root != null ? root.sizeDelta : Vector2.zero;
+            var originalCamera = canvas.worldCamera;
+            var originalTarget = originalCamera != null ? originalCamera.targetTexture : null;
             try
             {
-                if (canvas.renderMode == RenderMode.WorldSpace)
+                if (fit && world && root != null)
+                {
+                    root.sizeDelta = FocusedDesktopSize();
+                    Canvas.ForceUpdateCanvases();
+                }
+                else if (fit && !world && originalCamera != null &&
+                         canvas.renderMode == RenderMode.ScreenSpaceCamera)
+                {
+                    originalCamera.targetTexture = session.frame;
+                    Canvas.ForceUpdateCanvases();
+                }
+                if (world)
                 {
                     ConfigureCamera(session);
                     captureCamera.targetTexture = session.frame;
-                    canvas.worldCamera = captureCamera; // raycaster only; no mode change
+                    canvas.worldCamera = captureCamera; // raycaster only
                 }
                 action();
             }
             finally
             {
-                if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
-                    canvas.worldCamera = original;
+                if (world && canvas != null) canvas.worldCamera = originalCamera;
                 if (captureCamera != null) captureCamera.targetTexture = null;
+                if (root != null && fit && world) root.sizeDelta = originalSize;
+                if (fit && !world && originalCamera != null)
+                    originalCamera.targetTexture = originalTarget;
+                if (fit) Canvas.ForceUpdateCanvases();
                 capturing = false;
             }
         }
@@ -423,29 +502,57 @@ namespace PC.Component.Software
         private void Capture(Session session)
         {
             var canvas = session.canvas;
-            Canvas.ForceUpdateCanvases();
+            bool fit = session.id == focusedId && focusViewport != null &&
+                focusViewport.rect.width > 1f && focusViewport.rect.height > 1f;
             if (canvas.renderMode == RenderMode.WorldSpace)
             {
-                ConfigureCamera(session);
+                var root = canvas.transform as RectTransform;
+                Vector2 original = root != null ? root.sizeDelta : Vector2.zero;
                 try
                 {
+                    if (fit && root != null) root.sizeDelta = FocusedDesktopSize();
+                    Canvas.ForceUpdateCanvases();
+                    ConfigureCamera(session);
                     captureCamera.targetTexture = session.frame;
                     captureCamera.Render();
                 }
-                finally { captureCamera.targetTexture = null; }
+                finally
+                {
+                    if (captureCamera != null) captureCamera.targetTexture = null;
+                    if (fit && root != null)
+                    {
+                        root.sizeDelta = original;
+                        Canvas.ForceUpdateCanvases();
+                    }
+                }
             }
             else
             {
-                // TexturedMonitor/Projector own a camera and an RT. Re-render
-                // that camera and copy its pixels; taking it over makes the
-                // physical monitor show a blank frame.
+                // Textured monitors own the camera/RT. Render the focused
+                // viewport into our RT, then redraw the original monitor RT.
                 var displayCamera = canvas.worldCamera;
-                var texture = displayCamera != null ? displayCamera.targetTexture : null;
-                if (texture != null && displayCamera != captureCamera)
+                var original = displayCamera != null ? displayCamera.targetTexture : null;
+                if (original == null || displayCamera == captureCamera) return;
+                if (fit && canvas.renderMode == RenderMode.ScreenSpaceCamera)
+                {
+                    try
+                    {
+                        displayCamera.targetTexture = session.frame;
+                        Canvas.ForceUpdateCanvases();
+                        displayCamera.Render();
+                    }
+                    finally
+                    {
+                        displayCamera.targetTexture = original;
+                        Canvas.ForceUpdateCanvases();
+                        displayCamera.Render();
+                    }
+                }
+                else
                 {
                     if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
                         displayCamera.Render();
-                    Graphics.Blit(texture, session.frame);
+                    Graphics.Blit(original, session.frame);
                 }
             }
         }
@@ -465,8 +572,9 @@ namespace PC.Component.Software
             // Textured monitors raycast in THEIR camera's RT pixel space.
             var eventTexture = session.canvas.renderMode == RenderMode.ScreenSpaceCamera &&
                 session.canvas.worldCamera != null ? session.canvas.worldCamera.targetTexture : null;
-            int eventWidth = eventTexture != null ? eventTexture.width : session.frame.width;
-            int eventHeight = eventTexture != null ? eventTexture.height : session.frame.height;
+            bool fitted = session.id == focusedId;
+            int eventWidth = fitted || eventTexture == null ? session.frame.width : eventTexture.width;
+            int eventHeight = fitted || eventTexture == null ? session.frame.height : eventTexture.height;
             Vector2 pos = new Vector2(u * eventWidth, v * eventHeight);
             OnRemoteCanvas(session, () =>
             {
@@ -694,6 +802,9 @@ namespace PC.Component.Software
             focusViewport.offsetMax = Vector2.zero;
             focusPage.SetActive(focused);
             gridPage.SetActive(!focused);
+            Canvas.ForceUpdateCanvases();
+            lastViewportSize = focusViewport.rect.size;
+            ResizeStreams();
             focusImage.texture = focused ? selected.frame : null;
             if (focused)
                 focusImage.GetComponent<AspectRatioFitter>().aspectRatio =

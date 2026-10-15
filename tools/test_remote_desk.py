@@ -51,17 +51,24 @@ assert 'Application.targetFrameRate' not in app and 'Time.captureFramerate' not 
 assert 'system.Fault();' in body(app, 'public override void Open(string content)')
 assert 'viewers[i].DisconnectSystem(system)' in app
 assert 'session.os.Ready' in body(app, 'private void LateUpdate()')
-assert 'captureCamera.Render()' in app and 'new RenderTexture(640, height' in app
+assert 'captureCamera.Render()' in app and 'new RenderTexture(size.x, size.y' in app
 capture = body(app, 'private void OnRemoteCanvas(Session session, Action action)')
-assert 'finally' in capture and 'canvas.worldCamera = original' in capture
+assert 'finally' in capture and 'canvas.worldCamera = originalCamera' in capture
 assert not re.search(r'canvas\.renderMode\s*=(?!=)', capture)
 renderer = body(app, 'private void Capture(Session session)')
 assert not re.search(r'canvas\.renderMode\s*=(?!=)', renderer)
 assert 'captureCamera.Render();' in renderer and 'displayCamera.Render();' in renderer
-assert 'Graphics.Blit(texture, session.frame)' in renderer
+assert 'Graphics.Blit(original, session.frame)' in renderer
 camera_setup = body(app, 'private void ConfigureCamera(Session session)')
 assert 'rect.GetWorldCorners(screenCorners)' in camera_setup
 assert ' - normal * depth' in camera_setup and 'Quaternion.LookRotation(normal, up.normalized)' in camera_setup
+assert 'Matrix4x4.Ortho(-width * .5f, width * .5f' in camera_setup
+assert 'Mathf.Clamp(Screen.width, 1280, 1920)' in body(app, 'private Vector2Int FrameSize(')
+assert 'view.x / 800f, view.y / 500f' in body(app, 'private Vector2 FocusedDesktopSize()')
+assert 'root.sizeDelta = FocusedDesktopSize()' in capture and 'root.sizeDelta = originalSize' in capture
+assert 'root.sizeDelta = original;' in renderer
+assert 'originalCamera.targetTexture = session.frame' in capture
+assert 'displayCamera.targetTexture = session.frame' in renderer
 assert 'ConnectionsPath = "System/RemoteDesk.connections"' in app
 assert 'JsonUtility.FromJson<SavedConnections>' in body(app, 'private void LoadSaved()')
 assert 'fm.Write(0, ConnectionsPath' in body(app, 'private void SaveConnections()')
