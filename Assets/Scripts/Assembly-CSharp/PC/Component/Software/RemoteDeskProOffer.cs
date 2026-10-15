@@ -10,6 +10,9 @@ namespace PC.Component.Software
         [SerializeField] private Sprite banner;
         private Text feedback;
         private bool built;
+        private const float PosterAspect = 1718f / 2400f;
+        private const float SideInsets = 16f;
+        private const float VerticalInsets = 50f;
 
         protected override bool ShowMenuBar => false;
 
@@ -22,20 +25,39 @@ namespace PC.Component.Software
                 Close();
                 return;
             }
+            canMaximize = false;
+            var maximize = transform.Find("Maximize");
+            if (maximize != null) maximize.gameObject.SetActive(false);
+            var artwork = banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner");
             var window = transform as RectTransform;
             var host = transform.parent as RectTransform;
             if (window != null && host != null)
             {
                 float inset = system.GetTaskbarInsetLocalHeight();
-                window.sizeDelta = new Vector2(Mathf.Min(520f, Mathf.Max(270f, host.rect.width - 16f)),
-                    Mathf.Min(740f, Mathf.Max(370f, host.rect.height - inset - 16f)));
+                float posterAspect = artwork != null
+                    ? artwork.rect.width / artwork.rect.height : PosterAspect;
+                // The physical PCOS canvas can have different X and Y screen
+                // scales. Fit the *visible* poster, not just its local UI rect.
+                float localAspect = posterAspect / ScreenStretch(host);
+                float maxHeight = Mathf.Max(VerticalInsets + 80f,
+                    Mathf.Min(800f, host.rect.height - inset - 16f));
+                float maxWidth = Mathf.Max(SideInsets + 80f, host.rect.width - 16f);
+                float contentHeight = maxHeight - VerticalInsets;
+                float contentWidth = contentHeight * localAspect;
+                if (contentWidth + SideInsets > maxWidth)
+                {
+                    contentWidth = maxWidth - SideInsets;
+                    contentHeight = contentWidth / localAspect;
+                }
+                window.sizeDelta = new Vector2(contentWidth + SideInsets,
+                    contentHeight + VerticalInsets);
                 window.anchoredPosition = new Vector2(0f, inset * .5f);
             }
             if (built) return;
             built = true;
             var title = transform.Find("Title");
             var titleText = title != null ? title.GetComponent<Text>() : null;
-            if (titleText != null) titleText.text = "RemoteDesk Pro";
+            if (titleText != null) titleText.text = "Buy pro!";
             var font = titleText != null && titleText.font != null
                 ? titleText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
             foreach (string obsolete in new[] { "Scroll View", "Refresh" })
@@ -52,16 +74,12 @@ namespace PC.Component.Software
             area.gameObject.AddComponent<Image>().color = new Color(1f, .33f, .16f);
 
             var poster = Rect("RemoteDesk Pro banner", area);
-            poster.anchorMin = poster.anchorMax = new Vector2(.5f, .5f);
-            poster.pivot = new Vector2(.5f, .5f);
-            poster.anchoredPosition = Vector2.zero;
-            var artwork = banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner");
+            // The window itself has the artwork's displayed aspect ratio;
+            // stretch the poster to its content area without a second fit pass.
+            Stretch(poster);
             var image = poster.gameObject.AddComponent<Image>();
             image.sprite = artwork;
             image.raycastTarget = false;
-            var fit = poster.gameObject.AddComponent<AspectRatioFitter>();
-            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            fit.aspectRatio = artwork != null ? artwork.rect.width / artwork.rect.height : 1718f / 2400f;
             if (artwork == null)
             {
                 image.enabled = false;
@@ -91,6 +109,30 @@ namespace PC.Component.Software
                 missing.alignment = TextAnchor.MiddleCenter;
                 Stretch(missing.rectTransform);
             }
+        }
+
+        // Window maximization would destroy the poster's proportions.
+        public override void Maximize() { }
+
+        private static float ScreenStretch(RectTransform host)
+        {
+            var corners = new Vector3[4];
+            host.GetWorldCorners(corners);
+            var canvas = host.GetComponentInParent<Canvas>();
+            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera : null;
+            var horizontal = RectTransformUtility.WorldToScreenPoint(camera, corners[3]) -
+                             RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+            var vertical = RectTransformUtility.WorldToScreenPoint(camera, corners[1]) -
+                           RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+            float x = horizontal.magnitude / Mathf.Max(1f, host.rect.width);
+            float y = vertical.magnitude / Mathf.Max(1f, host.rect.height);
+            if (x < .0001f || y < .0001f)
+            {
+                x = host.TransformVector(Vector3.right).magnitude;
+                y = host.TransformVector(Vector3.up).magnitude;
+            }
+            return Mathf.Clamp(x / Mathf.Max(y, .0001f), .25f, 4f);
         }
 
         private void Purchase()

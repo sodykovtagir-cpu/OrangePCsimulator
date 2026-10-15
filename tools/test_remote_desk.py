@@ -107,7 +107,14 @@ assert 'RemoteDesk.TryPurchasePro(system, out error)' in offer
 assert 'banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner")' in offer
 assert 'artwork == null' in offer and 'Debug.LogError(' in offer
 assert 'buy.gameObject.AddComponent<Button>().onClick.AddListener(Purchase)' in offer
-assert 'fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent' in offer
+assert 'titleText.text = "Buy pro!"' in offer
+assert 'canMaximize = false' in offer and 'maximize.gameObject.SetActive(false)' in offer
+assert 'public override void Maximize() { }' in offer
+assert 'posterAspect / ScreenStretch(host)' in offer
+assert 'Stretch(poster);' in offer and 'AspectRatioFitter' not in offer
+assert 'RectTransformUtility.WorldToScreenPoint' in offer
+for stretch in (.5, 1., 1.8):
+    assert abs((1718. / 2400. / stretch) * stretch - 1718. / 2400.) < 1e-9
 assert 'proButton = Button("Buy Pro' not in app
 assert 'heading' not in layout
 assert 'proButton.gameObject.SetActive(!focused && !premium)' in layout
@@ -158,6 +165,8 @@ offer_root = next(b['MonoBehaviour'] for b in offer_blocks if 'MonoBehaviour' in
 assert offer_root['m_Script']['guid'] == '557f8184d90d4dff9ae9a31297a679b2'
 assert offer_root['banner']['guid'] == '979c1648735b4489943f73574502406d'
 assert offer_root['windowState']['fileID'] != 0
+assert 'm_Text: Buy pro!' in offer_prefab.read_text()
+assert 'm_SizeDelta: {x: 320, y: 720}' in offer_prefab.read_text()
 assert {b['GameObject']['m_Name'] for b in offer_blocks if 'GameObject' in b} >= {'Title','Close','Maximize','Minimize'}
 print('PASS: RemoteDesk installation, Pro banner/purchase, FPS, capture/input and prefab checks')
 print('NOTE: Unity Editor/Play Mode required for pixels, raycast alignment, drag and keyboard verification')
