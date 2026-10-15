@@ -917,6 +917,19 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        // A companion window of RemoteDesk, not a separately installed program.
+        // Launch through PCOS so it has native title/drag/close/taskbar behavior.
+        public bool TryOpenRemoteDeskOffer()
+        {
+            if (!IsAppInstalled("RemoteDesk")) return false;
+            // Keep this companion window out of the installed-app catalog.
+            var asset = Resources.Load<GameObject>("RemoteDesk/RemoteDeskProOffer");
+            var prefab = asset != null ? asset.GetComponent<RemoteDeskProOffer>() : null;
+            if (prefab == null) return false;
+            LaunchApp(prefab);
+            return true;
+        }
+
         public bool TryCloseApp(string name)
         {
             var app = GetRunningApp(name);

@@ -54,8 +54,6 @@ namespace PC.Component.Software
         private Button proButton;
         private Button backButton;
         private Text statusText;
-        private GameObject promoPanel;
-        private Text promoMessage;
         private bool promoShownThisLaunch;
         private GameObject gridPage;
         private GameObject focusPage;
@@ -140,101 +138,65 @@ namespace PC.Component.Software
 
         private bool HasLicense()
         {
+            return HasProLicense(system);
+        }
+
+        internal static bool HasProLicense(global::PC.Component.Software.OS.OperatingSystem owner)
+        {
             File license;
-            return system != null && system.FileManager != null &&
-                system.FileManager.TryGetFile(0, LicensePath, out license) &&
+            return owner != null && owner.FileManager != null &&
+                owner.FileManager.TryGetFile(0, LicensePath, out license) &&
                 license != null && license.content == "RemoteDesk Pro v1";
         }
 
         private void ShowPromotion()
         {
-            if (premium || !built || promoPanel != null) return;
+            if (premium || system == null) return;
             promoShownThisLaunch = true;
-            var shade = Box("RemoteDesk Pro offer", transform, 0, 0, 100, 100,
-                new Color(0f, 0f, 0f, .78f));
-            shade.anchorMin = Vector2.zero;
-            shade.anchorMax = Vector2.one;
-            shade.offsetMin = Vector2.zero;
-            shade.offsetMax = Vector2.zero;
-            promoPanel = shade.gameObject;
-
-            var poster = NewRect("Pro banner", shade, 0, 0, 400, 560);
-            poster.anchorMin = poster.anchorMax = new Vector2(.5f, .5f);
-            poster.pivot = new Vector2(.5f, .5f);
-            poster.anchoredPosition = Vector2.zero;
-            var texture = Resources.Load<Texture2D>("RemoteDesk/pro_banner");
-            var image = poster.gameObject.AddComponent<RawImage>();
-            image.texture = texture;
-            var fitter = poster.gameObject.AddComponent<AspectRatioFitter>();
-            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            fitter.aspectRatio = texture != null ? (float)texture.width / texture.height : 1718f / 2400f;
-
-            // The gray rectangle labeled 'кнопка' is artwork, not an actual
-            // control. Cover it precisely with a working UGUI purchase button.
-            var buy = Button("Купить", poster, 0, 0, 100, 34, Purchase);
-            var buyRect = buy.GetComponent<RectTransform>();
-            buyRect.anchorMin = new Vector2(.53f, .015f);
-            buyRect.anchorMax = new Vector2(.982f, .122f);
-            buyRect.offsetMin = buyRect.offsetMax = Vector2.zero;
-            var caption = buy.GetComponentInChildren<Text>();
-            if (caption != null)
+            if (!system.TryOpenRemoteDeskOffer())
             {
-                caption.fontSize = 21;
-                var captionRect = caption.rectTransform;
-                captionRect.anchorMin = Vector2.zero;
-                captionRect.anchorMax = Vector2.one;
-                captionRect.offsetMin = captionRect.offsetMax = Vector2.zero;
+                status = "Could not open the RemoteDesk Pro offer.";
+                RefreshLayout();
             }
-            promoMessage = Label("", poster, 0, 0, 100, 32, 16);
-            promoMessage.color = Color.black;
-            promoMessage.alignment = TextAnchor.MiddleCenter;
-            var messageRect = promoMessage.rectTransform;
-            messageRect.anchorMin = new Vector2(.52f, .127f);
-            messageRect.anchorMax = new Vector2(.98f, .17f);
-            messageRect.offsetMin = messageRect.offsetMax = Vector2.zero;
-
-            var close = Button("X", shade, 0, 0, 34, 34, ClosePromotion);
-            var closeRect = close.GetComponent<RectTransform>();
-            closeRect.anchorMin = closeRect.anchorMax = Vector2.one;
-            closeRect.pivot = Vector2.one;
-            closeRect.anchoredPosition = new Vector2(-8, -8);
         }
 
-        private void ClosePromotion()
+        internal static bool TryPurchasePro(global::PC.Component.Software.OS.OperatingSystem owner,
+            out string error)
         {
-            if (promoPanel == null) return;
-            promoPanel.SetActive(false);
-            Destroy(promoPanel);
-            promoPanel = null;
-            promoMessage = null;
-        }
-
-        private void Purchase()
-        {
-            if (premium) return;
-            if (BitcoinManager.Bitcoin < 5f)
+            error = null;
+            var fm = owner != null ? owner.FileManager : null;
+            if (fm == null)
             {
-                status = "Pro costs 5 BTC. Insufficient balance.";
-                if (promoMessage != null) promoMessage.text = "Недостаточно BTC";
-                RefreshLayout();
-                return;
+                error = "Не удалось открыть диск этой ОС";
+                return false;
             }
-            var fm = system != null ? system.FileManager : null;
-            var file = fm != null ? fm.Write(0, LicensePath, "RemoteDesk Pro v1") : null;
-            if (file == null || file.content != "RemoteDesk Pro v1")
+            if (!HasProLicense(owner))
             {
-                status = "Cannot save the license to this PC.";
-                if (promoMessage != null) promoMessage.text = "Не удалось сохранить лицензию";
-                RefreshLayout();
-                return;
+                if (BitcoinManager.Bitcoin < 5f)
+                {
+                    error = "Недостаточно BTC";
+                    return false;
+                }
+                var file = fm.Write(0, LicensePath, "RemoteDesk Pro v1");
+                if (file == null || file.content != "RemoteDesk Pro v1")
+                {
+                    error = "Не удалось сохранить лицензию";
+                    return false;
+                }
+                file.hidden = true;
+                BitcoinManager.Bitcoin -= 5f;
+                BitcoinManager.Save();
             }
-            file.hidden = true;
-            BitcoinManager.Bitcoin -= 5f;
-            BitcoinManager.Save();
-            premium = true;
-            status = "";
-            ClosePromotion();
-            RefreshLayout();
+            // The offer is a separate PCOS window. Update the already-open
+            // RemoteDesk on THIS OS without requiring it to be relaunched.
+            foreach (var viewer in viewers)
+            {
+                if (viewer == null || viewer.system != owner) continue;
+                viewer.premium = true;
+                viewer.status = "";
+                viewer.RefreshLayout();
+            }
+            return true;
         }
 
         private void LoadSaved()
@@ -777,7 +739,7 @@ namespace PC.Component.Software
             backButton = Button("Back", transform, 220, 8, 100, 30,
                 () => { focusedId = 0; RefreshLayout(); });
             backButton.gameObject.SetActive(false);
-            proButton = Button("Купить", transform, 220, 8, 100, 30, ShowPromotion);
+            proButton = Button("Купить", transform, 220, 8, 120, 30, ShowPromotion);
             panel = Box("RemoteDesk UI", transform, 8, 40, 604, 490, Color.white);
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.one;
@@ -840,10 +802,11 @@ namespace PC.Component.Software
                 if (button != null) button.gameObject.SetActive(true);
             }
             var window = transform as RectTransform;
+            float headerWidth = window != null && window.rect.width < 440f ? 78f : 120f;
             float headerX = window != null ?
-                Mathf.Min(220f, Mathf.Max(160f, window.rect.width - 230f)) : 220f;
-            Place(backButton.GetComponent<RectTransform>(), headerX, 8, 100, 30);
-            Place(proButton.GetComponent<RectTransform>(), headerX, 8, 100, 30);
+                Mathf.Min(220f, Mathf.Max(135f, window.rect.width - headerWidth - 140f)) : 220f;
+            Place(backButton.GetComponent<RectTransform>(), headerX, 8, headerWidth, 30);
+            Place(proButton.GetComponent<RectTransform>(), headerX, 8, headerWidth, 30);
             float connectWidth = compact ? Mathf.Min(94, Mathf.Max(60, W * .28f)) : 94;
             float connectX = compact ? W - connectWidth - 14 : 175;
             Place(idInput.GetComponent<RectTransform>(), 14, 8,

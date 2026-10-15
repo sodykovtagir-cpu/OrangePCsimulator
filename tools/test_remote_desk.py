@@ -41,9 +41,9 @@ assert 'system.TryLaunchApp("RemoteDesk", string.Join(",", ids.ToArray()))' in m
 assert 'if (registered.Contains(id)) ids.Add' in manager
 assert 'manager.OpenInRemoteDesk' in menu
 assert 'FreeLimit = 5' in app and 'BitcoinManager.Bitcoin -= 5f' in app
-assert 'HasLicense()' in app and 'system.FileManager.TryGetFile(0, LicensePath' in app
+assert 'HasLicense()' in app and 'owner.FileManager.TryGetFile(0, LicensePath' in app
 assert 'fm.Write(0, LicensePath, "RemoteDesk Pro v1")' in app
-purchase = body(app, 'private void Purchase()')
+purchase = body(app, 'internal static bool TryPurchasePro(')
 assert purchase.index('fm.Write(0, LicensePath') < purchase.index('BitcoinManager.Bitcoin -= 5f')
 assert 'SharedFramesPerSecond = 24f' in app
 assert 'Mathf.Max(1, ActiveConnections) / SharedFramesPerSecond' in app
@@ -86,7 +86,7 @@ assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position)' in 
 assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
 build_ui = body(app, 'private void BuildUi()')
 assert 'focusWatermark = Label(' in build_ui
-assert 'proButton = Button("Купить", transform, 220, 8, 100, 30, ShowPromotion)' in build_ui
+assert 'proButton = Button("Купить", transform, 220, 8, 120, 30, ShowPromotion)' in build_ui
 assert 'idInput = InputField("System ID (hex)", panel, 14, 8' in build_ui
 assert 'connectButton = Button("Connect", panel, 175, 8' in build_ui
 assert 'Label(' not in body(app, 'private void RefreshLayout()').split('for (int i = 0; i < savedIds.Count; i++)')[0]
@@ -95,12 +95,19 @@ assert 'focusWatermark.gameObject.SetActive(!premium && focused)' in layout
 assert 'windowTitle.text = premium ? "RemoteDesk- Pro" : "RemoteDesk"' in layout
 assert 'gridRect.offsetMax = new Vector2(-14, -87)' in layout
 promo = body(app, 'private void ShowPromotion()')
-assert 'Resources.Load<Texture2D>("RemoteDesk/pro_banner")' in promo
-assert 'Button("Купить", poster, 0, 0, 100, 34, Purchase)' in promo
-assert 'Button("X", shade, 0, 0, 34, 34, ClosePromotion)' in promo
-assert 'promoPanel != null' in promo
+assert 'system.TryOpenRemoteDeskOffer()' in promo
+assert 'Box(' not in promo and 'RawImage' not in promo
 assert 'promoShownThisLaunch' in body(app, 'public override void Open(string content)')
-assert 'ClosePromotion();' in body(app, 'private void Purchase()')
+assert 'LaunchApp(prefab);' in body(os, 'public bool TryOpenRemoteDeskOffer()')
+assert 'Resources.Load<GameObject>("RemoteDesk/RemoteDeskProOffer")' in os
+assert 'IsAppInstalled("RemoteDesk")' in body(os, 'public bool TryOpenRemoteDeskOffer()')
+offer = (src / 'PC/Component/Software/RemoteDeskProOffer.cs').read_text()
+assert 'public class RemoteDeskProOffer : App' in offer
+assert 'RemoteDesk.TryPurchasePro(system, out error)' in offer
+assert 'banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner")' in offer
+assert 'artwork == null' in offer and 'Debug.LogError(' in offer
+assert 'buy.gameObject.AddComponent<Button>().onClick.AddListener(Purchase)' in offer
+assert 'fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent' in offer
 assert 'proButton = Button("Buy Pro' not in app
 assert 'heading' not in layout
 assert 'proButton.gameObject.SetActive(!focused && !premium)' in layout
@@ -136,6 +143,21 @@ for path in (prefab, src / 'PC/Component/Software/RemoteDesk.cs',
 poster = project / 'Assets/Resources/RemoteDesk/pro_banner.png'
 assert poster.exists() and poster.with_name(poster.name + '.meta').exists()
 assert poster.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
-assert 'nPOTScale: 0' in poster.with_name(poster.name + '.meta').read_text()
+poster_meta = poster.with_name(poster.name + '.meta').read_text()
+assert 'nPOTScale: 0' in poster_meta
+assert 'textureShape: 1' in poster_meta and 'textureType: 8' in poster_meta
+assert 'spriteID: 979c1648735b4489943f73574502406d' in poster_meta
+assert (src / 'PC/Component/Software/RemoteDeskProOffer.cs.meta').exists()
+offer_prefab = project / 'Assets/Resources/RemoteDesk/RemoteDeskProOffer.prefab'
+assert offer_prefab.with_name(offer_prefab.name + '.meta').exists()
+raw_offer = offer_prefab.read_text().replace('%YAML 1.1\n','').replace('%TAG !u! tag:unity3d.com,2011:\n','')
+raw_offer = re.sub(r'--- !u!\d+ &\d+', '---', raw_offer)
+offer_blocks = list(yaml.safe_load_all(raw_offer))
+offer_root = next(b['MonoBehaviour'] for b in offer_blocks if 'MonoBehaviour' in b
+                  and b['MonoBehaviour'].get('appName') == 'RemoteDesk Pro offer')
+assert offer_root['m_Script']['guid'] == '557f8184d90d4dff9ae9a31297a679b2'
+assert offer_root['banner']['guid'] == '979c1648735b4489943f73574502406d'
+assert offer_root['windowState']['fileID'] != 0
+assert {b['GameObject']['m_Name'] for b in offer_blocks if 'GameObject' in b} >= {'Title','Close','Maximize','Minimize'}
 print('PASS: RemoteDesk installation, Pro banner/purchase, FPS, capture/input and prefab checks')
 print('NOTE: Unity Editor/Play Mode required for pixels, raycast alignment, drag and keyboard verification')
