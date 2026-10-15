@@ -36,6 +36,7 @@ namespace PC.Component.Software
         private const string ConnectionsPath = "System/RemoteDesk.connections";
         private const int FreeLimit = 5;
         private const float SharedFramesPerSecond = 24f;
+        private const float ProFramesPerSecond = 60f;
         private static readonly List<RemoteDesk> viewers = new List<RemoteDesk>();
         // Only set while dispatching a synthetic event. Existing PCOS hit
         // tests must see the remote canvas, not the local game's UI overlay.
@@ -53,6 +54,7 @@ namespace PC.Component.Software
         private Button connectButton;
         private Button proButton;
         private Button backButton;
+        private Button uploadButton;
         private Text statusText;
         private bool promoShownThisLaunch;
         private GameObject gridPage;
@@ -127,6 +129,18 @@ namespace PC.Component.Software
             }
         }
 
+        private static int FreeConnections
+        {
+            get
+            {
+                int count = 0;
+                foreach (var viewer in viewers)
+                    if (viewer != null && viewer.isActiveAndEnabled && !viewer.premium)
+                        count += viewer.sessions.Count;
+                return count;
+            }
+        }
+
         private static bool IsControlled(global::PC.Component.Software.OS.OperatingSystem os)
         {
             foreach (var viewer in viewers)
@@ -194,6 +208,7 @@ namespace PC.Component.Software
                 if (viewer == null || viewer.system != owner) continue;
                 viewer.premium = true;
                 viewer.status = "";
+                foreach (var session in viewer.sessions) session.nextFrame = 0f;
                 viewer.RefreshLayout();
             }
             return true;
@@ -364,6 +379,55 @@ namespace PC.Component.Software
             RefreshLayout();
         }
 
+        private void Upload()
+        {
+            var chosen = sessions.Find(s => s.id == focusedId);
+            if (chosen == null || chosen.os == null || !chosen.os.Ready || system == null) return;
+            int destinationId = chosen.id;
+            // Use the owning PCOS's existing picker, not the host phone/PC
+            // filesystem. Capture the destination so focus changes while the
+            // picker is open cannot silently send a file to another machine.
+            system.SelectFile("*", source =>
+            {
+                if (this == null || system == null || source == null) return;
+                if (source.isFolder)
+                {
+                    system.ShowMessageBox("Upload", "Select a file, not a folder.");
+                    return;
+                }
+                var target = sessions.Find(s => s.id == destinationId);
+                if (target == null || target.os == null || !target.os.Ready ||
+                    target.board == null || target.board.System != target.os ||
+                    target.os.FileManager == null)
+                {
+                    system.ShowMessageBox("Upload", "The remote PC is no longer connected.");
+                    return;
+                }
+                string name = source.path ?? "";
+                int slash = Mathf.Max(name.LastIndexOf('/'), name.LastIndexOf('\\'));
+                if (slash >= 0) name = name.Substring(slash + 1);
+                if (string.IsNullOrEmpty(name) || name == "." || name == "..")
+                {
+                    system.ShowMessageBox("Upload", "Invalid file name.");
+                    return;
+                }
+                string content = source.content ?? "";
+                // Create is non-destructive: Storage.AddFile chooses a unique
+                // (1), (2), ... name when that desktop already has the file.
+                var copy = new File(name, content, false,
+                    source.size > 0 ? source.size : content.Length);
+                if (!target.os.FileManager.Create(0, copy))
+                {
+                    system.ShowMessageBox("Upload", "Not enough space on the remote PC.");
+                    return;
+                }
+                target.os.RefreshDesktopIcon();
+                status = "Uploaded " + copy.path + " to " + destinationId.ToString("X8") + ".";
+                if (statusText != null) UpdateStatus();
+                target.nextFrame = 0f;
+            });
+        }
+
         private void DisconnectSystem(global::PC.Component.Software.OS.OperatingSystem remote)
         {
             for (int i = sessions.Count - 1; i >= 0; i--)
@@ -411,7 +475,7 @@ namespace PC.Component.Software
             if (Vector2.Distance(size, lastSize) > 1f ||
                 Vector2.Distance(focusViewport.rect.size, lastViewportSize) > 1f)
             { lastSize = size; RefreshLayout(); }
-            if (lastTotal != ActiveConnections) UpdateStatus();
+            if (lastTotal != (premium ? ActiveConnections : FreeConnections)) UpdateStatus();
             float now = Time.unscaledTime;
             if (now >= nextReconnect)
             {
@@ -444,8 +508,10 @@ namespace PC.Component.Software
                     RefreshLayout();
                 }
                 if (now < session.nextFrame) continue;
-                // One shared refresh budget across all attached PCs/miners.
-                session.nextFrame = now + Mathf.Max(1, ActiveConnections) / SharedFramesPerSecond;
+                // Pro runs each stream up to 60 FPS. Free viewers still share
+                // their 24 FPS budget; neither path throttles the Unity game.
+                session.nextFrame = now + (premium ? 1f / ProFramesPerSecond :
+                    Mathf.Max(1, FreeConnections) / SharedFramesPerSecond);
                 Capture(session);
             }
         }
@@ -740,6 +806,7 @@ namespace PC.Component.Software
                 () => { focusedId = 0; RefreshLayout(); });
             backButton.gameObject.SetActive(false);
             proButton = Button("Купить", transform, 220, 8, 120, 30, ShowPromotion);
+            uploadButton = Button("Upload", transform, 348, 8, 94, 30, Upload);
             panel = Box("RemoteDesk UI", transform, 8, 40, 604, 490, Color.white);
             panel.anchorMin = Vector2.zero;
             panel.anchorMax = Vector2.one;
@@ -775,10 +842,11 @@ namespace PC.Component.Software
 
         private void UpdateStatus()
         {
-            lastTotal = ActiveConnections;
+            lastTotal = premium ? ActiveConnections : FreeConnections;
             if (statusText != null)
                 statusText.text = status + "   Online: " + sessions.Count +
-                    "   Stream FPS/device: " + (lastTotal > 0 ? SharedFramesPerSecond / lastTotal : 0f).ToString("0.#");
+                    "   Stream FPS/device: " + (premium ? ProFramesPerSecond :
+                        lastTotal > 0 ? SharedFramesPerSecond / lastTotal : 0f).ToString("0.#");
         }
 
         private void RefreshLayout()
@@ -793,6 +861,7 @@ namespace PC.Component.Software
             idInput.gameObject.SetActive(!focused);
             connectButton.gameObject.SetActive(!focused);
             proButton.gameObject.SetActive(!focused && !premium);
+            uploadButton.gameObject.SetActive(focused);
             statusText.gameObject.SetActive(!focused);
             backButton.gameObject.SetActive(focused);
             // Keep the native title and window controls in the full view.
@@ -807,6 +876,11 @@ namespace PC.Component.Software
                 Mathf.Min(220f, Mathf.Max(135f, window.rect.width - headerWidth - 140f)) : 220f;
             Place(backButton.GetComponent<RectTransform>(), headerX, 8, headerWidth, 30);
             Place(proButton.GetComponent<RectTransform>(), headerX, 8, headerWidth, 30);
+            bool uploadBelowTitle = window != null && window.rect.width < 580f;
+            Place(uploadButton.GetComponent<RectTransform>(),
+                uploadBelowTitle ? 22f : headerX + headerWidth + 8f,
+                uploadBelowTitle ? 50f : 8f, 94f, 30f);
+            if (focused && uploadBelowTitle) uploadButton.transform.SetAsLastSibling();
             float connectWidth = compact ? Mathf.Min(94, Mathf.Max(60, W * .28f)) : 94;
             float connectX = compact ? W - connectWidth - 14 : 175;
             Place(idInput.GetComponent<RectTransform>(), 14, 8,
@@ -823,7 +897,7 @@ namespace PC.Component.Software
             focusRect.anchorMin = Vector2.zero;
             focusRect.anchorMax = Vector2.one;
             focusRect.offsetMin = Vector2.zero;
-            focusRect.offsetMax = Vector2.zero;
+            focusRect.offsetMax = focused && uploadBelowTitle ? new Vector2(0f, -44f) : Vector2.zero;
             gridViewport.anchorMin = Vector2.zero;
             gridViewport.anchorMax = Vector2.one;
             gridViewport.offsetMin = Vector2.zero;

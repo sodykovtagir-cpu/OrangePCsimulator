@@ -1159,7 +1159,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   appName: RemoteDesk Pro offer
-  icon: {fileID: 21300000, guid: 96deafda1a165f7499daf6d36e798208, type: 2}
+  icon: {fileID: 21300000, guid: 5225909a642e461eba4c04954de2747c, type: 3}
   fileName:
   fileIcon: {fileID: 0}
   size: 280
@@ -1264,7 +1264,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1561473398908126647
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1396,7 +1396,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &2573486119827062566
 RectTransform:
   m_ObjectHideFlags: 0

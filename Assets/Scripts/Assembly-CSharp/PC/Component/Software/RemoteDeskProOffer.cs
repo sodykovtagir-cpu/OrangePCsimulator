@@ -26,8 +26,11 @@ namespace PC.Component.Software
                 return;
             }
             canMaximize = false;
-            var maximize = transform.Find("Maximize");
-            if (maximize != null) maximize.gameObject.SetActive(false);
+            foreach (string control in new[] { "Maximize", "Minimize" })
+            {
+                var button = transform.Find(control);
+                if (button != null) button.gameObject.SetActive(false);
+            }
             var artwork = banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner");
             var window = transform as RectTransform;
             var host = transform.parent as RectTransform;
@@ -111,8 +114,9 @@ namespace PC.Component.Software
             }
         }
 
-        // Window maximization would destroy the poster's proportions.
+        // Only Close is allowed: neither maximizing nor minimizing this offer.
         public override void Maximize() { }
+        public override void Minimize() { }
 
         private static float ScreenStretch(RectTransform host)
         {

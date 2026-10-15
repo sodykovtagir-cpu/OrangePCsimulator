@@ -46,7 +46,10 @@ assert 'fm.Write(0, LicensePath, "RemoteDesk Pro v1")' in app
 purchase = body(app, 'internal static bool TryPurchasePro(')
 assert purchase.index('fm.Write(0, LicensePath') < purchase.index('BitcoinManager.Bitcoin -= 5f')
 assert 'SharedFramesPerSecond = 24f' in app
-assert 'Mathf.Max(1, ActiveConnections) / SharedFramesPerSecond' in app
+assert 'ProFramesPerSecond = 60f' in app
+assert 'premium ? 1f / ProFramesPerSecond' in app
+assert 'Mathf.Max(1, FreeConnections) / SharedFramesPerSecond' in app
+assert '!viewer.premium' in body(app, 'private static int FreeConnections')
 assert 'Application.targetFrameRate' not in app and 'Time.captureFramerate' not in app
 assert 'system.Fault();' in body(app, 'public override void Open(string content)')
 assert 'viewers[i].DisconnectSystem(system)' in app
@@ -108,8 +111,9 @@ assert 'banner != null ? banner : Resources.Load<Sprite>("RemoteDesk/pro_banner"
 assert 'artwork == null' in offer and 'Debug.LogError(' in offer
 assert 'buy.gameObject.AddComponent<Button>().onClick.AddListener(Purchase)' in offer
 assert 'titleText.text = "Buy pro!"' in offer
-assert 'canMaximize = false' in offer and 'maximize.gameObject.SetActive(false)' in offer
+assert 'canMaximize = false' in offer and 'button.gameObject.SetActive(false)' in offer
 assert 'public override void Maximize() { }' in offer
+assert 'public override void Minimize() { }' in offer
 assert 'posterAspect / ScreenStretch(host)' in offer
 assert 'Stretch(poster);' in offer and 'AspectRatioFitter' not in offer
 assert 'RectTransformUtility.WorldToScreenPoint' in offer
@@ -118,6 +122,16 @@ for stretch in (.5, 1., 1.8):
 assert 'proButton = Button("Buy Pro' not in app
 assert 'heading' not in layout
 assert 'proButton.gameObject.SetActive(!focused && !premium)' in layout
+assert 'uploadButton.gameObject.SetActive(focused)' in layout
+assert 'Button("Upload", transform,' in build_ui
+assert 'uploadBelowTitle ? 50f : 8f' in layout
+upload = body(app, 'private void Upload()')
+assert 'system.SelectFile("*", source =>' in upload
+assert 'int destinationId = chosen.id' in upload
+assert 'source.isFolder' in upload and 'source.content ?? ""' in upload
+assert 'target.os.FileManager.Create(0, copy)' in upload
+assert 'target.os.RefreshDesktopIcon()' in upload
+assert 'new File(name, content, false,' in upload
 for name in ('idInput', 'connectButton', 'statusText'):
     assert name + '.gameObject.SetActive(!focused)' in layout
 assert 'gridButton' not in app
@@ -141,6 +155,7 @@ root = next(b['MonoBehaviour'] for b in blocks if 'MonoBehaviour' in b
 assert root['m_Script']['guid'] == '7667aa25a2294de8abfd1e49fae971dd'
 assert root['size'] == 280
 assert root['windowState']['fileID'] != 0
+assert root['icon']['guid'] == '5225909a642e461eba4c04954de2747c'
 names = {b['GameObject']['m_Name']: b['GameObject'] for b in blocks if 'GameObject' in b}
 assert names['Scroll View']['m_IsActive'] == 0 and names['Refresh']['m_IsActive'] == 0
 assert names['Close']['m_IsActive'] == 1
@@ -165,8 +180,15 @@ offer_root = next(b['MonoBehaviour'] for b in offer_blocks if 'MonoBehaviour' in
 assert offer_root['m_Script']['guid'] == '557f8184d90d4dff9ae9a31297a679b2'
 assert offer_root['banner']['guid'] == '979c1648735b4489943f73574502406d'
 assert offer_root['windowState']['fileID'] != 0
+assert offer_root['icon']['guid'] == root['icon']['guid']
 assert 'm_Text: Buy pro!' in offer_prefab.read_text()
 assert 'm_SizeDelta: {x: 320, y: 720}' in offer_prefab.read_text()
-assert {b['GameObject']['m_Name'] for b in offer_blocks if 'GameObject' in b} >= {'Title','Close','Maximize','Minimize'}
+offer_names = {b['GameObject']['m_Name']: b['GameObject'] for b in offer_blocks if 'GameObject' in b}
+assert offer_names['Maximize']['m_IsActive'] == 0 and offer_names['Minimize']['m_IsActive'] == 0
+assert offer_names['Close']['m_IsActive'] == 1
+icon = project / 'Assets/Resources/RemoteDesk/remote_icon.png'
+assert icon.exists() and icon.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n'
+icon_meta = icon.with_name(icon.name + '.meta').read_text()
+assert 'textureType: 8' in icon_meta and root['icon']['guid'] in icon_meta
 print('PASS: RemoteDesk installation, Pro banner/purchase, FPS, capture/input and prefab checks')
 print('NOTE: Unity Editor/Play Mode required for pixels, raycast alignment, drag and keyboard verification')

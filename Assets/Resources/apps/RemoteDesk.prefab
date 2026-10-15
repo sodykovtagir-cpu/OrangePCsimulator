@@ -1159,7 +1159,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   appName: RemoteDesk
-  icon: {fileID: 21300000, guid: 96deafda1a165f7499daf6d36e798208, type: 2}
+  icon: {fileID: 21300000, guid: 5225909a642e461eba4c04954de2747c, type: 3}
   fileName:
   fileIcon: {fileID: 0}
   size: 280
