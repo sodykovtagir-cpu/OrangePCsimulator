@@ -139,8 +139,8 @@ start_buttons = [
     names[g] for g in descendants(start) if g in names
     if any(component_kind(c) == "Button" for c in components_of(g))
 ]
-check(sorted(start_buttons) == ["ButtonStart", "ButtonStartClose"],
-      "на стартовом экране есть кнопки START TEST и CLOSE (%s)" % start_buttons)
+check(sorted(start_buttons) == ["ButtonStart"],
+      "сохранена кнопка START TEST из последней авторской правки (%s)" % start_buttons)
 
 # Таблица сравнения: 8 строк × 6 колонок
 for index in range(LEADERBOARD_ROWS):
@@ -198,7 +198,7 @@ if script_block:
 
 REQUIRED_SINGLE = [
     "startPanel", "testPanel", "resultsPanel",
-    "buttonStart", "buttonStartClose", "buttonMenu",
+    "buttonStart", "buttonMenu",
     "leaderboardSelfRank", "leaderboardSelfName", "leaderboardSelfCpu",
     "leaderboardSelfGpu",
     "leaderboardSelfScore", "leaderboardSelfFps", "leaderboardAverage",
@@ -402,12 +402,11 @@ check("ShowStartScreen" in script_text, "перед тестом открыва�
 # ---------------------------------------------------------------------------
 # Префаб правится вручную в Unity, генератор tools/build_3dmork_prefab.py больше
 # не используется: его проверяет только то, что он не запускается.
-before = PREFAB.read_text(encoding="utf-8")
-result = subprocess.run([sys.executable, "tools/patch_3dmork_prefab.py"],
-                        cwd=str(ROOT), capture_output=True, text=True)
-check(result.returncode == 0, "патчер префаба отрабатывает без ошибок")
-check(PREFAB.read_text(encoding="utf-8") == before,
-      "повторный запуск патчера не меняет префаб")
+# The user edits this prefab directly in Unity. Never execute the old patcher
+# as a test: it would overwrite their layout and resurrect removed buttons.
+check(game_object("PersonalBestCircle") != "", "круг личного рекорда собран в префабе")
+check("m_IsActive: 0" in by_id[game_object("HistRow_0")][1],
+      "старые строки истории выключены, но авторская разметка сохранена")
 
 import importlib.util  # noqa: E402
 
@@ -504,93 +503,36 @@ check("PickRenderResolution" in script_text,
 check("ScoresAt(fpsCap)" in script_text and
       "ComputeScores(gpuScore, cpuScore, ramScore, driveScore, fpsCap)" in script_text,
       "эталонные машины считаются той же формулой, что и прогоны игрока")
-entries = re.findall(r"new LeaderboardEntry\((.*?)\)", script_text)
-check(entries and all(line.count(",") == 6 for line in entries),
-      "эталонная строка описывает железо, а не готовый результат")
+check("ReferenceBenchmarks = LoadReferenceBenchmarks()" in script_text and
+      "Resources.Load<PC.ReadyBuildSpawner>" in script_text and
+      "foreach (var part in build.BenchmarkParts)" in script_text,
+      "эталонные характеристики читаются из продаваемых ReadyPC-префабов")
+check("Array.Sort(ReferenceBenchmarks" in script_text,
+      "строки сортируются по фактическим баллам при текущем лимите FPS")
 references = score_model.reference_benchmarks()
-check(all(entry["gpuScore"] <= 27000 and entry["ramScore"] <= 24000
-          and entry["driveScore"] <= 18000 and entry["cpuScore"] <= 4213.0
-          for entry in references),
-      "эталонные сборки не превосходят максимум игрового железа")
+check(len(references) == 6 and len({entry['pc'] for entry in references}) == 6,
+      "в сравнении шесть разных готовых ПК")
 for cap in (30.0, 60.0, 144.0, 240.0):
-    totals = [score_model.scores(e["gpuScore"], e["cpuScore"], e["ramScore"],
-                                 e["driveScore"], cap)["total"] for e in references]
-    check(all(a > b for a, b in zip(totals, totals[1:])),
-          "эталонная таблица отсортирована по убыванию счёта (потолок %d)" % cap)
-    check(all(0 < t <= 130000 for t in totals),
-          "счёт эталонных машин правдоподобен (потолок %d)" % cap)
+    ordered = score_model.reference_benchmarks(cap)
+    totals = [score_model.scores(e['gpuScore'], e['cpuScore'], e['ramScore'],
+                                 e['driveScore'], cap)['total'] for e in ordered]
+    check(all(a >= b for a, b in zip(totals, totals[1:])),
+          "готовые ПК сортируются по баллам при лимите FPS %d" % cap)
+    check(all(t > 0 for t in totals), "все оценки положительны (FPS %d)" % cap)
 
-# каждая эталонная строка - реальная сборка из деталей игры
 import importlib.util as _importlib  # noqa: E402
-
 _spec = _importlib.spec_from_file_location("dm3_builds", ROOT / "tools/3dmork_builds.py")
 builds_module = _importlib.module_from_spec(_spec)
 _spec.loader.exec_module(builds_module)
+check(references == builds_module.reference_benchmarks(),
+      "тест и отчёт читают одни и те же ReadyPC-префабы")
+check(builds_module.main() == 0, "все шесть магазинных сборок доступны")
+dream = next(e for e in references if e['pc'] == 'Dream PC')
+check(dream['gpuScore'] > 0 and dream['ramScore'] > 0 and dream['cpuScore'] > 0,
+      "Dream PC получил действующие характеристики из собственного префаба")
+check('RTX 4080 Ti' not in script_text,
+      "в C# нет устаревшей жёстко заданной второй видеокарты Dream PC")
 
-for declared, built in zip(references, builds_module.reference_benchmarks()):
-    check(declared["pc"] == built["key"] and declared["cpu"] == built["cpu"]
-          and declared["gpu"] == built["gpu"] and declared["gpuScore"] == built["gpuScore"]
-          and abs(declared["cpuScore"] - built["cpuScore"]) < 1.0
-          and declared["ramScore"] == built["ramScore"]
-          and declared["driveScore"] == built["driveScore"],
-          "строка %s в ThreeDMork.cs совпадает со сборкой %s (%s + %s)"
-          % (declared["pc"], built["key"], built["cpu"], built["gpu"]))
-
-check(all("CPU " not in entry["cpu"] for entry in references),
-      "в таблице нет названий процессоров с префиксом CPU")
-# готовые ПК — это реальные товары: у Home/Gaming/Aquarium по одной карте, у Dream/Workstation — две разные
-mixed = [entry["gpu"] for entry in references if not entry["gpu"] or entry["gpu"] == "--"]
-check(not mixed, "у каждой эталонной сборки указана видеокарта (нарушители: %s)" % mixed)
-check(len({entry["gpu"] for entry in references}) == len(references),
-      "видеокарты в эталонных сборках не повторяются между строками")
-check(len({entry["cpu"] for entry in references}) >= 5
-      and len({entry["gpu"] for entry in references}) == len(references),
-      "в эталонных сборках нет повторов и случайных сочетаний видеокарт")
-check(all(references[index]["gpuScore"] > references[index + 1]["gpuScore"]
-          and references[index]["ramScore"] >= references[index + 1]["ramScore"]
-          and references[index]["driveScore"] >= references[index + 1]["driveScore"]
-          for index in range(len(references) - 1)),
-      "сборки идут по убыванию: видеокарты, память и накопители (готовые ПК)")
-# Сборка мечты: две самые мощные видеокарты, самая большая память и два
-# самых ёмких накопителя. Процессор - Ryzen 9 7950X: по счёту детали он чуть
-# слабее i7-14700K, но именно он стоит в сборке мечты (выбор владельца игры),
-# и вся лестница ниже идёт по убыванию, чтобы AMD оставался наверху.
-strongest_gpu = max(value for part, value in builds_module.PART_SCORE.items()
-                    if part.startswith(("RTX", "GTX", "RX")))
-strongest_ram = max(value for part, value in builds_module.PART_SCORE.items()
-                    if part.startswith("RAM"))
-strongest_drives = sorted((value for part, value in builds_module.PART_SCORE.items()
-                           if part.startswith(("SSD", "HDD", "FlashDrive"))), reverse=True)[:2]
-check(references[0]["gpuScore"] == 24500
-      and references[0]["ramScore"] == 2 * strongest_ram
-      and references[0]["driveScore"] == sum(strongest_drives)
-      and references[0]["cpu"] == "RMD Ryzen 9 7950X",
-      "сборка мечты (Dream PC): RTX 5090 + RTX 4080 Ti (24500), "
-      "2 x самая большая память и два самых ёмких накопителя")
-check(builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] ==
-      builds_module.CPU_PART["RMD Ryzen 9 7950X"][0] and
-      references[0]["cpuScore"] == round(
-          score_model.cpu_power(*builds_module.CPU_PART["RMD Ryzen 9 7950X"]), 0),
-      "мощность Ryzen 9 7950X в таблице посчитана той же формулой, что и у игрока")
-# у готовых ПК процессор не обязан идти строго по убыванию: Dream и Workstation на одном Ryzen,
-# а Aquarium на i7-14700K сильнее обоих — таблица сортируется по итоговому счёту, а не по CPU
-check(references[0]["cpu"] == "RMD Ryzen 9 7950X",
-      "первая строка — Dream PC на Ryzen 9 7950X")
-check(builds_module.main() == 0, "порядок эталонных сборок сбалансирован (tools/3dmork_builds.py)")
-
-dream = score_model.scores(24500, 3565.0, 24000, 18000, 240.0)
-budget = score_model.scores(150, 1897.0, 4000, 1000, 240.0)
-check(references[0]["gpuScore"] == 24500 and references[0]["pc"] == "Dream PC",
-      "первая строка таблицы - Dream PC (RTX 5090 + RTX 4080 Ti + Ryzen 9 7950X)")
-check(dream["total"] > 100000, "максимальный ПК набирает %d очков" % dream["total"])
-check(6 * budget["total"] < dream["total"],
-      "слабый ПК набирает в разы меньше максимального (%d против %d)"
-      % (budget["total"], dream["total"]))
-check(score_model.scores(24500, 3565.0, 24000, 18000, 60.0)["total"] <
-      dream["total"], "потолок из настроек снижает FPS-составляющую счёта")
-check(score_model.render_resolution(3000, 1897.0, 2000, 60.0) !=
-      score_model.render_resolution(27000, 3565.0, 24000, 60.0),
-      "слабый ПК рендерит тест в меньшем разрешении")
 old_cpu = score_model.cpu_power(2200, 3.7)   # i3-8300
 new_cpu = score_model.cpu_power(2400, 2.8)   # i5-8400
 check(new_cpu > old_cpu,

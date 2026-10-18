@@ -76,6 +76,10 @@ namespace PC
 		[SerializeField]
 		private Part[] parts;
 
+		/// <summary>Actual parts of the shop prefab, used by 3DMork's reference table.
+		/// No assembly is spawned or simulated just to read benchmark specs.</summary>
+		public IReadOnlyList<Part> BenchmarkParts => parts ?? System.Array.Empty<Part>();
+
 		[SerializeField]
 		[Tooltip("Пауза между установками. Ноль — вся сборка за один кадр, " +
 			"физика не успевает ничего сломать")]

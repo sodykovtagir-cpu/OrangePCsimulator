@@ -86,21 +86,17 @@ def render_resolution(gpu: int, cpu: float, ram: int, fps_cap: float) -> tuple:
     return RESOLUTIONS[-1]
 
 
-def reference_benchmarks() -> list:
-    """Эталонные машины прямо из ThreeDMork.cs, в порядке объявления."""
-    text = open(SCRIPT, encoding="utf-8").read()
-    block = re.search(r"ReferenceBenchmarks =\s*\{(.*?)\n\t\t\};", text, re.S)
-    assert block, "ReferenceBenchmarks not found in " + SCRIPT
-    rows = []
-    for match in re.finditer(
-            r'new LeaderboardEntry\("([^"]+)", "([^"]+)", "([^"]+)", '
-            r'(\d+), (\d+)f, (\d+), (\d+)\)', block.group(1)):
-        rows.append({
-            "pc": match.group(1), "cpu": match.group(2), "gpu": match.group(3),
-            "gpuScore": int(match.group(4)), "cpuScore": float(match.group(5)),
-            "ramScore": int(match.group(6)), "driveScore": int(match.group(7)),
-        })
-    assert len(rows) == 6, "expected 6 reference machines (готовые ПК), got %d" % len(rows)
+def reference_benchmarks(fps_cap: float = 240.0) -> list:
+    """Read six real ReadyBuildSpawner prefabs and order by displayed score."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "ready_pc_reference", os.path.join(HERE, "ready_pc_reference.py"))
+    reference = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reference)
+    rows = reference.read_builds()
+    rows.sort(key=lambda row: scores(row["gpuScore"], row["cpuScore"],
+                                      row["ramScore"], row["driveScore"],
+                                      fps_cap)["total"], reverse=True)
     return rows
 
 

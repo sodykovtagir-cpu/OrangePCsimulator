@@ -1024,3 +1024,34 @@ add_map("3DMork build 8", {
     "LV": "Budžeta", "VN": "Máy kinh tế", "GR": "Οικονομική", "BRL": "Econômico", "SK": "Rozpočtový",
     "SW": "Bei ya bei", "FA": "اقتصادی",
 })
+
+# Headings are sentence case, not ALL CAPS. Keep hardware acronyms and the
+# 3DMork brand. The main translation table is generated from these values.
+import re as _re
+
+
+def _sentence_case_heading(value):
+    letters = [c for c in value if c.isalpha()]
+    if not letters or sum(c.isupper() for c in letters) < .78 * len(letters):
+        return value
+    text = value.lower()
+    acronyms = {"3dmork": "3DMork", "pcs": "PCs", "pc": "PC", "cpu": "CPU",
+                "gpu": "GPU", "fps": "FPS", "пк": "ПК", "цп": "ЦП"}
+    text = _re.sub(r"\b(?:3dmork|pcs|pc|cpu|gpu|fps|пк|цп)\b",
+                   lambda m: acronyms[m.group(0)], text, flags=_re.I)
+    if not text.startswith("3DMork"):
+        first = next((i for i, c in enumerate(text) if c.isalpha()), None)
+        if first is not None:
+            text = text[:first] + text[first].upper() + text[first + 1:]
+    return text.replace("3DMOrk", "3DMork")
+
+
+for _key in ("3DMork comparison title", "3DMork results title", "3DMork score label",
+             "3DMork hardware title", "3DMork column score", "3DMork column date",
+             "3DMork column gpu"):
+    STRINGS[_key] = [_sentence_case_heading(v) for v in STRINGS[_key]]
+
+_store("3DMork personal best title", [
+    _sentence_case_heading(_re.sub(r"\s*[:：]?\s*\{0\}\s*$", "", v).strip(" :："))
+    for v in STRINGS["3DMork best score"]
+])

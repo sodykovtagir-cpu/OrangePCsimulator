@@ -100,7 +100,7 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Text leaderboardAverage;
 
-		[Header("Start Screen - Local Test History (this PC)")]
+		[Header("Start Screen - Personal best (this PC)")]
 		[SerializeField]
 		private Text[] historyIndex;
 
@@ -203,11 +203,19 @@ namespace PC.Component.Software
 		private float cameraFov = 65f;
 
 		private const int LeaderboardRows = 6;
-		private const int HistoryRows = 5;
 		private const int MaxHistoryEntries = 12;
 		private const string HistoryPrefsKey = "3DMork_History";
 		private const string BestScorePrefsKey = "3DMork_Score";
 		private const string FormulaPrefsKey = "3DMork_Formula";
+
+		// The original keys were global, so old records cannot reliably be
+		// assigned to one particular PC. Leave them untouched and start
+		// motherboard-scoped records rather than showing another PC's score.
+		private string PrefsKey(string prefix)
+		{
+			return prefix + "_" + (system != null && system.Board != null
+				? system.SystemId.ToString("X8") : "unknown");
+		}
 		/// <summary>Версия формулы очков. Меняется вместе с пересчётом результатов.</summary>
 		private const int FormulaVersion = 4;
 
@@ -261,19 +269,15 @@ namespace PC.Component.Software
 		}
 
 		/// <summary>
-		/// Референсные максимумы игрового железа (значения из ассетов):
-		/// потолки берутся из самых мощных деталей игры (2 x RTX 5090 = 27000,
-		/// 2 x 64 ГБ RGB = 24000, SSD 16 ТБ + M.2 8 ТБ = 18000, RMD Ryzen 9 7950X = 3645).
-		/// Готовые ПК в таблице — усечённые до 2 планок/2 накопителей: Dream PC идёт
-		/// с RTX 5090 + RTX 4080 Ti (24500) и 2 x 64 ГБ, поэтому не достигает потолка
-		/// GPU, но остаётся на первом месте за счёт памяти и накопителей.
+		/// Нормировочные значения формулы (не характеристики продаваемых ПК).
+		/// Реальные CPU/GPU/RAM/накопители таблица читает из ReadyPC-префабов.
 		/// </summary>
 		private const float RefGpuScore = 27000f;
 		private const float RefCpuScore = 3645f;
 		private const float RefRamScore = 24000f;
 		private const float RefDriveScore = 18000f;
 
-		/// <summary>Потолки категорий: максимум, который набирает эталонная сборка.</summary>
+		/// <summary>Потолки шкал категорий для нормировки очков.</summary>
 		private const float GraphicsCeiling = 160000f;
 		private const float PhysicsCeiling = 50000f;
 		private const float MemoryCeiling = 32000f;
@@ -310,24 +314,57 @@ namespace PC.Component.Software
 			public int achievedFps;
 		}
 
-		/// <summary>
-		/// Эталонные результаты других машин — теперь это 6 готовых ПК из магазина
-		/// (Ready PC) в усечённом виде: 2 планки памяти, 2 накопителя (у Office — 1),
-		/// видеокарты — как продаётся (1 или 2, одинаковые или разные). Каждая строка
-		/// — точный товар из Shop.asset, очки считаются той же формулой, что и прогон
-		/// купленного ПК, поэтому таблица всегда соответствует магазину.
-		/// Сортировка по убыванию итогового счёта, Dream PC на первом месте.
-		/// Список продублирован в tools/3dmork_builds.py, тесты сверяют оба источника.
-		/// </summary>
-		private static readonly LeaderboardEntry[] ReferenceBenchmarks =
+		// These are the six shop products, not another hardcoded set of specs.
+		private static readonly string[] ReadyPcModels =
 		{
-			new LeaderboardEntry("Dream PC", "RMD Ryzen 9 7950X", "RTX 5090 + RTX 4080 Ti", 24500, 3565f, 24000, 18000),
-			new LeaderboardEntry("Workstation PC", "RMD Ryzen 9 7950X", "RTX 4080 Ti + Titan V", 16800, 3565f, 24000, 12000),
-			new LeaderboardEntry("Aquarium PC", "i7-14700K", "RTX 5090", 13500, 4213f, 12000, 11000),
-			new LeaderboardEntry("Gaming PC", "i9-12900K", "RTX 4080", 10000, 3702f, 12000, 11000),
-			new LeaderboardEntry("Home PC", "i5-8400", "GTX 1060", 3000, 2256f, 6000, 5200),
-			new LeaderboardEntry("Office PC", "Celeron G3920", "GT 440", 150, 1897f, 4000, 1000)
+			"Dream", "Workstation", "Aquarium", "Gaming", "Home", "Office"
 		};
+
+		private static readonly LeaderboardEntry[] ReferenceBenchmarks = LoadReferenceBenchmarks();
+
+		/// <summary>Read exactly the parts that the Ready PC shop prefab installs.
+		/// Editing the shop's build changes the benchmark table automatically.</summary>
+		private static LeaderboardEntry[] LoadReferenceBenchmarks()
+		{
+			var entries = new List<LeaderboardEntry>();
+			foreach (string model in ReadyPcModels)
+			{
+				var build = Resources.Load<PC.ReadyBuildSpawner>(
+					"components/ready/ReadyPC_" + model + "_Black");
+				if (build == null) continue;
+				int gpu = 0, ram = 0, drive = 0;
+				float cpu = 0f;
+				string cpuName = "", gpuName = "";
+				int gpuCount = 0;
+				foreach (var part in build.BenchmarkParts)
+				{
+					if (part == null || part.prefab == null) continue;
+					var hardware = part.prefab.GetComponent<Hardware>();
+					if (hardware == null) continue;
+					switch (part.slotTarget)
+					{
+						case "GPU":
+							gpu += hardware.Score;
+							string name = CleanName(part.prefab.name);
+							gpuName = gpuCount++ == 0 ? name : gpuName + " + " + name;
+							break;
+						case "CPU":
+							var processor = hardware as CPU;
+							if (processor != null) cpu += CpuPower(processor);
+							cpuName = CleanName(part.prefab.name);
+							break;
+						case "RAM": ram += hardware.Score; break;
+						case "Drive": drive += hardware.Score; break;
+					}
+				}
+				if (cpu <= 0f || ram <= 0) continue;
+				// The Office PC has integrated graphics, just like CollectHardware().
+				if (gpu == 0) { gpu = 200; gpuName = "Integrated"; }
+				entries.Add(new LeaderboardEntry(model + " PC", cpuName, gpuName,
+					gpu, cpu, ram, drive));
+			}
+			return entries.ToArray();
+		}
 
 		/// <summary>Мощность процессора для бенчмарка.</summary>
 		/// <remarks>
@@ -489,11 +526,11 @@ namespace PC.Component.Software
 		/// </summary>
 		private void ResetStaleResults()
 		{
-			if (PlayerPrefs.GetInt(FormulaPrefsKey, 0) == FormulaVersion) return;
+			if (PlayerPrefs.GetInt(PrefsKey(FormulaPrefsKey), 0) == FormulaVersion) return;
 
-			PlayerPrefs.DeleteKey(HistoryPrefsKey);
-			PlayerPrefs.DeleteKey(BestScorePrefsKey);
-			PlayerPrefs.SetInt(FormulaPrefsKey, FormulaVersion);
+			PlayerPrefs.DeleteKey(PrefsKey(HistoryPrefsKey));
+			PlayerPrefs.DeleteKey(PrefsKey(BestScorePrefsKey));
+			PlayerPrefs.SetInt(PrefsKey(FormulaPrefsKey), FormulaVersion);
 			PlayerPrefs.Save();
 		}
 
@@ -547,7 +584,7 @@ namespace PC.Component.Software
 				var snapshot = CollectHardware();
 				RefreshHardwareSummary(snapshot);
 				RefreshLeaderboard(snapshot);
-				RefreshHistory();
+				RefreshPersonalBest();
 			}
 
 			RefreshTestTexts();
@@ -588,7 +625,7 @@ namespace PC.Component.Software
 
 		/// <summary>
 		/// Показывает стартовый экран: сравнительная таблица других ПК,
-		/// история тестов на этой машине и сводка по текущему железу.
+		/// личный рекорд этой машины и сводка по текущему железу.
 		/// Вся разметка заранее собрана в префабе, скрипт только заполняет текст.
 		/// </summary>
 		public void ShowStartScreen()
@@ -612,7 +649,7 @@ namespace PC.Component.Software
 			var snapshot = CollectHardware();
 			RefreshHardwareSummary(snapshot);
 			RefreshLeaderboard(snapshot);
-			RefreshHistory();
+			RefreshPersonalBest();
 		}
 
 		private void RefreshHardwareSummary(HardwareSnapshot snapshot)
@@ -680,6 +717,10 @@ namespace PC.Component.Software
 			// Эталонные машины считаются по той же формуле и с тем же потолком
 			// кадров, что и прогон игрока, поэтому таблица всегда сопоставима.
 			float fpsCap = GetFpsCap();
+			// Sort the actual shop products by the scores displayed at the
+			// player's current FPS cap, not by a fixed or brand-name order.
+			Array.Sort(ReferenceBenchmarks, (a, b) => b.ScoresAt(fpsCap).total.CompareTo(
+				a.ScoresAt(fpsCap).total));
 			int sum = 0;
 
 			for (int i = 0; i < LeaderboardRows; i++)
@@ -740,33 +781,17 @@ namespace PC.Component.Software
 			}
 		}
 
-		private void RefreshHistory()
+		/// <summary>The circular badge is authored in 3DMork.prefab;
+		/// only its value changes when this PC sets a new record.</summary>
+		private void RefreshPersonalBest()
 		{
-			var history = LoadHistory();
-
-			for (int i = 0; i < HistoryRows; i++)
-			{
-				bool hasRow = i < history.Count && history[i] != null;
-				int number = hasRow ? history.Count - i : 0;
-
-				SetCell(historyIndex, i, hasRow ? "#" + number : "--");
-				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--");
-				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--");
-				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() : "--");
-			}
-
-			if (historyEmpty != null) historyEmpty.gameObject.SetActive(history.Count == 0);
-
 			if (historyBest != null)
 			{
 				int best = GetBestScore();
-				historyBest.text = Format("3DMork best score", best > 0
-					? best.ToString()
-					: Tr("3DMork no runs yet"));
+				historyBest.text = best > 0 ? best.ToString() : "—";
 			}
 		}
 
-		// Only update dynamic values; Text color belongs to 3DMork.prefab.
 		private static void SetCell(Text[] cells, int index, string value)
 		{
 			if (cells == null || index < 0 || index >= cells.Length) return;
@@ -802,15 +827,15 @@ namespace PC.Component.Software
 			return (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
 		}
 
-		private static int GetBestScore()
+		private int GetBestScore()
 		{
-			return PlayerPrefs.GetInt(BestScorePrefsKey, 0);
+			return PlayerPrefs.GetInt(PrefsKey(BestScorePrefsKey), 0);
 		}
 
-		private static List<HistoryEntry> LoadHistory()
+		private List<HistoryEntry> LoadHistory()
 		{
 			var result = new List<HistoryEntry>();
-			string json = PlayerPrefs.GetString(HistoryPrefsKey, string.Empty);
+			string json = PlayerPrefs.GetString(PrefsKey(HistoryPrefsKey), string.Empty);
 			if (string.IsNullOrEmpty(json)) return result;
 
 			try
@@ -832,7 +857,7 @@ namespace PC.Component.Software
 			return result;
 		}
 
-		private static void PushHistory(int score, int fps, int graphics, int physics, int memory)
+		private void PushHistory(int score, int fps, int graphics, int physics, int memory)
 		{
 			var history = LoadHistory();
 
@@ -848,11 +873,11 @@ namespace PC.Component.Software
 
 			while (history.Count > MaxHistoryEntries) history.RemoveAt(history.Count - 1);
 
-			PlayerPrefs.SetString(HistoryPrefsKey, JsonUtility.ToJson(new HistoryData { entries = history }));
+			PlayerPrefs.SetString(PrefsKey(HistoryPrefsKey), JsonUtility.ToJson(new HistoryData { entries = history }));
 
 			if (GetBestScore() < score)
 			{
-				PlayerPrefs.SetInt(BestScorePrefsKey, score);
+				PlayerPrefs.SetInt(PrefsKey(BestScorePrefsKey), score);
 			}
 
 			PlayerPrefs.Save();
