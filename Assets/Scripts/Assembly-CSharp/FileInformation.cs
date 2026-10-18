@@ -661,9 +661,9 @@ public class FileInformation : MonoBehaviour
 		tex.filterMode = FilterMode.Point;
 		var px = new Color32[s * s];
 		var bg = new Color32(22, 22, 22, 255);
-		var frame = new Color32(190, 190, 190, 255);
+		var frame = new Color32(255, 136, 0, 255);
 		var icon = new Color32(90, 90, 90, 255);
-		var sun = new Color32(190, 190, 190, 255);
+		var sun = new Color32(255, 136, 0, 255);
 		for (int i = 0; i < px.Length; i++) px[i] = bg;
 		for (int i = 0; i < s; i++)
 		{
