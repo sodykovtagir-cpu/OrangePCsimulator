@@ -48,7 +48,7 @@ def generate_os_fixture():
     wanted_fields = set("""
         fileIconPrefab iconParent desktop folderSprite fileIcons iconPositions desktopFileKeys
         iconLayoutInitialized iconGridColumns SharedIconLayoutContext DefaultSortMode currentSortMode clockText
-        fullscreenIconPositions iconViewInitialized iconViewDirty lastIconViewFullscreen lastIconViewCanvas
+        fullscreenIconPositions monitorIconPositions iconViewInitialized iconViewDirty lastIconViewFullscreen lastIconViewCanvas
         lastIconViewportSize lastIconViewportPadding desktopFileSnapshot fileRefreshPending nextFileSystemScan FileSystemScanInterval
     """.split())
     members, found_methods, found_fields = [], set(), set()

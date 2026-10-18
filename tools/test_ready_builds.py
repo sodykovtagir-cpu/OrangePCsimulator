@@ -1756,123 +1756,24 @@ _art_path = ROOT / "Assets/Scripts/Assembly-CSharp/GpuArtifacts.cs"
 check(_art_path.exists(), "есть эффект артефактов на экране")
 _art_src = _strip_comments(_art_path.read_text(encoding="utf-8"))
 check("raycastTarget = false" in _art_src,
-      "полосы артефактов не перехватывают нажатия по рабочему столу")
-check("gpu.Damaged) continue" in _art_src,
-      "мёртвая карта не рисует артефакты — она вообще не даёт сигнала")
-
-# Артефакты должны быть видны ВЕЗДЕ, а не только на загрузке.
-check("is Bios" not in _art_src,
-      "эффект не ограничен экраном BIOS")
-
-# ПРИЧИНА, по которой полос не было видно в первой версии: и загрузка системы
-# (Display.ApplyScreen), и окна, и меню «Пуск» зовут SetAsLastSibling, вставая
-# последними среди потомков — то есть поверх всего, что добавлено раньше.
-# Поэтому эффекту нужен собственный Canvas с перекрытием сортировки.
-# КРИТИЧНО: камера экрана снимает только слой UI, а new GameObject создаёт
-# объект на слое Default. Из-за этого артефакты существовали, но были не видны
-# вообще — камера их просто не рендерила. Объекты обязаны наследовать слой.
-# Нажатие на монитор (Display.ZoomIn) переводит канвас в ScreenSpaceOverlay.
-# Unity такому канвасу каждый кадр сама переписывает позицию и размер, а ZoomOut
-# ещё и принудительно сбрасывает localPosition/localScale/sizeDelta. Двигать сам
-# канвас нельзя — искажение затрётся именно в приближении.
-_screenroot = _art_src.split("private RectTransform ScreenRoot()")[1].split("\n\t}")[0]
-check("childCount" in _screenroot and "GetChild" in _screenroot,
-      "искажение двигает содержимое экрана, а не сам канвас (переживает зум)")
-check(re.search(r"child == layer\) continue", _screenroot) is not None,
-      "слой артефактов не выбирается как картинка экрана")
-
-# Зум перекладывает иерархию, окна зовут SetAsLastSibling при каждом касании.
-_redraw_body = _art_src.split("private void Redraw(")[1].split("\n\t}")[0]
-check("SetAsLastSibling" in _redraw_body,
-      "слой артефактов подтверждает место наверху при каждой перерисовке")
-check("sortingOrder = ArtifactSortingOrder" in _redraw_body,
-      "порядок сортировки восстанавливается после смены режима канваса")
-
-check("NewUiObject" in _art_src,
-      "объекты артефактов создаются через помощник, задающий слой")
-check(re.search(r"go\.layer = parent\.gameObject\.layer", _art_src) is not None,
-      "созданный объект наследует слой родителя (иначе камера его не увидит)")
-_raw_new = re.findall(r"new GameObject\(", _art_src)
-check(len(_raw_new) == 1,
-      f"прямых new GameObject не осталось, кроме помощника (нашлось {len(_raw_new)})")
-
-check("overrideSorting = true" in _art_src,
-      "у слоя артефактов своя сортировка")
-_so = re.search(r"ArtifactSortingOrder = (\d+)", _art_src)
-check(_so is not None, "порядок сортировки слоя задан")
-if _so:
-    check(int(_so.group(1)) >= 1000,
-          f"слой артефактов заведомо выше окон и рабочего стола ({_so.group(1)})")
-check(re.search(r"sortingOrder = ArtifactSortingOrder", _art_src) is not None,
-      "порядок действительно применяется к Canvas слоя")
-check(re.search(r"typeof\(Canvas\)", _art_src) is not None,
-      "слой артефактов — отдельный Canvas, а не просто объект")
-
-# Warp обязан двигать САМ экран, иначе он возит прозрачный слой и толку ноль.
-# Срез строго по телу метода: "\n\t}" — закрывающая скобка на уровне класса.
-# Резать по следующему комментарию нельзя, комментария может не оказаться, и
-# тогда в срез попадёт соседний метод.
-_warp = _art_src.split("private void DrawWarp(")[1].split("\n\t}")[0]
-check("ScreenRoot()" in _warp,
-      "искажение двигает картинку экрана, а не слой артефактов")
-check("Parent()" not in _warp,
-      "искажение не трогает слой артефактов")
-
-# Виды сбоя. Однообразные полосы выглядели ненатурально — нужно несколько
-# разных исходов, включая «всё обошлось» и синий экран.
-for _g in ["None", "Stripes", "Warp", "ColorShift", "BlueScreen"]:
-    check(re.search(rf"\b{_g}\b", _art_src) is not None,
-          f"есть вид поведения карты: {_g}")
-# Мало объявить вид сбоя — он должен и выпадать, и рисоваться. Проверяем обе
-# стороны: ветку в switch и то, что PickGlitch вообще может его вернуть.
-_redraw = _art_src.split("private void Redraw(")[1].split("\n\t// =")[0]
-for _g, _fn in [("Stripes", "DrawStripes"), ("Warp", "DrawWarp"),
-                ("ColorShift", "DrawColorShift"), ("BlueScreen", "DrawBlueScreen")]:
-    check(re.search(rf"case Glitch\.{_g}:\s*\n\s*{_fn}\(", _redraw) is not None,
-          f"вид сбоя {_g} разбирается в Redraw и рисуется через {_fn}")
-    check(re.search(rf"return Glitch\.{_g};", _art_src) is not None,
-          f"вид сбоя {_g} может выпасть при розыгрыше")
-check(re.search(r"private void DrawBlueScreen\(\)", _art_src) is not None,
-      "синий экран реализован отдельным методом")
-
-# Вид сбоя выбирается ОДИН раз за загрузку. Если решать каждый кадр, виды
-# замелькают вперемешку и это будет выглядеть мусором, а не поломкой.
-check("private bool decided" in _art_src,
-      "решение о сбое запоминается на всю загрузку")
-check(re.search(r"if \(!decided\)", _art_src) is not None,
-      "сбой разыгрывается только когда решение ещё не принято")
-check(re.search(r"decided = false;", _art_src) is not None,
-      "после загрузки решение сбрасывается, следующий запуск разыграет заново")
-
-# Шанс, что всё обойдётся, обязан зависеть от степени повреждения.
-check(re.search(r"if \(Random\.value > strength\) return Glitch\.None;", _art_src)
-      is not None,
-      "слегка задетая карта часто стартует нормально")
-check(re.search(r"Glitch\.BlueScreen", _art_src) is not None
-      and "strength" in _art_src.split("Glitch.BlueScreen")[0][-120:],
-      "синий экран вероятнее у сильно разбитой карты")
-
-# Эффект обязан убирать за собой: сдвинутый канвас нельзя оставить сдвинутым.
-check("ResetVisuals" in _art_src,
-      "экран возвращается в исходное состояние")
-check(re.search(r"screen\.anchoredPosition = Vector2\.zero;", _art_src) is not None
-      and re.search(r"screen\.localScale = Vector3\.one;", _art_src) is not None,
-      "смещение и масштаб ЭКРАНА сбрасываются, иначе картинка останется кривой")
-
-# Эффект не должен сам стать причиной лагов: он обновляется по таймеру.
-check("refreshInterval" in _art_src and "Time.unscaledTime" in _art_src,
-      "артефакты перерисовываются по таймеру, а не каждый кадр")
-check(re.search(r"if \(now < nextRefresh\) return;", _art_src) is not None,
-      "до истечения интервала кадр пропускается")
-check(re.search(r"nextRefresh = now \+ ", _art_src) is not None,
-      "следующая перерисовка планируется от текущего момента")
-_lu = _art_src.split("private void LateUpdate()")[1].split("\n\tprivate ")[0]
-check("Redraw(" in _lu and _lu.index("if (now < nextRefresh) return;") < _lu.index("Redraw("),
-      "проверка таймера стоит ДО перерисовки, а не после")
-check(re.search(r"if \(strength <= 0f\)", _art_src) is not None,
-      "на целой видеокарте эффект ничего не делает")
-
-# Компонент вешается автоматически, иначе пришлось бы править 13 префабов.
+      "GPU-слой не перехватывает клики по экрану")
+check("gpu != null && !gpu.Damaged" in _art_src,
+      "мёртвая видеокарта не выдаёт артефакты")
+check("typeof(RectMask2D)" in _art_src and "viewport.SetParent(screen, false)" in _art_src,
+      "пиксели ограничены прямоугольником экрана")
+check("overrideSorting = true;" not in _art_src and "ArtifactSortingOrder =" not in _art_src,
+      "артефакты не просвечивают через корпус монитора")
+check("viewport.SetAsLastSibling()" in _art_src,
+      "артефакты поверх окон внутри экрана")
+check("texture.SetPixels32(pixels)" in _art_src and "FilterMode.Point" in _art_src,
+      "VRAM-артефакты нарисованы пикселями, а не цветными UI-полосами")
+for _pattern in ("Speckles", "BlueGlyphs", "GreenRows", "ColorBars", "MemoryTiles", "TornBands"):
+    check(f"{_pattern}(strength)" in _art_src,
+          f"реалистичный вид артефактов {_pattern} применяется")
+check("public void WipeBlocksAt(" in _art_src and "texture.SetPixels32(pixels)" in _art_src,
+      "окно может перерисовать повреждённый участок")
+check("Time.unscaledTime" in _art_src and "if (now < nextRefresh) return;" in _art_src,
+      "GPU-эффект обновляется с ограниченной частотой")
 _disp_src = _strip_comments(
     (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Display.cs")
     .read_text(encoding="utf-8"))
@@ -1998,52 +1899,17 @@ check(not _nocd, f"во всех префабах задана защита от
 # ---------------------------------------------------------------------------
 print("\nАртефакты приступами и новые виды сбоя")
 
-# Постоянный шум читается как сломанная игра, а редкие вспышки -- как сломанное
-# железо. Эффект обязан идти эпизодами с паузами.
-check("inEpisode" in _art_src, "артефакты идут приступами, а не постоянно")
-check("episodeUntil" in _art_src, "у приступа есть момент окончания")
-check("NextGapLength" in _art_src and "NextEpisodeLength" in _art_src,
-      "длительность приступа и паузы считаются отдельно")
-
-_lu_body = _art_src.split("private void LateUpdate()")[1].split("\n\tprivate")[0]
-check("inEpisode = !inEpisode" in _lu_body,
-      "приступ и пауза сменяют друг друга")
-check("current = PickGlitch(strength)" in _lu_body,
-      "каждый приступ разыгрывает вид сбоя заново")
-
-# Пауза обязана СОКРАЩАТЬСЯ с ростом повреждения, а приступ -- удлиняться.
-_gap = _art_src.split("private float NextGapLength(")[1].split("\n\t}")[0]
-_epi = _art_src.split("private float NextEpisodeLength(")[1].split("\n\t}")[0]
-_gm = re.search(r"Mathf\.Lerp\(([\d.]+)f, ([\d.]+)f, strength\)", _gap)
-check(_gm is not None and float(_gm.group(2)) < float(_gm.group(1)),
-      "пауза между приступами короче у сильно разбитой карты")
-_em = re.search(r"Mathf\.Lerp\(([\d.]+)f, ([\d.]+)f, strength\)", _epi)
-check(_em is not None and float(_em.group(2)) > float(_em.group(1)),
-      "приступ длиннее у сильно разбитой карты")
-
-for _name in ["ThinStripes", "DeadBlocks", "Rolling", "SignalLoss",
-              "BufferOverflow"]:
-    check(f"{_name} =" in _art_src or f"{_name} = " in _art_src,
-          f"есть вид сбоя {_name}")
-
-_redraw2 = _art_src.split("private void Redraw(")[1].split("\n\t}")[0]
-for _name in ["ThinStripes", "Rolling", "SignalLoss", "BufferOverflow"]:
-    check(f"case Glitch.{_name}:" in _redraw2 and f"Draw{_name}(" in _redraw2,
-          f"{_name} действительно рисуется, а не только объявлен")
-    check(f"return Glitch.{_name};" in _art_src,
-          f"{_name} может выпасть при розыгрыше")
-
-# Выпавшие блоки памяти -- особый случай: они НЕ перерисовываются, иначе их
-# нельзя было бы стереть окном.
-check("blocksPlaced" in _art_src, "блоки памяти рисуются один раз и стоят")
-check("if (!blocksPlaced) DrawDeadBlocks(strength)" in _lu_body,
-      "блоки не перерисовываются каждый кадр")
+# Паузами и короткими сбоями, как на фотографиях реальных повреждений VRAM.
+check("inEpisode = !inEpisode" in _art_src,
+      "короткие приступы чередуются с паузами")
+check("episodeUntil" in _art_src and "episodeGap" in _art_src,
+      "длительность приступов и пауз задана отдельно")
+check("Mathf.Lerp(1f, .15f, strength)" in _art_src,
+      "при сильном повреждении паузы короче")
+check("Mathf.Lerp(.6f, 1.5f, strength)" in _art_src,
+      "при сильном повреждении приступы длиннее")
 check("public void WipeBlocksAt(" in _art_src,
-      "блоки можно стереть, проведя сверху окном")
-
-_wipe = _art_src.split("public void WipeBlocksAt(")[1].split("\n\t}")[0]
-check("Overlaps" in _wipe and "enabled = false" in _wipe,
-      "стирается только то, что реально попало под окно")
+      "перерисовка окна может стереть фрагмент кадра")
 
 _wd = _strip_comments(
     (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/WindowDrag.cs")

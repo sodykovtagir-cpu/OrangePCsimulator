@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""Fast source guards; the final verdict requires a Unity Play Mode smoke test."""
+from pathlib import Path
+root = Path(__file__).resolve().parents[1] / 'Assets/Scripts/Assembly-CSharp'
+ray = (root / 'Raycast.cs').read_text()
+os = (root / 'PC/Component/Software/OS/OperatingSystem.cs').read_text()
+fx = (root / 'GpuArtifacts.cs').read_text()
+assert 'SampleThrowVelocity(currentDrag, point)' in ray
+assert 'SampleThrowVelocity(releaseDrag, ray.GetPoint(releaseDrag.distance))' in ray
+assert 'rb.velocity = aim.sqrMagnitude > 0.2f' in ray
+assert 'GridMode() || d.gridTouched || rb.isKinematic' in ray
+assert 'rb.drag = d.oldDrag' in ray and 'rb.constraints = d.oldConstrains' in ray
+assert 'monitorIconPositions.Clear()' in os
+assert 'FitOverflow(monitorIconPositions, size, padding)' in os
+assert 'var visiblePositions = fullscreen ? fullscreenIconPositions : monitorIconPositions' in os
+assert 'PersistIconPositions();' not in os.split('private void UpdateDesktopIconView(')[1].split('internal void RequestFileRefresh()')[0]
+assert 'typeof(RectMask2D)' in fx and 'viewport.SetParent(screen, false)' in fx
+assert 'viewport.SetAsLastSibling()' in fx
+assert 'overrideSorting = true;' not in fx and 'sortingOrder = ArtifactSortingOrder;' not in fx
+assert 'image.raycastTarget = false' in fx and 'FilterMode.Point' in fx
+for kind in ('Speckles', 'BlueGlyphs', 'GreenRows', 'ColorBars', 'MemoryTiles', 'TornBands'):
+    assert f'{kind}(strength)' in fx
+assert 'System.Array.Clear(pixels, 0, pixels.Length)' in fx
+assert 'texture.SetPixels32(pixels)' in fx
+assert 'if (now < nextRefresh) return;' in fx
+print('PASS: throw momentum, physical monitor icons, clipped six-mode VRAM artifacts')

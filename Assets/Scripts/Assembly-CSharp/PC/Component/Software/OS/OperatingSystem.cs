@@ -107,6 +107,9 @@ namespace PC.Component.Software.OS
         // A temporary fullscreen projection. Automatic fitting must never overwrite
         // the shared/manual coordinates used by the physical monitor and saves.
         private readonly Dictionary<string, Vector2> fullscreenIconPositions = new Dictionary<string, Vector2>();
+        // World-space monitors have a smaller usable desktop than zoom/fullscreen.
+        // Fit a separate VIEW; never rewrite saved icon coordinates on zoom.
+        private readonly Dictionary<string, Vector2> monitorIconPositions = new Dictionary<string, Vector2>();
         private bool iconViewInitialized;
         private bool iconViewDirty = true;
         private bool lastIconViewFullscreen;
@@ -1823,8 +1826,20 @@ namespace PC.Component.Software.OS
                 // Keep current in-bounds positions on resize; only overflowing icons move.
                 GetDesktopIconGrid().FitOverflow(fullscreenIconPositions, size, padding);
             }
+            else
+            {
+                // The colored/compact monitors show the same OS in a smaller
+                // world-space viewport. Saved fullscreen coordinates can all be
+                // outside its RectMask2D; fitting only on zoom made the physical
+                // display look like it had no icons. Do not persist this view.
+                monitorIconPositions.Clear();
+                foreach (var pair in fileIcons)
+                    if (iconPositions.TryGetValue(pair.Key, out var position))
+                        monitorIconPositions[pair.Key] = position;
+                GetDesktopIconGrid().FitOverflow(monitorIconPositions, size, padding);
+            }
 
-            var visiblePositions = fullscreen ? fullscreenIconPositions : iconPositions;
+            var visiblePositions = fullscreen ? fullscreenIconPositions : monitorIconPositions;
             foreach (var pair in fileIcons)
                 if (pair.Value != null && visiblePositions.TryGetValue(pair.Key, out var position))
                     pair.Value.SetPosition(position);

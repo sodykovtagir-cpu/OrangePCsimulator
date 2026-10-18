@@ -25,6 +25,13 @@ public class Raycast : MonoBehaviour
 
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
+
+        // Velocity of the point held by the spring. Unity's high drag and the
+        // release handler used to erase it, making even a fast toss fall flat.
+        public Vector3 lastAim;
+        public float lastAimTime;
+        public Vector3 aimVelocity;
+        public bool hasAim;
     }
 
     [SerializeField]
@@ -2214,6 +2221,7 @@ public class Raycast : MonoBehaviour
                 }
                 else
                 {
+                    SampleThrowVelocity(currentDrag, point);
                     // Сетку выключили на ходу. Предмет ещё держит резкий снап, а
                     // пружина вот-вот вернётся и потянет его к точке прицела —
                     // на лёгких предметах это рывок «залетает». Поэтому отпускаем.
@@ -2300,8 +2308,36 @@ public class Raycast : MonoBehaviour
         drag.distance = (maxDistance - 2f) * v + 2f;
     }
 
+    private static void SampleThrowVelocity(Drag drag, Vector3 aim)
+    {
+        if (drag == null) return;
+        float now = Time.unscaledTime;
+        if (drag.hasAim)
+        {
+            float dt = now - drag.lastAimTime;
+            if (dt >= 0.004f && dt <= 0.25f)
+            {
+                var instant = Vector3.ClampMagnitude((aim - drag.lastAim) / dt, 12f);
+                drag.aimVelocity = Vector3.Lerp(drag.aimVelocity, instant, 0.72f);
+            }
+        }
+        drag.hasAim = true;
+        drag.lastAim = aim;
+        drag.lastAimTime = now;
+    }
+
     public void End()
     {
+        // Sample the latest camera/touch ray BEFORE ending the drag coroutine:
+        // a quick flick and release can happen before its next Update iteration.
+        var releaseDrag = currentDrag;
+        if (releaseDrag != null && !GridMode() && !releaseDrag.gridTouched && cam != null)
+        {
+            var ray = cam.ScreenPointToRay(pointer != null ? pointer.position :
+                new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+            SampleThrowVelocity(releaseDrag, ray.GetPoint(releaseDrag.distance));
+        }
+
         // Обычную мягкую пружину вернём до того, как отпустим тело
         RestoreSpring();
 
@@ -2322,10 +2358,21 @@ public class Raycast : MonoBehaviour
                 rb.constraints = d.oldConstrains;
                 rb.drag = d.oldDrag;
                 rb.angularDrag = d.oldAngularDrag;
-                // гасим остаточную скорость от переноса — чтобы на
-                // отпускании предмет не выстреливал
-                rb.velocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
+                // Grid placements remain still, but a normal quick release is
+                // a throw. The high temporary drag must not cancel its momentum.
+                if (GridMode() || d.gridTouched || rb.isKinematic)
+                {
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+                else
+                {
+                    var held = rb.velocity;
+                    var aim = d.aimVelocity;
+                    rb.velocity = aim.sqrMagnitude > 0.2f
+                        ? Vector3.ClampMagnitude(Vector3.Lerp(held, aim, 0.8f), 12f)
+                        : Vector3.ClampMagnitude(held * 0.25f, 12f);
+                }
                 // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
                 var latch = rb.GetComponent<DoorLatch>();
                 if (latch != null)
