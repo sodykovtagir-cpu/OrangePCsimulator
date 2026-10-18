@@ -5,8 +5,7 @@ using UnityEngine.UI;
 
 namespace PC.Component.Software
 {
-    // The existing CPU/temperature controls remain on the prefab. The added
-    // GPU/RAM controls are built in its window, without replacing its CPU UI.
+    // The entire window (including GPU/RAM controls) is editable in its prefab.
     public class Overclock : App
     {
         [SerializeField] private Slider controlBar;
@@ -18,14 +17,17 @@ namespace PC.Component.Software
         private CPU cpu;
         private bool auto = true;
         private float delay;
-        private Slider gpuSlider, ramSlider;
-        private Text gpuText, ramText, statusText;
-        private Button testButton;
+        [SerializeField] private Slider gpuSlider;
+        [SerializeField] private Slider ramSlider;
+        [SerializeField] private Text gpuText;
+        [SerializeField] private Text ramText;
+        [SerializeField] private Text statusText;
+        [SerializeField] private Button testButton;
+        [SerializeField] private Button saveButton;
         private Coroutine testRoutine;
         private OverclockBoot.Profile saved;
         private float startedAt;
         private bool testing;
-        private static readonly Color Ink = new Color(.14f, .19f, .22f, 1f);
 
         protected override void Start()
         {
@@ -38,7 +40,7 @@ namespace PC.Component.Software
                 OverclockBoot.TryRead(system.FileManager, out saved);
             else saved = null; // a recovered disk may keep its stale profile file
             if (controlBar != null) controlBar.value = cpu.frequency;
-            BuildControls();
+            BindControls();
             StartCoroutine(ShowInfo());
         }
 
@@ -51,121 +53,24 @@ namespace PC.Component.Software
 
         public void OnToggleChangedAuto(bool value) { auto = value; }
 
-        private static RectTransform Box(Transform parent, string name, Vector2 position, Vector2 size)
+        private void BindControls()
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.layer = 5;
-            var r = go.GetComponent<RectTransform>();
-            r.SetParent(parent, false);
-            r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
-            r.pivot = new Vector2(0f, 1f);
-            r.anchoredPosition = position;
-            r.sizeDelta = size;
-            return r;
-        }
-
-        private static Text Label(Transform parent, string name, string value, Vector2 pos, Vector2 size, int fontSize = 16)
-        {
-            var r = Box(parent, name, pos, size);
-            var text = r.gameObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = fontSize;
-            text.color = Ink;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.text = value;
-            return text;
-        }
-
-        // The original CPU slider supplies the game's track/handle sprites.
-        // Reuse those instead of inventing a new colored control skin.
-        private static void MatchStock(Image target, Image source, Color fallback)
-        {
-            target.color = source != null ? source.color : fallback;
-            if (source == null) return;
-            target.sprite = source.sprite;
-            target.type = source.type;
-            target.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
-        }
-
-        private static Image StockChild(Slider stock, string name)
-        {
-            if (stock == null) return null;
-            var t = stock.transform.Find(name);
-            return t != null ? t.GetComponent<Image>() : null;
-        }
-
-        private static Button MakeButton(Transform parent, string title, Vector2 pos, Vector2 size, Slider stock)
-        {
-            var r = Box(parent, title, pos, size);
-            var bg = r.gameObject.AddComponent<Image>();
-            MatchStock(bg, stock != null && stock.handleRect != null
-                ? stock.handleRect.GetComponent<Image>() : null, new Color(.88f, .88f, .88f));
-            bg.color = new Color(.88f, .88f, .88f, 1f);
-            var button = r.gameObject.AddComponent<Button>();
-            button.targetGraphic = bg;
-            var caption = Label(r, "Caption", title, Vector2.zero, size, 14);
-            caption.alignment = TextAnchor.MiddleCenter;
-            return button;
-        }
-
-        private static Slider MakeSlider(Transform parent, string name, Vector2 pos, Slider stock)
-        {
-            var r = Box(parent, name, pos, new Vector2(300f, 28f));
-            var slider = r.gameObject.AddComponent<Slider>();
-            var track = Box(r, "Background", Vector2.zero, Vector2.zero);
-            track.anchorMin = Vector2.zero;
-            track.anchorMax = Vector2.one;
-            track.sizeDelta = new Vector2(0f, -10f);
-            var bg = track.gameObject.AddComponent<Image>();
-            MatchStock(bg, StockChild(stock, "Background"), new Color(.88f, .88f, .88f));
-            var fill = Box(r, "Fill", Vector2.zero, Vector2.zero);
-            fill.anchorMin = Vector2.zero;
-            fill.anchorMax = Vector2.one;
-            fill.sizeDelta = new Vector2(0f, -10f);
-            var fillImage = fill.gameObject.AddComponent<Image>();
-            MatchStock(fillImage, stock != null && stock.fillRect != null
-                ? stock.fillRect.GetComponent<Image>() : null, new Color(.73f, .73f, .73f));
-            fillImage.raycastTarget = false;
-            var handle = Box(r, "Handle", Vector2.zero, new Vector2(20f, 0f));
-            handle.anchorMin = Vector2.zero;
-            handle.anchorMax = new Vector2(0f, 1f);
-            handle.pivot = new Vector2(.5f, .5f);
-            var grip = handle.gameObject.AddComponent<Image>();
-            MatchStock(grip, stock != null && stock.handleRect != null
-                ? stock.handleRect.GetComponent<Image>() : null, Color.white);
-            slider.targetGraphic = grip;
-            slider.fillRect = fill;
-            slider.handleRect = handle;
-            slider.minValue = 1f;
-            slider.maxValue = 2f;
-            slider.wholeNumbers = false;
-            return slider;
-        }
-
-        private void BuildControls()
-        {
-            var root = transform as RectTransform;
-            if (root == null) return;
-            // Keep the stock title, CPU slider, thermal bar and auto toggle.
-            // The fullscreen desktop leaves less vertical space than the old
-            // 530px layout. Keep status and actions above its taskbar.
-            SetDefaultSize(new Vector2(Mathf.Max(defaultSize.x, 700f), 410f));
-            Label(root, "GPU label", "GPU clock", new Vector2(48f, -261f), new Vector2(112f, 26f));
-            gpuSlider = MakeSlider(root, "GPU ratio", new Vector2(160f, -263f), controlBar);
-            gpuText = Label(root, "GPU value", "", new Vector2(470f, -261f), new Vector2(82f, 26f));
-            Label(root, "RAM label", "RAM clock", new Vector2(48f, -301f), new Vector2(112f, 26f));
-            ramSlider = MakeSlider(root, "RAM ratio", new Vector2(160f, -303f), controlBar);
-            ramText = Label(root, "RAM value", "", new Vector2(470f, -301f), new Vector2(82f, 26f));
-            gpuSlider.value = saved != null ? saved.gpu : 1f;
-            ramSlider.value = saved != null ? saved.ram : 1f;
+            // Visuals, layout, labels and stock sprites live in the prefab.
+            // Only the values and actions are bound at runtime. Never replace
+            // artist edits by creating a second set of controls here.
+            if (gpuSlider == null || ramSlider == null || gpuText == null ||
+                ramText == null || statusText == null || testButton == null ||
+                saveButton == null)
+            {
+                Debug.LogError("Overclock: missing UI references in the prefab.");
+                return;
+            }
+            gpuSlider.SetValueWithoutNotify(saved != null ? saved.gpu : 1f);
+            ramSlider.SetValueWithoutNotify(saved != null ? saved.ram : 1f);
             gpuSlider.onValueChanged.AddListener(_ => UpdateDraft());
             ramSlider.onValueChanged.AddListener(_ => UpdateDraft());
-            statusText = Label(root, "Status", "Test optional. Choose a GPU/RAM profile.",
-                new Vector2(45f, -338f), new Vector2(615f, 25f), 14);
-            testButton = MakeButton(root, "Test 60 seconds", new Vector2(45f, -369f), new Vector2(150f, 32f), controlBar);
             testButton.onClick.AddListener(BeginTest);
-            var save = MakeButton(root, "Save without test", new Vector2(207f, -369f), new Vector2(161f, 32f), controlBar);
-            save.onClick.AddListener(SaveProfile);
+            saveButton.onClick.AddListener(SaveProfile);
             UpdateDraft();
         }
 

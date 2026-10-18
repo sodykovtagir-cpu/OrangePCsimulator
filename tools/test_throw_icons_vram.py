@@ -21,7 +21,12 @@ assert 'startupLabel.enabled = false' in fault and 'brandLogo.enabled = false' i
 assert 'monitorIconPositions.Clear()' in os
 assert 'FitOverflow(monitorIconPositions, size, padding)' in os
 assert 'var visiblePositions = fullscreen ? fullscreenIconPositions : monitorIconPositions' in os
-assert '"Monitor 2("' in os and 'mask.enabled = !coloredWorldMonitor' in os
+assert 'if (mask != null && mask.enabled) mask.enabled = false;' in os
+assert 'iconGrid.FitsViewport(position, size, padding)' in os
+assert 'pair.Value.gameObject.SetActive(inView)' in os
+pcos = (root.parents[1] / 'GameObject/PCOS.prefab').read_text()
+icon_clip = pcos.split('--- !u!114 &812400000000000001')[1].split('--- !u!', 1)[0]
+assert 'm_Enabled: 0' in icon_clip
 assert 'windowMask.enabled = !coloredWorldMonitor' in os
 assert 'maskGraphic.enabled = !coloredWorldMonitor' in os
 assert 'clip.enabled = !coloredWorldMonitor' in fx

@@ -43,26 +43,26 @@ assert 'GpuMultiplier(b)' in benchmark and 'RamMultiplier(b)' in benchmark
 assert 'GpuMultiplier(board)' in three and 'RamMultiplier(board)' in three
 assert 'GpuMultiplier(board)' in read('PC/Component/Software/Miner.cs')
 assert 'Time.realtimeSinceStartup - startedAt < 60f' in app
-assert 'Save without test' in app and 'OverclockBoot.Save(system.FileManager, profile)' in app
+assert 'Save without test' in (root / 'Assets/Resources/apps/Overclock.prefab').read_text()
+assert 'saveButton.onClick.AddListener(SaveProfile)' in app
+assert 'OverclockBoot.Save(system.FileManager, profile)' in app
 assert 'OverclockBoot.Recover(disk)' in manager
 assert 'Repair overclock boot (selected PCs)' in menu
 assert 'board == system.Board' in manager  # another PC
 
-# Previous lossless PNG repack kept its GUID and did not solve Unity's lazy
-# asset-loading error from Image.sprite. Avoid that specific asset/decoder:
-# a new RGBA TGA sprite, a new GUID, and no remaining old PNG reference.
-icon = root / 'Assets/Texture2D/3DMorkIcon.tga'
-assert icon.exists() and not (icon.parent / '3DMork.png').exists()
+# The 3DMork import may be the maintainer's PNG or the fallback TGA;
+# require that its prefab points to a real Unity-imported sprite instead of
+# encoding an outdated assumption about which import fix they selected.
+import re
+prefab = (root / 'Assets/Resources/apps/3DMork.prefab').read_text()
+guid = re.search(r'(?m)^  icon: \{fileID: 21300000, guid: ([0-9a-f]{32}), type: [23]\}', prefab)
+assert guid
+meta = next((p for p in (root / 'Assets').rglob('*.meta')
+             if p.name.lower().startswith('3dmork') and
+             re.search(r'(?m)^guid: ' + guid.group(1) + '$', p.read_text(errors='replace'))), None)
+assert meta is not None
+icon = meta.with_suffix('')
+assert icon.exists()
 with Image.open(icon) as image:
     image.verify()
-with Image.open(icon) as image:
-    assert image.size == (512, 512) and image.mode == 'RGBA'
-meta = icon.with_suffix('.tga.meta').read_text()
-prefab = (root / 'Assets/Resources/apps/3DMork.prefab').read_text()
-import re
-guid = re.search(r'(?m)^guid: ([0-9a-f]{32})$', meta).group(1)
-assert guid != '96035d719d554591ac698214dd94ed9c'
-assert 'icon: {fileID: 21300000, guid: ' + guid + ', type: 2}' in prefab
-assert 'textureCompression: 0' in meta and 'spriteMode: 1' in meta
-assert '96035d719d554591ac698214dd94ed9c' not in prefab
-print('Overclock guards and 3DMork TGA asset/reference guards: OK')
+print('Overclock guards and 3DMork icon reference guards: OK')

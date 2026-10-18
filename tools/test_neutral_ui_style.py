@@ -26,11 +26,18 @@ for file in scripts.rglob('*.cs'):
     assert '#ff8800' not in s.lower(), file
 oc = (scripts / 'PC/Component/Software/Overclock.cs').read_text()
 prefab = (base / 'Resources/apps/Overclock.prefab').read_text()
-assert 'MatchStock(bg, StockChild(stock, "Background")' in oc
-assert 'stock.handleRect.GetComponent<Image>()' in oc
-assert 'slider.fillRect = fill;' in oc and 'slider.handleRect = handle;' in oc
-assert 'MakeSlider(root, "GPU ratio",' in oc and 'controlBar' in oc
-assert 'new Vector2(45f, -369f)' in oc and 'new Vector2(45f, -338f)' in oc
+assert 'BindControls();' in oc and 'new GameObject(' not in oc
+assert 'gpuSlider.SetValueWithoutNotify(' in oc
+assert 'saveButton.onClick.AddListener(SaveProfile)' in oc
+ids = re.findall(r'(?m)^--- !u!\d+ &(\d+)', prefab)
+assert len(ids) == len(set(ids))
+for field in ('gpuSlider', 'ramSlider', 'gpuText', 'ramText', 'statusText', 'testButton', 'saveButton'):
+    assert '[SerializeField] private ' in oc and field in oc
+    m = re.search(r'(?m)^  ' + field + r': \{fileID: (\d+)\}', prefab)
+    assert m and m.group(1) in ids, field
+for node in ('GPU label', 'RAM label', 'GPU ratio', 'RAM ratio', 'Status', 'Test button', 'Save button'):
+    assert 'm_Name: ' + node + '\n' in prefab
+assert 'm_SizeDelta: {x: 700, y: 410}' in prefab
 assert 'm_AnchoredPosition: {x: 140, y: -237}' in prefab
 assert '<color=orange>' not in (base / 'Scenes/Menu.unity').read_text().lower()
-print('PASS: neutral UI palette, stock Overclock controls, compact maximized layout')
+print('PASS: neutral UI palette and fully editor-editable Overclock prefab')

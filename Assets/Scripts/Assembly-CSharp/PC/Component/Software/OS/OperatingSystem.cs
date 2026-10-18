@@ -1829,8 +1829,12 @@ namespace PC.Component.Software.OS
                 canvas.renderMode == RenderMode.WorldSpace && Board != null &&
                 Board.monitor != null && Board.monitor.gameObject.name.StartsWith(
                     "Monitor 2(", StringComparison.Ordinal);
-            if (mask != null && mask.enabled == coloredWorldMonitor)
-                mask.enabled = !coloredWorldMonitor;
+            // Icons have a fitted per-viewport layout and are individually
+            // hidden when outside the view. RectMask2D culls every icon on
+            // some displays (including the maximized/overlay desktop), even
+            // while the wallpaper and taskbar render normally. Never re-enable
+            // that mask on a render-mode switch.
+            if (mask != null && mask.enabled) mask.enabled = false;
             if (windowMask != null && windowMask.enabled == coloredWorldMonitor)
                 windowMask.enabled = !coloredWorldMonitor;
             // The Mask's opaque Image is normally hidden by ShowMaskGraphic=0.
@@ -1866,9 +1870,18 @@ namespace PC.Component.Software.OS
             }
 
             var visiblePositions = fullscreen ? fullscreenIconPositions : monitorIconPositions;
+            var iconGrid = GetDesktopIconGrid();
             foreach (var pair in fileIcons)
-                if (pair.Value != null && visiblePositions.TryGetValue(pair.Key, out var position))
-                    pair.Value.SetPosition(position);
+            {
+                if (pair.Value == null) continue;
+                bool hasPosition = visiblePositions.TryGetValue(pair.Key, out var position);
+                bool inView = hasPosition && iconGrid.FitsViewport(position, size, padding);
+                // Without the broken RectMask2D, an overflowing icon must not
+                // bleed onto the taskbar or past the physical monitor bezel.
+                if (pair.Value.gameObject.activeSelf != inView)
+                    pair.Value.gameObject.SetActive(inView);
+                if (inView) pair.Value.SetPosition(position);
+            }
 
             // No persistence here: world-space / render-texture monitors always use
             // the original shared coordinates, independent of fullscreen fitting.
