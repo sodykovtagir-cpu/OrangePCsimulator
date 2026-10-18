@@ -521,8 +521,33 @@ namespace PC.Component.Software.OS
             foreach (var pair in fileIcons)
                 if (pair.Value != null && pair.Value.gameObject.activeInHierarchy) active++;
             var view = iconParent as RectTransform;
-            Debug.Log("PCOS desktop icons: files=" + (GetDesktopStorageFiles()?.Count ?? 0) +
+            var files = GetDesktopStorageFiles();
+            var candidates = CollectDesktopFiles();
+            // A raw disk-file count includes System/* and hidden files. Report
+            // the actual candidates and references so a blank desktop is not
+            // misdiagnosed as a rendering/viewport problem again.
+            int hidden = 0;
+            int nested = 0;
+            string sample = "none";
+            if (files != null)
+            {
+                foreach (var file in files)
+                {
+                    if (file == null) continue;
+                    if (file.hidden) hidden++;
+                    else if (!string.IsNullOrEmpty(file.path) && file.path.Contains("/"))
+                    {
+                        nested++;
+                        if (sample == "none") sample = file.path;
+                    }
+                }
+            }
+            Debug.Log("PCOS desktop icons: files=" + (files?.Count ?? 0) +
+                ", eligible=" + candidates.Count + ", hidden=" + hidden +
+                ", nested=" + nested + " (e.g. " + sample + ")" +
                 ", created=" + fileIcons.Count + ", active=" + active +
+                ", prefab=" + (fileIconPrefab != null) +
+                ", parent=" + (iconParent != null) +
                 ", viewport=" + (view != null ? view.rect.size.ToString() : "missing"));
         }
 #endif
@@ -1115,7 +1140,13 @@ namespace PC.Component.Software.OS
 
         private void AddFileIcon(File file)
         {
-            if (file == null || fileIcons == null || fileIconPrefab == null || iconParent == null) return;
+            if (file == null || fileIcons == null || iconParent == null) return;
+            // Older/custom PCOS prefab instances can lose their serialized icon
+            // reference even though the desktop and the disk still exist.
+            // Keep a build-safe copy in Resources so those PCs can recover too.
+            if (fileIconPrefab == null)
+                fileIconPrefab = Resources.Load<FileIcon>("DesktopFileIcon");
+            if (fileIconPrefab == null) return;
             string key = file.path;
             bool created = !fileIcons.TryGetValue(key, out var iconInstance) || iconInstance == null;
             if (created)

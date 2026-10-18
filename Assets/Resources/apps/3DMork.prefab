@@ -152,6 +152,7 @@ MonoBehaviour:
   leaderboardSelfRank: {fileID: 5000000000000284}
   leaderboardSelfName: {fileID: 5000000000000288}
   leaderboardSelfCpu: {fileID: 5000000000000292}
+  leaderboardSelfGpu: {fileID: 5000000000000728}
   leaderboardSelfScore: {fileID: 5000000000000296}
   leaderboardSelfFps: {fileID: 5000000000000300}
   leaderboardAverage: {fileID: 5000000000000304}

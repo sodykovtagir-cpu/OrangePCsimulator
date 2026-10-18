@@ -688,12 +688,12 @@ namespace PC.Component.Software
 				var entry = hasRow ? ReferenceBenchmarks[i] : null;
 				var scores = hasRow ? entry.ScoresAt(fpsCap) : new BenchmarkScores();
 
-				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--", new Color(0.75f, 0.75f, 0.8f));
-				SetCell(leaderboardName, i, hasRow ? Tr(entry.pcKey) : "--", new Color(1f, 1f, 1f));
-				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
-				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
-				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--", new Color(.88f, .88f, .88f));
-				SetCell(leaderboardFps, i, hasRow ? scores.achievedFps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--");
+				SetCell(leaderboardName, i, hasRow ? Tr(entry.pcKey) : "--");
+				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--");
+				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--");
+				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--");
+				SetCell(leaderboardFps, i, hasRow ? scores.achievedFps.ToString() : "--");
 
 				if (hasRow) sum += scores.total;
 			}
@@ -749,10 +749,10 @@ namespace PC.Component.Software
 				bool hasRow = i < history.Count && history[i] != null;
 				int number = hasRow ? history.Count - i : 0;
 
-				SetCell(historyIndex, i, hasRow ? "#" + number : "--", new Color(0.75f, 0.75f, 0.8f));
-				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--", new Color(0.85f, 0.87f, 0.92f));
-				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(.88f, .88f, .88f));
-				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
+				SetCell(historyIndex, i, hasRow ? "#" + number : "--");
+				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--");
+				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--");
+				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() : "--");
 			}
 
 			if (historyEmpty != null) historyEmpty.gameObject.SetActive(history.Count == 0);
@@ -766,13 +766,13 @@ namespace PC.Component.Software
 			}
 		}
 
-		private static void SetCell(Text[] cells, int index, string value, Color color)
+		// Only update dynamic values; Text color belongs to 3DMork.prefab.
+		private static void SetCell(Text[] cells, int index, string value)
 		{
 			if (cells == null || index < 0 || index >= cells.Length) return;
 			var cell = cells[index];
 			if (cell == null) return;
 			cell.text = value;
-			cell.color = color;
 		}
 
 		private static string FormatDate(long unixSeconds)
