@@ -68,7 +68,7 @@ namespace PC.Component.Software
         {
             var r = Box(parent, name, pos, size);
             var text = r.gameObject.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = fontSize;
             text.color = Ink;
             text.alignment = TextAnchor.MiddleLeft;

@@ -862,7 +862,7 @@ namespace PC.Component.Software
             built = true;
             var title = transform.Find("Title");
             windowTitle = title != null ? title.GetComponent<Text>() : null;
-            font = windowTitle != null ? windowTitle.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+            font = windowTitle != null ? windowTitle.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             backButton = Button("Back", transform, 220, 8, 100, 30,
                 () => { focusedId = 0; RefreshLayout(); });
             backButton.gameObject.SetActive(false);

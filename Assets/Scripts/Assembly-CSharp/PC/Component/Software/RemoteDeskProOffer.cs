@@ -62,7 +62,7 @@ namespace PC.Component.Software
             var titleText = title != null ? title.GetComponent<Text>() : null;
             if (titleText != null) titleText.text = "Buy pro!";
             var font = titleText != null && titleText.font != null
-                ? titleText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+                ? titleText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             foreach (string obsolete in new[] { "Scroll View", "Refresh" })
             {
                 var child = transform.Find(obsolete);
