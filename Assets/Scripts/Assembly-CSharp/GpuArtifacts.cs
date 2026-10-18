@@ -128,6 +128,15 @@ public class GpuArtifacts : MonoBehaviour
         }
         EnsureView();
         if (image == null) return;
+        var host = screen != null ? screen.GetComponent<Canvas>() : null;
+        bool coloredWorldMonitor = host != null && host.renderMode == RenderMode.WorldSpace &&
+            display != null && display.gameObject.name.StartsWith("Monitor 2(", System.StringComparison.Ordinal);
+        // The same world-space clipping issue hides icons/windows on these
+        // prefabs. The RawImage already fits the screen rectangle exactly;
+        // only the broken mask is disabled, never the canvas depth test.
+        var clip = viewport.GetComponent<RectMask2D>();
+        if (clip != null && clip.enabled == coloredWorldMonitor)
+            clip.enabled = !coloredWorldMonitor;
         // Windows, desktop and popups may call SetAsLastSibling each frame.
         // Stay above OS content WITHOUT escaping the host screen's depth test.
         if (viewport.GetSiblingIndex() != screen.childCount - 1)

@@ -1812,6 +1812,26 @@ namespace PC.Component.Software.OS
             var canvas = GetDesktopCanvas();
             bool fullscreen = canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay;
             var mask = iconParent.GetComponent<RectMask2D>();
+            var windowMask = appParent != null && appParent.parent != null
+                ? appParent.parent.GetComponent<Mask>() : null;
+            // On the colored Monitor 2 prefabs, nested RectMask2D/stencil
+            // masks cull the world-space Icons and WindowArea completely.
+            // Wallpaper/taskbar have no such masks, hence the blank desktop.
+            // Their bounds and physical bezel already constrain the world view;
+            // restore both masks when zoom switches to ScreenSpaceOverlay.
+            bool coloredWorldMonitor = !fullscreen && canvas != null &&
+                canvas.renderMode == RenderMode.WorldSpace && Board != null &&
+                Board.monitor != null && Board.monitor.gameObject.name.StartsWith(
+                    "Monitor 2(", StringComparison.Ordinal);
+            if (mask != null && mask.enabled == coloredWorldMonitor)
+                mask.enabled = !coloredWorldMonitor;
+            if (windowMask != null && windowMask.enabled == coloredWorldMonitor)
+                windowMask.enabled = !coloredWorldMonitor;
+            // The Mask's opaque Image is normally hidden by ShowMaskGraphic=0.
+            // If only Mask is disabled, that Image paints over the entire OS.
+            var maskGraphic = windowMask != null ? windowMask.GetComponent<Graphic>() : null;
+            if (maskGraphic != null && maskGraphic.enabled == coloredWorldMonitor)
+                maskGraphic.enabled = !coloredWorldMonitor;
             Vector4 padding = mask != null ? mask.padding : Vector4.zero;
             Vector2 size = rect.rect.size;
             if (!force && !iconViewDirty && iconViewInitialized && lastIconViewCanvas == canvas &&

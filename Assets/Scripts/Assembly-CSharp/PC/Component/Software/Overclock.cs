@@ -137,7 +137,7 @@ namespace PC.Component.Software
             testButton.onClick.AddListener(BeginTest);
             var save = MakeButton(root, "Save without test", new Vector2(207f, -402f), new Vector2(161f, 34f));
             save.onClick.AddListener(SaveProfile);
-            statusText = Label(root, "Status", "Test optional. GPU/RAM x1.55: bootloop; x1.85: damage.",
+            statusText = Label(root, "Status", "Test optional. Choose a GPU/RAM profile.",
                 new Vector2(45f, -449f), new Vector2(615f, 52f), 14);
             statusText.verticalOverflow = VerticalWrapMode.Overflow;
             UpdateDraft();
@@ -147,8 +147,18 @@ namespace PC.Component.Software
         {
             if (gpuSlider != null && gpuText != null) gpuText.text = "x" + gpuSlider.value.ToString("0.00");
             if (ramSlider != null && ramText != null) ramText.text = "x" + ramSlider.value.ToString("0.00");
-            if (testing && statusText != null)
-                statusText.text = "Settings changed: current test will not certify these values. Save is still available.";
+            if (statusText != null)
+                statusText.text = testing
+                    ? "Settings changed during test. Save or test again."
+                    : "GPU/RAM profile: " + ProfileName(Draft()) + ". Test optional.";
+        }
+
+        private static string ProfileName(OverclockBoot.Profile profile)
+        {
+            if (OverclockBoot.Fatal(profile)) return "Extreme";
+            if (OverclockBoot.Unstable(profile)) return "High";
+            if (profile.gpu >= 1.15f || profile.ram >= 1.15f) return "Boosted";
+            return "Normal";
         }
 
         private OverclockBoot.Profile Draft() => new OverclockBoot.Profile
@@ -186,10 +196,8 @@ namespace PC.Component.Software
             bool changed = Mathf.Abs(p.gpu - gpuSlider.value) > .001f ||
                 Mathf.Abs(p.ram - ramSlider.value) > .001f ||
                 (controlBar != null && Mathf.Abs(p.cpuFrequency - controlBar.value) > .001f);
-            statusText.text = changed ? "Test finished, but settings changed; retest or save anyway."
-                : OverclockBoot.Fatal(p) ? "Test failed: extreme settings can destroy GPU/RAM at boot."
-                : OverclockBoot.Unstable(p) ? "Test failed: settings will cause BSOD bootloop."
-                : "60-second test passed. You may save now.";
+            statusText.text = changed ? "Test finished; settings changed. Retest or save."
+                : "60-second test complete. GPU/RAM profile: " + ProfileName(p) + ".";
             testing = false;
             testRoutine = null;
             testButton.interactable = true;
@@ -208,11 +216,7 @@ namespace PC.Component.Software
             { statusText.text = "Cannot save: check disk space and System/Autorun.conf."; return; }
             saved = profile;
             OverclockBoot.Apply(system.Board, saved);
-            statusText.text = OverclockBoot.Fatal(profile)
-                ? "Saved. Extreme settings will damage hardware on next boot!"
-                : OverclockBoot.Unstable(profile)
-                    ? "Saved. Next boot will BSOD until repaired from another PC."
-                    : "Saved in System/overclockerd-boot.bin. Active on next boot.";
+            statusText.text = "Saved GPU/RAM profile: " + ProfileName(profile) + ".";
         }
 
         private void RestoreApplied()
