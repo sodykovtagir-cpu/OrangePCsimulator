@@ -120,8 +120,8 @@ public class MainMenu : MonoBehaviour
         showLine = !showLine;
 
         title.text = showLine
-            ? "<color=#FF8800>Orange PC</color> Simulator_"
-            : "<color=#FF8800>Orange PC</color> Simulator";
+            ? "Orange PC Simulator_"
+            : "Orange PC Simulator";
     }
 
     public void LoadExample(string name)

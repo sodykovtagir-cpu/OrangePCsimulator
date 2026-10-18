@@ -63,7 +63,7 @@ public class LanguageMenu : MonoBehaviour
 			}
 
 			if (i != 0) sb.AppendLine();
-			sb.Append("<color=orange>");
+			sb.Append("<color=#D6D6D6>");
 			sb.Append(display);
 			sb.Append(" [");
 			sb.Append(status);

@@ -692,7 +692,7 @@ namespace PC.Component.Software
 				SetCell(leaderboardName, i, hasRow ? Tr(entry.pcKey) : "--", new Color(1f, 1f, 1f));
 				SetCell(leaderboardCpu, i, hasRow ? entry.cpuName : "--", new Color(0.82f, 0.85f, 0.9f));
 				SetCell(leaderboardGpu, i, hasRow ? entry.gpuName : "--", new Color(0.82f, 0.85f, 0.9f));
-				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--", new Color(1f, 0.72f, 0.2f));
+				SetCell(leaderboardScore, i, hasRow ? scores.total.ToString() : "--", new Color(.88f, .88f, .88f));
 				SetCell(leaderboardFps, i, hasRow ? scores.achievedFps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
 
 				if (hasRow) sum += scores.total;
@@ -751,7 +751,7 @@ namespace PC.Component.Software
 
 				SetCell(historyIndex, i, hasRow ? "#" + number : "--", new Color(0.75f, 0.75f, 0.8f));
 				SetCell(historyDate, i, hasRow ? FormatDate(history[i].unixTime) : "--", new Color(0.85f, 0.87f, 0.92f));
-				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(1f, 0.72f, 0.2f));
+				SetCell(historyScore, i, hasRow ? history[i].score.ToString() : "--", new Color(.88f, .88f, .88f));
 				SetCell(historyFps, i, hasRow ? history[i].fps.ToString() : "--", new Color(0.55f, 0.9f, 0.6f));
 			}
 

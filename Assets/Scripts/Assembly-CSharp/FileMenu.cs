@@ -232,8 +232,8 @@ public class FileMenu : MonoBehaviour
 		tex.filterMode = FilterMode.Bilinear;
 		var px = new Color32[s * s];
 		var clear = new Color32(0, 0, 0, 0);
-		var orange = new Color32(255, 136, 0, 255);
-		var dark = new Color32(40, 24, 0, 255);
+		var badge = new Color32(190, 190, 190, 255);
+		var dark = new Color32(35, 35, 35, 255);
 		for (int i = 0; i < px.Length; i++) px[i] = clear;
 		int cx = 16, cy = 16, r = 14;
 		int r2 = r * r;
@@ -241,7 +241,7 @@ public class FileMenu : MonoBehaviour
 			for (int x = 0; x < s; x++)
 			{
 				int dx = x - cx, dy = y - cy;
-				if (dx * dx + dy * dy <= r2) px[y * s + x] = orange;
+				if (dx * dx + dy * dy <= r2) px[y * s + x] = badge;
 			}
 		// стрелка вверх
 		for (int y = 8; y <= 20; y++)

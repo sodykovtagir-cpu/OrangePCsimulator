@@ -480,7 +480,7 @@ public class WorkshopMenu : MonoBehaviour
 	{
 		var go = new GameObject(s, typeof(RectTransform), typeof(Image), typeof(Button));
 		go.transform.SetParent(parent, false);
-		go.GetComponent<Image>().color = new Color(1f, 0.53f, 0f);
+		go.GetComponent<Image>().color = new Color(.88f, .88f, .88f, 1f);
 		var le = go.AddComponent<LayoutElement>();
 		le.preferredWidth = 80;
 		le.preferredHeight = 32;

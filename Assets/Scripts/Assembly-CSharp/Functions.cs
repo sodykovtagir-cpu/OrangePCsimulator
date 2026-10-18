@@ -430,7 +430,7 @@ public class Functions : MonoBehaviour
         if (spr == null) spr = on ? gridOffSprite : gridOnSprite;
         if (spr != null) gridImage.sprite = spr;
 
-        // Оранжевый фирменный, когда режим включён
-        gridImage.color = on ? new Color(1f, 0.62f, 0.18f, 1f) : gridOffColor;
+        // Neutral active state; the icon sprite already communicates the mode.
+        gridImage.color = on ? new Color(.75f, .81f, .86f, 1f) : gridOffColor;
     }
 }

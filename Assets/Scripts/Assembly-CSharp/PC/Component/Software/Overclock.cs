@@ -76,11 +76,31 @@ namespace PC.Component.Software
             return text;
         }
 
-        private static Button MakeButton(Transform parent, string title, Vector2 pos, Vector2 size)
+        // The original CPU slider supplies the game's track/handle sprites.
+        // Reuse those instead of inventing a new colored control skin.
+        private static void MatchStock(Image target, Image source, Color fallback)
+        {
+            target.color = source != null ? source.color : fallback;
+            if (source == null) return;
+            target.sprite = source.sprite;
+            target.type = source.type;
+            target.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
+        }
+
+        private static Image StockChild(Slider stock, string name)
+        {
+            if (stock == null) return null;
+            var t = stock.transform.Find(name);
+            return t != null ? t.GetComponent<Image>() : null;
+        }
+
+        private static Button MakeButton(Transform parent, string title, Vector2 pos, Vector2 size, Slider stock)
         {
             var r = Box(parent, title, pos, size);
             var bg = r.gameObject.AddComponent<Image>();
-            bg.color = new Color(.84f, .88f, .89f, 1f);
+            MatchStock(bg, stock != null && stock.handleRect != null
+                ? stock.handleRect.GetComponent<Image>() : null, new Color(.88f, .88f, .88f));
+            bg.color = new Color(.88f, .88f, .88f, 1f);
             var button = r.gameObject.AddComponent<Button>();
             button.targetGraphic = bg;
             var caption = Label(r, "Caption", title, Vector2.zero, size, 14);
@@ -88,27 +108,32 @@ namespace PC.Component.Software
             return button;
         }
 
-        private static Slider MakeSlider(Transform parent, string name, Vector2 pos)
+        private static Slider MakeSlider(Transform parent, string name, Vector2 pos, Slider stock)
         {
-            var r = Box(parent, name, pos, new Vector2(300f, 22f));
-            var bg = r.gameObject.AddComponent<Image>();
-            bg.color = new Color(.73f, .76f, .77f, 1f);
+            var r = Box(parent, name, pos, new Vector2(300f, 28f));
             var slider = r.gameObject.AddComponent<Slider>();
-            slider.targetGraphic = bg;
-            var fill = Box(r, "Fill", new Vector2(0f, -4f), new Vector2(300f, 14f));
-            fill.anchorMin = new Vector2(0f, 0f);
-            fill.anchorMax = new Vector2(1f, 1f);
-            fill.sizeDelta = new Vector2(0f, -8f);
+            var track = Box(r, "Background", Vector2.zero, Vector2.zero);
+            track.anchorMin = Vector2.zero;
+            track.anchorMax = Vector2.one;
+            track.sizeDelta = new Vector2(0f, -10f);
+            var bg = track.gameObject.AddComponent<Image>();
+            MatchStock(bg, StockChild(stock, "Background"), new Color(.88f, .88f, .88f));
+            var fill = Box(r, "Fill", Vector2.zero, Vector2.zero);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = Vector2.one;
+            fill.sizeDelta = new Vector2(0f, -10f);
             var fillImage = fill.gameObject.AddComponent<Image>();
-            fillImage.color = new Color(.96f, .48f, .16f, 1f);
+            MatchStock(fillImage, stock != null && stock.fillRect != null
+                ? stock.fillRect.GetComponent<Image>() : null, new Color(.73f, .73f, .73f));
             fillImage.raycastTarget = false;
-            var handle = Box(r, "Handle", new Vector2(0f, 0f), new Vector2(18f, 22f));
-            handle.anchorMin = new Vector2(0f, 0f);
+            var handle = Box(r, "Handle", Vector2.zero, new Vector2(20f, 0f));
+            handle.anchorMin = Vector2.zero;
             handle.anchorMax = new Vector2(0f, 1f);
             handle.pivot = new Vector2(.5f, .5f);
-            handle.anchoredPosition = Vector2.zero;
-            handle.sizeDelta = new Vector2(18f, 0f);
-            handle.gameObject.AddComponent<Image>().color = Color.white;
+            var grip = handle.gameObject.AddComponent<Image>();
+            MatchStock(grip, stock != null && stock.handleRect != null
+                ? stock.handleRect.GetComponent<Image>() : null, Color.white);
+            slider.targetGraphic = grip;
             slider.fillRect = fill;
             slider.handleRect = handle;
             slider.minValue = 1f;
@@ -122,24 +147,25 @@ namespace PC.Component.Software
             var root = transform as RectTransform;
             if (root == null) return;
             // Keep the stock title, CPU slider, thermal bar and auto toggle.
-            SetDefaultSize(new Vector2(Mathf.Max(defaultSize.x, 700f), 530f));
-            Label(root, "GPU label", "GPU clock", new Vector2(48f, -299f), new Vector2(112f, 26f));
-            gpuSlider = MakeSlider(root, "GPU ratio", new Vector2(160f, -302f));
-            gpuText = Label(root, "GPU value", "", new Vector2(470f, -299f), new Vector2(82f, 26f));
-            Label(root, "RAM label", "RAM clock", new Vector2(48f, -346f), new Vector2(112f, 26f));
-            ramSlider = MakeSlider(root, "RAM ratio", new Vector2(160f, -349f));
-            ramText = Label(root, "RAM value", "", new Vector2(470f, -346f), new Vector2(82f, 26f));
+            // The fullscreen desktop leaves less vertical space than the old
+            // 530px layout. Keep status and actions above its taskbar.
+            SetDefaultSize(new Vector2(Mathf.Max(defaultSize.x, 700f), 410f));
+            Label(root, "GPU label", "GPU clock", new Vector2(48f, -261f), new Vector2(112f, 26f));
+            gpuSlider = MakeSlider(root, "GPU ratio", new Vector2(160f, -263f), controlBar);
+            gpuText = Label(root, "GPU value", "", new Vector2(470f, -261f), new Vector2(82f, 26f));
+            Label(root, "RAM label", "RAM clock", new Vector2(48f, -301f), new Vector2(112f, 26f));
+            ramSlider = MakeSlider(root, "RAM ratio", new Vector2(160f, -303f), controlBar);
+            ramText = Label(root, "RAM value", "", new Vector2(470f, -301f), new Vector2(82f, 26f));
             gpuSlider.value = saved != null ? saved.gpu : 1f;
             ramSlider.value = saved != null ? saved.ram : 1f;
             gpuSlider.onValueChanged.AddListener(_ => UpdateDraft());
             ramSlider.onValueChanged.AddListener(_ => UpdateDraft());
-            testButton = MakeButton(root, "Test 60 seconds", new Vector2(45f, -402f), new Vector2(150f, 34f));
-            testButton.onClick.AddListener(BeginTest);
-            var save = MakeButton(root, "Save without test", new Vector2(207f, -402f), new Vector2(161f, 34f));
-            save.onClick.AddListener(SaveProfile);
             statusText = Label(root, "Status", "Test optional. Choose a GPU/RAM profile.",
-                new Vector2(45f, -449f), new Vector2(615f, 52f), 14);
-            statusText.verticalOverflow = VerticalWrapMode.Overflow;
+                new Vector2(45f, -338f), new Vector2(615f, 25f), 14);
+            testButton = MakeButton(root, "Test 60 seconds", new Vector2(45f, -369f), new Vector2(150f, 32f), controlBar);
+            testButton.onClick.AddListener(BeginTest);
+            var save = MakeButton(root, "Save without test", new Vector2(207f, -369f), new Vector2(161f, 32f), controlBar);
+            save.onClick.AddListener(SaveProfile);
             UpdateDraft();
         }
 

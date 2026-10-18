@@ -341,7 +341,7 @@ namespace PC.Component.Software
 			if (bar == null || target == null) yield break;
 
 			var title = Localization.GetText("Formatting") + "...";
-			var color = new Color(1f, 0.8f, 0.3f, 1f);
+			var color = new Color(.75f, .81f, .86f, 1f);
 			System.Action cancelCallback = () => { StopCoroutine(formatCoroutine); };
 
 			bar.CallProgressBar(title, color, cancelCallback);
