@@ -33,12 +33,15 @@ assert 'system.SystemId.ToString("X8")' in CS
 assert 'private void PushHistory(' in CS and 'private List<HistoryEntry> LoadHistory()' in CS
 SPAWNER = (ROOT / 'Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs').read_text()
 assert 'IReadOnlyList<Part> BenchmarkParts' in SPAWNER
-assert 'ReferenceBenchmarks = LoadReferenceBenchmarks()' in CS
+assert re.search(r'private LeaderboardEntry\[\] referenceBenchmarks\s*;', CS)
+start = CS.split('protected override void Start()', 1)[1].split('private void ResetStaleResults()', 1)[0]
+assert start.index('referenceBenchmarks = LoadReferenceBenchmarks();') < start.index('ShowStartScreen();')
+assert not re.search(r'\b(?:static\s+)?(?:readonly\s+)?LeaderboardEntry\[\]\s+\w+\s*=\s*LoadReferenceBenchmarks\(', CS)
 assert 'Resources.Load<PC.ReadyBuildSpawner>' in CS
 assert 'foreach (var part in build.BenchmarkParts)' in CS
 assert 'gpu += hardware.Score' in CS and 'ram += hardware.Score' in CS and 'drive += hardware.Score' in CS
 assert 'cpu += CpuPower(processor)' in CS
-assert 'Array.Sort(ReferenceBenchmarks' in CS and 'RTX 4080 Ti' not in CS
+assert 'Array.Sort(benchmarks' in CS and 'RTX 4080 Ti' not in CS
 for model in ('Dream','Workstation','Aquarium','Gaming','Home','Office'):
     assert (ROOT / f'Assets/Resources/components/ready/ReadyPC_{model}_Black.prefab').exists()
 rows = {v[0]: v[1:] for v in (l.split('\t') for l in TRANSLATE.splitlines()) if v}

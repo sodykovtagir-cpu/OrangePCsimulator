@@ -503,11 +503,14 @@ check("PickRenderResolution" in script_text,
 check("ScoresAt(fpsCap)" in script_text and
       "ComputeScores(gpuScore, cpuScore, ramScore, driveScore, fpsCap)" in script_text,
       "эталонные машины считаются той же формулой, что и прогоны игрока")
-check("ReferenceBenchmarks = LoadReferenceBenchmarks()" in script_text and
-      "Resources.Load<PC.ReadyBuildSpawner>" in script_text and
-      "foreach (var part in build.BenchmarkParts)" in script_text,
-      "эталонные характеристики читаются из продаваемых ReadyPC-префабов")
-check("Array.Sort(ReferenceBenchmarks" in script_text,
+start_body = script_text.split('protected override void Start()', 1)[1].split('private void ResetStaleResults()', 1)[0]
+check('referenceBenchmarks = LoadReferenceBenchmarks();' in start_body and
+      start_body.index('LoadReferenceBenchmarks();') < start_body.index('ShowStartScreen();') and
+      'Resources.Load<PC.ReadyBuildSpawner>' in script_text and
+      'foreach (var part in build.BenchmarkParts)' in script_text and
+      'static readonly LeaderboardEntry[] ReferenceBenchmarks = LoadReferenceBenchmarks()' not in script_text,
+      "эталонные данные загружаются только в Start, не в инициализаторе MonoBehaviour")
+check("Array.Sort(benchmarks" in script_text,
       "строки сортируются по фактическим баллам при текущем лимите FPS")
 references = score_model.reference_benchmarks()
 check(len(references) == 6 and len({entry['pc'] for entry in references}) == 6,

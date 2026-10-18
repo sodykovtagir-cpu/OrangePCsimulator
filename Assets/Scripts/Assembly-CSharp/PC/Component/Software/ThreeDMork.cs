@@ -320,7 +320,9 @@ namespace PC.Component.Software
 			"Dream", "Workstation", "Aquarium", "Gaming", "Home", "Office"
 		};
 
-		private static readonly LeaderboardEntry[] ReferenceBenchmarks = LoadReferenceBenchmarks();
+		// No Unity Resources API during type/MonoBehaviour initialization.
+		// Loaded in Start, after Unity has constructed the component.
+		private LeaderboardEntry[] referenceBenchmarks;
 
 		/// <summary>Read exactly the parts that the Ready PC shop prefab installs.
 		/// Editing the shop's build changes the benchmark table automatically.</summary>
@@ -512,6 +514,9 @@ namespace PC.Component.Software
 		protected override void Start()
 		{
 			base.Start();
+			// Resources.Load must run on Unity's main thread after construction,
+			// never in a static or instance field initializer.
+			referenceBenchmarks = LoadReferenceBenchmarks();
 			SetDefaultSize(new Vector2(722.5f, 408.5f));
 			ResetStaleResults();
 			WireButtons();
@@ -717,16 +722,17 @@ namespace PC.Component.Software
 			// Эталонные машины считаются по той же формуле и с тем же потолком
 			// кадров, что и прогон игрока, поэтому таблица всегда сопоставима.
 			float fpsCap = GetFpsCap();
+			var benchmarks = referenceBenchmarks ?? Array.Empty<LeaderboardEntry>();
 			// Sort the actual shop products by the scores displayed at the
 			// player's current FPS cap, not by a fixed or brand-name order.
-			Array.Sort(ReferenceBenchmarks, (a, b) => b.ScoresAt(fpsCap).total.CompareTo(
+			Array.Sort(benchmarks, (a, b) => b.ScoresAt(fpsCap).total.CompareTo(
 				a.ScoresAt(fpsCap).total));
 			int sum = 0;
 
 			for (int i = 0; i < LeaderboardRows; i++)
 			{
-				bool hasRow = i < ReferenceBenchmarks.Length;
-				var entry = hasRow ? ReferenceBenchmarks[i] : null;
+				bool hasRow = i < benchmarks.Length;
+				var entry = hasRow ? benchmarks[i] : null;
 				var scores = hasRow ? entry.ScoresAt(fpsCap) : new BenchmarkScores();
 
 				SetCell(leaderboardRank, i, hasRow ? "#" + (i + 1) : "--");
@@ -775,8 +781,8 @@ namespace PC.Component.Software
 
 			if (leaderboardAverage != null)
 			{
-				int avg = ReferenceBenchmarks.Length > 0 ? sum / ReferenceBenchmarks.Length : 0;
-				leaderboardAverage.text = Format("3DMork average", ReferenceBenchmarks.Length, avg,
+				int avg = benchmarks.Length > 0 ? sum / benchmarks.Length : 0;
+				leaderboardAverage.text = Format("3DMork average", benchmarks.Length, avg,
 												  best > 0 ? best.ToString() : "--");
 			}
 		}
