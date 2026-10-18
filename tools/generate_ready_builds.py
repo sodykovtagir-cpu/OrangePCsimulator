@@ -289,7 +289,7 @@ def aquarium_pc(case: str) -> List[PartRef]:
 
 
 def dream_pc(case: str) -> List[PartRef]:
-    """Полный фарш: плата MSG, 512 ГБ RGB-памяти, RTX 5090 и RTX 4080 Ti.
+    """Полный фарш: плата MSG, 512 ГБ RGB-памяти, двумя RTX 5090.
 
     Плата взята MSG_ATX_Black, а не EXATX: набор слотов у них совпадает
     один в один (CPU 1, кулер 1, GPU 2, RAM 8, M.2 2, USB 1), поэтому сборка
@@ -306,7 +306,7 @@ def dream_pc(case: str) -> List[PartRef]:
     parts += [p("RAM 64GB(RGB)", "RAM", host=board) for _ in range(8)]
     parts += [
         p("RTX5090", "GPU", host=board),
-        p("RTX4080Ti", "GPU", host=board),
+        p("RTX5090", "GPU", host=board),
         p("SSD_M.2 8TB", "Drive", host=board),
         p("SSD_M.2 8TB", "Drive", host=board),
         # Корпусные слоты Supply принимают только match=0, то есть до

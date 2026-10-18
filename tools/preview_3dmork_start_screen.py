@@ -78,7 +78,7 @@ def hardware_sample(language: str = "EN") -> dict:
     return {
         "SelfName": board,
         "SelfCpu": "RMD Ryzen 9 7950X",
-        "SelfGpu": "RTX 5090 + RTX 4080 Ti",
+        "SelfGpu": "RTX 5090 + RTX 5090",
         "SelfRam": "64 GB",
         "SelfScore": "103341",
         "SelfFps": "180",

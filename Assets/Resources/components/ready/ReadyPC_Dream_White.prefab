@@ -148,7 +148,7 @@ MonoBehaviour:
     order: 16
     slotTarget: GPU
     hostPrefabName: MSG_ATX_White
-  - prefab: {fileID: 7209420444613088609, guid: 8cedbac4d3d448e4ab65da578350baca, type: 3}
+  - prefab: {fileID: 5024337473304829655, guid: dceea9be82b729f43ad08523eaef8b21, type: 3}
     localPosition: {x: -0.1895, y: 0.00141, z: -0.78786}
     localEuler: {x: 0, y: 270, z: 180}
     order: 17

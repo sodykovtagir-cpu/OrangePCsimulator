@@ -264,8 +264,8 @@ SPECS = {
         "Core i7-14700K / 128 GB RGB / RTX 5090 / 2 TB + 1 TB SSD / "
         "1.1 kW / Aquarium ATX",
     "Dream PC Description":
-        "Ryzen 9 7950X / 512 GB RGB (8 x 64) / RTX 5090 + RTX 4080 Ti / "
-        "2 x 1 TB M.2 + 2 x 2 TB SSD / 2 kW / EXATX / Aquarium",
+        "Ryzen 9 7950X / 512 GB RGB (8 x 64) / RTX 5090 + RTX 5090 / "
+        "2 x 8 TB M.2 + 2 x 16 TB SSD / 1.1 kW / MSG ATX / Aquarium",
     "Titan Miner Description":
         "8 x Titan V / Core i7-14700K / 64 GB / 1 TB SSD / 2 x 2 kW",
     # Было "24 x RTX 5090 ... 2 x 1 TB M.2 / 6 x 2 kW" — описание не совпадало
