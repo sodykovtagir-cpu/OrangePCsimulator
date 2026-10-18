@@ -48,12 +48,21 @@ assert 'OverclockBoot.Recover(disk)' in manager
 assert 'Repair overclock boot (selected PCs)' in menu
 assert 'board == system.Board' in manager  # another PC
 
-png = root / 'Assets/Texture2D/3DMork.png'
-with Image.open(png) as image:
+# Previous lossless PNG repack kept its GUID and did not solve Unity's lazy
+# asset-loading error from Image.sprite. Avoid that specific asset/decoder:
+# a new RGBA TGA sprite, a new GUID, and no remaining old PNG reference.
+icon = root / 'Assets/Texture2D/3DMorkIcon.tga'
+assert icon.exists() and not (icon.parent / '3DMork.png').exists()
+with Image.open(icon) as image:
     image.verify()
-with Image.open(png) as image:
+with Image.open(icon) as image:
     assert image.size == (512, 512) and image.mode == 'RGBA'
-meta = png.with_suffix('.png.meta').read_text()
-assert 'guid: 96035d719d554591ac698214dd94ed9c' in meta
-assert 'textureCompression: 0' in meta
-print('Overclock startup, recovery, benchmark, 60s timer and PNG guards: OK')
+meta = icon.with_suffix('.tga.meta').read_text()
+prefab = (root / 'Assets/Resources/apps/3DMork.prefab').read_text()
+import re
+guid = re.search(r'(?m)^guid: ([0-9a-f]{32})$', meta).group(1)
+assert guid != '96035d719d554591ac698214dd94ed9c'
+assert 'icon: {fileID: 21300000, guid: ' + guid + ', type: 2}' in prefab
+assert 'textureCompression: 0' in meta and 'spriteMode: 1' in meta
+assert '96035d719d554591ac698214dd94ed9c' not in prefab
+print('Overclock guards and 3DMork TGA asset/reference guards: OK')
