@@ -81,7 +81,8 @@ namespace PC.Component.Software
 					for (int i = 0; i < gpus.Count; i++)
 					{
 						var h = gpus[i];
-						if (h != null) scores[1] += h.Score;
+                        if (h != null) scores[1] += Mathf.RoundToInt(h.Score *
+                            PC.Component.Software.OS.OverclockBoot.GpuMultiplier(b));
 					}
 				}
 
@@ -91,7 +92,8 @@ namespace PC.Component.Software
 					for (int i = 0; i < rams.Count; i++)
 					{
 						var h = rams[i];
-						if (h != null) scores[2] += h.Score;
+                        if (h != null) scores[2] += Mathf.RoundToInt(h.Score *
+                            PC.Component.Software.OS.OverclockBoot.RamMultiplier(b));
 					}
 				}
 			}

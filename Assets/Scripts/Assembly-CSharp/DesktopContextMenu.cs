@@ -488,6 +488,7 @@ namespace PC.Component.Software
             if (manager.SelectedCount > 0)
             {
                 AddMenuItem(menuPanel, "Open selected in RemoteDesk", manager.OpenInRemoteDesk);
+                AddMenuItem(menuPanel, "Repair overclock boot (selected PCs)", manager.RecoverSelectedBoot);
                 AddMenuItem(menuPanel, "Power on selected", () => manager.RunSelected("startup"));
                 AddMenuItem(menuPanel, "EZ: Bitcoin (selected)", () => manager.RunSelected("bitcoin"));
                 AddMenuItem(menuPanel, "EZ: Money (selected)", () => manager.RunSelected("cash"));

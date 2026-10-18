@@ -405,6 +405,35 @@ namespace PC.Component.Software
             Render();
         }
 
+        public void RecoverSelectedBoot()
+        {
+            if (selection.Count == 0) { status = "Select a PC first"; Render(); return; }
+            int recovered = 0;
+            foreach (int id in selection)
+            {
+                if (!registered.Contains(id)) continue;
+                var board = DeviceAutomation.Find(id);
+                if (board == null || board == system.Board || DeviceAutomation.IsMiner(board)) continue;
+                // Access the hardware directly. A bootlooping computer has no
+                // Ready OS, so RemoteDesk and its FileManager cannot be used.
+                var drives = board.GetHardwares(HardwareType.Drive);
+                if (drives == null) continue;
+                bool repaired = false;
+                foreach (var hardware in drives)
+                {
+                    var disk = hardware as Storage;
+                    File bios;
+                    if (disk == null || !disk.TryGetFile("System/boot.bin", out bios) ||
+                        bios == null || bios.content != "pcos") continue;
+                    if (OverclockBoot.Recover(disk)) repaired = true;
+                }
+                if (repaired) recovered++;
+            }
+            status = "Restored boot line on " + recovered + "/" + selection.Count +
+                " remote PCs. Original boot.bin was not changed.";
+            Render();
+        }
+
         public void RunGlobal(string what)
         {
             // Deliberately ignore registry, visible tab and multiselection.

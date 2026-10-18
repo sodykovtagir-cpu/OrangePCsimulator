@@ -908,7 +908,8 @@ namespace PC.Component.Software
 						var g = gpus[i];
 						if (g == null || g.Damaged) continue;
 						snapshot.gpuCount++;
-						snapshot.gpuScore += g.Score;
+                        snapshot.gpuScore += Mathf.RoundToInt(g.Score *
+                            PC.Component.Software.OS.OverclockBoot.GpuMultiplier(board));
 						string name = CleanName(g.gameObject.name);
 						if (string.IsNullOrEmpty(snapshot.gpuName)) snapshot.gpuName = name;
 						else if (string.IsNullOrEmpty(snapshot.gpuName2)) snapshot.gpuName2 = name;
@@ -936,7 +937,8 @@ namespace PC.Component.Software
 						var r = rams[i];
 						if (r == null || r.Damaged) continue;
 						snapshot.ramCount++;
-						snapshot.ramScore += r.Score;
+                        snapshot.ramScore += Mathf.RoundToInt(r.Score *
+                            PC.Component.Software.OS.OverclockBoot.RamMultiplier(board));
 						snapshot.ramCapacity += r.Capacity;
 					}
 				}

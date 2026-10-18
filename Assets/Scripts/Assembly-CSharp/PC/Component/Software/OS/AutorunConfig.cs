@@ -46,7 +46,8 @@ namespace PC.Component.Software.OS
             {
                 var line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal)
-                    || line == "run boot.bin" || line == "init devices" || line == "init user") continue;
+                    || line == "run boot.bin" || line == OverclockBoot.Command ||
+                    line == "init devices" || line == "init user") continue;
                 commands.Add(line);
             }
             return commands.ToArray();

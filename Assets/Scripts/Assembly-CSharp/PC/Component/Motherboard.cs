@@ -110,6 +110,25 @@ namespace PC.Component
 		private List<External> externals = new List<External>();
 
 		private bool running;
+        private bool overclockRebootScheduled;
+        private int powerEpoch;
+
+        // A corrupt/unstable startup profile cannot repair itself. Restart until
+        // another computer fixes this board's startup file (or hardware fails).
+        public void ScheduleOverclockReboot()
+        {
+            if (overclockRebootScheduled || !running) return;
+            overclockRebootScheduled = true;
+            StartCoroutine(OverclockReboot(powerEpoch));
+        }
+
+        private System.Collections.IEnumerator OverclockReboot(int epoch)
+        {
+            yield return new WaitForSecondsRealtime(3f);
+            if (epoch != powerEpoch) yield break;
+            overclockRebootScheduled = false;
+            if (running) PowerOff(true);
+        }
 
 		[SerializeField]
 		[Header("Devices")]
@@ -378,6 +397,9 @@ namespace PC.Component
 
 		public void PowerOff(bool restart = false)
         {
+            powerEpoch++;
+            overclockRebootScheduled = false;
+            PC.Component.Software.OS.OverclockBoot.Apply(this, null);
 			running = false;
 			Switch(false, false);
 			SwitchBuiltIn(false);

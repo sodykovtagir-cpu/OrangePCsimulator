@@ -309,11 +309,41 @@ namespace PC.Component.Software.OS
             // that predate this feature. Once marked, missing lines stay missing.
             AutorunConfig.Ensure(FileManager);
             string autorun = AutorunConfig.Read(FileManager);
-            if (!AutorunConfig.HasLine(autorun, "run boot.bin"))
+            if (OverclockBoot.Enabled(autorun))
+            {
+                OverclockBoot.Profile profile;
+                if (!OverclockBoot.TryRead(FileManager, out profile))
+                {
+                    // The bad line stays on disk. A healthy PC's Device
+                    // Manager can remove it while this PC is in a BSOD loop.
+                    if (Board != null) Board.ScheduleOverclockReboot();
+                    yield return FreezeThenFault();
+                    yield break;
+                }
+                if (OverclockBoot.Fatal(profile))
+                {
+                    OverclockBoot.BreakExtreme(Board, profile);
+                    yield return FreezeThenFault(); // irreversible GPU/RAM damage
+                    yield break;
+                }
+                if (OverclockBoot.Unstable(profile))
+                {
+                    if (Board != null) Board.ScheduleOverclockReboot();
+                    yield return FreezeThenFault(); // recoverable BSOD bootloop
+                    yield break;
+                }
+                OverclockBoot.Apply(Board, profile);
+            }
+            else if (!AutorunConfig.HasLine(autorun, "run boot.bin") &&
+                !(AutorunConfig.HasLine(autorun, OverclockBoot.Comment) &&
+                  AutorunConfig.HasLine(autorun, "//run boot.bin")))
             {
                 yield return FreezeThenFault(); // before the OS loads
                 yield break;
             }
+            // Deleting only the custom `run overclockerd-boot.bin` line from
+            // another PC also restores normal boot. Leave the user's config
+            // untouched; Device Manager can fully restore the stock line.
 
             // Косметика не имеет права останавливать загрузку: исключение
             // внутри корутины обрывает её целиком, и система зависает на
