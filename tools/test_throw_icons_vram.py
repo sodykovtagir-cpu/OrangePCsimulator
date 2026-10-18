@@ -23,7 +23,12 @@ assert 'FitOverflow(monitorIconPositions, size, padding)' in os
 assert 'var visiblePositions = fullscreen ? fullscreenIconPositions : monitorIconPositions' in os
 assert 'if (mask != null && mask.enabled) mask.enabled = false;' in os
 assert 'iconGrid.FitsViewport(position, size, padding)' in os
-assert 'pair.Value.gameObject.SetActive(inView)' in os
+assert 'pair.Value.gameObject.SetActive(true)' in os
+assert 'SetActive(inView)' not in os
+file_icon = (root / 'PC/Component/Software/FileIcon.cs').read_text()
+set_position = file_icon.split('public void SetPosition(Vector2 position)')[1].split('public Vector2 GetPosition()', 1)[0]
+assert 'rectTransform = GetComponent<RectTransform>()' in set_position
+assert 'rectTransform.anchoredPosition = position' in set_position
 pcos = (root.parents[1] / 'GameObject/PCOS.prefab').read_text()
 icon_clip = pcos.split('--- !u!114 &812400000000000001')[1].split('--- !u!', 1)[0]
 assert 'm_Enabled: 0' in icon_clip

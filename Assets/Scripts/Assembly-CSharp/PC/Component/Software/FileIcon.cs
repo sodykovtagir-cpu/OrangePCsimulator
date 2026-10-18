@@ -55,15 +55,18 @@ namespace PC.Component.Software
 
         public void SetPosition(Vector2 position)
         {
-            if (rectTransform != null)
-                rectTransform.anchoredPosition = position;
+            // PCOS populates desktop icons during Boot, before its Desktop
+            // hierarchy is shown. Awake is not guaranteed to have cached the
+            // RectTransform yet; dropping this first position leaves every
+            // icon stacked at the prefab's (0, 0) by the screen edge.
+            if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
+            if (rectTransform != null) rectTransform.anchoredPosition = position;
         }
 
         public Vector2 GetPosition()
         {
-            if (rectTransform != null)
-                return rectTransform.anchoredPosition;
-            return Vector2.zero;
+            if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
+            return rectTransform != null ? rectTransform.anchoredPosition : Vector2.zero;
         }
 
         public void Open()

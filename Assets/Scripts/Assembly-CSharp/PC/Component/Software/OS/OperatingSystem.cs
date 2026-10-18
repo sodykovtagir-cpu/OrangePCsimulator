@@ -477,6 +477,9 @@ namespace PC.Component.Software.OS
             if (desktop != null) desktop.blocksRaycasts = true;
 
             Ready = true;
+#if UNITY_EDITOR
+            StartCoroutine(LogDesktopIconState());
+#endif
 
             if (taskbar != null)
                 taskbar.SetActive(true);
@@ -508,6 +511,21 @@ namespace PC.Component.Software.OS
                 }
             }
         }
+
+#if UNITY_EDITOR
+        private IEnumerator LogDesktopIconState()
+        {
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            int active = 0;
+            foreach (var pair in fileIcons)
+                if (pair.Value != null && pair.Value.gameObject.activeInHierarchy) active++;
+            var view = iconParent as RectTransform;
+            Debug.Log("PCOS desktop icons: files=" + (GetDesktopStorageFiles()?.Count ?? 0) +
+                ", created=" + fileIcons.Count + ", active=" + active +
+                ", viewport=" + (view != null ? view.rect.size.ToString() : "missing"));
+        }
+#endif
 
         private void EnsureTerminalForAutorun()
         {
@@ -1829,10 +1847,8 @@ namespace PC.Component.Software.OS
                 canvas.renderMode == RenderMode.WorldSpace && Board != null &&
                 Board.monitor != null && Board.monitor.gameObject.name.StartsWith(
                     "Monitor 2(", StringComparison.Ordinal);
-            // Icons have a fitted per-viewport layout and are individually
-            // hidden when outside the view. RectMask2D culls every icon on
-            // some displays (including the maximized/overlay desktop), even
-            // while the wallpaper and taskbar render normally. Never re-enable
+            // Icons have a fitted/clamped per-viewport layout. RectMask2D
+            // culled them on some monitors and zoom modes; never re-enable
             // that mask on a render-mode switch.
             if (mask != null && mask.enabled) mask.enabled = false;
             if (windowMask != null && windowMask.enabled == coloredWorldMonitor)
@@ -1874,13 +1890,24 @@ namespace PC.Component.Software.OS
             foreach (var pair in fileIcons)
             {
                 if (pair.Value == null) continue;
-                bool hasPosition = visiblePositions.TryGetValue(pair.Key, out var position);
-                bool inView = hasPosition && iconGrid.FitsViewport(position, size, padding);
-                // Without the broken RectMask2D, an overflowing icon must not
-                // bleed onto the taskbar or past the physical monitor bezel.
-                if (pair.Value.gameObject.activeSelf != inView)
-                    pair.Value.gameObject.SetActive(inView);
-                if (inView) pair.Value.SetPosition(position);
+                if (!visiblePositions.TryGetValue(pair.Key, out var position) &&
+                    !iconPositions.TryGetValue(pair.Key, out position))
+                    position = iconGrid.GetPosition(Vector2Int.zero);
+
+                // A very small/transient viewport can have no free grid cell.
+                // Never disable every desktop icon just because FitOverflow
+                // cannot place one: keep the nearest visible point instead.
+                if (!iconGrid.FitsViewport(position, size, padding) &&
+                    size.x > padding.x + padding.z + 70f &&
+                    size.y > padding.y + padding.w + 70f)
+                {
+                    position.x = Mathf.Clamp(position.x, padding.x + 35f,
+                        size.x - padding.z - 35f);
+                    position.y = Mathf.Clamp(position.y, -size.y + padding.y + 35f,
+                        -padding.w - 35f);
+                }
+                if (!pair.Value.gameObject.activeSelf) pair.Value.gameObject.SetActive(true);
+                pair.Value.SetPosition(position);
             }
 
             // No persistence here: world-space / render-texture monitors always use
