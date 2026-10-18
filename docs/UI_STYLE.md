@@ -1,7 +1,10 @@
-# UI style for new in-game applications
+# UI style for in-game applications
 
-Use the stock PCOS window chrome and its existing button, toggle and slider visual assets (for example the CPU slider in `Assets/Resources/apps/Overclock.prefab`). Build additional controls from matching prefabs/sprites and neutral grey states; do not invent a branded orange accent or draw bespoke button/slider skins. Keep the game's existing light surface, dark text and normal Unity `Selectable` feedback. Keep warning/error colours only where they communicate a real state, not as decoration.
+Use the stock PCOS window chrome and the game's default button, toggle and slider sprites/states. In the regular game UI, keep the established orange accent; do not replace it wholesale with grey. Preserve warning/error colors when they communicate a real state, and do not recolor logos, authored images, equipment or world lighting.
 
-The complete Overclock window is editable in `Assets/Resources/apps/Overclock.prefab`: GPU/RAM sliders, captions, status and buttons are serialized prefab children, wired to `Overclock.cs`. The slider clones reuse the stock CPU slider sprites but have no CPU-frequency listener; the buttons use the stock neutral sprite and default `Button` transition. Change their positions, colours and labels in the Unity prefab, not by editing runtime UI construction. Test ordinary and maximized windows (especially above the taskbar), keyboard/mouse interaction and the physical monitor in Unity Play Mode.
+Exceptions requested by the project owner:
+- `Assets/Resources/apps/3DMork.prefab` (and its dynamic score text) stays neutral, without orange accent.
+- `Assets/Resources/apps/Overclock.prefab` stays neutral. The whole window is editable there: GPU/RAM sliders, captions, status and buttons are serialized prefab children wired to `Overclock.cs`. No controls are generated when the app opens. Adjust layout, colors and labels in the Unity prefab.
+- The magnet/grid-mode hotbar icon stays neutral; its active tint is set by `Functions.RefreshGridIcon()`.
 
-Do not recolour logos, authored pictures, equipment, world lighting or the title/name of Orange PC. `tools/test_neutral_ui_style.py` guards serialized UI colours and script-level accents; when adding a new application, prefer an existing prefab's visuals to a new palette.
+For future custom applications, reuse the default control style instead of inventing bespoke buttons or sliders. Follow the standard orange accent unless the owner requests an exception. Test the prefab both in an ordinary window and maximized above the taskbar, and check the physical monitor in Unity Play Mode. `tools/test_ui_accent_exceptions.py` guards this palette policy.

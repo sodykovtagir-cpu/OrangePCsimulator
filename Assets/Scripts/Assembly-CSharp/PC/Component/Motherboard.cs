@@ -180,7 +180,7 @@ namespace PC.Component
 				// отличить от «не хватает детали».
 				Debug.Log("Boot отменён, комплектация неполная: "
 					+ message.Replace("\n", " ").Replace("<color=red>", "")
-						.Replace("</color>", ""));
+						.Replace("<color=Orange>", "").Replace("</color>", ""));
 				return message;
 			}
 
@@ -467,7 +467,7 @@ namespace PC.Component
 			var coolers = GetHardwares(HardwareType.Cooler);
 			if (coolers != null && coolers.Count < cpuCount)
 			{
-				info += "<color=red>" + Localization.GetText("Cooler Missing!") + "</color> \n";
+				info += "<color=Orange>" + Localization.GetText("Cooler Missing!") + "</color> \n";
 			}
 
 			return ok;

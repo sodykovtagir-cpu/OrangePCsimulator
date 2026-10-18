@@ -191,7 +191,7 @@ namespace PC.Component
 			if (!Damaged && ArtifactLevel > 0)
 			{
 				string text = Localization.GetText("Artifacting");
-				info += "\n<color=#D6D6D6>" + text + "</color>";
+				info += "\n<color=orange>" + text + "</color>";
 			}
 
 			return info;
