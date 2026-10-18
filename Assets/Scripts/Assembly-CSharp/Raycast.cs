@@ -26,14 +26,6 @@ public class Raycast : MonoBehaviour
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
 
-        // Velocity of the point held by the spring. Unity's high drag and the
-        // release handler used to erase it, making even a fast toss fall flat.
-        public Vector3 lastAim;
-        public float lastAimTime;
-        public Vector3 aimVelocity;
-        public Vector3 lastFlickVelocity;
-        public float lastFlickTime;
-        public bool hasAim;
     }
 
     [SerializeField]
@@ -53,10 +45,6 @@ public class Raycast : MonoBehaviour
 
     [SerializeField]
     private float targetAngularDrag = 5f;
-
-    [Header("Обычный бросок (без сетки)")]
-    [SerializeField] private float throwPower = 3.2f;
-    [SerializeField] private float maxThrowSpeed = 30f;
 
     [Header("Поворот предмета")]
     [Tooltip("Шаг и квант поворота стрелками, градусов: угол всегда кратен шагу. " +
@@ -2227,7 +2215,6 @@ public class Raycast : MonoBehaviour
                 }
                 else
                 {
-                    SampleThrowVelocity(currentDrag, point);
                     // Сетку выключили на ходу. Предмет ещё держит резкий снап, а
                     // пружина вот-вот вернётся и потянет его к точке прицела —
                     // на лёгких предметах это рывок «залетает». Поэтому отпускаем.
@@ -2314,41 +2301,8 @@ public class Raycast : MonoBehaviour
         drag.distance = (maxDistance - 2f) * v + 2f;
     }
 
-    private static void SampleThrowVelocity(Drag drag, Vector3 aim)
-    {
-        if (drag == null) return;
-        float now = Time.unscaledTime;
-        if (drag.hasAim)
-        {
-            float dt = now - drag.lastAimTime;
-            if (dt >= 0.004f && dt <= 0.25f)
-            {
-                var instant = Vector3.ClampMagnitude((aim - drag.lastAim) / dt, 20f);
-                drag.aimVelocity = Vector3.Lerp(drag.aimVelocity, instant, 0.72f);
-                if (instant.sqrMagnitude > 1.5f * 1.5f)
-                {
-                    drag.lastFlickVelocity = instant;
-                    drag.lastFlickTime = now;
-                }
-            }
-        }
-        drag.hasAim = true;
-        drag.lastAim = aim;
-        drag.lastAimTime = now;
-    }
-
     public void End()
     {
-        // Sample the latest camera/touch ray BEFORE ending the drag coroutine:
-        // a quick flick and release can happen before its next Update iteration.
-        var releaseDrag = currentDrag;
-        if (releaseDrag != null && !GridMode() && !releaseDrag.gridTouched && cam != null)
-        {
-            var ray = cam.ScreenPointToRay(pointer != null ? pointer.position :
-                new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
-            SampleThrowVelocity(releaseDrag, ray.GetPoint(releaseDrag.distance));
-        }
-
         // Обычную мягкую пружину вернём до того, как отпустим тело
         RestoreSpring();
 
@@ -2369,30 +2323,13 @@ public class Raycast : MonoBehaviour
                 rb.constraints = d.oldConstrains;
                 rb.drag = d.oldDrag;
                 rb.angularDrag = d.oldAngularDrag;
-                // Grid placements remain still, but a normal quick release is
-                // a throw. The high temporary drag must not cancel its momentum.
+                // Original OrangePC Rebirth release: restore drag and detach
+                // the spring without modifying the body's velocity. Grid
+                // placement is the only exception: its snap must remain still.
                 if (GridMode() || d.gridTouched || rb.isKinematic)
                 {
                     rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
-                }
-                else
-                {
-                    var aim = d.aimVelocity;
-                    // A flick can end on the frame after camera movement stops.
-                    // Keep its impulse briefly instead of averaging it to zero.
-                    if (Time.unscaledTime - d.lastFlickTime < 0.13f &&
-                        d.lastFlickVelocity.sqrMagnitude > aim.sqrMagnitude)
-                        aim = Vector3.Lerp(aim, d.lastFlickVelocity, 0.65f);
-                    if (aim.sqrMagnitude > 0.2f)
-                    {
-                        float lightness = Mathf.Clamp(1f / Mathf.Sqrt(Mathf.Max(.25f, rb.mass)), .8f, 2f);
-                        rb.velocity = Vector3.ClampMagnitude(
-                            aim * Mathf.Max(0f, throwPower) * lightness + rb.velocity * .25f,
-                            Mathf.Max(1f, maxThrowSpeed));
-                    }
-                    // At rest, retain only the body's small natural motion.
-                    else rb.velocity *= .25f;
                 }
                 // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
                 var latch = rb.GetComponent<DoorLatch>();

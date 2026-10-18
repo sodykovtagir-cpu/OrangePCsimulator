@@ -308,6 +308,19 @@ namespace PC.Component.Software.OS
             if (user != null) user.SetActive(false);
             if (loading != null) loading.SetActive(true);
 
+            // Set the logo/text state on EVERY boot, before any early fault.
+            // An unstable overclock used to exit here before ApplyBrand(),
+            // leaving "Starting Computer" visible behind the board logo.
+            // Cosmetic failures must not abort boot or the BSOD sequence.
+            try
+            {
+                ApplyBrand();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("PCOS: не удалось применить логотип платы: " + e);
+            }
+
             // Backwards-compatible first boot: install a config only for disks
             // that predate this feature. Once marked, missing lines stay missing.
             AutorunConfig.Ensure(FileManager);
@@ -347,18 +360,6 @@ namespace PC.Component.Software.OS
             // Deleting only the custom `run overclockerd-boot.bin` line from
             // another PC also restores normal boot. Leave the user's config
             // untouched; Device Manager can fully restore the stock line.
-
-            // Косметика не имеет права останавливать загрузку: исключение
-            // внутри корутины обрывает её целиком, и система зависает на
-            // экране запуска с чистой консолью.
-            try
-            {
-                ApplyBrand();
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning("PCOS: не удалось применить логотип платы: " + e);
-            }
 
             // Wait for canvas/iconParent to be fully initialized before creating icons.
             // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).
@@ -725,6 +726,11 @@ namespace PC.Component.Software.OS
             if (error) return;
             error = true;
             StopProcess();
+            // The BSOD must not inherit any startup text or board logo,
+            // regardless of when the boot failed. ApplyBrand restores them
+            // as appropriate on the next boot cycle.
+            if (startupLabel != null) startupLabel.enabled = false;
+            if (brandLogo != null) brandLogo.enabled = false;
             var src = Board != null ? Board.Source : null;
             if (src != null) src.PlayOneShot(errorSound);
             if (animator != null) animator.SetTrigger("Error");
