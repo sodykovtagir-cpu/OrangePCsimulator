@@ -93,7 +93,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   appName: 3DMork
-  icon: {fileID: 21300000, guid: a18d0735026d4e02895401647d94e5f7, type: 2}
+  icon: {fileID: 21300000, guid: 96035d719d554591ac698214dd94ed9c, type: 3}
   fileName: 
   fileIcon: {fileID: 0}
   size: 650
@@ -152,7 +152,6 @@ MonoBehaviour:
   leaderboardSelfRank: {fileID: 5000000000000284}
   leaderboardSelfName: {fileID: 5000000000000288}
   leaderboardSelfCpu: {fileID: 5000000000000292}
-  leaderboardSelfGpu: {fileID: 5000000000000728}
   leaderboardSelfScore: {fileID: 5000000000000296}
   leaderboardSelfFps: {fileID: 5000000000000300}
   leaderboardAverage: {fileID: 5000000000000304}
@@ -14275,7 +14274,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: '3DMork resolution'
+  m_Text: 3DMork resolution
 --- !u!114 &5000000000000724
 MonoBehaviour:
   m_ObjectHideFlags: 0
