@@ -99,6 +99,9 @@ namespace PC.Component.Software
 
 		protected virtual bool ShowMenuBar => true;
 
+        // Idle UI/apps draw power too; OS adds activity and app-specific work.
+        public virtual float Workload => 0.08f;
+
 		public virtual bool SingleInstance => true;
 
 		public virtual bool CanOpenExtension(string ext) => false;

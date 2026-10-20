@@ -7,6 +7,7 @@ using PC.Component.Software.Lua;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.UI.Extensions;
+using UnityEngine.EventSystems;
 
 namespace PC.Component.Software.OS
 {
@@ -15,6 +16,8 @@ namespace PC.Component.Software.OS
 
         void Start()
         {
+            Localization.LanguageChanged += OnDocumentationLanguageChanged;
+            if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
             // Disable ReorderableList layout on iconParent for free icon positioning
             if (iconParent != null)
             {
@@ -132,6 +135,73 @@ namespace PC.Component.Software.OS
         public DevicePicker DevicePicker => devicePicker;
         public bool Ready { get; private set; }
 
+        private static readonly HardwareType[] OtherPowerParts =
+            { HardwareType.Cooler, HardwareType.RAM, HardwareType.Drive, HardwareType.Output };
+        private float nextWorkSample;
+        private float workUntil;
+        private float workStrength;
+        private bool stressTest;
+        public float CurrentDrawWatts { get; private set; }
+        public float CpuLoad { get; private set; }
+
+        public void RegisterWork(float strength, float seconds = .5f)
+        {
+            float until = Time.unscaledTime + Mathf.Max(.05f, seconds);
+            if (workUntil < until) workUntil = until;
+            workStrength = Mathf.Max(workStrength, Mathf.Clamp01(strength));
+        }
+
+        public void SetStressTest(bool enabled) { stressTest = enabled; }
+
+        private void UpdateWorkload()
+        {
+            if (Board == null || !Board.Running || Time.unscaledTime < nextWorkSample) return;
+            nextWorkSample = Time.unscaledTime + .1f;
+            float cpuTarget = .05f;
+            float gpuTarget = .03f;
+            for (int i = 0; i < runningApps.Count; i++)
+            {
+                var app = runningApps[i];
+                if (app == null || !app.isActiveAndEnabled) continue;
+                cpuTarget += app.Workload;
+                // Media, 3D tests and mining also use the graphics cards.
+                string name = app.AppName ?? "";
+                if (name == "Viewer") gpuTarget += .20f;
+                else if (name == "Miner") { cpuTarget += .25f; gpuTarget += .60f; }
+                else if (name == "3DMork" || name == "Benchmark")
+                { cpuTarget += .35f; gpuTarget += .60f; }
+                else if (name == "Lua App" || name == "Lua Editor") cpuTarget += .15f;
+            }
+            var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            if (selected != null && selected.transform.IsChildOf(transform) &&
+                (Input.anyKey || Input.GetMouseButton(0) || Input.touchCount > 0))
+                RegisterWork(.28f, .3f);
+            if (Time.unscaledTime < workUntil)
+            {
+                cpuTarget += workStrength;
+                gpuTarget += workStrength * .35f;
+            }
+            else workStrength = 0f;
+            if (stressTest) { cpuTarget = 1f; gpuTarget = 1f; }
+            CpuLoad = Mathf.MoveTowards(CpuLoad, Mathf.Clamp01(cpuTarget), .1f * .6f);
+            float graphicsLoad = Mathf.Clamp01(gpuTarget);
+            CurrentDrawWatts = 0f;
+            var cpus = Board.GetHardwares(HardwareType.CPU);
+            if (cpus != null)
+                foreach (var item in cpus)
+                    if (item is CPU cpu) { cpu.Workload = CpuLoad; CurrentDrawWatts += cpu.CurrentWatts; }
+            var gpus = Board.GetHardwares(HardwareType.GPU);
+            if (gpus != null)
+                foreach (var item in gpus)
+                    if (item is GPU gpu) { gpu.Workload = graphicsLoad; CurrentDrawWatts += gpu.CurrentWatts; }
+            foreach (var type in OtherPowerParts)
+            {
+                var parts = Board.GetHardwares(type);
+                if (parts == null) continue;
+                foreach (var part in parts) if (part != null && part.Power) CurrentDrawWatts += part.Wattage;
+            }
+        }
+
         public string UserPicturePath
         {
             get { return userData.userPicturePath; }
@@ -195,6 +265,7 @@ namespace PC.Component.Software.OS
 
         private void OnDestroy()
         {
+            Localization.LanguageChanged -= OnDocumentationLanguageChanged;
             if (virtualRemoteCanvas != null) Destroy(virtualRemoteCanvas.gameObject);
         }
 
@@ -381,6 +452,7 @@ namespace PC.Component.Software.OS
 
             EnsureIconLayoutLoaded();
             LoadFilesFromDisk();
+            if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
 
             storageScore = 0;
             var all = AllStorage;
@@ -819,6 +891,7 @@ namespace PC.Component.Software.OS
             if (FileManager.Create(0, file))
             {
                 AddApp(app.AppName);
+                if (app.AppName == "Lua Editor") EnsureLuaDocs();
                 RefreshDesktopIcon();
             }
         }
@@ -964,13 +1037,21 @@ namespace PC.Component.Software.OS
             EnsureLuaDocs();
         }
 
+        private const string LuaDocumentationPath = "Lua Documentation.txt";
+
+        private void OnDocumentationLanguageChanged()
+        {
+            if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
+        }
+
         private void EnsureLuaDocs()
         {
             if (FileManager == null) return;
-            if (FileManager.Exists(0, "Lua.txt"))
-                FileManager.Delete(0, "Lua.txt");
-            // hello.lua не создаётся — пользователь сам решит когда нужен
-            RefreshDesktopIcon();
+            string content = PC.Component.Software.LuaDocs.Text();
+            if (FileManager.TryGetFile(0, LuaDocumentationPath, out var old) &&
+                old != null && old.content == content) return;
+            var file = FileManager.Write(0, LuaDocumentationPath, content);
+            if (file != null) { file.hidden = false; RefreshDesktopIcon(); }
         }
 
         public IList<string> InstalledAppNames()
@@ -1326,6 +1407,11 @@ namespace PC.Component.Software.OS
                     var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
                     if (editor != null) editor.OpenDocument(file);
                 }
+                if (prefab is PC.Component.Software.Viewer && runningApps.Count > 0)
+                {
+                    var viewer = runningApps[runningApps.Count - 1] as PC.Component.Software.Viewer;
+                    if (viewer != null) viewer.OpenDocument(file);
+                }
                 return true;
             }
 
@@ -1351,6 +1437,11 @@ namespace PC.Component.Software.OS
             {
                 var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
                 if (editor != null) editor.OpenDocument(file);
+            }
+            if (app is PC.Component.Software.Viewer && runningApps.Count > 0)
+            {
+                var viewer = runningApps[runningApps.Count - 1] as PC.Component.Software.Viewer;
+                if (viewer != null) viewer.OpenDocument(file);
             }
             return true;
         }
@@ -1440,7 +1531,8 @@ namespace PC.Component.Software.OS
                 string.Equals(ext, ".mov", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(ext, ".png", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(ext, ".jpg", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase);
+                string.Equals(ext, ".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, ".gif", StringComparison.OrdinalIgnoreCase);
         }
 
         private App FindInstalledAppForExtension(string ext)
@@ -2130,7 +2222,21 @@ namespace PC.Component.Software.OS
 
         public void DeleteUserFile(File file)
         {
-            if (file == null || IsProtectedFile(file)) return;
+            if (file == null) return;
+            if (file.path == OverclockBoot.Path)
+            {
+                // Explorer must restore the original autorun line BEFORE removing
+                // the hidden custom kernel, otherwise this PC would bootloop.
+                var disk = FindStorageOf(file);
+                if (disk == null || (OverclockBoot.Enabled(AutorunConfig.Read(FileManager)) &&
+                    !OverclockBoot.Recover(disk))) return;
+                if (FileManager != null) FileManager.Delete(0, OverclockBoot.Path);
+                if (Board != null) OverclockBoot.Apply(Board, null);
+                RefreshDesktopIcon();
+                RefreshRunningFileManagers();
+                return;
+            }
+            if (IsProtectedFile(file)) return;
             if (AllStorage == null || AllStorage.Count == 0) return;
 
             // Файл может лежать на любом диске: ищем тот, где он есть на самом
@@ -2742,6 +2848,7 @@ namespace PC.Component.Software.OS
         private void Update()
         {
             if (!Ready) return;
+            UpdateWorkload();
 
             if (clockText != null)
             {
@@ -3091,6 +3198,7 @@ namespace PC.Component.Software.OS
         private void LaunchApp(App prefab, string content = "")
         {
             if (prefab == null) return;
+            RegisterWork(.40f, 1f);
 
             if (prefab.SingleInstance)
             {

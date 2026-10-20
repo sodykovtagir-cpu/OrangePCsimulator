@@ -1,108 +1,96 @@
-PCOS Lua
-========
-Scripting language inside the OS. Community: t.me/orangePCsimu
+PCOS LUA — EDITOR AND API
+=========================
+Install Lua Editor to get this document on the desktop. Russian game language uses the Russian manual; all other languages use English. Write Lua, click Run to preview, Save to create a .lua/.txt source file, or Compile to create a .exe shortcut. Pick icon chooses an image file for the compiled app. Tap a snippet to insert it at the current caret; | marks the caret position after insertion. ui.* needs a running app window. The origin for ui and gfx is the top-left corner (x grows right, y grows down); sizes are in pixels.
 
-EDITOR
-------
-Left: code. Right: snippets. | in a snippet is where the caret jumps.
-Run — preview the program in a system window (needed for ui.*).
-Save — .lua / .txt source.
-Compile — writes Name.exe to the desktop (shortcut). Double-click to launch.
-Pick icon — choose a .pic (or any base64 image file) for that .exe.
-Compile name — InputField on the editor (inspector: Compile Name).
+START HERE
+----------
+print("Hello!")                          -- log a line to Output / debugger
+ui.title("My app")                      -- window title
+ui.size(320, 180)                       -- window width, height
+local label = ui.label("Ready", 20, 20, 250, 24)
+ui.button("Press", 20, 60, 120, 28, function()
+  ui.set(label, "Pressed!")             -- change a widget by its returned id
+end)
 
-Docs — separate button, OnClick = Docs (or OpenDocs / ShowDocs),
-target = this Lua Editor window in the scene (not the Project prefab).
-
-SYNTAX HIGHLIGHT
-----------------
-On the Lua Editor object add LuaSyntaxHighlight:
-  Code = the code InputField
-  Overlay = a Text copy of that field (same RectTransform, Rich Text ON, Raycast OFF)
-Set the InputField text color almost transparent so only the overlay shows.
-Colors (keyword / string / comment / number) are in the inspector.
-
-COMPILE / .EXE
---------------
-Compile packs JSON { pcos: lua-app, name, icon, script } into Name.exe.
-Desktop icon uses your picture if Pick Icon was used.
-Several compiled apps can run at once.
-
-UI (system look: angular PCOS chrome)
--------------------------------------
-Coordinates: top-left origin, Y down, pixels.
-
-WINDOW
-------
-isdraggable(true/false)    -- also ui.isdraggable
-ismaximable(true/false)    -- show maximize like Video; also ismaxible / ui.ismaximable
-enabledebugger()           -- read-only draggable console (works in compiled .exe too)
-
-print(...) goes to the editor Output. After enabledebugger() also to that console.
-Not the Unity log. Log is not cleared after run.
-
-ui.title("Name")
-ui.size(w, h)
-ui.label(text, x, y, w, h)           -> id
-ui.button(text, x, y, w, h, fn)      -> id
-ui.input(text, x, y, w, h)           -> id
-ui.panel(x, y, w, h)                 -> id
-ui.rect(x, y, w, h, r, g, b, a)      -> id
-ui.image(path, x, y, w, h)           -> id  (.pic / base64 file)
-ui.slider(x, y, w, h, min, max)      -> id
-ui.toggle(text, x, y, w, h, on)      -> id
-ui.get(id)  ui.set(id, text)
-ui.color(id, r, g, b, a)
-ui.value(id)     -- slider
-ui.checked(id)   -- toggle
-ui.remove(id)  ui.clear()
-ui.systemstyle()
-ui.style({
-  window={r,g,b}, panel={r,g,b},
-  button={r,g,b}, buttonText={r,g,b},
-  text={r,g,b}, input={r,g,b}, inputText={r,g,b},
-  fontSize=14
-})
-Colors are 0..1 tables {r,g,b} or {r,g,b,a}.
-
-Example:
-  ui.title("Counter")
-  ui.size(320, 180)
-  local n = 0
-  local lab = ui.label("0", 20, 20, 200, 24)
-  ui.button("Click", 20, 60, 100, 28, function()
-    n = n + 1
-    ui.set(lab, tostring(n))
-  end)
+WINDOW AND UI
+-------------
+isdraggable(bool) / ui.isdraggable(bool) — enable or disable dragging; without an argument, return its current state. ui.draggable is an alias.
+ismaximable(bool) / ui.ismaximable(bool) — enable or disable maximize; without an argument, return its current state. ismaxible, ismaximizable, ui.ismaximizable and ui.maximizable are aliases.
+enabledebugger() — show a read-only draggable console; print also writes there.
+onupdate(function() ... end) — run a callback on each frame (avoid slow/infinite loops).
+ui.title(text) — rename the current window.
+ui.size(width, height) — resize the window.
+ui.label(text,x,y,w,h) — draw text; returns an id.
+ui.button(text,x,y,w,h,fn) — create a clickable button calling fn(); returns an id.
+ui.input(text,x,y,w,h) — editable text; returns an id. Read it with ui.get(id).
+ui.panel(x,y,w,h) — draw a background panel; returns an id.
+ui.rect(x,y,w,h,r,g,b,a) — draw a colored rectangle; returns an id.
+ui.image(path,x,y,w,h) — show an image from an existing .pic/base64 file; returns an id.
+ui.slider(x,y,w,h,min,max) — numeric slider; returns an id. Read ui.value(id).
+ui.toggle(text,x,y,w,h,on) — checkbox; returns an id. Read ui.checked(id).
+ui.get(id) / ui.set(id,text) — read/change a label, button or input by id.
+ui.color(id,r,g,b,a) — recolor a widget; channels range 0..1.
+ui.value(id) / ui.checked(id) — get slider number / checkbox boolean.
+ui.remove(id) / ui.clear() — remove one widget / all widgets.
+ui.systemstyle() — restore native PCOS chrome. ui.style({window={r,g,b},panel={r,g,b},button={r,g,b},buttonText={r,g,b},text={r,g,b},input={r,g,b},inputText={r,g,b},fontSize=14}) customizes colors and font size.
 
 GRAPHICS
 --------
-Origin top-left, Y down. Call gfx.flip() if you draw after a click.
-gfx.size(w, h)   gfx.color(r,g,b,a)   gfx.clear(r,g,b,a)
-gfx.pixel(x,y,r,g,b)  gfx.rect(x,y,w,h,r,g,b)  gfx.box(...)
-gfx.line(x1,y1,x2,y2,r,g,b)  gfx.circle(x,y,r,r,g,b)  gfx.ring(...)
-gfx.flip() / gfx.apply()
+gfx.size(w,h) — set drawing canvas size. gfx.color(r,g,b,a) — set draw color (0..1).
+gfx.clear(r,g,b,a) — erase background. gfx.pixel(x,y,r,g,b) — plot a point.
+gfx.rect(x,y,w,h,r,g,b) — draw a filled rectangle; gfx.box(...) draws its outline.
+gfx.line(x1,y1,x2,y2,r,g,b) — draw a line.
+gfx.circle(x,y,radius,r,g,b) — draw a circle; gfx.ring(...) its ring.
+gfx.text(x,y,text,r,g,b) — draw text. gfx.getpixel(x,y) — read {r,g,b,a} color values.
+gfx.flip() / gfx.apply() — display the pending drawing; call after updates.
+Example:
+  gfx.size(128, 64)
+  gfx.clear(0, 0, 0, 1)
+  gfx.rect(10, 10, 30, 20, 1, 0.4, 0)
+  gfx.flip()
 
-OS / FILES / WINDOWS
---------------------
-print(...)
-os.alert(title, msg)  os.open(nameOrFile)  os.close(name)
-os.apps()  os.windows()  os.username()  os.id()
-os.installed(name)  os.shutdown()  os.time()  os.ready()
-fs.list()  fs.read(p)  fs.write(p,s)  fs.exists(p)  fs.delete(p)
-win.alert(msg)  win.open(name)  win.close(name)
+OS, FILES, WINDOWS
+------------------
+os.alert(title,message) / win.alert(message) — show a system message.
+os.open(appOrFile) / win.open(appName) — open an installed app or file / open an app; returns success.
+os.close(appName) / win.close(appName) — close an app; returns success.
+os.apps() — names of installed apps. os.windows() / os.running() / win.list() — names of running windows.
+os.username() — current user name. os.id() — current PC ID. os.time() — current UTC Unix timestamp. os.ready() — whether PCOS is ready. os.installed(name) — whether an app is installed. os.shutdown() — turn off this PC.
+fs.list() — array of user file names. fs.read(path) — text or nil if absent. fs.write(path,text) — create/overwrite a user file, returns success. fs.exists(path) — check if a file exists. fs.delete(path) — remove a user file, returns success. System/ paths cannot be written/deleted by scripts.
+Example:
+  fs.write("note.txt", "Hello")
+  print(fs.read("note.txt"))
+  if os.installed("Viewer") then os.open("Viewer") end
 
-LANGUAGE
---------
-if / then / elseif / else / end
-while / do / end   repeat / until
-for i = 1, n do ... end
-function name(...) ... end
-local x = ...
-tables {1,2, a=3}, t.a, t[1], #t
-and or not  ..  == ~= < >
+LUA BASICS
+----------
+local x = 2; if x > 1 then print(x) end
+for i = 1, 3 do print(i) end
+while x < 4 do x = x + 1 end
+function add(a,b) return a+b end
+Tables: local t = {"one", "two"}; print(t[1], #t)
+Operators: + - * /, .. (join text), == ~= < > <= >=, and/or/not.
+STANDARD FUNCTIONS (THIS PCOS LUA IMPLEMENTATION)
+-----------------------------------------
+tonumber(x) — parse a number, nil if invalid. tostring(x) — convert to text. type(x) — return the type name.
+assert(x,message) — return x if true, otherwise throw message. error(message) — stop with an error.
+select(i,a,b,...) — return one argument at 1-based index i; select("#",...) counts them.
+pcall(fn,...) — call safely; returns a TABLE: result[1] is success boolean, result[2] is value or error text (not multiple return values).
+pairs(t) — returns a TABLE with keys, values, n; NOT a standard Lua iterator. Use: local p = pairs(t); for i=1,p.n do print(p.keys[i],p.values[i]) end
+ipairs(t) — returns t itself; use numeric indexes: local a = ipairs(t); for i=1,#a do print(a[i]) end
 
-math.abs/floor/ceil/sqrt/sin/cos/min/max/random/pi
-string.len/upper/lower/sub/rep/find
-table.insert / table.concat
-tonumber tostring type assert error
+MATH AND STRINGS
+----------------
+math.pi — pi constant. math.huge — positive infinity; math.maxinteger/mininteger — numeric bounds.
+math.abs(x) — absolute value. math.floor(x) / math.ceil(x) — round down/up.
+math.sqrt(x) — square root. math.sin(x) / math.cos(x) — sine/cosine in radians.
+math.min(a,b,...) / math.max(a,b,...) — smallest/largest input.
+math.random() — random fraction 0..1; random(n) — integer 1..n; random(a,b) — integer a..b.
+string.len(s) — length. string.upper(s) / string.lower(s) — change letter case.
+string.sub(s,i,j) — substring from inclusive 1-based i through j; negative indexes count from end.
+string.rep(s,n) — repeat text n times. string.find(s,needle,start) — first 1-based position, or nil; searches literal text, not a pattern.
+string.reverse(s) — reverse characters. string.byte(s,i) — numeric character code at position i.
+string.char(code,...) — build text from character codes. string.format(fmt,...) — format values (example: string.format("%d", 5)).
+table.insert(t,value) — append to an array. table.concat(t,separator) — join array values.
+table.remove(t,pos) — remove element and shift following elements; by default, remove the last one.
+table.sort(t,fn) — sort in place; optional fn(a,b) returns true when a comes first.

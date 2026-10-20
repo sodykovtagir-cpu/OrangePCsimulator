@@ -69,7 +69,11 @@ namespace PC.Component.Software.OS
 
 		private void NotifyChanged()
 		{
-			if (cs is OperatingSystem os) os.RequestFileRefresh();
+			if (cs is OperatingSystem os)
+            {
+                os.RegisterWork(.35f, .8f);
+                os.RequestFileRefresh();
+            }
 		}
 
 		public bool Exists(int storage, string path)

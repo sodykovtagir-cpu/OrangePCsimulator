@@ -60,6 +60,10 @@ namespace PC.Component
         // Volatile per-boot clock ratio. Hardware damage remains persisted by
         // Hardware/ArtifactLevel; merely previewing a clock does not damage it.
         public float OverclockRatio { get; set; } = 1f;
+        public float Workload { get; set; }
+        public float CurrentWatts => Power && !Damaged
+            ? Wattage * (.20f + .80f * Mathf.Clamp01(Workload)) * Mathf.Clamp(OverclockRatio, 1f, 1.5f)
+            : 0f;
 
 		/// <summary>Карта повреждена, но ещё выдаёт изображение.</summary>
 		public bool Artifacting
@@ -79,7 +83,10 @@ namespace PC.Component
 			get
 			{
                     float wear = Mathf.Clamp01((float)ArtifactLevel / MaxArtifactLevel);
-                    float clock = Mathf.Clamp01((OverclockRatio - 1.15f) / .7f);
+                    float clock = OverclockRatio >= PC.Component.Software.OS.OverclockBoot.FatalRatio
+                        ? Mathf.Clamp01(.15f + (OverclockRatio - PC.Component.Software.OS.OverclockBoot.FatalRatio) /
+                            (2f - PC.Component.Software.OS.OverclockBoot.FatalRatio) * .85f)
+                        : 0f;
                     return Mathf.Max(wear, clock);
 			}
 		}

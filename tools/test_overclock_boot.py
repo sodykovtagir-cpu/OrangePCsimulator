@@ -21,7 +21,7 @@ assert 'System/overclockerd-boot.bin' in boot
 assert 'run overclockerd-boot.bin' in boot
 assert '"//run boot.bin"' in boot
 assert '"run boot.bin"' in boot
-assert 'System/boot.bin' not in boot.replace('System/boot.bin = pcos', '')  # never write BIOS file
+assert 'fm.Write(0, "System/boot.bin"' not in boot and 'fm.Delete(0, "System/boot.bin"' not in boot  # never modify BIOS file
 assert 'Save(FileManager fm' in boot and 'Recover(Storage disk)' in boot
 assert 'fm.Write(0, AutorunConfig.Path, updated)' in boot
 assert 'fm.TryGetFile(0, Path, out onDisk)' in boot
@@ -42,8 +42,15 @@ assert 'OverclockRatio' in gpu and 'ArtifactStrength' in gpu
 assert 'GpuMultiplier(b)' in benchmark and 'RamMultiplier(b)' in benchmark
 assert 'GpuMultiplier(board)' in three and 'RamMultiplier(board)' in three
 assert 'GpuMultiplier(board)' in read('PC/Component/Software/Miner.cs')
-assert 'Time.realtimeSinceStartup - startedAt < 60f' in app
-assert 'Save without test' in (root / 'Assets/Resources/apps/Overclock.prefab').read_text()
+assert 'Time.realtimeSinceStartup - startedAt < 30f' in app
+assert 'seconds remaining (real time)' not in app
+assert 'Test optional' not in app
+assert 'Save settings' in (root / 'Assets/Resources/apps/Overclock.prefab').read_text()
+assert 'Test 30 seconds' in (root / 'Assets/Resources/apps/Overclock.prefab').read_text()
+assert 'Test optional' not in (root / 'Assets/Resources/apps/Overclock.prefab').read_text()
+assert 'OverclockBoot.ResetToStock(system.FileManager)' in app
+assert 'fm.Delete(0, Path)' in boot
+assert 'OverclockBoot.Recover(disk)' in os
 assert 'saveButton.onClick.AddListener(SaveProfile)' in app
 assert 'OverclockBoot.Save(system.FileManager, profile)' in app
 assert 'OverclockBoot.Recover(disk)' in manager

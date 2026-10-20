@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,11 +18,16 @@ namespace PC.Component.Software
         RectTransform viewRt;
         GameObject barGo;
         Texture2D[] frames;
+        float[] frameIntervals;
         float interval = 0.1f;
         int index;
         bool playing;
         float lastTime;
         bool built;
+        private File currentFile;
+        private readonly List<File> siblings = new List<File>();
+        private Button previousButton;
+        private Button nextButton;
 
         public override bool SingleInstance => false;
         protected override bool ShowMenuBar => false;
@@ -33,13 +39,16 @@ namespace PC.Component.Software
                 || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
                 || ext.Equals(".png", StringComparison.OrdinalIgnoreCase)
                 || ext.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
-                || ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase);
+                || ext.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+                || ext.Equals(".gif", StringComparison.OrdinalIgnoreCase);
         }
 
         public override void Open(string content)
         {
             base.Open(content);
             rect = GetComponent<RectTransform>();
+            currentFile = null;
+            siblings.Clear();
             EnsureUi();
 
             if (!string.IsNullOrEmpty(content))
@@ -48,31 +57,72 @@ namespace PC.Component.Software
                 return;
             }
 
-            // Запуск с иконки/меню без файла — сразу предлагаем выбрать файл,
-            // как это делает блокнот. Viewer принимает только .pic и .mov.
+            // Запуск без файла открывает диалог выбора фото или анимации.
             LoadContent(null);
             PromptPickFile();
         }
 
         /// <summary>
-        /// Открывает системный диалог выбора файла, отфильтрованный по .pic и .mov.
+        /// Открывает системный диалог выбора изображения или анимации.
         /// </summary>
         public void PromptPickFile()
         {
             var os = system;
             if (os == null) return;
 
-            os.SelectFile(new[] { ".pic", ".mov" }, file =>
+            os.SelectFile(new[] { ".pic", ".mov", ".png", ".jpg", ".jpeg", ".gif" }, file =>
             {
                 if (file == null) return;
                 LoadContent(file.content);
+                OpenDocument(file);
             });
+        }
+
+        public void OpenDocument(File file)
+        {
+            if (file == null) return;
+            currentFile = file;
+            siblings.Clear();
+            if (system != null && system.AllStorage != null)
+                foreach (var disk in system.AllStorage)
+                {
+                    if (disk == null || disk.files == null || !disk.files.Contains(file)) continue;
+                    string folder = FolderOf(file.path);
+                    foreach (var item in disk.files)
+                        if (item != null && !item.isFolder &&
+                            FolderOf(item.path) == folder && CanOpenExtension(item.Extension()))
+                            siblings.Add(item);
+                    break;
+                }
+            siblings.Sort((a, b) => string.Compare(a.path, b.path, StringComparison.OrdinalIgnoreCase));
+            ShowFrame(index, false);
+            RefreshControls();
+        }
+
+        private static string FolderOf(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            int slash = path.LastIndexOf('/');
+            return slash < 0 ? "" : path.Substring(0, slash);
+        }
+
+        public void PreviousFile() { SwitchFile(-1); }
+        public void NextFile() { SwitchFile(1); }
+
+        private void SwitchFile(int direction)
+        {
+            if (siblings.Count < 2 || currentFile == null) return;
+            int i = siblings.IndexOf(currentFile);
+            if (i < 0) return;
+            currentFile = siblings[(i + direction + siblings.Count) % siblings.Count];
+            LoadContent(currentFile.content);
         }
 
         void Update()
         {
             if (!playing || frames == null || frames.Length < 2) return;
-            float step = Mathf.Max(0.02f, interval);
+            float step = Mathf.Max(0.02f, frameIntervals != null && index < frameIntervals.Length
+                ? frameIntervals[index] : interval);
             if (Time.unscaledTime - lastTime < step) return;
             lastTime = Time.unscaledTime;
             ShowFrame((index + 1) % frames.Length, true);
@@ -84,6 +134,7 @@ namespace PC.Component.Software
             playing = false;
             index = 0;
             interval = 0.1f;
+            frameIntervals = null;
 
             if (string.IsNullOrEmpty(content))
             {
@@ -103,6 +154,9 @@ namespace PC.Component.Software
             {
                 var tex = FormatConverter.BytesToTexture(bytes, false);
                 if (tex != null) loaded = new[] { tex };
+            }
+            else if (bytes != null && GifFrames.TryDecode(bytes, out loaded, out frameIntervals))
+            {
             }
             else if (TryLoadMov(bytes, out loaded, out movInterval))
             {
@@ -198,7 +252,7 @@ namespace PC.Component.Software
             {
                 if (display != null) display.texture = null;
                 if (frameLabel != null) frameLabel.text = "0/0";
-                SetTitle("Viewer");
+                SetTitle(currentFile != null ? System.IO.Path.GetFileName(currentFile.path) : "Viewer");
                 return;
             }
 
@@ -214,7 +268,8 @@ namespace PC.Component.Software
 
             if (frameLabel != null)
                 frameLabel.text = (index + 1) + "/" + frames.Length;
-            SetTitle(frames.Length > 1 ? "Viewer  " + (index + 1) + "/" + frames.Length : "Viewer");
+            string name = currentFile != null ? System.IO.Path.GetFileName(currentFile.path) : "Viewer";
+            SetTitle(frames.Length > 1 ? name + "  " + (index + 1) + "/" + frames.Length : name);
 
             if (updateSlider && frameSlider != null)
                 frameSlider.SetValueWithoutNotify(index);
@@ -224,9 +279,12 @@ namespace PC.Component.Software
         {
             int count = frames != null ? frames.Length : 0;
             bool anim = count > 1;
-            if (barGo != null) barGo.SetActive(anim);
+            bool navigation = siblings.Count > 1;
+            if (barGo != null) barGo.SetActive(anim || navigation);
             if (viewRt != null)
-                viewRt.offsetMin = new Vector2(8f, anim ? 52f : 8f);
+                viewRt.offsetMin = new Vector2(8f, anim || navigation ? 52f : 8f);
+            if (previousButton != null) previousButton.interactable = navigation;
+            if (nextButton != null) nextButton.interactable = navigation;
 
             if (playButton != null) playButton.gameObject.SetActive(anim);
             if (frameSlider != null)
@@ -268,6 +326,7 @@ namespace PC.Component.Software
             if (frames == null) return;
             DestroyAll(frames);
             frames = null;
+            frameIntervals = null;
         }
 
         public override void Close()
@@ -335,7 +394,13 @@ namespace PC.Component.Software
             barGo.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.18f, 0.95f);
             barGo.GetComponent<Image>().raycastTarget = true;
 
-            playButton = MakeButton(barGo.transform, "Play", new Vector2(8f, 0f), new Vector2(56f, 30f), font);
+            previousButton = MakeButton(barGo.transform, "Previous", new Vector2(8f, 0f), new Vector2(32f, 30f), font);
+            previousButton.GetComponentInChildren<Text>().text = "‹";
+            previousButton.onClick.AddListener(PreviousFile);
+            nextButton = MakeButton(barGo.transform, "Next", new Vector2(46f, 0f), new Vector2(32f, 30f), font);
+            nextButton.GetComponentInChildren<Text>().text = "›";
+            nextButton.onClick.AddListener(NextFile);
+            playButton = MakeButton(barGo.transform, "Play", new Vector2(84f, 0f), new Vector2(56f, 30f), font);
             playLabel = playButton.GetComponentInChildren<Text>();
             playLabel.text = "Play";
             playButton.onClick.AddListener(TogglePlay);
@@ -346,8 +411,8 @@ namespace PC.Component.Software
             sliderRt.anchorMin = new Vector2(0f, 0.5f);
             sliderRt.anchorMax = new Vector2(1f, 0.5f);
             sliderRt.pivot = new Vector2(0.5f, 0.5f);
-            sliderRt.anchoredPosition = new Vector2(18f, 0f);
-            sliderRt.sizeDelta = new Vector2(-150f, 22f);
+            sliderRt.anchoredPosition = new Vector2(85f, 0f);
+            sliderRt.sizeDelta = new Vector2(-284f, 22f);
 
             var bg = MakeFill(sliderGo.transform, "Background", new Color(0.25f, 0.3f, 0.32f, 1f));
             Stretch(bg, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
