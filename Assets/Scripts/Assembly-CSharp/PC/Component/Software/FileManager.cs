@@ -489,7 +489,9 @@ namespace PC.Component.Software
             if (cutButton != null) cutButton.interactable = !protect;
             if (copyButton != null) copyButton.interactable = system != null && system.CanCopyFile(file);
             if (renameButton != null) renameButton.interactable = !protect;
-            if (deleteButton != null) deleteButton.interactable = !protect;
+            // The custom overclock boot file is deletable even when hidden.
+            if (deleteButton != null) deleteButton.interactable = !protect ||
+                file.path == OS.OverclockBoot.Path;
 
             if (hiddenToggle != null)
             {

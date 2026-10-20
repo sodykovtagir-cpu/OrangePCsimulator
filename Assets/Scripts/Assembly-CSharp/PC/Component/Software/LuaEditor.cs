@@ -95,8 +95,8 @@ namespace PC.Component.Software
 			base.Open(content);
 			EnsureTrack();
 			BuildSnippetButtons();
-			if (fillDocsOnOpen && docsText != null && string.IsNullOrEmpty(docsText.text))
-				docsText.text = LuaDocs.Text();
+            if (fillDocsOnOpen && docsText != null)
+                docsText.text = LuaDocs.Text();
 			if (code != null)
 				code.text = string.IsNullOrEmpty(content) ? DefaultSource() : content;
 			filePath = string.IsNullOrEmpty(content) ? defaultFileName : filePath;
@@ -479,13 +479,20 @@ namespace PC.Component.Software
 			return crop.EncodeToPNG();
 		}
 
+        // Called on pointer-down before a touch button steals input focus.
+        public void CaptureSnippetCaret()
+        {
+            EnsureTrack();
+            if (track != null) track.Capture();
+        }
+
 		public void InsertSnippet(string snippet)
 		{
 			if (code == null || string.IsNullOrEmpty(snippet)) return;
 			if (!isActiveAndEnabled || !gameObject.activeInHierarchy) return;
 
 			EnsureTrack();
-			if (track != null)
+			if (track != null && track.HasSelection)
 			{
 				lastCaret = track.Caret;
 				lastSelA = track.SelA;
@@ -495,7 +502,7 @@ namespace PC.Component.Software
 			int mark = snippet.IndexOf('|');
 			string ins = snippet.Replace("|", "");
 			string t = code.text ?? "";
-			int caret = lastCaret;
+			int caret = track != null && track.HasSelection ? lastCaret : t.Length;
 			if (caret < 0 || caret > t.Length) caret = t.Length;
 
 			int a = Mathf.Min(lastSelA, lastSelB);
@@ -542,8 +549,15 @@ namespace PC.Component.Software
 					: sn.label;
 				var txt = btn.GetComponentInChildren<Text>();
 				if (txt != null) txt.text = label;
-				var captured = sn.insert;
-				btn.onClick.AddListener(() => InsertSnippet(captured));
+                var hook = btn.GetComponent<LuaSnippetButton>();
+                if (hook == null)
+                {
+                    hook = btn.gameObject.AddComponent<LuaSnippetButton>();
+                    btn.onClick.AddListener(hook.Click);
+                }
+                // The stock button prefab already calls Click: never add it twice.
+                hook.editor = this;
+                hook.insert = sn.insert;
 			}
 		}
 
@@ -632,10 +646,10 @@ namespace PC.Component.Software
 	{
 		public static string Text()
 		{
-			var lang = Localization.GetLanguage() ?? "EN";
-			if (lang == "UA" || lang == "BRL") lang = "RU";
-			var asset = Resources.Load<TextAsset>("LuaDocs_" + lang);
-			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs_EN");
+            var lang = string.Equals(Localization.GetLanguage(), "RU", StringComparison.OrdinalIgnoreCase)
+                ? "RU" : "EN";
+            var asset = Resources.Load<TextAsset>("LuaDocs_" + lang);
+            if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs_EN");
 			if (asset == null) asset = Resources.Load<TextAsset>("LuaDocs");
 			if (asset != null && !string.IsNullOrEmpty(asset.text)) return asset.text;
 			return "PCOS Lua. Press Docs.";

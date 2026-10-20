@@ -20,7 +20,14 @@ namespace PC.Component
 
 		public float temperature = 20;
 
-		public float burnTemp = 150;
+        public float burnTemp = 150;
+
+        // Running workload is separate from the rated TDP used by boot/PSU checks.
+        public float Workload { get; set; }
+        public float CurrentWatts => Power && !Damaged
+            ? Wattage * (.25f + .75f * Mathf.Clamp01(Workload)) *
+              Mathf.Clamp(frequency / Mathf.Max(defaultFrequency, .5f), .5f, 1.5f)
+            : 0f;
 
 		[SerializeField]
 		private GameObject particle;
@@ -56,7 +63,7 @@ namespace PC.Component
 				// Heat scales with clock vs stock, not raw GHz * 10 (that cooked even a Celeron).
 				float stock = Mathf.Max(defaultFrequency, 0.5f);
 				float load = Mathf.Clamp(frequency / stock, 0.25f, 4f);
-				float heatPerSecond = heat * load * 1.35f;
+                float heatPerSecond = heat * load * (.35f + 1.35f * Mathf.Clamp01(Workload));
 				temperature += dt * heatPerSecond;
 			}
 
@@ -70,6 +77,8 @@ namespace PC.Component
 			{
 				temperature -= (temperature - ambient) * 2.5f * dt;
 			}
+
+            if (!Power) Workload = 0f;
 
 			if (Power && !Damaged && temperature >= burnTemp)
 			{

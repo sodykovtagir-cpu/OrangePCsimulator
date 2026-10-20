@@ -1,93 +1,94 @@
-PCOS Lua
-========
-Язык внутри системы. Канал: t.me/orangePCsimu
+PCOS LUA — РЕДАКТОР И СПРАВОЧНИК
+================================
+При установке Lua Editor этот файл появляется на рабочем столе. При русском языке игры откроется русская справка; при остальных — английская. Напиши код и нажми Run для проверки, Save для сохранения .lua/.txt, Compile для создания ярлыка .exe. Pick icon выбирает файл изображения для иконки. Шаблон вставляется в позицию курсора; знак | внутри шаблона указывает, куда поставить курсор после вставки. Для ui.* нужно окно запущенного приложения. Начало координат ui и gfx — сверху слева, x направлен вправо, y вниз. Размеры в пикселях.
 
-РЕДАКТОР
---------
-Слева код, справа подсказки. | в шаблоне — куда встанет курсор.
-Run — превью в системном окне (нужно для ui.*).
-Save — исходник .lua / .txt.
-Compile — пишет Name.exe на рабочий стол (ярлык). Запуск двойным кликом.
-Pick icon — иконка из .pic (или любой файл-картинка в base64).
-Имя .exe — поле Compile Name в инспекторе редактора.
+БЫСТРЫЙ ПРИМЕР
+--------------
+print("Привет!")                        -- сообщение в Output / отладчике
+ui.title("Моя программа")              -- заголовок окна
+ui.size(320, 180)                      -- ширина и высота
+local label = ui.label("Готово", 20, 20, 250, 24)
+ui.button("Нажми", 20, 60, 120, 28, function()
+  ui.set(label, "Нажато!")             -- меняем элемент по возвращённому id
+end)
 
-Документация: отдельная кнопка, OnClick = Docs (или OpenDocs / ShowDocs),
-цель = это окно Lua Editor на сцене, не префаб из Project.
+ОКНО И ИНТЕРФЕЙС
+----------------
+isdraggable(bool) / ui.isdraggable(bool) — разрешить или запретить перетаскивание; без аргумента вернуть текущее состояние. ui.draggable — псевдоним.
+ismaximable(bool) / ui.ismaximable(bool) — разрешить или запретить развёртывание; без аргумента вернуть состояние. Псевдонимы: ismaxible, ismaximizable, ui.ismaximizable, ui.maximizable.
+enabledebugger() — показать перетаскиваемую консоль только для чтения; print пишет и туда.
+onupdate(function() ... end) — вызывать функцию каждый кадр (не создавай бесконечный цикл).
+ui.title(text) — изменить заголовок окна. ui.size(width,height) — изменить размер окна.
+ui.label(text,x,y,w,h) — надпись; возвращает id.
+ui.button(text,x,y,w,h,fn) — кнопка; при нажатии вызывает fn(); возвращает id.
+ui.input(text,x,y,w,h) — поле ввода; текст читается через ui.get(id).
+ui.panel(x,y,w,h) — фоновая панель. ui.rect(x,y,w,h,r,g,b,a) — цветной прямоугольник.
+ui.image(path,x,y,w,h) — картинка из .pic/файла в base64; возвращает id.
+ui.slider(x,y,w,h,min,max) — ползунок; возвращает id; значение — ui.value(id).
+ui.toggle(text,x,y,w,h,on) — переключатель; состояние — ui.checked(id).
+ui.get(id) / ui.set(id,text) — получить/изменить текст элемента по id.
+ui.color(id,r,g,b,a) — задать цвет элемента, каналы 0..1.
+ui.value(id) / ui.checked(id) — число с ползунка / флаг переключателя.
+ui.remove(id) / ui.clear() — удалить элемент / все элементы.
+ui.systemstyle() — вернуть штатный стиль PCOS. ui.style({window={r,g,b},panel={r,g,b},button={r,g,b},buttonText={r,g,b},text={r,g,b},input={r,g,b},inputText={r,g,b},fontSize=14}) задаёт цвета и шрифт.
 
-ПОДСВЕТКА СИНТАКСИСА
---------------------
-На объект Lua Editor повесь LuaSyntaxHighlight:
-  Code = InputField с кодом
-  Overlay = Text-копия того же поля (тот же Rect, Rich Text ВКЛ, Raycast ВЫКЛ)
-Цвет текста у InputField почти прозрачный — виден только overlay.
-Цвета keyword / string / comment / number настраиваются в инспекторе.
-
-КОМПИЛЯЦИЯ / .EXE
------------------
-Compile пакует JSON { pcos: lua-app, name, icon, script } в Name.exe.
-Иконка на рабочем столе — из Pick Icon, если выбирал.
-Несколько скомпилированных окон могут быть открыты сразу.
-
-ИНТЕРФЕЙС (системный угловатый PCOS)
-------------------------------------
-Координаты: левый верх, Y вниз, пиксели.
-
-ui.title("Имя")
-ui.size(w, h)
-ui.isdraggable(true/false)           -- также ui.draggable
-ui.ismaximable(true/false)           -- также ui.ismaximizable / ui.maximizable
-ui.label(text, x, y, w, h)           -> id
-ui.button(text, x, y, w, h, fn)      -> id
-ui.input(text, x, y, w, h)           -> id
-ui.panel(x, y, w, h)                 -> id
-ui.rect(x, y, w, h, r, g, b, a)      -> id
-ui.image(path, x, y, w, h)           -> id  (.pic / файл в base64)
-ui.slider(x, y, w, h, min, max)      -> id
-ui.toggle(text, x, y, w, h, on)      -> id
-ui.get(id)  ui.set(id, text)
-ui.color(id, r, g, b, a)
-ui.value(id)     -- слайдер
-ui.checked(id)   -- галка
-ui.remove(id)  ui.clear()
-ui.systemstyle()
-ui.style({
-  window={r,g,b}, panel={r,g,b},
-  button={r,g,b}, buttonText={r,g,b},
-  text={r,g,b}, input={r,g,b}, inputText={r,g,b},
-  fontSize=14
-})
-Цвет — таблица 0..1 {r,g,b} или {r,g,b,a}.
-
+ГРАФИКА
+-------
+gfx.size(w,h) — размер холста. gfx.color(r,g,b,a) — цвет рисования (0..1).
+gfx.clear(r,g,b,a) — очистить фон. gfx.pixel(x,y,r,g,b) — нарисовать точку.
+gfx.rect(x,y,w,h,r,g,b) — закрашенный прямоугольник; gfx.box(...) — его контур.
+gfx.line(x1,y1,x2,y2,r,g,b) — нарисовать линию.
+gfx.circle(x,y,radius,r,g,b) — круг; gfx.ring(...) — кольцо.
+gfx.text(x,y,text,r,g,b) — надпись. gfx.getpixel(x,y) — получить цвет пикселя {r,g,b,a}.
+gfx.flip() / gfx.apply() — показать сделанные изменения.
 Пример:
-  ui.title("Счётчик")
-  ui.size(320, 180)
-  local n = 0
-  local lab = ui.label("0", 20, 20, 200, 24)
-  ui.button("Клик", 20, 60, 100, 28, function()
-    n = n + 1
-    ui.set(lab, tostring(n))
-  end)
+  gfx.size(128, 64)
+  gfx.clear(0, 0, 0, 1)
+  gfx.rect(10, 10, 30, 20, 1, 0.4, 0)
+  gfx.flip()
 
-ОС / ФАЙЛЫ / ОКНА
------------------
-print(...)
-os.alert(title, msg)  os.open(имяИлиФайл)  os.close(имя)
-os.apps()  os.windows()  os.username()  os.id()
-os.installed(имя)  os.shutdown()  os.time()  os.ready()
-fs.list()  fs.read(p)  fs.write(p,s)  fs.exists(p)  fs.delete(p)
-win.alert(msg)  win.open(имя)  win.close(имя)
+ОС, ФАЙЛЫ, ОКНА
+---------------
+os.alert(title,message) / win.alert(message) — системное сообщение.
+os.open(appOrFile) / win.open(appName) — открыть приложение/файл либо приложение; возвращает успешность.
+os.close(appName) / win.close(appName) — закрыть программу; возвращает успешность.
+os.apps() — установленные программы. os.windows() / os.running() / win.list() — открытые окна.
+os.username() — имя пользователя. os.id() — идентификатор ПК. os.time() — время UTC в секундах Unix. os.ready() — готова ли система. os.installed(name) — установлена ли программа. os.shutdown() — выключить ПК.
+fs.list() — имена файлов пользователя. fs.read(path) — содержимое или nil. fs.write(path,text) — создать/перезаписать файл, возвращает успешность. fs.exists(path) — существует ли файл. fs.delete(path) — удалить файл, возвращает успешность. Скрипт не может удалять или перезаписывать System/.
+Пример:
+  fs.write("заметка.txt", "Привет")
+  print(fs.read("заметка.txt"))
+  if os.installed("Viewer") then os.open("Viewer") end
 
-ЯЗЫК
-----
-if / then / elseif / else / end
-while / do / end   repeat / until
-for i = 1, n do ... end
-function name(...) ... end
-local x = ...
-таблицы {1,2, a=3}, t.a, t[1], #t
-and or not  ..  == ~= < >
+ОСНОВЫ LUA
+----------
+local x = 2; if x > 1 then print(x) end
+for i = 1, 3 do print(i) end
+while x < 4 do x = x + 1 end
+function add(a,b) return a+b end
+Таблицы: local t = {"один", "два"}; print(t[1], #t)
+Операторы: + - * /, .. (склеить строки), == ~= < > <= >=, and/or/not.
+ВСТРОЕННЫЕ ФУНКЦИИ (РЕАЛИЗАЦИЯ PCOS LUA)
+------------------------------------------
+tonumber(x) — число из строки; nil, если не получилось. tostring(x) — текст из значения. type(x) — название типа.
+assert(x,сообщение) — вернуть x, если оно истинно, иначе вызвать ошибку. error(сообщение) — остановить скрипт с ошибкой.
+select(i,a,b,...) — вернуть аргумент с номером i (счёт с 1); select("#",...) — посчитать аргументы.
+pcall(fn,...) — безопасно вызвать функцию; возвращает ТАБЛИЦУ: результат[1] — успех, результат[2] — значение или текст ошибки (не два отдельных возвращаемых значения).
+pairs(t) — возвращает ТАБЛИЦУ с keys, values, n, а не стандартный итератор Lua. Пример: local p = pairs(t); for i=1,p.n do print(p.keys[i],p.values[i]) end
+ipairs(t) — возвращает t; перебирай индексы: local a = ipairs(t); for i=1,#a do print(a[i]) end
 
-math.abs/floor/ceil/sqrt/sin/cos/min/max/random/pi
-string.len/upper/lower/sub/rep/find
-table.insert / table.concat
-tonumber tostring type assert error
+МАТЕМАТИКА И СТРОКИ
+-------------------
+math.pi — число пи. math.huge — бесконечность; math.maxinteger/mininteger — пределы чисел.
+math.abs(x) — модуль. math.floor(x) / math.ceil(x) — округлить вниз/вверх.
+math.sqrt(x) — квадратный корень. math.sin(x) / math.cos(x) — синус/косинус в радианах.
+math.min(a,b,...) / math.max(a,b,...) — наименьшее/наибольшее значение.
+math.random() — случайное число от 0 до 1; random(n) — целое от 1 до n; random(a,b) — целое от a до b.
+string.len(s) — длина строки. string.upper(s) / string.lower(s) — регистр букв.
+string.sub(s,i,j) — подстрока от i до j включительно; индексация с 1, отрицательный индекс — от конца.
+string.rep(s,n) — повторить строку n раз. string.find(s,текст,start) — первое вхождение с 1 либо nil; поиск буквальный, не шаблон.
+string.reverse(s) — перевернуть строку. string.byte(s,i) — код символа на позиции i.
+string.char(code,...) — строка из кодов символов. string.format(fmt,...) — форматирование (пример: string.format("%d", 5)).
+table.insert(t,значение) — добавить в конец массива. table.concat(t,разделитель) — соединить элементы.
+table.remove(t,pos) — удалить элемент и сдвинуть остальные; по умолчанию удаляется последний.
+table.sort(t,fn) — сортировать на месте; fn(a,b) необязательна, возвращает true, если a должно идти раньше b.

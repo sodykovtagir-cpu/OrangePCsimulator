@@ -170,6 +170,23 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        // A stock preset removes both the startup command and its custom file.
+        // Keep unrelated autorun commands and never touch System/boot.bin.
+        public static bool ResetToStock(FileManager fm)
+        {
+            if (fm == null || !fm.TryGetFile(0, AutorunConfig.Path, out var autorun) || autorun == null)
+                return false;
+            // Never silently repair a missing/user-replaced boot directive.
+            if (!Enabled(autorun.content) &&
+                !AutorunConfig.HasLine(autorun.content, "//run boot.bin") &&
+                !AutorunConfig.HasLine(autorun.content, "run boot.bin")) return false;
+            string body = DisableLine(autorun.content);
+            var written = fm.Write(0, AutorunConfig.Path, body);
+            if (written == null || written.content != body) return false;
+            fm.Delete(0, Path);
+            return !fm.Exists(0, Path);
+        }
+
         public static bool Recover(Storage disk)
         {
             File autorun;

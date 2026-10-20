@@ -74,22 +74,27 @@ namespace PC.Component.Software
             UpdateDraft();
         }
 
+        private static string T(string en, string ru) =>
+            string.Equals(Localization.GetLanguage(), "RU", System.StringComparison.OrdinalIgnoreCase)
+                ? ru : en;
+
         private void UpdateDraft()
         {
             if (gpuSlider != null && gpuText != null) gpuText.text = "x" + gpuSlider.value.ToString("0.00");
             if (ramSlider != null && ramText != null) ramText.text = "x" + ramSlider.value.ToString("0.00");
             if (statusText != null)
                 statusText.text = testing
-                    ? "Settings changed during test. Save or test again."
-                    : "GPU/RAM profile: " + ProfileName(Draft()) + ". Test optional.";
+                    ? T("Settings changed during test. Save or test again.",
+                        "Настройки изменены во время теста. Повтори или сохрани.")
+                    : T("GPU/RAM profile: ", "Профиль GPU/RAM: ") + ProfileName(Draft()) + ".";
         }
 
         private static string ProfileName(OverclockBoot.Profile profile)
         {
-            if (OverclockBoot.Fatal(profile)) return "Extreme";
-            if (OverclockBoot.Unstable(profile)) return "High";
-            if (profile.gpu >= 1.15f || profile.ram >= 1.15f) return "Boosted";
-            return "Normal";
+            if (OverclockBoot.Fatal(profile)) return T("Extreme", "Экстремальный");
+            if (OverclockBoot.Unstable(profile)) return T("High", "Высокий");
+            if (profile.gpu >= 1.15f || profile.ram >= 1.15f) return T("Boosted", "Ускоренный");
+            return T("Normal", "Обычный");
         }
 
         private OverclockBoot.Profile Draft() => new OverclockBoot.Profile
@@ -104,8 +109,9 @@ namespace PC.Component.Software
             if (testing || system == null || system.Board == null) return;
             if (system.Board.GetHardwares(HardwareType.GPU).Count == 0 ||
                 system.Board.GetHardwares(HardwareType.RAM).Count == 0)
-            { statusText.text = "Install a GPU and RAM before testing."; return; }
+            { statusText.text = T("Install a GPU and RAM before testing.", "Установи видеокарту и память перед тестом."); return; }
             testing = true;
+            system.SetStressTest(true);
             testButton.interactable = false;
             testRoutine = StartCoroutine(Test(Draft()));
         }
@@ -115,11 +121,12 @@ namespace PC.Component.Software
             var board = system.Board;
             OverclockBoot.Apply(board, p); // visible GPU artifacts and score boost during test
             startedAt = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - startedAt < 60f)
+            while (Time.realtimeSinceStartup - startedAt < 30f)
             {
                 if (board == null || !board.Running) yield break;
-                statusText.text = "Testing GPU/RAM: " + Mathf.CeilToInt(60f -
-                    (Time.realtimeSinceStartup - startedAt)) + " seconds remaining (real time).";
+                statusText.text = T("Testing GPU/RAM: ", "Проверка GPU/RAM: ") + Mathf.CeilToInt(30f -
+                    (Time.realtimeSinceStartup - startedAt)) +
+                    T(" seconds remaining.", " с до конца.");
                 yield return null;
             }
             // The test never writes a boot file. A failed test is advisory;
@@ -127,9 +134,13 @@ namespace PC.Component.Software
             bool changed = Mathf.Abs(p.gpu - gpuSlider.value) > .001f ||
                 Mathf.Abs(p.ram - ramSlider.value) > .001f ||
                 (controlBar != null && Mathf.Abs(p.cpuFrequency - controlBar.value) > .001f);
-            statusText.text = changed ? "Test finished; settings changed. Retest or save."
-                : "60-second test complete. GPU/RAM profile: " + ProfileName(p) + ".";
+            statusText.text = changed
+                ? T("Test finished; settings changed. Retest or save.",
+                    "Тест завершён; настройки изменены. Повтори или сохрани.")
+                : T("30-second test complete. GPU/RAM profile: ",
+                    "Тест 30 секунд завершён. Профиль GPU/RAM: ") + ProfileName(p) + ".";
             testing = false;
+            if (system != null) system.SetStressTest(false);
             testRoutine = null;
             testButton.interactable = true;
             RestoreApplied();
@@ -141,13 +152,20 @@ namespace PC.Component.Software
             if (gpuSlider == null || ramSlider == null) return;
             if (system.Board.GetHardwares(HardwareType.GPU).Count == 0 ||
                 system.Board.GetHardwares(HardwareType.RAM).Count == 0)
-            { statusText.text = "Install a GPU and RAM before saving."; return; }
+            { statusText.text = T("Install a GPU and RAM before saving.", "Установи видеокарту и память перед сохранением."); return; }
             var profile = Draft();
-            if (!OverclockBoot.Save(system.FileManager, profile))
-            { statusText.text = "Cannot save: check disk space and System/Autorun.conf."; return; }
-            saved = profile;
+            bool stock = Mathf.Abs(profile.cpuFrequency - cpu.defaultFrequency) < 0.01f &&
+                profile.gpu <= 1.001f && profile.ram <= 1.001f;
+            if (stock ? !OverclockBoot.ResetToStock(system.FileManager)
+                      : !OverclockBoot.Save(system.FileManager, profile))
+            { statusText.text = T("Cannot save: check disk space and System/Autorun.conf.",
+                "Не удалось сохранить: проверь место на диске и System/Autorun.conf."); return; }
+            saved = stock ? null : profile;
             OverclockBoot.Apply(system.Board, saved);
-            statusText.text = "Saved GPU/RAM profile: " + ProfileName(profile) + ".";
+            if (stock && cpu != null && !cpu.Damaged) cpu.frequency = cpu.defaultFrequency;
+            statusText.text = stock
+                ? T("Stock settings restored.", "Стоковые настройки восстановлены.")
+                : T("Saved GPU/RAM profile: ", "Профиль GPU/RAM сохранён: ") + ProfileName(profile) + ".";
         }
 
         private void RestoreApplied()
@@ -161,6 +179,7 @@ namespace PC.Component.Software
         {
             if (testing && testRoutine != null) StopCoroutine(testRoutine);
             testing = false;
+            if (system != null) system.SetStressTest(false);
             RestoreApplied();
         }
 
@@ -196,6 +215,16 @@ namespace PC.Component.Software
                 if (t >= .5f)
                 {
                     if (cpu != null && CPU_temp != null) CPU_temp.text = cpu.temperature.ToString("0") + "°C";
+                    if (system != null && statusText != null)
+                    {
+                        const string separator = " | CPU ";
+                        string text = statusText.text;
+                        int old = text.IndexOf(separator);
+                        if (old >= 0) text = text.Substring(0, old);
+                        statusText.text = text + separator +
+                            Mathf.RoundToInt(system.CpuLoad * 100f) + "% / " +
+                            system.CurrentDrawWatts.ToString("0") + "W";
+                    }
                     t = 0f;
                 }
                 else t += Time.deltaTime;

@@ -3278,7 +3278,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Test 60 seconds
+  m_Text: Test 30 seconds
 --- !u!1 &8700000000000000059
 GameObject:
   m_ObjectHideFlags: 0
@@ -3478,4 +3478,4 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Save without test
+  m_Text: Save settings
