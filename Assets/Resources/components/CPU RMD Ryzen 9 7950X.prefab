@@ -139,6 +139,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 257
   burnedColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+  integratedGraphics: 1
   defaultFrequency: 4.5
   frequency: 3
   heat: 35

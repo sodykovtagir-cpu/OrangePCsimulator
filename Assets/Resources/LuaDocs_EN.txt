@@ -1,6 +1,6 @@
 PCOS LUA — EDITOR AND API
 =========================
-Install Lua Editor to get this document on the desktop. Russian game language uses the Russian manual; all other languages use English. Write Lua, click Run to preview, Save to create a .lua/.txt source file, or Compile to create a .exe shortcut. Pick icon chooses an image file for the compiled app. Tap a snippet to insert it at the current caret; | marks the caret position after insertion. ui.* needs a running app window. The origin for ui and gfx is the top-left corner (x grows right, y grows down); sizes are in pixels.
+Install Lua Editor to get this document on the desktop. Write Lua, click Run to preview, Save to create a .lua/.txt source file, or Compile to create a .exe shortcut. Pick icon chooses an image file for the compiled app. Tap a snippet to insert it at the current caret; | marks the caret position after insertion. ui.* needs a running app window. The origin for ui and gfx is the top-left corner (x grows right, y grows down); sizes are in pixels.
 
 START HERE
 ----------

@@ -61,6 +61,16 @@ namespace PC.Component
         // Hardware/ArtifactLevel; merely previewing a clock does not damage it.
         public float OverclockRatio { get; set; } = 1f;
         public float Workload { get; set; }
+        public float Temperature { get; private set; } = 24f;
+
+        private void Update()
+        {
+            // Discrete cards have a simulated sensor; mining drives it without
+            // borrowing the CPU thermometer or altering permanent hardware wear.
+            float target = AirConditioner.temperature + (Power && !Damaged
+                ? 12f + 54f * Mathf.Clamp01(Workload) * Mathf.Clamp(OverclockRatio, 1f, 1.5f) : 0f);
+            Temperature = Mathf.Lerp(Temperature, target, Mathf.Clamp01(Time.deltaTime * .6f));
+        }
         public float CurrentWatts => Power && !Damaged
             ? Wattage * (.20f + .80f * Mathf.Clamp01(Workload)) * Mathf.Clamp(OverclockRatio, 1f, 1.5f)
             : 0f;
