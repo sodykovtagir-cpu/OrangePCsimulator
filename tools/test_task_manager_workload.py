@@ -55,12 +55,13 @@ assert 'desktop.gameObject.SetActive(false)' not in os[os.index('public void End
 # Case 4: installed on both existing/new desktops; prefab native chrome and sprite imports.
 assert 'EnsureTaskManager();' in os and 'Task Manager.exe' in os
 assert 'appName: Task Manager' in pref and 'm_Text: Task Manager' in pref
-assert 'm_SizeDelta: {x: 720, y: 460}' in pref
+assert 'm_SizeDelta: {x: 780, y: 470}' in pref
 assert 'm_MethodName: Close' in pref and 'm_MethodName: Minimize' in pref
 assert 'm_MethodName: Maximize' in pref
-assert 'Processes page' in task and 'Performance page' in task
-assert 'ScrollRect' in task and 'RectMask2D' in task
-assert 'PerformanceGraph[] graphs' in task and 'graphs[i].Sample(usage[i])' in task
+assert 'ProcessesPage' in pref and 'PerformancePage' in pref
+assert 'Row template' in pref and 'Process scroll' in pref
+assert 'ScrollRect' not in task and 'new GameObject(' not in task
+assert 'TaskManagerRow' in task and 'graphs[i].Sample(usage[i])' in task
 chart = (comp/'Software/PerformanceGraph.cs').read_text()
 assert 'private const int Samples = 72' in chart
 assert 'protected override void OnPopulateMesh(VertexHelper mesh)' in chart
