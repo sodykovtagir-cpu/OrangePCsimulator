@@ -211,11 +211,26 @@ namespace PC.Component.Software
 		// The original keys were global, so old records cannot reliably be
 		// assigned to one particular PC. Leave them untouched and start
 		// motherboard-scoped records rather than showing another PC's score.
-		private string PrefsKey(string prefix)
-		{
-			return prefix + "_" + (system != null && system.Board != null
-				? system.SystemId.ToString("X8") : "unknown");
-		}
+        private int recordPcId;
+
+        private string PrefsKey(string prefix)
+        {
+            var board = system != null ? system.Board : null;
+            if (board == null) return prefix + "_unknown";
+            int id = board.Id;
+            var main = Main.Instance;
+            if (main != null && (id == 0 ||
+                (main.GetItemById(id) != null && main.GetItemById(id) != board)))
+            {
+                // Boot from old/custom builds can leave an unassigned or
+                // colliding motherboard ID. Never share history key 00000000.
+                id = main.GetNewId(board);
+                board.Id = id;
+            }
+            if (id == 0) id = board.GetInstanceID();
+            if (recordPcId == 0) recordPcId = id;
+            return prefix + "_" + recordPcId.ToString("X8");
+        }
 		/// <summary>Версия формулы очков. Меняется вместе с пересчётом результатов.</summary>
 		private const int FormulaVersion = 4;
 
@@ -506,6 +521,29 @@ namespace PC.Component.Software
 		private Coroutine benchmarkCoroutine;
 		private GameObject currentStageInstance;
 		private bool isAdditiveSceneLoaded;
+        private static readonly HashSet<int> ActiveStageSlots = new HashSet<int>();
+        private int stageSlot = -1;
+        private int previewLayer = 11;
+        public bool IsRunningTest => benchmarkCoroutine != null && stageSlot >= 0;
+
+        private void ReserveStage()
+        {
+            if (stageSlot >= 0) return;
+            int slot = 0;
+            while (ActiveStageSlots.Contains(slot)) slot++;
+            ActiveStageSlots.Add(slot);
+            stageSlot = slot;
+            // Unity supports 32 layers; each simultaneous room gets a unique
+            // light/render layer until all 21 available preview slots are used.
+            previewLayer = 11 + (slot % 21);
+        }
+
+        private void ReleaseStage()
+        {
+            if (stageSlot < 0) return;
+            ActiveStageSlots.Remove(stageSlot);
+            stageSlot = -1;
+        }
 		private int liveFps = -1;
 		private string liveResolution = string.Empty;
 		private string currentSceneName = string.Empty;
@@ -1232,7 +1270,10 @@ namespace PC.Component.Software
 
 			// Создаём отдельную комнату/сцену для бенчмарка
 			Transform stageWaypoints = null;
-			Vector3 anchor = stageSpawnPosition;
+            ReserveStage();
+            // Never spawn several test rooms at the same world coordinates.
+            // Camera far clip is 150 m; slots are 500 m apart.
+			Vector3 anchor = stageSpawnPosition + Vector3.right * (stageSlot * 500f);
 
 			if (!string.IsNullOrEmpty(stageSceneName))
 			{
@@ -1243,7 +1284,11 @@ namespace PC.Component.Software
 					isAdditiveSceneLoaded = true;
 					var sceneWp = GameObject.Find("3DMork_Waypoints") ?? GameObject.Find("Waypoints");
 					if (sceneWp != null) stageWaypoints = sceneWp.transform;
-					anchor = Vector3.zero;
+                    anchor = stageSpawnPosition + Vector3.right * (stageSlot * 500f);
+                    var loadedScene = SceneManager.GetSceneByName(stageSceneName);
+                    if (loadedScene.IsValid())
+                        foreach (var root in loadedScene.GetRootGameObjects())
+                            root.transform.position += anchor;
 					IsolateAdditiveSceneLights(stageSceneName);
 				}
 			}
@@ -1253,7 +1298,7 @@ namespace PC.Component.Software
 				if (prefab == null) prefab = Resources.Load<GameObject>("3DMork_Stage");
 				if (prefab != null)
 				{
-					currentStageInstance = Instantiate(prefab, stageSpawnPosition, Quaternion.identity);
+					currentStageInstance = Instantiate(prefab, anchor, Quaternion.identity);
 					var wpObj = currentStageInstance.transform.Find("Waypoints") ?? currentStageInstance.transform.Find("3DMork_Waypoints");
 					if (wpObj != null) stageWaypoints = wpObj;
 					IsolateStageInstance(currentStageInstance);
@@ -1292,7 +1337,11 @@ namespace PC.Component.Software
 			// исключаем только UI (5) и игрока (10). Раньше исключали и 11, из-за чего
 			// изолированная комната на слое 11 не рендерилась, а её направленный свет
 			// с cullingMask=all всё равно засвечивал основную карту.
-			testCamera.cullingMask = ~((1 << 5) | (1 << 10));
+            testCamera.cullingMask = ~((1 << 5) | (1 << 10));
+            // Other runs are on distinct preview layers, and their rooms are
+            // also outside this camera's far clipping distance.
+            for (int layer = 11; layer <= 31; layer++)
+                if (layer != previewLayer) testCamera.cullingMask &= ~(1 << layer);
 			testCamera.enabled = false; // Рендерим явно через testCamera.Render()
 
 			List<FlybySegment> segments = BuildSegments(anchor, stageWaypoints);
@@ -1536,14 +1585,14 @@ namespace PC.Component.Software
 				SceneManager.UnloadSceneAsync(stageSceneName);
 				isAdditiveSceneLoaded = false;
 			}
+            ReleaseStage();
 		}
 
 		/// <summary>Изолирует свет комнаты бенчмарка, чтобы он не засвечивал основную карту.</summary>
 		private void IsolateStageInstance(GameObject stage)
 		{
 			if (stage == null) return;
-			const int previewLayer = 11;
-			int mask = 1 << previewLayer;
+            int mask = 1 << previewLayer;
 			var renderers = stage.GetComponentsInChildren<Renderer>(true);
 			foreach (var r in renderers) r.gameObject.layer = previewLayer;
 			var lights = stage.GetComponentsInChildren<Light>(true);
@@ -1554,8 +1603,7 @@ namespace PC.Component.Software
 		{
 			var scene = SceneManager.GetSceneByName(sceneName);
 			if (!scene.IsValid()) return;
-			const int previewLayer = 11;
-			int mask = 1 << previewLayer;
+            int mask = 1 << previewLayer;
 			var roots = scene.GetRootGameObjects();
 			foreach (var root in roots)
 			{

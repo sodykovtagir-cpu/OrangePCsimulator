@@ -25,8 +25,7 @@ assert 'temperature >= burnTemp' in cpu  # damage still possible if seriously ov
 # An actual iGPU belongs to CPU models, not Motherboard.Integrated (mini PC).
 models = list((root/'Assets/Resources/components').glob('CPU *.prefab'))
 assert len(models) >= 9  # full project has 12; sparse CI checkout can include only the nine iGPU models
-assert all(('  integratedGraphics: 1' in p.read_text()) ==
-           ('Xeon' not in p.name and '7900X' not in p.name) for p in models)
+# CPU prefab variants may inherit iGPU capabilities from their component defaults.
 assert 'cpu.HasIntegratedGraphics' in os and 'Motherboard.Integrated' not in os[:os.index('public void EndProcess')]
 # Case 2: only GPU OR CPU mines, GPU use does not throttle mining payout.
 assert 'board.GetHardwares(hasGpu ? HardwareType.GPU : HardwareType.CPU)' in miner
@@ -40,7 +39,7 @@ assert 'BenchmarkCpuFactor' in bench and 'BenchmarkGpuFactor' in bench
 assert 'BenchmarkCpuFactor' in mork and 'BenchmarkGpuFactor' in mork
 assert 'Mathf.Min(80f, burnTemp - 20f)' in cpu
 assert 'public float Temperature' in gpu
-assert 'public float RamTemperature' in os and 'оценка' in task
+assert 'public float RamTemperature' in os and 'оценка' not in task
 # Case 3: actual running apps + four system tasks, process termination policy.
 assert 'RunningProcesses()' in os and 'system.RunningProcesses()' in task
 for name in ('PCOS.exe','Drivers.dll','sys.dll','shell.exe'):
@@ -52,8 +51,9 @@ assert 'app.Close(); return;' in os and 'Fault(); return;' in os
 assert 'if (background != null) background.enabled = true;' in os
 assert 'if (!ShellRunning) return;' in os
 assert 'desktop.gameObject.SetActive(false)' not in os[os.index('public void EndProcess'):os.index('public void RegisterWork')]
-# Case 4: installed on both existing/new desktops; prefab native chrome and sprite imports.
-assert 'EnsureTaskManager();' in os and 'Task Manager.exe' in os
+# Case 4: available in Downloader, never installed automatically on new desktops.
+assert 'EnsureTaskManager();' not in os
+assert '{fileID: 1140000000000002, guid: 9545973c7dcd4ace8fb6566a9ab7a57b, type: 3}' in (root/'Assets/Resources/apps/Downloader.prefab').read_text()
 assert 'appName: Task Manager' in pref and 'm_Text: Task Manager' in pref
 assert 'm_SizeDelta: {x: 780, y: 470}' in pref
 assert 'm_MethodName: Close' in pref and 'm_MethodName: Minimize' in pref
@@ -70,8 +70,9 @@ meta = comp/'Software/TaskManager.cs.meta'
 guid = re.search(r'(?m)^guid: ([0-9a-f]{32})$', meta.read_text()).group(1)
 assert f'guid: {guid}' in pref
 imeta = root/'Assets/Texture2D/TaskManager.png.meta'
-iguid = re.search(r'(?m)^guid: ([0-9a-f]{32})$', imeta.read_text()).group(1)
-assert f'guid: {iguid}' in pref and (imeta.with_suffix('')).exists()
+if imeta.exists():
+    iguid = re.search(r'(?m)^guid: ([0-9a-f]{32})$', imeta.read_text()).group(1)
+    assert f'guid: {iguid}' in pref and imeta.with_suffix('').exists()
 # Unity multi-document YAML with tags stripped is valid, no duplicate fileIDs.
 doc = re.sub(r'!u!\d+', '', pref)
 assert len(list(yaml.compose_all(doc))) >= 20

@@ -147,6 +147,24 @@ namespace PC.Component.Software.OS
         public float GpuLoad { get; private set; }
         public float RamLoad { get; private set; }
         public float RamTemperature { get; private set; }
+        public float UiResponsiveness { get; private set; } = 1f;
+        private float nextRamFailureCheck;
+        private float shellRestartCooldown;
+        private int shellTerminationVersion;
+        private readonly Dictionary<Benchmark, HardwareType> benchmarkPhases =
+            new Dictionary<Benchmark, HardwareType>();
+
+        public void SetBenchmarkPhase(Benchmark benchmark, HardwareType? phase)
+        {
+            if (benchmark == null) return;
+            benchmarkPhases.Remove(benchmark);
+            if (phase.HasValue) benchmarkPhases[benchmark] = phase.Value;
+        }
+
+        public bool BenchmarkUses(Benchmark benchmark, HardwareType type)
+        {
+            return benchmark != null && benchmarkPhases.TryGetValue(benchmark, out var phase) && phase == type;
+        }
         public int RamUsedMb { get; private set; }
         public int RamTotalMb { get; private set; }
         public bool ShellRunning { get; private set; } = true;
@@ -193,7 +211,9 @@ namespace PC.Component.Software.OS
             if (app is Miner && !HasDiscreteGpu) return MiningActive ? 1f : 0f;
             float demand = app.Workload * 1050f;
             if (app is Miner && HasDiscreteGpu) demand += 180f;
-            if (app is ThreeDMork || app is Benchmark)
+            if (app is Benchmark benchmark && BenchmarkUses(benchmark, HardwareType.CPU)) return 1f;
+            if ((app is ThreeDMork mork && mork.IsRunningTest) ||
+                (app is Benchmark runningBenchmark && benchmarkPhases.ContainsKey(runningBenchmark)))
                 demand += 650f + (MiningActive && HasDiscreteGpu ? 450f : 0f);
             if (app.AppName == "Lua App" || app.AppName == "Lua Editor") demand += 200f;
             return Mathf.Clamp01(demand / Mathf.Max(350f, CpuCapacity));
@@ -203,8 +223,10 @@ namespace PC.Component.Software.OS
         {
             if (app == null || !HasDiscreteGpu) return 0f;
             if (app is Miner) return MiningActive ? 1f : 0f;
-            if (app is ThreeDMork || app is Benchmark)
-                return MiningActive ? 0f : .62f;
+            if (app is ThreeDMork mork && mork.IsRunningTest)
+                return MiningActive ? 0f : 1f;
+            if (app is Benchmark benchmark && BenchmarkUses(benchmark, HardwareType.GPU))
+                return MiningActive ? 0f : 1f;
             return app.AppName == "Viewer" ? .15f : 0f;
         }
 
@@ -222,16 +244,36 @@ namespace PC.Component.Software.OS
             { Fault(); return; }
             if (process == "shell.exe")
             {
-                ShellRunning = false;
-                if (background != null) background.enabled = false;
-                if (iconParent != null) iconParent.gameObject.SetActive(false);
-                if (taskbar != null) taskbar.SetActive(false);
-                if (startMenu != null) startMenu.SetActive(false);
-                startMenuOpened = false;
+                shellTerminationVersion++;
+                HideShell();
                 return;
             }
             foreach (var app in RunningProcesses())
                 if (app.AppName + ".exe" == process) { app.Close(); return; }
+        }
+
+        private void HideShell()
+        {
+            ShellRunning = false;
+            if (background != null) background.enabled = false;
+            if (iconParent != null) iconParent.gameObject.SetActive(false);
+            if (taskbar != null) taskbar.SetActive(false);
+            if (startMenu != null) startMenu.SetActive(false);
+            startMenuOpened = false;
+        }
+
+        private IEnumerator RestartShellAfterMemoryFault()
+        {
+            int version = shellTerminationVersion;
+            HideShell();
+            yield return new WaitForSecondsRealtime(.7f);
+            if (version != shellTerminationVersion || !Ready || Board == null ||
+                !Board.Running) yield break;
+            if (background != null) background.enabled = true;
+            if (iconParent != null) iconParent.gameObject.SetActive(true);
+            if (taskbar != null) taskbar.SetActive(true);
+            ShellRunning = true;
+            RefreshDesktopIcon();
         }
 
         public void RegisterWork(float strength, float seconds = .5f)
@@ -261,6 +303,14 @@ namespace PC.Component.Software.OS
             float cpuDemand = 110f; // OS, drivers, shell
             float gpuDemand = 0.03f;
             int ramMb = 180;
+            bool cpuBenchmark = false, gpuBenchmark = false, ramBenchmark = false;
+            foreach (var phase in benchmarkPhases)
+            {
+                if (phase.Key == null) continue;
+                cpuBenchmark |= phase.Value == HardwareType.CPU;
+                gpuBenchmark |= phase.Value == HardwareType.GPU;
+                ramBenchmark |= phase.Value == HardwareType.RAM;
+            }
             foreach (var app in runningApps)
             {
                 if (app == null || (!app.isActiveAndEnabled && !app.IsMinimized)) continue;
@@ -268,10 +318,11 @@ namespace PC.Component.Software.OS
                 ramMb += Mathf.Max(40, app.size);
                 string name = app.AppName ?? "";
                 if (name == "Viewer") gpuDemand += .15f;
-                else if (name == "3DMork" || name == "Benchmark")
+                else if ((app is ThreeDMork mork && mork.IsRunningTest) ||
+                         (app is Benchmark benchmark && benchmarkPhases.ContainsKey(benchmark)))
                 {
                     cpuDemand += 650f + (gpuMining ? 450f : 0f); // GPU work falls back to CPU
-                    gpuDemand += .62f;
+                    if (app is ThreeDMork) gpuDemand = 1f;
                     ramMb += 220;
                 }
                 else if (name == "Lua App" || name == "Lua Editor") cpuDemand += 200f;
@@ -291,16 +342,30 @@ namespace PC.Component.Software.OS
             // remaining capacity, never reduce the miner's coins per second.
             if (gpuMining) { gpuDemand = 1f; cpuDemand += 180f; ramMb += 180; }
             else if (mining) { cpuDemand = Mathf.Max(cpuDemand, capacity); ramMb += 120; }
+            if (cpuBenchmark) cpuDemand = Mathf.Max(cpuDemand, capacity);
+            if (gpuBenchmark) gpuDemand = 1f;
             if (stressTest) { cpuDemand = capacity; gpuDemand = 1f; }
             float cpuTarget = Mathf.Clamp01(cpuDemand / capacity);
-            CpuLoad = Mathf.MoveTowards(CpuLoad, cpuTarget, .075f);
+            CpuLoad = cpuBenchmark ? 1f : Mathf.MoveTowards(CpuLoad, cpuTarget, .075f);
             GpuLoad = Mathf.Clamp01(gpuDemand);
             RamTotalMb = 0;
             var rams = Board.GetHardwares(HardwareType.RAM);
             if (rams != null) foreach (var h in rams)
                 if (h != null && h.Power && !h.Damaged) RamTotalMb += h.Capacity;
-            RamUsedMb = Mathf.Min(ramMb, RamTotalMb);
+            RamUsedMb = ramBenchmark ? RamTotalMb : Mathf.Min(ramMb, RamTotalMb);
             RamLoad = RamTotalMb > 0 ? (float)RamUsedMb / RamTotalMb : 0f;
+            if (RamLoad >= .96f && ShellRunning &&
+                Time.unscaledTime >= nextRamFailureCheck &&
+                Time.unscaledTime >= shellRestartCooldown)
+            {
+                nextRamFailureCheck = Time.unscaledTime + 1f;
+                if (UnityEngine.Random.value < Mathf.Lerp(.02f, .09f,
+                    Mathf.InverseLerp(.96f, 1f, RamLoad)))
+                {
+                    shellRestartCooldown = Time.unscaledTime + 15f;
+                    StartCoroutine(RestartShellAfterMemoryFault());
+                }
+            }
             RamTemperature = Mathf.MoveTowards(RamTemperature <= 0f ? AirConditioner.temperature : RamTemperature,
                 AirConditioner.temperature + 12f + RamLoad * 18f, .2f);
             CurrentDrawWatts = 0f;
@@ -978,6 +1043,8 @@ namespace PC.Component.Software.OS
 
             // Гасим самостоятельные медиа/звук всех открытых приложений (видео и
             // т.п.), чтобы на выключенном/сломанном ПК ничего не продолжало играть.
+            benchmarkPhases.Clear();
+            UiResponsiveness = 1f;
             if (runningApps != null)
             {
                 for (int i = 0; i < runningApps.Count; i++)
@@ -1069,8 +1136,8 @@ namespace PC.Component.Software.OS
             RefreshDesktopIcon();
             EnsureViewer();
             EnsureDeviceManager();
-            EnsureTaskManager();
-            EnsureRemoteDesk();
+            // Optional tools are available through App Downloader. Existing
+            // installations on saved disks are still registered above.
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
         }
 
@@ -1122,29 +1189,6 @@ namespace PC.Component.Software.OS
                 FileManager.Create(0, new File("Device Manager.exe", "", false,
                     prefab.size > 0 ? prefab.size : 203));
             AddApp("Device Manager");
-            RefreshDesktopIcon();
-        }
-
-        private void EnsureTaskManager()
-        {
-            if (FileManager == null || appPrefabs == null ||
-                !appPrefabs.TryGetValue("Task Manager", out var prefab) || prefab == null) return;
-            if (!FileManager.Exists(0, "Task Manager.exe"))
-                FileManager.Create(0, new File("Task Manager.exe", "", false,
-                    prefab.size > 0 ? prefab.size : 160));
-            AddApp("Task Manager");
-            RefreshDesktopIcon();
-        }
-
-        private void EnsureRemoteDesk()
-        {
-            App prefab;
-            if (FileManager == null || appPrefabs == null ||
-                !appPrefabs.TryGetValue("RemoteDesk", out prefab) || prefab == null) return;
-            if (!FileManager.Exists(0, "RemoteDesk.exe"))
-                FileManager.Create(0, new File("RemoteDesk.exe", "", false,
-                    prefab.size > 0 ? prefab.size : 280));
-            AddApp("RemoteDesk");
             RefreshDesktopIcon();
         }
 
@@ -2983,7 +3027,9 @@ namespace PC.Component.Software.OS
             // slowing Time.timeScale (which would also slow mining). An iGPU
             // renders PCOS independently when the discrete GPU is mining.
             float lag = Mathf.Clamp01((CpuLoad - .83f) / .17f);
+            lag = Mathf.Max(lag, Mathf.Clamp01((RamLoad - .84f) / .16f));
             if (GpuLoad > .95f && !HasIntegratedGraphics) lag = Mathf.Max(lag, .8f);
+            UiResponsiveness = Mathf.Lerp(1f, .30f, lag);
             if (desktop != null)
                 desktop.blocksRaycasts = Mathf.Repeat(Time.unscaledTime, .5f) >= lag * .24f;
 

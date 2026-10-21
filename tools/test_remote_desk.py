@@ -35,8 +35,8 @@ assert 'new GameObject("RemoteDesk virtual display"' in remote_canvas
 assert 'desktopRect.SetParent(virtualRemoteCanvas.transform, false)' in remote_canvas
 assert 'virtualRemoteCanvas.renderMode = RenderMode.WorldSpace' in remote_canvas
 assert 'if (!Ready || Board == null || Board.monitor != null) return null;' in remote_canvas
-assert 'EnsureRemoteDesk();' in os
-assert 'appPrefabs.TryGetValue("RemoteDesk", out prefab)' in os
+assert 'EnsureRemoteDesk();' not in os
+assert '{fileID: 114706950818030795, guid: 30880d3feb9c466494d51cfad949dd4f, type: 3}' in (project / 'Assets/Resources/apps/Downloader.prefab').read_text()
 assert 'system.TryLaunchApp("RemoteDesk", string.Join(",", ids.ToArray()))' in manager
 assert 'if (registered.Contains(id)) ids.Add' in manager
 assert 'manager.OpenInRemoteDesk' in menu

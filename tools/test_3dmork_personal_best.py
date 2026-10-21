@@ -29,7 +29,9 @@ for fid, (kind, body) in DOCS.items():
 assert 'historyBest.text = best > 0 ? best.ToString() : "—";' in CS
 assert 'RefreshHistory()' not in CS
 assert 'PrefsKey(BestScorePrefsKey)' in CS and 'PrefsKey(HistoryPrefsKey)' in CS
-assert 'system.SystemId.ToString("X8")' in CS
+assert 'recordPcId.ToString("X8")' in CS and 'board.Id = id;' in CS
+assert 'ActiveStageSlots' in CS and 'ReleaseStage();' in CS
+assert 'mork.IsRunningTest' in (ROOT / 'Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/OperatingSystem.cs').read_text()
 assert 'private void PushHistory(' in CS and 'private List<HistoryEntry> LoadHistory()' in CS
 SPAWNER = (ROOT / 'Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs').read_text()
 assert 'IReadOnlyList<Part> BenchmarkParts' in SPAWNER

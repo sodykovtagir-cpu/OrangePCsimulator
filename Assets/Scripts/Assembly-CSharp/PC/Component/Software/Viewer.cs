@@ -22,7 +22,7 @@ namespace PC.Component.Software
         float interval = 0.1f;
         int index;
         bool playing;
-        float lastTime;
+        float frameAccumulator;
         bool built;
         private File currentFile;
         private readonly List<File> siblings = new List<File>();
@@ -123,8 +123,10 @@ namespace PC.Component.Software
             if (!playing || frames == null || frames.Length < 2) return;
             float step = Mathf.Max(0.02f, frameIntervals != null && index < frameIntervals.Length
                 ? frameIntervals[index] : interval);
-            if (Time.unscaledTime - lastTime < step) return;
-            lastTime = Time.unscaledTime;
+            frameAccumulator += Time.unscaledDeltaTime *
+                (system != null ? system.UiResponsiveness : 1f);
+            if (frameAccumulator < step) return;
+            frameAccumulator = 0f;
             ShowFrame((index + 1) % frames.Length, true);
         }
 
@@ -177,7 +179,7 @@ namespace PC.Component.Software
             frames = loaded ?? new Texture2D[0];
             interval = movInterval;
             playing = frames.Length > 1;
-            lastTime = Time.unscaledTime;
+            frameAccumulator = 0f;
             ShowFrame(0, false);
             RefreshControls();
         }
@@ -307,7 +309,7 @@ namespace PC.Component.Software
         {
             if (frames == null || frames.Length < 2) return;
             playing = !playing;
-            lastTime = Time.unscaledTime;
+            frameAccumulator = 0f;
             RefreshControls();
         }
 

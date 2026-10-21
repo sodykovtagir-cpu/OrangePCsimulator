@@ -22,7 +22,11 @@ namespace PC.Component.Software.OS
 
         private void Awake()
         {
-            if (listView != null) listView.SelectedIndexChanged += SelectedIndexChanged;
+            if (listView != null)
+            {
+                listView.SetSelectionTint(new Color(.72f, .72f, .72f, 1f));
+                listView.SelectedIndexChanged += SelectedIndexChanged;
+            }
         }
 
         private void SelectedIndexChanged(int index)

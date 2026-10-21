@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using PC.Component;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,6 +25,19 @@ namespace PC.Component.Software
 
 		[SerializeField]
 		private Text text_mark;
+
+        private HardwareType? activePhase;
+
+        private void SetPhase(HardwareType? phase)
+        {
+            activePhase = phase;
+            if (system != null) system.SetBenchmarkPhase(this, phase);
+        }
+
+        public override void Close() { SetPhase(null); base.Close(); }
+        public override void OnSystemStop() { SetPhase(null); base.OnSystemStop(); }
+        private void OnDisable() { SetPhase(null); }
+        private void OnDestroy() { SetPhase(null); }
 
 		protected override void Start()
 		{
@@ -98,6 +112,8 @@ namespace PC.Component.Software
 				}
 			}
 
+            // Contention with the priority miner is real; the benchmark's own
+            // saturation (below) is NOT a reason to penalize measured scores.
             if (system != null)
             {
                 scores[0] = Mathf.RoundToInt(scores[0] * system.BenchmarkCpuFactor);
@@ -116,6 +132,8 @@ namespace PC.Component.Software
 
 			for (int i = 0; i < scores.Length && marks != null && i < marks.Length; i++)
 			{
+                SetPhase(i == 0 ? HardwareType.CPU : i == 1 ? HardwareType.GPU :
+                    i == 2 ? HardwareType.RAM : (HardwareType?)null);
 				var slider = marks[i];
 				if (slider == null) continue;
 
@@ -148,6 +166,8 @@ namespace PC.Component.Software
 
 				yield return new WaitForSeconds(1f);
 			}
+
+            SetPhase(null);
 
 			var main = Main.Instance;
 //			if (main != null && !main.example)

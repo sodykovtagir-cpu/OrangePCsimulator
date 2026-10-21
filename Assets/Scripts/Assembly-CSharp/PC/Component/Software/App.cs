@@ -286,7 +286,8 @@ namespace PC.Component.Software
 			while (t < duration && rt != null)
 			{
 				if (id != animId) yield break; // нас перебили (развернули)
-				t += Mathf.Min(Time.unscaledDeltaTime, duration * 0.25f);
+				t += Mathf.Min(Time.unscaledDeltaTime, duration * .25f) *
+                    (system != null ? system.UiResponsiveness : 1f);
 				float k = Mathf.Clamp01(t / duration);
 				float e = 1f - (1f - k) * (1f - k); // ease-out quad
 				rt.position = Vector3.Lerp(startPos, target, e);
@@ -397,7 +398,8 @@ namespace PC.Component.Software
 			while (t < duration)
 			{
 				if (id != animId) { restoreFlying = false; yield break; } // нас перебили (свернули)
-				t += Mathf.Min(Time.unscaledDeltaTime, duration * 0.25f);
+				t += Mathf.Min(Time.unscaledDeltaTime, duration * .25f) *
+                    (system != null ? system.UiResponsiveness : 1f);
 				float k = Mathf.Clamp01(t / duration);
 				float e = 1f - (1f - k) * (1f - k); // ease-out quad (как PlayOpen/PlayStartMenu)
 				rt.position = Vector3.Lerp(target, endPos, e);

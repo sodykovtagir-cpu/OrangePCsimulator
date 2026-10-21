@@ -15,6 +15,22 @@ public class ListView : MonoBehaviour
 
 	private List<ListViewElement> items = new List<ListViewElement>();
 
+    private bool hasSelectionTint;
+    private Color selectionTint;
+
+    public void SetSelectionTint(Color tint)
+    {
+        selectionTint = tint;
+        hasSelectionTint = true;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var image = items[i] != null ? items[i].graphic : null;
+            if (image == null) continue;
+            image.color = tint;
+            image.CrossFadeAlpha(i == selectedIndex ? 1f : 0f, 0f, true);
+        }
+    }
+
 	public int SelectedIndex
 	{
 		get
@@ -33,7 +49,11 @@ public class ListView : MonoBehaviour
 	{
 		var element = Instantiate(itemPrefab, itemParent);
 		element.Init();
-		if (element.graphic != null) element.graphic.CrossFadeAlpha(0f, 0f, true);
+        if (element.graphic != null)
+        {
+            if (hasSelectionTint) element.graphic.color = selectionTint;
+            element.graphic.CrossFadeAlpha(0f, 0f, true);
+        }
 		if (element.text != null) element.text.text = item.text;
 		if (item.icon != null && element.icon != null) element.icon.sprite = item.icon;
 		items.Add(element);
@@ -41,8 +61,7 @@ public class ListView : MonoBehaviour
 		var btn = element.Button;
 		if (btn != null) btn.onClick.AddListener(() =>
 		{
-			selectedIndex = index;
-			SelectedIndexChanged?.Invoke(selectedIndex);
+            UpdateSelection(index);
 		});
 	}
 
@@ -67,11 +86,14 @@ public class ListView : MonoBehaviour
 
 		items.RemoveAt(index);
 
-		if (selectedIndex != -1)
-		{
-			selectedIndex = -1;
-			SelectedIndexChanged?.Invoke(selectedIndex);
-		}
+        if (selectedIndex != -1)
+        {
+            foreach (var item in items)
+                if (item != null && item.graphic != null)
+                    item.graphic.CrossFadeAlpha(0f, 0f, true);
+            selectedIndex = -1;
+            SelectedIndexChanged?.Invoke(selectedIndex);
+        }
 
 		UpdateButtonListeners(index);
 	}
@@ -107,11 +129,9 @@ public class ListView : MonoBehaviour
 		if (selected != null && selected.graphic != null)
 			selected.graphic.CrossFadeAlpha(1f, 0f, true);
 
-		if (selectedIndex != index)
-		{
-			selectedIndex = index;
-			SelectedIndexChanged?.Invoke(selectedIndex);
-		}
+        selectedIndex = index;
+        // Repeat the event on a second tap so OpenDialog can open folders.
+        SelectedIndexChanged?.Invoke(selectedIndex);
 	}
 
 	private void UpdateButtonListeners(int i)
@@ -126,8 +146,7 @@ public class ListView : MonoBehaviour
 			var idx = i;
 			btn.onClick.AddListener(() =>
 			{
-				selectedIndex = idx;
-				SelectedIndexChanged?.Invoke(selectedIndex);
+                UpdateSelection(idx);
 			});
 		}
 	}

@@ -43,6 +43,13 @@ namespace PC.Component.Software
             CreateLayer(window, BorderName, 5f, new Color(1f, 1f, 1f, 0.28f), 1);
         }
 
+        private static float AnimationDelta(RectTransform window, float maximum)
+        {
+            var os = window != null ? window.GetComponentInParent<OS.OperatingSystem>() : null;
+            float responsiveness = os != null ? os.UiResponsiveness : 1f;
+            return Mathf.Min(Time.unscaledDeltaTime, maximum) * responsiveness;
+        }
+
         public static IEnumerator PlayOpen(RectTransform window)
         {
             if (window == null) yield break;
@@ -55,7 +62,7 @@ namespace PC.Component.Software
             {
                 // Не больше 25% длительности за кадр: фриз/лаг не должен
                 // «телепортировать» анимацию в конец (иначе окно появляется скачком).
-                t += Mathf.Min(Time.unscaledDeltaTime, OpenTime * 0.25f);
+                t += AnimationDelta(window, OpenTime * .25f);
                 float k = Mathf.Clamp01(t / OpenTime);
                 k = 1f - (1f - k) * (1f - k);
                 cg.alpha = k;
@@ -78,7 +85,7 @@ namespace PC.Component.Software
             float t = 0f;
             while (t < CloseTime && window != null)
             {
-                t += Mathf.Min(Time.unscaledDeltaTime, CloseTime * 0.25f);
+                t += AnimationDelta(window, CloseTime * .25f);
                 float k = Mathf.Clamp01(t / CloseTime);
                 k = k * k;
                 cg.alpha = Mathf.Lerp(fromAlpha, 0f, k);
@@ -107,7 +114,7 @@ namespace PC.Component.Software
             float t = 0f;
             while (t < time && menu != null)
             {
-                t += Mathf.Min(Time.unscaledDeltaTime, time * 0.25f);
+                t += AnimationDelta(menu, time * .25f);
                 float k = Mathf.Clamp01(t / time);
                 k = open ? (1f - (1f - k) * (1f - k)) : (k * k);
                 cg.alpha = Mathf.Lerp(fromA, toA, k);

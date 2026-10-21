@@ -37,6 +37,7 @@ namespace PC.Component.Software
 		private GameObject pauseIndicator;
 
 		private VideoPlayer player;
+        private VideoLoadController loadController;
 		private RenderTexture render;
 
 		// Хост вне окна: при сворачивании окно деактивируется (SetActive(false)),
@@ -65,6 +66,8 @@ namespace PC.Component.Software
 			if (parentRoot != null) host.transform.SetParent(parentRoot, false);
 			else host.transform.SetParent(null);
 			player = host.AddComponent<VideoPlayer>();
+            loadController = host.AddComponent<VideoLoadController>();
+            loadController.Bind(system, player);
 			player.playOnAwake = false;
 			player.source = VideoSource.Url;
 			player.renderMode = VideoRenderMode.RenderTexture;
@@ -111,7 +114,8 @@ namespace PC.Component.Software
 			// Значок паузы виден, когда видео поставлено на паузу.
 			if (pauseIndicator != null)
 			{
-				bool paused = !player.isPlaying;
+                bool paused = !player.isPlaying &&
+                    (loadController == null || !loadController.PausedByLoad);
 				if (pauseIndicator.activeSelf != paused)
 					pauseIndicator.SetActive(paused);
 			}
@@ -135,6 +139,7 @@ namespace PC.Component.Software
 			var board = system != null ? system.Board : null;
 			if (board != null && board.StressGraphics()) return;
 
+            if (loadController != null) loadController.SetUserPlayback(true);
 			p.Play();
 			hasVideo = true;
 			if (output != null)
@@ -150,8 +155,11 @@ namespace PC.Component.Software
 		public void TogglePlayPause()
 		{
 			if (player == null || !hasVideo) return;
-			if (player.isPlaying) player.Pause();
-			else player.Play();
+            bool playing = player.isPlaying ||
+                (loadController != null && loadController.PausedByLoad);
+            if (loadController != null) loadController.SetUserPlayback(!playing);
+            if (playing) player.Pause();
+            else player.Play();
 		}
 
 		private void OnScrub(float value)
@@ -235,6 +243,7 @@ namespace PC.Component.Software
 		public override void OnSystemStop()
 		{
 			base.OnSystemStop();
+            if (loadController != null) loadController.SetUserPlayback(false);
 			var p = player;
 			if (p != null)
 			{
@@ -251,6 +260,7 @@ namespace PC.Component.Software
 		{
 			if (tornDown) return;
 			tornDown = true;
+            if (loadController != null) loadController.SetUserPlayback(false);
 
 			try
 			{
@@ -281,4 +291,5 @@ namespace PC.Component.Software
 			TeardownHost();
 		}
 	}
+
 }

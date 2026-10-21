@@ -147,6 +147,8 @@ MonoBehaviour:
   performanceTabLabel: {fileID: 6100000000000000024}
   processesPage: {fileID: 6100000000000000034}
   performancePage: {fileID: 6100000000000000097}
+  gpuCard: {fileID: 6100000000000000119}
+  ramCard: {fileID: 6100000000000000137}
   rows: {fileID: 6100000000000000063}
   rowTemplate: {fileID: 6100000000000000082}
   endButton: {fileID: 6100000000000000092}
@@ -3502,9 +3504,9 @@ MonoBehaviour:
     m_Font: {fileID: 12800000, guid: 2644e223131232f41a7199fc4aef1e34, type: 3}
     m_FontSize: 13
     m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 2
-    m_MaxSize: 40
+    m_BestFit: 1
+    m_MinSize: 9
+    m_MaxSize: 13
     m_Alignment: 3
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -3961,9 +3963,9 @@ MonoBehaviour:
     m_Font: {fileID: 12800000, guid: 2644e223131232f41a7199fc4aef1e34, type: 3}
     m_FontSize: 13
     m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 2
-    m_MaxSize: 40
+    m_BestFit: 1
+    m_MinSize: 9
+    m_MaxSize: 13
     m_Alignment: 3
     m_AlignByGeometry: 0
     m_RichText: 0

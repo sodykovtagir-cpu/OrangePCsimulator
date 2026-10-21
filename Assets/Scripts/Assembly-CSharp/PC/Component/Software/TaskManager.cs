@@ -36,6 +36,10 @@ namespace PC.Component.Software
         [SerializeField] private Text[] stats;
         [SerializeField] private Image[] bars;
         [SerializeField] private PerformanceGraph[] graphs;
+        [SerializeField] private RectTransform gpuCard;
+        [SerializeField] private RectTransform ramCard;
+        private Vector2 ramDefaultMax;
+        private Vector2 ramDefaultOffsetMax;
 
         private readonly List<TaskManagerRow> liveRows = new List<TaskManagerRow>();
         private readonly List<string> names = new List<string>();
@@ -53,7 +57,8 @@ namespace PC.Component.Software
             if (processesTab == null || performanceTab == null || endButton == null ||
                 processesPage == null || performancePage == null || rows == null ||
                 rowTemplate == null || stats == null || stats.Length != 3 ||
-                bars == null || bars.Length != 3 || graphs == null || graphs.Length != 3)
+                bars == null || bars.Length != 3 || graphs == null || graphs.Length != 3 ||
+                gpuCard == null || ramCard == null)
             {
                 Debug.LogError("Task Manager: missing UI references in TaskManager.prefab");
                 enabled = false;
@@ -82,6 +87,8 @@ namespace PC.Component.Software
                     enabled = false;
                     return;
                 }
+            ramDefaultMax = ramCard.anchorMax;
+            ramDefaultOffsetMax = ramCard.offsetMax;
             processesTab.onClick.AddListener(() => ShowPage(true));
             performanceTab.onClick.AddListener(() => ShowPage(false));
             endButton.onClick.AddListener(EndSelected);
@@ -157,29 +164,75 @@ namespace PC.Component.Software
             }
         }
 
+        private static string HardwareModel(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "?";
+            string result = name.Replace("(Clone)", "").Trim();
+            if (result.StartsWith("CPU ", StringComparison.OrdinalIgnoreCase) ||
+                result.StartsWith("GPU ", StringComparison.OrdinalIgnoreCase))
+                result = result.Substring(4);
+            return result;
+        }
+
+        private static string Models(List<string> devices)
+        {
+            var labels = new List<string>();
+            var counts = new List<int>();
+            foreach (var model in devices)
+            {
+                int at = labels.IndexOf(model);
+                if (at < 0) { labels.Add(model); counts.Add(1); }
+                else counts[at]++;
+            }
+            for (int i = 0; i < labels.Count; i++)
+                labels[i] += " (" + counts[i] + ")";
+            return string.Join(", ", labels.ToArray());
+        }
+
         private void UpdatePerformance()
         {
             if (system == null || system.Board == null) return;
             float cpuTemp = 0f, clock = 0f, gpuTemp = 0f;
             int cpuCount = 0, gpuCount = 0;
+            var cpuModels = new List<string>();
+            var gpuModels = new List<string>();
             var cpus = system.Board.GetHardwares(HardwareType.CPU);
             if (cpus != null) foreach (var part in cpus)
                 if (part is CPU cpu && cpu.Power && !cpu.Damaged)
-                { cpuTemp = Mathf.Max(cpuTemp, cpu.temperature); clock += cpu.EffectiveFrequency; cpuCount++; }
+                {
+                    cpuTemp = Mathf.Max(cpuTemp, cpu.temperature);
+                    clock += cpu.EffectiveFrequency;
+                    cpuModels.Add(HardwareModel(cpu.gameObject.name));
+                    cpuCount++;
+                }
             var gpus = system.Board.GetHardwares(HardwareType.GPU);
             if (gpus != null) foreach (var part in gpus)
                 if (part is GPU gpu && gpu.Power && !gpu.Damaged)
-                { gpuTemp = Mathf.Max(gpuTemp, gpu.Temperature); gpuCount++; }
-            stats[0].text = (system.CpuLoad * 100f).ToString("0") + "%    " +
+                {
+                    gpuTemp = Mathf.Max(gpuTemp, gpu.Temperature);
+                    gpuModels.Add(HardwareModel(gpu.gameObject.name));
+                    gpuCount++;
+                }
+            bool hasGpu = gpuCount > 0;
+            if (gpuCard.gameObject.activeSelf != hasGpu)
+            {
+                gpuCard.gameObject.SetActive(hasGpu);
+                // Stretch the authored RAM card into the GPU card's space.
+                // Restore its Inspector layout when a card is installed again.
+                ramCard.anchorMax = hasGpu ? ramDefaultMax :
+                    new Vector2(ramDefaultMax.x, gpuCard.anchorMax.y);
+                ramCard.offsetMax = hasGpu ? ramDefaultOffsetMax : gpuCard.offsetMax;
+            }
+            stats[0].text = Models(cpuModels) + "\n" +
+                (system.CpuLoad * 100f).ToString("0") + "%    " +
                 cpuTemp.ToString("0") + "°C    " +
                 (cpuCount > 0 ? clock / cpuCount : 0f).ToString("0.00") + " GHz";
-            stats[1].text = gpuCount > 0 ? (system.GpuLoad * 100f).ToString("0") +
-                "%    " + gpuTemp.ToString("0") + "°C" :
-                L("Integrated / no discrete GPU", "Встроенная / без видеокарты");
-            // RAM has no physical sensor; label its temperature as estimated.
+            if (hasGpu)
+                stats[1].text = Models(gpuModels) + "\n" +
+                    (system.GpuLoad * 100f).ToString("0") + "%    " +
+                    gpuTemp.ToString("0") + "°C";
             stats[2].text = (system.RamLoad * 100f).ToString("0") + "%    " +
-                system.RamUsedMb + "/" + system.RamTotalMb + " MB    " +
-                system.RamTemperature.ToString("0") + "°C " + L("est.", "оценка");
+                system.RamUsedMb + "/" + system.RamTotalMb + " MB";
             float[] usage = { system.CpuLoad, gpuCount > 0 ? system.GpuLoad : 0f, system.RamLoad };
             for (int i = 0; i < 3; i++)
             {
