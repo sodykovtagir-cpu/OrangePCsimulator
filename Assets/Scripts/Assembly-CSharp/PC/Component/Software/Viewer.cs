@@ -280,11 +280,13 @@ namespace PC.Component.Software
             int count = frames != null ? frames.Length : 0;
             bool anim = count > 1;
             bool navigation = siblings.Count > 1;
-            if (barGo != null) barGo.SetActive(anim || navigation);
+            // Photo navigation floats on the vertical edges. The bottom bar is
+            // reserved for animation controls and never steals photo space.
+            if (barGo != null) barGo.SetActive(anim);
             if (viewRt != null)
-                viewRt.offsetMin = new Vector2(8f, anim || navigation ? 52f : 8f);
-            if (previousButton != null) previousButton.interactable = navigation;
-            if (nextButton != null) nextButton.interactable = navigation;
+                viewRt.offsetMin = new Vector2(8f, anim ? 52f : 8f);
+            if (previousButton != null) previousButton.gameObject.SetActive(navigation);
+            if (nextButton != null) nextButton.gameObject.SetActive(navigation);
 
             if (playButton != null) playButton.gameObject.SetActive(anim);
             if (frameSlider != null)
@@ -394,11 +396,15 @@ namespace PC.Component.Software
             barGo.GetComponent<Image>().color = new Color(0.12f, 0.16f, 0.18f, 0.95f);
             barGo.GetComponent<Image>().raycastTarget = true;
 
-            previousButton = MakeButton(barGo.transform, "Previous", new Vector2(8f, 0f), new Vector2(32f, 30f), font);
+            previousButton = MakeButton(viewRt, "Previous", Vector2.zero, new Vector2(58f, 74f), font);
+            PlaceNavigationArrow(previousButton, false);
             previousButton.GetComponentInChildren<Text>().text = "‹";
+            previousButton.GetComponentInChildren<Text>().fontSize = 32;
             previousButton.onClick.AddListener(PreviousFile);
-            nextButton = MakeButton(barGo.transform, "Next", new Vector2(46f, 0f), new Vector2(32f, 30f), font);
+            nextButton = MakeButton(viewRt, "Next", Vector2.zero, new Vector2(58f, 74f), font);
+            PlaceNavigationArrow(nextButton, true);
             nextButton.GetComponentInChildren<Text>().text = "›";
+            nextButton.GetComponentInChildren<Text>().fontSize = 32;
             nextButton.onClick.AddListener(NextFile);
             playButton = MakeButton(barGo.transform, "Play", new Vector2(84f, 0f), new Vector2(56f, 30f), font);
             playLabel = playButton.GetComponentInChildren<Text>();
@@ -458,6 +464,16 @@ namespace PC.Component.Software
             frameLabel.alignment = TextAnchor.MiddleRight;
             frameLabel.raycastTarget = false;
             frameLabel.text = "0/0";
+        }
+
+        private static void PlaceNavigationArrow(Button button, bool right)
+        {
+            var rt = button.transform as RectTransform;
+            if (rt == null) return;
+            rt.anchorMin = rt.anchorMax = new Vector2(right ? 1f : 0f, .5f);
+            rt.pivot = new Vector2(right ? 1f : 0f, .5f);
+            rt.anchoredPosition = new Vector2(right ? -12f : 12f, 0f);
+            rt.SetAsLastSibling();
         }
 
         static Button MakeButton(Transform parent, string name, Vector2 pos, Vector2 size, Font font)

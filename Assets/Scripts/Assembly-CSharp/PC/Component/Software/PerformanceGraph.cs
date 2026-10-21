@@ -49,7 +49,7 @@ namespace PC.Component.Software
             float top = rect.yMax - 3f;
             float height = top - bottom;
             float step = (right - left) / (Samples - 1f);
-            Color grid = new Color(.23f, .40f, .40f, .12f);
+            Color grid = new Color(.42f, .42f, .42f, .12f);
             for (int i = 0; i <= 4; i++)
             {
                 float y = bottom + i * height / 4f;
