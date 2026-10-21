@@ -11,6 +11,13 @@ namespace PC.Component
 		[SerializeField]
 		private Color burnedColor = new Color(50f / 255f, 50f / 255f, 50f / 255f, 1f);
 
+		[SerializeField] private bool integratedGraphics;
+		public bool HasIntegratedGraphics => integratedGraphics && Power && !Damaged;
+
+		// Temporary thermal clock, independent of the configured (and saved) overclock.
+		public float ThermalThrottleRatio { get; private set; } = 1f;
+		public float EffectiveFrequency => frequency * ThermalThrottleRatio;
+
 		public float defaultFrequency;
 
 		public float frequency;
@@ -26,7 +33,7 @@ namespace PC.Component
         public float Workload { get; set; }
         public float CurrentWatts => Power && !Damaged
             ? Wattage * (.25f + .75f * Mathf.Clamp01(Workload)) *
-              Mathf.Clamp(frequency / Mathf.Max(defaultFrequency, .5f), .5f, 1.5f)
+              Mathf.Clamp(EffectiveFrequency / Mathf.Max(defaultFrequency, .5f), .5f, 1.5f)
             : 0f;
 
 		[SerializeField]
@@ -62,7 +69,12 @@ namespace PC.Component
 			{
 				// Heat scales with clock vs stock, not raw GHz * 10 (that cooked even a Celeron).
 				float stock = Mathf.Max(defaultFrequency, 0.5f);
-				float load = Mathf.Clamp(frequency / stock, 0.25f, 4f);
+				// Start throttling before the physical burn threshold, recover on cooling.
+                float throttleStart = Mathf.Min(80f, burnTemp - 20f);
+                float targetClock = Mathf.Lerp(1f, .55f,
+                    Mathf.InverseLerp(throttleStart, Mathf.Max(throttleStart + 1f, burnTemp - 8f), temperature));
+                ThermalThrottleRatio = Mathf.MoveTowards(ThermalThrottleRatio, targetClock, dt * .45f);
+				float load = Mathf.Clamp(EffectiveFrequency / stock, 0.25f, 4f);
                 float heatPerSecond = heat * load * (.35f + 1.35f * Mathf.Clamp01(Workload));
 				temperature += dt * heatPerSecond;
 			}
@@ -78,7 +90,7 @@ namespace PC.Component
 				temperature -= (temperature - ambient) * 2.5f * dt;
 			}
 
-            if (!Power) Workload = 0f;
+            if (!Power) { Workload = 0f; ThermalThrottleRatio = 1f; }
 
 			if (Power && !Damaged && temperature >= burnTemp)
 			{
@@ -143,7 +155,7 @@ namespace PC.Component
 
 		public override string GetInfo()
 		{
-			return frequency.ToString() + "GHZ\n" + base.GetInfo();
+			return EffectiveFrequency.ToString("0.00") + "GHZ\n" + base.GetInfo();
 		}
 
 		public override void Damage()

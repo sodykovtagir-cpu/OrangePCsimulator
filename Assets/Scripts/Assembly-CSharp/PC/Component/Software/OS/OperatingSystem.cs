@@ -143,6 +143,96 @@ namespace PC.Component.Software.OS
         private bool stressTest;
         public float CurrentDrawWatts { get; private set; }
         public float CpuLoad { get; private set; }
+        public float CpuCapacity { get; private set; }
+        public float GpuLoad { get; private set; }
+        public float RamLoad { get; private set; }
+        public float RamTemperature { get; private set; }
+        public int RamUsedMb { get; private set; }
+        public int RamTotalMb { get; private set; }
+        public bool ShellRunning { get; private set; } = true;
+
+        public bool HasDiscreteGpu
+        {
+            get
+            {
+                var cards = Board != null ? Board.GetHardwares(HardwareType.GPU) : null;
+                if (cards != null) foreach (var h in cards)
+                    if (h != null && h.Power && !h.Damaged) return true;
+                return false;
+            }
+        }
+
+        public bool HasIntegratedGraphics
+        {
+            get
+            {
+                var cpus = Board != null ? Board.GetHardwares(HardwareType.CPU) : null;
+                if (cpus != null) foreach (var h in cpus)
+                    if (h is CPU cpu && cpu.HasIntegratedGraphics) return true;
+                return false;
+            }
+        }
+
+        public bool MiningActive
+        {
+            get
+            {
+                foreach (var a in runningApps) if (a is Miner && (a.isActiveAndEnabled || a.IsMinimized)) return true;
+                return false;
+            }
+        }
+
+        // The miner gets first access to its mining device. Graphics tests use
+        // CPU fallback when the discrete GPU is occupied by the miner.
+        public float BenchmarkCpuFactor => !MiningActive ? 1f : HasDiscreteGpu ? .72f : .36f;
+        public float BenchmarkGpuFactor => MiningActive && HasDiscreteGpu ? .48f : 1f;
+
+        public float ProcessCpuLoad(App app)
+        {
+            if (app == null) return 0f;
+            if (app is Miner && !HasDiscreteGpu) return MiningActive ? 1f : 0f;
+            float demand = app.Workload * 1050f;
+            if (app is Miner && HasDiscreteGpu) demand += 180f;
+            if (app is ThreeDMork || app is Benchmark)
+                demand += 650f + (MiningActive && HasDiscreteGpu ? 450f : 0f);
+            if (app.AppName == "Lua App" || app.AppName == "Lua Editor") demand += 200f;
+            return Mathf.Clamp01(demand / Mathf.Max(350f, CpuCapacity));
+        }
+
+        public float ProcessGpuLoad(App app)
+        {
+            if (app == null || !HasDiscreteGpu) return 0f;
+            if (app is Miner) return MiningActive ? 1f : 0f;
+            if (app is ThreeDMork || app is Benchmark)
+                return MiningActive ? 0f : .62f;
+            return app.AppName == "Viewer" ? .15f : 0f;
+        }
+
+        public System.Collections.Generic.List<App> RunningProcesses()
+        {
+            var result = new System.Collections.Generic.List<App>();
+            foreach (var app in runningApps) if (app != null) result.Add(app);
+            return result;
+        }
+
+        public void EndProcess(string process)
+        {
+            if (!Ready || string.IsNullOrEmpty(process)) return;
+            if (process == "PCOS.exe" || process == "Drivers.dll" || process == "sys.dll")
+            { Fault(); return; }
+            if (process == "shell.exe")
+            {
+                ShellRunning = false;
+                if (background != null) background.enabled = false;
+                if (iconParent != null) iconParent.gameObject.SetActive(false);
+                if (taskbar != null) taskbar.SetActive(false);
+                if (startMenu != null) startMenu.SetActive(false);
+                startMenuOpened = false;
+                return;
+            }
+            foreach (var app in RunningProcesses())
+                if (app.AppName + ".exe" == process) { app.Close(); return; }
+        }
 
         public void RegisterWork(float strength, float seconds = .5f)
         {
@@ -157,20 +247,34 @@ namespace PC.Component.Software.OS
         {
             if (Board == null || !Board.Running || Time.unscaledTime < nextWorkSample) return;
             nextWorkSample = Time.unscaledTime + .1f;
-            float cpuTarget = .05f;
-            float gpuTarget = .03f;
-            for (int i = 0; i < runningApps.Count; i++)
+            var cpus = Board.GetHardwares(HardwareType.CPU);
+            float capacity = 0f;
+            if (cpus != null) foreach (var h in cpus)
+                if (h is CPU cpu && cpu.Power && !cpu.Damaged)
+                    capacity += cpu.Score * Mathf.Clamp(cpu.EffectiveFrequency /
+                        Mathf.Max(.5f, cpu.defaultFrequency), .45f, 1.8f);
+            capacity = Mathf.Max(350f, capacity);
+            CpuCapacity = capacity;
+
+            bool mining = MiningActive;
+            bool gpuMining = mining && HasDiscreteGpu;
+            float cpuDemand = 110f; // OS, drivers, shell
+            float gpuDemand = 0.03f;
+            int ramMb = 180;
+            foreach (var app in runningApps)
             {
-                var app = runningApps[i];
-                if (app == null || !app.isActiveAndEnabled) continue;
-                cpuTarget += app.Workload;
-                // Media, 3D tests and mining also use the graphics cards.
+                if (app == null || (!app.isActiveAndEnabled && !app.IsMinimized)) continue;
+                cpuDemand += app.Workload * 1050f;
+                ramMb += Mathf.Max(40, app.size);
                 string name = app.AppName ?? "";
-                if (name == "Viewer") gpuTarget += .20f;
-                else if (name == "Miner") { cpuTarget += .25f; gpuTarget += .60f; }
+                if (name == "Viewer") gpuDemand += .15f;
                 else if (name == "3DMork" || name == "Benchmark")
-                { cpuTarget += .35f; gpuTarget += .60f; }
-                else if (name == "Lua App" || name == "Lua Editor") cpuTarget += .15f;
+                {
+                    cpuDemand += 650f + (gpuMining ? 450f : 0f); // GPU work falls back to CPU
+                    gpuDemand += .62f;
+                    ramMb += 220;
+                }
+                else if (name == "Lua App" || name == "Lua Editor") cpuDemand += 200f;
             }
             var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             if (selected != null && selected.transform.IsChildOf(transform) &&
@@ -178,22 +282,33 @@ namespace PC.Component.Software.OS
                 RegisterWork(.28f, .3f);
             if (Time.unscaledTime < workUntil)
             {
-                cpuTarget += workStrength;
-                gpuTarget += workStrength * .35f;
+                cpuDemand += workStrength * 1600f;
+                gpuDemand += workStrength * .24f;
             }
             else workStrength = 0f;
-            if (stressTest) { cpuTarget = 1f; gpuTarget = 1f; }
-            CpuLoad = Mathf.MoveTowards(CpuLoad, Mathf.Clamp01(cpuTarget), .1f * .6f);
-            float graphicsLoad = Mathf.Clamp01(gpuTarget);
+
+            // Reserve the mining device first; UI and benchmarks compete for the
+            // remaining capacity, never reduce the miner's coins per second.
+            if (gpuMining) { gpuDemand = 1f; cpuDemand += 180f; ramMb += 180; }
+            else if (mining) { cpuDemand = Mathf.Max(cpuDemand, capacity); ramMb += 120; }
+            if (stressTest) { cpuDemand = capacity; gpuDemand = 1f; }
+            float cpuTarget = Mathf.Clamp01(cpuDemand / capacity);
+            CpuLoad = Mathf.MoveTowards(CpuLoad, cpuTarget, .075f);
+            GpuLoad = Mathf.Clamp01(gpuDemand);
+            RamTotalMb = 0;
+            var rams = Board.GetHardwares(HardwareType.RAM);
+            if (rams != null) foreach (var h in rams)
+                if (h != null && h.Power && !h.Damaged) RamTotalMb += h.Capacity;
+            RamUsedMb = Mathf.Min(ramMb, RamTotalMb);
+            RamLoad = RamTotalMb > 0 ? (float)RamUsedMb / RamTotalMb : 0f;
+            RamTemperature = Mathf.MoveTowards(RamTemperature <= 0f ? AirConditioner.temperature : RamTemperature,
+                AirConditioner.temperature + 12f + RamLoad * 18f, .2f);
             CurrentDrawWatts = 0f;
-            var cpus = Board.GetHardwares(HardwareType.CPU);
-            if (cpus != null)
-                foreach (var item in cpus)
-                    if (item is CPU cpu) { cpu.Workload = CpuLoad; CurrentDrawWatts += cpu.CurrentWatts; }
+            if (cpus != null) foreach (var h in cpus)
+                if (h is CPU cpu) { cpu.Workload = CpuLoad; CurrentDrawWatts += cpu.CurrentWatts; }
             var gpus = Board.GetHardwares(HardwareType.GPU);
-            if (gpus != null)
-                foreach (var item in gpus)
-                    if (item is GPU gpu) { gpu.Workload = graphicsLoad; CurrentDrawWatts += gpu.CurrentWatts; }
+            if (gpus != null) foreach (var h in gpus)
+                if (h is GPU gpu) { gpu.Workload = GpuLoad; CurrentDrawWatts += gpu.CurrentWatts; }
             foreach (var type in OtherPowerParts)
             {
                 var parts = Board.GetHardwares(type);
@@ -543,6 +658,9 @@ namespace PC.Component.Software.OS
 #endif
             if (userData == null) return;
 
+            ShellRunning = true;
+            if (background != null) background.enabled = true;
+            if (iconParent != null) iconParent.gameObject.SetActive(true);
             ApplyWallpaper();
 
             if (animator != null) animator.SetTrigger("Enter");
@@ -951,6 +1069,7 @@ namespace PC.Component.Software.OS
             RefreshDesktopIcon();
             EnsureViewer();
             EnsureDeviceManager();
+            EnsureTaskManager();
             EnsureRemoteDesk();
             // EnsureLuaEditor(); // Отключено — Lua Editor не устанавливается по умолчанию
         }
@@ -1003,6 +1122,17 @@ namespace PC.Component.Software.OS
                 FileManager.Create(0, new File("Device Manager.exe", "", false,
                     prefab.size > 0 ? prefab.size : 203));
             AddApp("Device Manager");
+            RefreshDesktopIcon();
+        }
+
+        private void EnsureTaskManager()
+        {
+            if (FileManager == null || appPrefabs == null ||
+                !appPrefabs.TryGetValue("Task Manager", out var prefab) || prefab == null) return;
+            if (!FileManager.Exists(0, "Task Manager.exe"))
+                FileManager.Create(0, new File("Task Manager.exe", "", false,
+                    prefab.size > 0 ? prefab.size : 160));
+            AddApp("Task Manager");
             RefreshDesktopIcon();
         }
 
@@ -2849,6 +2979,13 @@ namespace PC.Component.Software.OS
         {
             if (!Ready) return;
             UpdateWorkload();
+            // Short missed-input intervals simulate a saturated desktop without
+            // slowing Time.timeScale (which would also slow mining). An iGPU
+            // renders PCOS independently when the discrete GPU is mining.
+            float lag = Mathf.Clamp01((CpuLoad - .83f) / .17f);
+            if (GpuLoad > .95f && !HasIntegratedGraphics) lag = Mathf.Max(lag, .8f);
+            if (desktop != null)
+                desktop.blocksRaycasts = Mathf.Repeat(Time.unscaledTime, .5f) >= lag * .24f;
 
             if (clockText != null)
             {
@@ -2903,6 +3040,7 @@ namespace PC.Component.Software.OS
 
         private void ToggleStartMenu()
         {
+            if (!ShellRunning) return;
             if (startMenu == null)
                 return;
 
@@ -3243,6 +3381,7 @@ namespace PC.Component.Software.OS
 
         private void EnableTaskbar()
         {
+            if (!ShellRunning) return;
             if (taskbar != null)
                 taskbar.SetActive(true);
 

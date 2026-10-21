@@ -71,7 +71,7 @@ namespace PC.Component.Software
 					{
 						var h = cpus[i];
 						var cpu = h as CPU;
-						if (cpu != null) scores[0] += Mathf.FloorToInt(cpu.frequency * cpu.Score);
+						if (cpu != null) scores[0] += Mathf.FloorToInt(cpu.EffectiveFrequency * cpu.Score);
 					}
 				}
 
@@ -97,6 +97,12 @@ namespace PC.Component.Software
 					}
 				}
 			}
+
+            if (system != null)
+            {
+                scores[0] = Mathf.RoundToInt(scores[0] * system.BenchmarkCpuFactor);
+                scores[1] = Mathf.RoundToInt(scores[1] * system.BenchmarkGpuFactor);
+            }
 
 			var storages = system != null ? system.AllStorage : null;
 			if (storages != null)

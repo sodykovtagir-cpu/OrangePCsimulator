@@ -37,6 +37,30 @@ namespace PC.Component.Software
 
 		private float revenue;
         private bool initialized;
+        private Coroutine miningRoutine;
+
+        private void StopMining()
+        {
+            if (system != null && miningRoutine != null)
+            {
+                system.StopCoroutine(miningRoutine);
+                miningRoutine = null;
+            }
+        }
+
+        public override void Close()
+        {
+            StopMining();
+            base.Close();
+        }
+
+        public override void OnSystemStop()
+        {
+            StopMining();
+            base.OnSystemStop();
+        }
+
+        private void OnDestroy() { StopMining(); }
 
         // Launch parameters: "bitcoin" (BTC), "cash"/"money" (dollars).
         // Open is called before Start on newly instantiated Unity windows.
@@ -64,30 +88,21 @@ namespace PC.Component.Software
 			var os = system;
 			var board = os != null ? os.Board : null;
 
-			var gpus = board != null ? board.GetHardwares(HardwareType.GPU) : null;
-			if (gpus != null)
-			{
-				for (int i = 0; i < gpus.Count; i++)
-				{
-                    var h = gpus[i];
-                    if (h != null) score += Mathf.RoundToInt(h.Score *
-                        PC.Component.Software.OS.OverclockBoot.GpuMultiplier(board));
-				}
-			}
-
-			var cpus = board != null ? board.GetHardwares(HardwareType.CPU) : null;
-			if (cpus != null)
-			{
-				for (int i = 0; i < cpus.Count; i++)
-				{
-					var h = cpus[i];
-					if (h != null) score += h.Score;
-				}
-			}
+            // Mine on the discrete GPU if present, otherwise on the CPU.
+            // Do not mix both scores or tie payout to the OS input lag.
+            bool hasGpu = os != null && os.HasDiscreteGpu;
+            var parts = board != null ? board.GetHardwares(hasGpu ? HardwareType.GPU : HardwareType.CPU) : null;
+            if (parts != null)
+                foreach (var h in parts)
+                    if (h != null && h.Power && !h.Damaged)
+                        score += Mathf.RoundToInt(h.Score * (hasGpu
+                            ? PC.Component.Software.OS.OverclockBoot.GpuMultiplier(board) : 1f));
 
             initialized = true;
 			ChangeMode(bitcoinMode);
-			StartCoroutine(Digging());
+            // OS owns the coroutine: Unity deactivates minimized windows and
+            // would stop a coroutine running on Miner, interrupting payouts.
+            miningRoutine = system != null ? system.StartCoroutine(Digging()) : StartCoroutine(Digging());
 		}
 
 		public void ChangeMode(bool bitcoinMode)
@@ -133,7 +148,7 @@ namespace PC.Component.Software
 				info_text.text = info_text.text + "\n" + m;
 			}
 
-			while (true)
+			while (system != null && system.Ready)
 			{
 				if (bitcoinMode)
 				{

@@ -382,7 +382,7 @@ namespace PC.Component.Software
 			// При 3.5 ГГц = 1.0x, при 4.2 ГГц (+20%) = 1.06x, при 5 ГГц = 1.12x (clamp 1.2).
 			// i5-8400 (2.8 ГГц, Score 2328) всё ещё чуть быстрее i3-8300 (3.7 ГГц, Score 2219) с разгоном,
 			// но уже чувствуется: +300 МГц дают ~+2-3% к physics/fps, а +1 ГГц ~+8%.
-			float frequencyFactor = 0.70f + 0.30f * Mathf.Clamp(cpu.frequency / 3.5f, 0.5f, 1.2f);
+			float frequencyFactor = 0.70f + 0.30f * Mathf.Clamp(cpu.EffectiveFrequency / 3.5f, 0.5f, 1.2f);
 			return cpu.Score * frequencyFactor;
 		}
 
@@ -1219,6 +1219,11 @@ namespace PC.Component.Software
 			// Потолок кадров из настроек игры: тест не может рендерить чаще,
 			// чем игрок выбрал в настройках, даже если железо быстрее.
 			float fpsCap = GetFpsCap();
+            if (system != null)
+            {
+                gpuRawScore = Mathf.RoundToInt(gpuRawScore * system.BenchmarkGpuFactor);
+                cpuRawScore = Mathf.RoundToInt(cpuRawScore * system.BenchmarkCpuFactor);
+            }
 			BenchmarkScores plan = ComputeScores(gpuRawScore, cpuRawScore, ramScore, driveScore, fpsCap);
 			float machineFps = plan.machineFps;
 			float baseFps = Mathf.Min(machineFps, fpsCap);
