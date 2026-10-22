@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using SaveManagement;
 using UnityEngine;
@@ -499,12 +500,45 @@ public class WorkshopClient : MonoBehaviour
 		return new MultipartFormDataSection(name, value);
 	}
 
+    /// <summary>
+    /// Plain fields need neither a MIME boundary nor multipart encoding. The
+    /// hosting proxy currently rejects multipart POSTs before PHP can read them;
+    /// keep binary uploads multipart, but use normal form encoding for account
+    /// and other text-only requests. Never put passwords/tokens into query URLs.
+    /// </summary>
+    private static UnityWebRequest PostForm(string url, List<IMultipartFormSection> form)
+    {
+        bool hasFile = false;
+        if (form != null)
+            foreach (var part in form)
+                if (part != null && !string.IsNullOrEmpty(part.fileName))
+                { hasFile = true; break; }
+        if (hasFile) return UnityWebRequest.Post(url, form);
+
+        var data = new StringBuilder();
+        if (form != null)
+            foreach (var part in form)
+            {
+                if (part == null || string.IsNullOrEmpty(part.sectionName)) continue;
+                if (data.Length > 0) data.Append('&');
+                data.Append(Uri.EscapeDataString(part.sectionName));
+                data.Append('=');
+                data.Append(Uri.EscapeDataString(Encoding.UTF8.GetString(part.sectionData)));
+            }
+        var request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
+        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(data.ToString()));
+        request.uploadHandler.contentType = "application/x-www-form-urlencoded";
+        request.downloadHandler = new DownloadHandlerBuffer();
+        request.chunkedTransfer = false;
+        return request;
+    }
+
 	private IEnumerator RequestPostBase(IEnumerable<string> urls, string query, List<IMultipartFormSection> form, Action<string, string> done)
 	{
 		yield return BypassByethost();
 		foreach (var baseUrl in urls)
 		{
-			using (var req = UnityWebRequest.Post(baseUrl + query, form))
+			using (var req = PostForm(baseUrl + query, form))
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
@@ -669,7 +703,7 @@ public class WorkshopClient : MonoBehaviour
 		yield return BypassByethost();
 		foreach (var baseUrl in UrlOrder())
 		{
-			using (var req = UnityWebRequest.Post(baseUrl + query, form))
+			using (var req = PostForm(baseUrl + query, form))
 			{
 				ApplyCookie(req);
 				req.timeout = 60;
