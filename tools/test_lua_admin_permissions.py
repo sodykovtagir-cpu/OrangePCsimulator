@@ -27,6 +27,9 @@ assert 'return existing;' in os
 assert 'a.SetAdministrator(false)' in os and 'app.SetAdministrator(elevated)' in os
 assert 'private bool administrator;' in app and 'system.Ready' in app
 assert 'OpenFileAsAdministrator(file)' in menu and '".tmn"' in menu
+assert '"Запуск от имени администратора"' in menu
+assert 'fitLabel: true' in menu and 'text.preferredWidth + 36f' in menu
+assert 'panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width)' in menu
 assert 'ContentType.Password' in prompt and 'Callback' not in prompt
 assert 'OnDestroy()' in prompt and 'private void Confirm()' in prompt
 assert 'OpenFileInternal(file, true)' in os and 'IsSystemPath(file.path) && !elevated' in os

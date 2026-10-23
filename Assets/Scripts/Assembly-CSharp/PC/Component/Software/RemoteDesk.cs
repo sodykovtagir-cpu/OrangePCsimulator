@@ -24,6 +24,7 @@ namespace PC.Component.Software
             public GameObject pressed;
             public GameObject dragged;
             public bool dragging;
+            public Vector2 pressSourcePosition;
             public DesktopIconDragger desktopIcon;
         }
 
@@ -38,6 +39,7 @@ namespace PC.Component.Software
         private const int FreeLimit = 5;
         private const float SharedFramesPerSecond = 24f;
         private const float ProFramesPerSecond = 60f;
+        private const float ProThumbnailFramesPerSecond = 8f;
         private static readonly List<RemoteDesk> viewers = new List<RemoteDesk>();
         // Only set while dispatching a synthetic event. Existing PCOS hit
         // tests must see the remote canvas, not the local game's UI overlay.
@@ -312,14 +314,13 @@ namespace PC.Component.Software
             RefreshLayout();
         }
 
-        // The focused desktop has the viewport's aspect, not the attached
-        // monitor's aspect. Only that stream needs a larger RT in Pro.
+        // Keep the remote monitor's aspect in BOTH views: borrowing the OS
+        // canvas size for the focused viewport made its layout oscillate and
+        // converted the same pointer movement into different window positions.
         private Vector2Int FrameSize(Canvas canvas, bool focused)
         {
             float aspect = 16f / 9f;
-            if (focused && focusViewport != null && focusViewport.rect.height > 1f)
-                aspect = Mathf.Max(.25f, focusViewport.rect.width / focusViewport.rect.height);
-            else if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+            if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
             {
                 var rect = canvas.transform as RectTransform;
                 if (rect != null && rect.rect.height > 1f) aspect = rect.rect.width / rect.rect.height;
@@ -364,16 +365,6 @@ namespace PC.Component.Software
                 if (old != null) { old.Release(); Destroy(old); }
                 session.nextFrame = 0f;
             }
-        }
-
-        private Vector2 FocusedDesktopSize()
-        {
-            var view = focusViewport != null ? focusViewport.rect.size : Vector2.zero;
-            if (view.x < 1f || view.y < 1f) return new Vector2(800f, 500f);
-            // This is CanvasScaler's Expand rule for PCOS's 800x500 reference:
-            // the logical area grows along the wider screen dimension.
-            float scale = Mathf.Min(view.x / 800f, view.y / 500f);
-            return view / Mathf.Max(.0001f, scale);
         }
 
         private void ConnectEntered()
@@ -566,13 +557,32 @@ namespace PC.Component.Software
                     session.dragged = null;
                     RefreshLayout();
                 }
-                if (now < session.nextFrame) continue;
-                // Pro runs each stream up to 60 FPS. Free viewers still share
-                // their 24 FPS budget; neither path throttles the Unity game.
-                session.nextFrame = now + (premium ? 1f / ProFramesPerSecond :
-                    Mathf.Max(1, FreeConnections) / SharedFramesPerSecond);
-                Capture(session);
             }
+            // Render the focused connection first, and never render all tiles
+            // in one frame. 12 Pro devices at 60 FPS used to request 720 full
+            // camera renders/s, starving pointer processing and shaking UI.
+            int budget = premium ? 3 : 1;
+            var focused = sessions.Find(s => s.id == focusedId);
+            if (focused != null && now >= focused.nextFrame)
+            {
+                CaptureDue(focused, now, premium ? 1f / ProFramesPerSecond :
+                    Mathf.Max(1, FreeConnections) / SharedFramesPerSecond);
+                budget--;
+            }
+            foreach (var session in sessions)
+            {
+                if (budget <= 0) break;
+                if (session == focused || now < session.nextFrame) continue;
+                CaptureDue(session, now, premium ? 1f / ProThumbnailFramesPerSecond :
+                    Mathf.Max(1, FreeConnections) / SharedFramesPerSecond);
+                budget--;
+            }
+        }
+
+        private void CaptureDue(Session session, float now, float interval)
+        {
+            session.nextFrame = now + interval;
+            Capture(session);
         }
 
         private void EnsureCamera()
@@ -619,39 +629,23 @@ namespace PC.Component.Software
                 captureCamera.farClipPlane);
         }
 
-        // Borrow the canvas only for this synchronous operation. The physical
-        // monitor returns to its original dimensions/camera before Unity draws
-        // the next game frame. The OS object itself is never cloned or moved.
+        // Borrow only the camera used by the world-space raycaster. Never
+        // resize the remote Canvas or switch the physical monitor's target RT
+        // during input; both operations shift UI coordinates mid-drag.
         private void OnRemoteCanvas(Session session, Action action)
         {
             if (capturing || session == null || session.canvas == null) return;
             capturing = true;
             var canvas = session.canvas;
-            var root = canvas.transform as RectTransform;
             bool world = canvas.renderMode == RenderMode.WorldSpace;
-            bool fit = session.id == focusedId && focusViewport != null &&
-                focusViewport.rect.width > 1f && focusViewport.rect.height > 1f;
-            var originalSize = root != null ? root.sizeDelta : Vector2.zero;
             var originalCamera = canvas.worldCamera;
-            var originalTarget = originalCamera != null ? originalCamera.targetTexture : null;
             try
             {
-                if (fit && world && root != null)
-                {
-                    root.sizeDelta = FocusedDesktopSize();
-                    Canvas.ForceUpdateCanvases();
-                }
-                else if (fit && !world && originalCamera != null &&
-                         canvas.renderMode == RenderMode.ScreenSpaceCamera)
-                {
-                    originalCamera.targetTexture = session.frame;
-                    Canvas.ForceUpdateCanvases();
-                }
                 if (world)
                 {
                     ConfigureCamera(session);
                     captureCamera.targetTexture = session.frame;
-                    canvas.worldCamera = captureCamera; // raycaster only
+                    canvas.worldCamera = captureCamera;
                 }
                 action();
             }
@@ -659,10 +653,6 @@ namespace PC.Component.Software
             {
                 if (world && canvas != null) canvas.worldCamera = originalCamera;
                 if (captureCamera != null) captureCamera.targetTexture = null;
-                if (root != null && fit && world) root.sizeDelta = originalSize;
-                if (fit && !world && originalCamera != null)
-                    originalCamera.targetTexture = originalTarget;
-                if (fit) Canvas.ForceUpdateCanvases();
                 capturing = false;
             }
         }
@@ -670,58 +660,28 @@ namespace PC.Component.Software
         private void Capture(Session session)
         {
             var canvas = session.canvas;
-            bool fit = session.id == focusedId && focusViewport != null &&
-                focusViewport.rect.width > 1f && focusViewport.rect.height > 1f;
             if (canvas.renderMode == RenderMode.WorldSpace)
             {
-                var root = canvas.transform as RectTransform;
-                Vector2 original = root != null ? root.sizeDelta : Vector2.zero;
+                Canvas.ForceUpdateCanvases();
+                ConfigureCamera(session);
                 try
                 {
-                    if (fit && root != null) root.sizeDelta = FocusedDesktopSize();
-                    Canvas.ForceUpdateCanvases();
-                    ConfigureCamera(session);
                     captureCamera.targetTexture = session.frame;
                     captureCamera.Render();
                 }
                 finally
                 {
                     if (captureCamera != null) captureCamera.targetTexture = null;
-                    if (fit && root != null)
-                    {
-                        root.sizeDelta = original;
-                        Canvas.ForceUpdateCanvases();
-                    }
                 }
             }
             else
             {
-                // Textured monitors own the camera/RT. Render the focused
-                // viewport into our RT, then redraw the original monitor RT.
                 var displayCamera = canvas.worldCamera;
                 var original = displayCamera != null ? displayCamera.targetTexture : null;
                 if (original == null || displayCamera == captureCamera) return;
-                if (fit && canvas.renderMode == RenderMode.ScreenSpaceCamera)
-                {
-                    try
-                    {
-                        displayCamera.targetTexture = session.frame;
-                        Canvas.ForceUpdateCanvases();
-                        displayCamera.Render();
-                    }
-                    finally
-                    {
-                        displayCamera.targetTexture = original;
-                        Canvas.ForceUpdateCanvases();
-                        displayCamera.Render();
-                    }
-                }
-                else
-                {
-                    if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
-                        displayCamera.Render();
-                    Graphics.Blit(original, session.frame);
-                }
+                if (canvas.renderMode == RenderMode.ScreenSpaceCamera)
+                    displayCamera.Render();
+                Graphics.Blit(original, session.frame);
             }
         }
 
@@ -740,9 +700,8 @@ namespace PC.Component.Software
             // Textured monitors raycast in THEIR camera's RT pixel space.
             var eventTexture = session.canvas.renderMode == RenderMode.ScreenSpaceCamera &&
                 session.canvas.worldCamera != null ? session.canvas.worldCamera.targetTexture : null;
-            bool fitted = session.id == focusedId;
-            int eventWidth = fitted || eventTexture == null ? session.frame.width : eventTexture.width;
-            int eventHeight = fitted || eventTexture == null ? session.frame.height : eventTexture.height;
+            int eventWidth = eventTexture == null ? session.frame.width : eventTexture.width;
+            int eventHeight = eventTexture == null ? session.frame.height : eventTexture.height;
             Vector2 pos = new Vector2(u * eventWidth, v * eventHeight);
             OnRemoteCanvas(session, () =>
             {
@@ -773,6 +732,7 @@ namespace PC.Component.Software
                         evt.eligibleForClick = true;
                         evt.dragging = false;
                         evt.pressPosition = pos;
+                        session.pressSourcePosition = source.position;
                         evt.pointerPressRaycast = evt.pointerCurrentRaycast;
                         session.dragging = false;
                         session.pressed = hit != null
@@ -792,10 +752,14 @@ namespace PC.Component.Software
                     }
                     else if (phase == "drag")
                     {
-                        if (session.desktopIcon != null) session.desktopIcon.MoveRemoteDrag(pos);
+                        // Slop is in the *local pointer's* pixels, never in the
+                        // remote high-resolution RT's pixels (up to 1920 wide).
+                        bool movedEnough = Vector2.Distance(source.position, session.pressSourcePosition) >
+                            (source.pointerId >= 0 ? PointerInput.Slop : 8f);
+                        if (session.desktopIcon != null) session.desktopIcon.MoveRemoteDrag(pos, movedEnough);
                         if (session.dragged != null)
                         {
-                            if (!session.dragging && Vector2.Distance(pos, evt.pressPosition) > 5f)
+                            if (!session.dragging && movedEnough)
                             {
                                 ExecuteEvents.Execute(session.dragged, evt, ExecuteEvents.beginDragHandler);
                                 session.dragging = true;
@@ -806,8 +770,7 @@ namespace PC.Component.Software
                                 ExecuteEvents.Execute(session.dragged, evt, ExecuteEvents.dragHandler);
                             }
                         }
-                        if (session.desktopIcon != null &&
-                            Vector2.Distance(pos, evt.pressPosition) > PointerInput.Slop)
+                        if (session.desktopIcon != null && movedEnough)
                         {
                             session.dragging = true;
                             evt.dragging = true;
@@ -906,8 +869,9 @@ namespace PC.Component.Software
             lastTotal = premium ? ActiveConnections : FreeConnections;
             if (statusText != null)
                 statusText.text = status + "   Online: " + sessions.Count +
-                    "   Stream FPS/device: " + (premium ? ProFramesPerSecond :
-                        lastTotal > 0 ? SharedFramesPerSecond / lastTotal : 0f).ToString("0.#");
+                    "   Stream FPS/device: " + (premium ?
+                        (focusedId != 0 ? "60 (focused) / 8 (tiles)" : "8 (tiles)") :
+                        (lastTotal > 0 ? SharedFramesPerSecond / lastTotal : 0f).ToString("0.#"));
         }
 
         private void RefreshLayout()

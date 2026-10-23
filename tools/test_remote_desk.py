@@ -67,11 +67,17 @@ assert 'rect.GetWorldCorners(screenCorners)' in camera_setup
 assert ' - normal * depth' in camera_setup and 'Quaternion.LookRotation(normal, up.normalized)' in camera_setup
 assert 'Matrix4x4.Ortho(-width * .5f, width * .5f' in camera_setup
 assert 'Mathf.Clamp(Screen.width, 1280, 1920)' in body(app, 'private Vector2Int FrameSize(')
-assert 'view.x / 800f, view.y / 500f' in body(app, 'private Vector2 FocusedDesktopSize()')
-assert 'root.sizeDelta = FocusedDesktopSize()' in capture and 'root.sizeDelta = originalSize' in capture
-assert 'root.sizeDelta = original;' in renderer
-assert 'originalCamera.targetTexture = session.frame' in capture
-assert 'displayCamera.targetTexture = session.frame' in renderer
+# Captures/input may borrow the camera, never resize the remote desktop or
+# change its physical display RT: that made window positions jump mid-drag.
+assert 'FocusedDesktopSize()' not in app
+assert 'root.sizeDelta' not in capture + renderer
+assert 'originalCamera.targetTexture = session.frame' not in capture
+assert 'displayCamera.targetTexture = session.frame' not in renderer
+assert 'ProThumbnailFramesPerSecond = 8f' in app
+assert 'int budget = premium ? 3 : 1;' in body(app, 'private void LateUpdate()')
+assert 'session.pressSourcePosition = source.position' in app
+assert 'Vector2.Distance(source.position, session.pressSourcePosition)' in app
+assert 'eventTexture == null ? session.frame.width : eventTexture.width' in app
 assert 'ConnectionsPath = "System/RemoteDesk.connections"' in app
 assert 'JsonUtility.FromJson<SavedConnections>' in body(app, 'private void LoadSaved()')
 assert 'fm.Write(0, ConnectionsPath' in body(app, 'private void SaveConnections()')
@@ -85,7 +91,8 @@ for signal in ('pointerDownHandler', 'pointerUpHandler', 'pointerClickHandler',
 assert 'SetSelectedGameObject(session.pressed, evt)' in app
 assert 'RemoteDesk.ForwardingRaycaster.Raycast(pointer, results)' in menu
 assert 'RemoteDesk.ForwardingSystem == os' in menu
-assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position)' in dragger
+assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position, bool movedEnough)' in dragger
+assert 'pointerOffset = parentPointer - window.anchoredPosition' in window_drag
 assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
 build_ui = body(app, 'private void BuildUi()')
 assert 'focusWatermark = Label(' in build_ui

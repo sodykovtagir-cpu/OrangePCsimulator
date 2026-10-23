@@ -41,7 +41,7 @@ namespace SaveManagement
             if (string.IsNullOrEmpty(data))
                 throw new Exception("Save file is empty.");
 
-            // Новый формат: XOR + HMAC-подпись. Старый формат: только XOR (обратная совместимость).
+            // OPC3: gzip + HMAC; OPC2: XOR + HMAC; legacy: XOR без подписи.
             string payload;
             var integrity = SaveUtility.Decode(data, out payload);
             if (integrity == SaveUtility.SaveIntegrity.Tampered)
@@ -68,7 +68,7 @@ namespace SaveManagement
             string json = JsonUtility.ToJson(GameData);
             string content = Content ?? string.Empty;
 
-            // Пишем новый формат (XOR + HMAC).
+            // Пишем сжатый OPC3; старые OPC2/.pc по-прежнему читаются.
             string encrypted = SaveUtility.Encode(json + "\n" + content);
 
             string directory = System.IO.Path.GetDirectoryName(Path);
