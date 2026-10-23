@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemName: HDD 8TB
   price: 190
-  bitcoin: 2
+  bitcoin: 5
   sprite: {fileID: 21300000, guid: ebdf46ce4bfbc9b4798d497a5fca977e, type: 2}
-  spawn: {fileID: 6696442554626000070, guid: d4ec819b8522d94e920241022a45b66c, type: 2}
+  spawn: {fileID: 6696442554626000070, guid: d4ec819b8522d94e920241022a45b66c, type: 3}
   large: 0
   translateDescription: 1
   description: 
