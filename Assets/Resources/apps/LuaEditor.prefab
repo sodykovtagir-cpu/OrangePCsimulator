@@ -137,6 +137,20 @@ MonoBehaviour:
     insert: os.installed("|")
   - label: os.shutdown()
     insert: os.shutdown()
+  - label: admin.status()
+    insert: admin.status()
+  - label: admin.request
+    insert: "admin.request(function(granted)\n  if granted then\n    |\n  end\nend)"
+  - label: pc.ids()
+    insert: pc.ids()
+  - label: pc.scan()
+    insert: pc.scan()
+  - label: pc.command
+    insert: pc.command("|", "startup")
+  - label: pc.connect
+    insert: pc.connect("|")
+  - label: terminal.run
+    insert: terminal.run("|")
   - label: fs.list()
     insert: fs.list()
   - label: fs.read
@@ -3526,7 +3540,7 @@ RectTransform:
   m_Father: {fileID: 1022709486295646660}
   m_LocalEulerAnglesHint: {x: 0, y: -0, z: -0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: -2.5, y: 0}
   m_SizeDelta: {x: -5, y: -10}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3584,7 +3598,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &8298437747449277902
 RectTransform:
   m_ObjectHideFlags: 0
