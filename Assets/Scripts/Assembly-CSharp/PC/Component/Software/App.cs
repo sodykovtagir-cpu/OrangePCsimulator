@@ -138,6 +138,12 @@ namespace PC.Component.Software
             }
 		}
 
+        // Assigned by PCOS only after an administrator confirmation. Never
+        // serialized into a prefab/save or inherited by a normal launch.
+        private bool administrator;
+        public bool IsAdministrator => administrator && !closing && system != null && system.Ready;
+        internal void SetAdministrator(bool value) { administrator = value && !closing; }
+
 		public string AppName => appName;
 
 		public Sprite Icon => icon;

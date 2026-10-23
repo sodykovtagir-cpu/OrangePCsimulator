@@ -56,11 +56,38 @@ os.open(appOrFile) / win.open(appName) — open an installed app or file / open 
 os.close(appName) / win.close(appName) — close an app; returns success.
 os.apps() — names of installed apps. os.windows() / os.running() / win.list() — names of running windows.
 os.username() — current user name. os.id() — current PC ID. os.time() — current UTC Unix timestamp. os.ready() — whether PCOS is ready. os.installed(name) — whether an app is installed. os.shutdown() — turn off this PC.
-fs.list() — array of user file names. fs.read(path) — text or nil if absent. fs.write(path,text) — create/overwrite a user file, returns success. fs.exists(path) — check if a file exists. fs.delete(path) — remove a user file, returns success. System/ paths cannot be written/deleted by scripts.
+fs.list() — array of user file names. fs.read(path) — text or nil if absent. fs.write(path,text) — create/overwrite a user file, returns success. fs.exists(path) — check if a file exists. fs.delete(path) — remove a user file, returns success. System/ paths are invisible to ordinary scripts; an administrator can read, write, list and delete them on system drive 0.
 Example:
   fs.write("note.txt", "Hello")
   print(fs.read("note.txt"))
   if os.installed("Viewer") then os.open("Viewer") end
+
+ADMINISTRATOR, REGISTERED PCs AND TERMINAL
+-------------------------------------------
+Use the file context menu > Run as administrator to elevate only that launch (.exe, .lua or .tmn). If the current PC's boot password is empty, no password prompt appears; otherwise enter that same password in the PCOS dialog, never in Lua. Closing the app or turning off PCOS ends its privileges. Other windows and other PCs do not inherit them.
+admin.status() / os.is_admin() — true if this script's current process has administrator rights.
+admin.request(function(granted) ... end) / os.request_admin(callback) — ask for administrator rights for THIS script. Returns true if the request was accepted; the callback receives true/false after the user confirms or cancels. The callback can run later: do not assume the request return value means access was granted. Password text is never returned to Lua. One password prompt can be active at a time.
+pc.ids() — array of hexadecimal IDs for PCs registered in THIS PC's Device Manager (not miners). Requires administrator; otherwise returns an empty array.
+pc.scan() — array of {id="XXXXXXXX",name="...",online=true/false} for the same registered PCs. Offline registrations remain visible. This is not a scan of every device in the world.
+pc.command(id,action,argument) — schedule a command for a registered PC; returns success. Supported actions: startup, shutdown, bitcoin, cash, video, app (argument = installed app name), file (argument = target file path). An ID is an 8-digit hex string from pc.ids() or a decimal Lua number. Actions on the target still respect its installed software; no target administrator rights are inherited.
+pc.connect(id) — open that registered PC in the ordinary RemoteDesk; returns success if it can launch. RemoteDesk's normal connection/license restrictions still apply.
+terminal.run(command) — open a SEPARATE native Terminal window on this PC and start an ordinary terminal command asynchronously. Returns true when scheduled, not when completed. This terminal is admin; existing terminal windows do not gain rights. Use only for commands you would type in the Terminal; it is not a shell API.
+All pc.* and terminal.run calls check this process's permissions again at call time. Non-admin fs.read/exists/list and os.open cannot expose System/. Lua os.open cannot launch .tmn files; use terminal.run("run script.tmn") with administrator rights instead. Manually launched Terminal scripts and Device Manager exports keep their existing behavior.
+Example:
+  if admin.status() then
+    local devices = pc.scan()
+    for i=1,#devices do
+      local item = devices[i]
+      print(item.id, item.name, item.online)
+    end
+  else
+    admin.request(function(granted)
+      if granted then
+        print("Administrator access enabled:", admin.status())
+        print("Registered PCs:", #pc.ids())
+      end
+    end)
+  end
 
 LUA BASICS
 ----------

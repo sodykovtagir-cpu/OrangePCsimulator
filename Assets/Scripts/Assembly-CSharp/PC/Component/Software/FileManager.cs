@@ -361,7 +361,7 @@ namespace PC.Component.Software
 
             foreach (var file in storage.files)
             {
-                if (file == null) continue;
+                if (file == null || (!IsAdministrator && OS.OperatingSystem.IsSystemPath(file.path))) continue;
 
                 string fileFolder = GetFolderPath(file.path);
                 if (fileFolder == currentFolder)
@@ -394,6 +394,7 @@ namespace PC.Component.Software
         private bool IsProtectedFile(File file)
         {
             if (file == null) return false;
+            if (OS.OperatingSystem.IsSystemPath(file.path)) return true;
             if (file.isFolder && systemFolders.Contains(GetDisplayName(file.path))) return true;
 
             var ext = File.Extension(file.path);
@@ -484,10 +485,10 @@ namespace PC.Component.Software
                 return;
             }
 
-            bool protect = IsProtectedFile(file);
+            bool protect = IsProtectedFile(file) && !IsAdministrator;
 
             if (cutButton != null) cutButton.interactable = !protect;
-            if (copyButton != null) copyButton.interactable = system != null && system.CanCopyFile(file);
+            if (copyButton != null) copyButton.interactable = system != null && system.CanCopyFile(file, IsAdministrator);
             if (renameButton != null) renameButton.interactable = !protect;
             // The custom overclock boot file is deletable even when hidden.
             if (deleteButton != null) deleteButton.interactable = !protect ||
@@ -505,6 +506,7 @@ namespace PC.Component.Software
             var file = GetSelectedFile();
             if (file == null || file.isFolder) return;
 
+            if (!IsAdministrator && IsProtectedFile(file)) return;
             file.hidden = hidden;
             if (system != null) system.RefreshDesktopIcon();
 
@@ -522,22 +524,22 @@ namespace PC.Component.Software
         {
             var file = GetSelectedFile();
             if (file == null || system == null) return;
-            system.CutToClipboard(file);
+            system.CutToClipboard(file, IsAdministrator);
             UpdatePasteButton();
         }
 
         public void Copy()
         {
             var file = GetSelectedFile();
-            if (file == null || system == null || !system.CanCopyFile(file)) return;
-            system.CopyToClipboard(file);
+            if (file == null || system == null || !system.CanCopyFile(file, IsAdministrator)) return;
+            system.CopyToClipboard(file, IsAdministrator);
             UpdatePasteButton();
         }
 
         public void Paste()
         {
             if (system == null) return;
-            system.PasteClipboard(currentFolder);
+            system.PasteClipboard(currentFolder, IsAdministrator);
         }
 
         public void Rename()
@@ -580,14 +582,14 @@ namespace PC.Component.Software
             var file = GetSelectedFile();
             if (file == null || system == null) return;
 
-            system.RenameUserFile(file, fileNameInput.text + extension);
+            system.RenameUserFile(file, fileNameInput.text + extension, IsAdministrator);
         }
 
         public void Delete()
         {
             var file = GetSelectedFile();
             if (file == null || system == null) return;
-            system.DeleteUserFile(file);
+            system.DeleteUserFile(file, IsAdministrator);
         }
 
         private File GetSelectedFile()
@@ -599,6 +601,7 @@ namespace PC.Component.Software
 
         public void OpenFolderFromPath(string path)
         {
+            if (!IsAdministrator && OS.OperatingSystem.IsSystemPath(path)) return;
             startFolderPath = path ?? "";
             if (selectedStorage == null) return;
 
@@ -730,7 +733,7 @@ namespace PC.Component.Software
             openedMenu = true;
             var menu = DesktopContextMenu.For(this);
             if (menu != null && menu.CanReceiveAppPointer(GetComponentInParent<FileManager>(), eventData.position))
-                menu.ShowFileMenu(file, eventData.position);
+                menu.ShowFileMenu(file, eventData.position, GetComponentInParent<FileManager>());
         }
 
         private void Update()
@@ -749,7 +752,7 @@ namespace PC.Component.Software
             PointerInput.ConsumedClick = true;
             var menu = DesktopContextMenu.For(this);
             if (menu != null && menu.CanReceiveAppPointer(GetComponentInParent<FileManager>(), pointerDownPos))
-                menu.ShowFileMenu(file, pointerDownPos);
+                menu.ShowFileMenu(file, pointerDownPos, GetComponentInParent<FileManager>());
         }
     }
 }

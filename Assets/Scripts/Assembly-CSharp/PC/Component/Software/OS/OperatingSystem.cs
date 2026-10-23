@@ -134,6 +134,7 @@ namespace PC.Component.Software.OS
         public SaveDialog SaveDialog => saveDialog;
         public DevicePicker DevicePicker => devicePicker;
         public bool Ready { get; private set; }
+        public int SessionToken { get; private set; }
 
         private static readonly HardwareType[] OtherPowerParts =
             { HardwareType.Cooler, HardwareType.RAM, HardwareType.Drive, HardwareType.Output };
@@ -167,6 +168,49 @@ namespace PC.Component.Software.OS
         }
         public int RamUsedMb { get; private set; }
         public int RamTotalMb { get; private set; }
+        private AdministratorPrompt administratorPrompt;
+
+        public bool RequestAdministrator(Action<bool> complete)
+        {
+            if (!Ready || Board == null || !Board.Running || administratorPrompt != null)
+            { complete?.Invoke(false); return false; }
+            var storage = AllStorage != null && AllStorage.Count > 0 ? AllStorage[0] : null;
+            if (storage == null) { complete?.Invoke(false); return false; }
+            if (string.IsNullOrEmpty(storage.password))
+            { complete?.Invoke(true); return true; }
+            int session = SessionToken;
+            administratorPrompt = AdministratorPrompt.Show(popup != null ? popup : transform,
+                typed => Ready && Board != null && Board.Running &&
+                    AllStorage != null && AllStorage.Count > 0 && AllStorage[0] == storage &&
+                    string.Equals(typed, storage.password, StringComparison.Ordinal),
+                allowed =>
+                {
+                    administratorPrompt = null;
+                    complete?.Invoke(allowed && Ready && Board != null && Board.Running && session == SessionToken);
+                },
+                string.Equals(Localization.GetLanguage(), "RU", StringComparison.OrdinalIgnoreCase));
+            return administratorPrompt != null;
+        }
+
+        public void OpenFileAsAdministrator(File file)
+        {
+            if (file == null) return;
+            RequestAdministrator(allowed =>
+            {
+                if (allowed && Ready) OpenFileInternal(file, true);
+            });
+        }
+
+        public static bool IsSystemPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            var segments = path.Replace('\\', '/').Split('/');
+            foreach (var segment in segments)
+                if (string.Equals(segment.Trim(), "System", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
         public bool ShellRunning { get; private set; } = true;
 
         public bool HasDiscreteGpu
@@ -1040,9 +1084,15 @@ namespace PC.Component.Software.OS
             if (!running) return;
             running = false;
             Ready = false;
+            SessionToken++;
 
             // Гасим самостоятельные медиа/звук всех открытых приложений (видео и
             // т.п.), чтобы на выключенном/сломанном ПК ничего не продолжало играть.
+            if (administratorPrompt != null)
+            {
+                administratorPrompt.Cancel();
+                administratorPrompt = null;
+            }
             benchmarkPhases.Clear();
             UiResponsiveness = 1f;
             if (runningApps != null)
@@ -1052,6 +1102,7 @@ namespace PC.Component.Software.OS
                     var a = runningApps[i];
                     if (a != null)
                     {
+                        a.SetAdministrator(false);
                         try { a.OnSystemStop(); } catch { }
                     }
                 }
@@ -1287,7 +1338,7 @@ namespace PC.Component.Software.OS
             return false;
         }
 
-        public List<string> ListUserFiles()
+        public List<string> ListUserFiles(bool includeSystem = false)
         {
             var r = new List<string>();
             var all = AllStorage;
@@ -1296,10 +1347,73 @@ namespace PC.Component.Software.OS
             for (int i = 0; i < files.Count; i++)
             {
                 var f = files[i];
-                if (f == null || f.hidden) continue;
+                if (f == null || (!includeSystem && (f.hidden || IsSystemPath(f.path)))) continue;
                 r.Add(f.path);
             }
             return r;
+        }
+
+        [Serializable]
+        private sealed class RegisteredDeviceIds
+        {
+            public List<int> ids = new List<int>();
+            public List<int> minerIds = new List<int>();
+            public List<int> pcIds = new List<int>();
+        }
+
+        public List<int> RegisteredPcIds()
+        {
+            var result = new List<int>();
+            File file;
+            if (!Ready || FileManager == null ||
+                !FileManager.TryGetFile(0, "System/manager_devices", out file) || file == null)
+                return result;
+            try
+            {
+                var saved = JsonUtility.FromJson<RegisteredDeviceIds>(file.content);
+                if (saved == null || saved.ids == null || saved.pcIds == null) return result;
+                foreach (int id in saved.ids)
+                    if (id != 0 && id != SystemId && !result.Contains(id) &&
+                        saved.pcIds.Contains(id) &&
+                        (saved.minerIds == null || !saved.minerIds.Contains(id)) &&
+                        (DeviceAutomation.Find(id) == null ||
+                         !DeviceAutomation.IsMiner(DeviceAutomation.Find(id))))
+                        result.Add(id);
+            }
+            catch (Exception) { /* corrupt registry must not grant world-wide access */ }
+            return result;
+        }
+
+        public bool RegisteredPcCommand(int id, string action, string argument = "")
+        {
+            if (!Ready || !RegisteredPcIds().Contains(id)) return false;
+            var board = DeviceAutomation.Find(id);
+            return board != null && DeviceAutomation.Run(this, board, action, argument);
+        }
+
+        public bool OpenRegisteredRemoteDesk(int id)
+        {
+            if (!Ready || !RegisteredPcIds().Contains(id)) return false;
+            if (DeviceAutomation.Find(id) == null) return false;
+            return TryLaunchApp("RemoteDesk", id.ToString("X8"));
+        }
+
+        public bool RunAdministratorTerminal(string command)
+        {
+            if (!Ready || string.IsNullOrWhiteSpace(command)) return false;
+            App prefab;
+            if (!IsAppInstalled("Terminal", out prefab) || prefab == null) return false;
+            // A separate instance: never elevate another user's existing terminal.
+            var terminal = Instantiate(prefab, appParent) as PC.Component.Software.Terminal;
+            if (terminal == null) return false;
+            terminal.Init(this);
+            terminal.SetAdministrator(true);
+            RegisterRunningApp(terminal);
+            terminal.AppClosed += ResetAppState;
+            terminal.Open("");
+            FocusApp(true);
+            terminal.StartCoroutine(terminal.Run(command));
+            return true;
         }
 
         /// <summary>Прочитать файл по пути.</summary>
@@ -1308,7 +1422,7 @@ namespace PC.Component.Software.OS
         /// с файлами того диска, который открыт у игрока, и жёсткий индекс 0
         /// приводил к «файл не найден» для второго диска.
         /// </remarks>
-        public bool TryReadFile(string path, out string content)
+        public bool TryReadFile(string path, out string content, int disk = -1)
         {
             content = null;
             if (FileManager == null || string.IsNullOrEmpty(path)) return false;
@@ -1317,7 +1431,8 @@ namespace PC.Component.Software.OS
             int count = all != null ? all.Count : 0;
 
             // Сначала активный диск -- это почти всегда нужный.
-            int first = ActiveStorage;
+            int first = disk >= 0 ? disk : ActiveStorage;
+            if (first < 0 || first >= count) return false;
             File file;
             if (FileManager.TryGetFile(first, path, out file) && file != null)
             {
@@ -1325,6 +1440,7 @@ namespace PC.Component.Software.OS
                 return true;
             }
 
+            if (disk >= 0) return false;
             for (int i = 0; i < count; i++)
             {
                 if (i == first) continue;
@@ -1360,10 +1476,10 @@ namespace PC.Component.Software.OS
         /// втором диске, скрипт должен сохранять туда же, куда сохраняет всё
         /// остальное.
         /// </remarks>
-        public bool TryWriteFile(string path, string content)
+        public bool TryWriteFile(string path, string content, int disk = -1)
         {
             if (FileManager == null || string.IsNullOrEmpty(path)) return false;
-            var file = FileManager.Write(ActiveStorage, path, content ?? "");
+            var file = FileManager.Write(disk >= 0 ? disk : ActiveStorage, path, content ?? "");
             RefreshDesktopIcon();
             return file != null;
         }
@@ -1483,21 +1599,21 @@ namespace PC.Component.Software.OS
             return RunLua(content, null);
         }
 
-        public bool RunLua(string content, Action<string> printer)
+        public bool RunLua(string content, Action<string> printer, bool administrator = false)
         {
             var pack = LuaAppPackage.Parse(content);
             var script = pack != null ? pack.script : content;
             if (LuaAppPackage.NeedsWindow(script))
-                return SpawnLuaApp(content ?? "", printer) != null;
-            RunLuaHeadless(script ?? "", printer);
+                return SpawnLuaApp(content ?? "", printer, administrator) != null;
+            RunLuaHeadless(script ?? "", printer, administrator);
             return true;
         }
 
-        void RunLuaHeadless(string script, Action<string> printer)
+        void RunLuaHeadless(string script, Action<string> printer, bool administrator)
         {
             var vm = new PcosLua();
             vm.Printer = printer;
-            PcosLuaHost.Bind(vm, this);
+            PcosLuaHost.Bind(vm, this, null, administrator);
             vm.SetNative("isdraggable", a => LuaValue.Bool(false));
             vm.SetNative("Isdraggable", a => LuaValue.Bool(false));
             vm.SetNative("ismaximable", a => LuaValue.Bool(false));
@@ -1513,7 +1629,7 @@ namespace PC.Component.Software.OS
             }
         }
 
-        public LuaApp SpawnLuaApp(string content, Action<string> printer)
+        public LuaApp SpawnLuaApp(string content, Action<string> printer, bool administrator = false)
         {
             App prefab = null;
             if (appPrefabs != null) appPrefabs.TryGetValue("Lua App", out prefab);
@@ -1523,6 +1639,7 @@ namespace PC.Component.Software.OS
             if (app == null) return null;
 
             app.Init(this);
+            app.SetAdministrator(administrator);
             var lua = app as LuaApp;
             if (lua != null && printer != null) lua.Printer = printer;
             RegisterRunningApp(app);
@@ -1532,17 +1649,22 @@ namespace PC.Component.Software.OS
             return lua;
         }
 
-        public bool OpenFile(File file)
+        public bool OpenFile(File file) { return OpenFileInternal(file, false); }
+
+        private bool OpenFileInternal(File file, bool elevated)
         {
             if (file == null) return false;
+            if (IsSystemPath(file.path) && !elevated) return false;
 
             if (file.isFolder)
-                return OpenFolder(file);
+                return OpenFolder(file, elevated);
 
             if (LuaAppPackage.IsPackage(file.content))
-                return LaunchLuaApp(file.content);
+                return RunLua(file.content, null, elevated);
 
             var ext = file.Extension();
+            if (elevated && string.Equals(ext, ".lua", StringComparison.OrdinalIgnoreCase))
+                return RunLua(file.content, null, true);
             App prefab = null;
 
             if (string.Equals(ext, ".conf", StringComparison.OrdinalIgnoreCase))
@@ -1552,8 +1674,7 @@ namespace PC.Component.Software.OS
                     ShowRequires("Text Editor");
                     return false;
                 }
-                LaunchApp(prefab, file.content ?? "");
-                var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                var editor = LaunchApp(prefab, file.content ?? "", elevated) as PC.Component.Software.TextEditor;
                 if (editor != null) editor.OpenDocument(file);
                 return true;
             }
@@ -1564,7 +1685,7 @@ namespace PC.Component.Software.OS
                 if (!IsAppInstalled(name)) RegisterInstalledExecutables();
                 if (IsAppInstalled(name, out prefab) && prefab != null)
                 {
-                    LaunchApp(prefab, file.content ?? "");
+                    LaunchApp(prefab, file.content ?? "", elevated);
                     return true;
                 }
 
@@ -1575,15 +1696,15 @@ namespace PC.Component.Software.OS
             prefab = FindInstalledAppForExtension(ext);
             if (prefab != null)
             {
-                LaunchApp(prefab, file.content ?? "");
+                var opened = LaunchApp(prefab, file.content ?? "", elevated);
                 if (prefab.AppName == "Text Editor")
                 {
-                    var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                    var editor = opened as PC.Component.Software.TextEditor;
                     if (editor != null) editor.OpenDocument(file);
                 }
-                if (prefab is PC.Component.Software.Viewer && runningApps.Count > 0)
+                if (prefab is PC.Component.Software.Viewer)
                 {
-                    var viewer = runningApps[runningApps.Count - 1] as PC.Component.Software.Viewer;
+                    var viewer = opened as PC.Component.Software.Viewer;
                     if (viewer != null) viewer.OpenDocument(file);
                 }
                 return true;
@@ -1594,9 +1715,23 @@ namespace PC.Component.Software.OS
             return false;
         }
 
+        public bool IsElevatedExplorer(PC.Component.Software.FileManager explorer)
+        {
+            return Ready && explorer != null && explorer.IsAdministrator &&
+                runningApps != null && runningApps.Contains(explorer);
+        }
+
+        public bool OpenFileFromExplorer(File file, PC.Component.Software.FileManager explorer)
+        {
+            if (file == null) return false;
+            if (!IsSystemPath(file.path)) return OpenFile(file);
+            if (!IsElevatedExplorer(explorer) || FindStorageOf(file) == null) return false;
+            return OpenFileInternal(file, true);
+        }
+
         public bool OpenFileWith(File file, App app)
         {
-            if (file == null || app == null) return false;
+            if (file == null || app == null || IsSystemPath(file.path)) return false;
             if (file.isFolder)
                 return OpenFolder(file);
 
@@ -1606,15 +1741,15 @@ namespace PC.Component.Software.OS
                 return false;
             }
 
-            LaunchApp(app, file.content ?? "");
+            var opened = LaunchApp(app, file.content ?? "");
             if (app.AppName == "Text Editor")
             {
-                var editor = GetRunningApp("Text Editor") as PC.Component.Software.TextEditor;
+                var editor = opened as PC.Component.Software.TextEditor;
                 if (editor != null) editor.OpenDocument(file);
             }
-            if (app is PC.Component.Software.Viewer && runningApps.Count > 0)
+            if (app is PC.Component.Software.Viewer)
             {
-                var viewer = runningApps[runningApps.Count - 1] as PC.Component.Software.Viewer;
+                var viewer = opened as PC.Component.Software.Viewer;
                 if (viewer != null) viewer.OpenDocument(file);
             }
             return true;
@@ -1627,9 +1762,10 @@ namespace PC.Component.Software.OS
             ShowMessageBox(Localization.GetText("Error"), string.Format(Localization.GetText("Requires {0}"), Localization.GetText(appName)));
         }
 
-        private bool OpenFolder(File folder)
+        private bool OpenFolder(File folder, bool elevated = false)
         {
             if (folder == null || !folder.isFolder) return false;
+            if (IsSystemPath(folder.path) && !elevated) return false;
 
             App prefab;
             if (!IsAppInstalled("File Manager", out prefab) || prefab == null)
@@ -1638,10 +1774,7 @@ namespace PC.Component.Software.OS
                 return false;
             }
 
-            LaunchApp(prefab, "");
-
-            var existing = GetRunningApp(prefab.AppName);
-            var fm = existing as PC.Component.Software.FileManager;
+            var fm = LaunchApp(prefab, "", elevated) as PC.Component.Software.FileManager;
             if (fm != null)
                 fm.OpenFolderFromPath(folder.path);
 
@@ -2312,35 +2445,37 @@ namespace PC.Component.Software.OS
         {
             if (file == null) return true;
             if (string.IsNullOrEmpty(file.path)) return true;
-            if (file.path == "System" || file.path.StartsWith("System/")) return true;
+            if (IsSystemPath(file.path)) return true;
             if (file.Extension() == ".exe" && !LuaAppPackage.IsPackage(file.content)) return true;
             return false;
         }
 
-        public bool CanCopyFile(File file)
+        public bool CanCopyFile(File file, bool administrator = false)
         {
             if (file == null || string.IsNullOrEmpty(file.path)) return false;
-            if (file.path == "System" || file.path.StartsWith("System/")) return false;
+            if (administrator) return true;
+            if (IsSystemPath(file.path)) return false;
             if (file.Extension() == ".exe")
                 return LuaAppPackage.IsPackage(file.content);
             return true;
         }
 
-        public void CopyToClipboard(File file)
+        public void CopyToClipboard(File file, bool administrator = false)
         {
-            if (!CanCopyFile(file)) return;
+            if (!CanCopyFile(file, administrator)) return;
             clipboard = new ClipboardEntry { file = file, cut = false };
         }
 
-        public void CutToClipboard(File file)
+        public void CutToClipboard(File file, bool administrator = false)
         {
-            if (file == null || IsProtectedFile(file)) return;
+            if (file == null || (IsProtectedFile(file) && !administrator)) return;
             clipboard = new ClipboardEntry { file = file, cut = true };
         }
 
-        public bool PasteClipboard(string targetFolder)
+        public bool PasteClipboard(string targetFolder, bool administrator = false)
         {
-            if (!HasClipboard || AllStorage == null || AllStorage.Count == 0)
+            if (!HasClipboard || AllStorage == null || AllStorage.Count == 0 ||
+                !administrator && (IsSystemPath(targetFolder) || IsSystemPath(clipboard.file.path)))
                 return false;
 
             // Вставляем на тот диск, который сейчас открыт, а не на системный.
@@ -2386,15 +2521,15 @@ namespace PC.Component.Software.OS
             return true;
         }
 
-        public void HideUserFile(File file)
+        public void HideUserFile(File file, bool administrator = false)
         {
-            if (file == null || IsProtectedFile(file)) return;
+            if (file == null || (IsProtectedFile(file) && !administrator)) return;
             file.hidden = true;
             RefreshDesktopIcon();
             RefreshRunningFileManagers();
         }
 
-        public void DeleteUserFile(File file)
+        public void DeleteUserFile(File file, bool administrator = false)
         {
             if (file == null) return;
             if (file.path == OverclockBoot.Path)
@@ -2410,7 +2545,7 @@ namespace PC.Component.Software.OS
                 RefreshRunningFileManagers();
                 return;
             }
-            if (IsProtectedFile(file)) return;
+            if (IsProtectedFile(file) && !administrator) return;
             if (AllStorage == null || AllStorage.Count == 0) return;
 
             // Файл может лежать на любом диске: ищем тот, где он есть на самом
@@ -2436,9 +2571,9 @@ namespace PC.Component.Software.OS
             RefreshRunningFileManagers();
         }
 
-        public bool RenameUserFile(File file, string newName)
+        public bool RenameUserFile(File file, string newName, bool administrator = false)
         {
-            if (file == null || IsProtectedFile(file) || string.IsNullOrEmpty(newName)) return false;
+            if (file == null || (IsProtectedFile(file) && !administrator) || string.IsNullOrEmpty(newName)) return false;
             if (AllStorage == null || AllStorage.Count == 0) return false;
 
             newName = newName.Trim();
@@ -3379,14 +3514,18 @@ namespace PC.Component.Software.OS
             return null;
         }
 
-        private void LaunchApp(App prefab, string content = "")
+        private App LaunchApp(App prefab, string content = "", bool elevated = false)
         {
-            if (prefab == null) return;
+            if (prefab == null) return null;
             RegisterWork(.40f, 1f);
 
             if (prefab.SingleInstance)
             {
-                var existing = GetRunningApp(prefab.AppName);
+                App existing = null;
+                foreach (var candidate in runningApps)
+                    if (candidate != null && candidate.AppName == prefab.AppName &&
+                        candidate.IsAdministrator == elevated)
+                    { existing = candidate; break; }
                 if (existing != null)
                 {
                     if (existing.IsMinimized)
@@ -3394,19 +3533,21 @@ namespace PC.Component.Software.OS
                     existing.transform.SetAsLastSibling();
                     if (!string.IsNullOrEmpty(content)) existing.Open(content);
                     FocusApp(true);
-                    return;
+                    return existing;
                 }
             }
 
             var app = Instantiate(prefab, appParent);
-            if (app == null) return;
+            if (app == null) return null;
 
             app.Init(this);
+            app.SetAdministrator(elevated);
             RegisterRunningApp(app);
             app.AppClosed += ResetAppState;
             app.Open(content);
 
             FocusApp(true);
+            return app;
         }
 
         public void ImportWallpaperFromDevice(byte[] imageBytes)

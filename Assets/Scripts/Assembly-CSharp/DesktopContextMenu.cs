@@ -318,7 +318,7 @@ namespace PC.Component.Software
 
             if (item != null && item.File != null)
             {
-                ShowFileMenu(item.File, screenPos);
+                ShowFileMenu(item.File, screenPos, explorer);
                 return;
             }
 
@@ -430,7 +430,7 @@ namespace PC.Component.Software
             PositionMenu(menuRect, screenPos);
         }
 
-        public void ShowFileMenu(File file, Vector2 screenPos)
+        public void ShowFileMenu(File file, Vector2 screenPos, FileManager explorer = null)
         {
             if (file == null) return;
             CloseMenu();
@@ -442,11 +442,16 @@ namespace PC.Component.Software
             AddMenuItem(menuPanel, Localization.GetText("Open"), () =>
             {
                 if (operatingSystem == null) return;
-                operatingSystem.OpenFile(file);
+                operatingSystem.OpenFileFromExplorer(file, explorer);
             });
 
             if (!file.isFolder)
             {
+                var ext = file.Extension();
+                if (ext == ".exe" || ext == ".lua" || ext == ".tmn")
+                    AddMenuItem(menuPanel, Localization.GetLanguage() == "RU"
+                        ? "Запуск от имени администратора" : "Run as administrator",
+                        () => operatingSystem.OpenFileAsAdministrator(file));
                 var apps = operatingSystem.GetOpenWithApps(file);
                 if (apps != null && apps.Count > 0)
                 {
@@ -463,16 +468,21 @@ namespace PC.Component.Software
                 }
             }
 
-            if (operatingSystem.CanCopyFile(file))
-                AddMenuItem(menuPanel, Localization.GetText("Copy"), () => operatingSystem.CopyToClipboard(file));
+            bool adminExplorer = operatingSystem.IsElevatedExplorer(explorer);
+            if (operatingSystem.CanCopyFile(file, adminExplorer))
+                AddMenuItem(menuPanel, Localization.GetText("Copy"), () =>
+                    operatingSystem.CopyToClipboard(file, operatingSystem.IsElevatedExplorer(explorer)));
 
-            bool protect = operatingSystem.IsProtectedFile(file);
+            bool protect = operatingSystem.IsProtectedFile(file) && !adminExplorer;
             if (!protect)
             {
-                AddMenuItem(menuPanel, Localization.GetText("Cut"), () => operatingSystem.CutToClipboard(file));
-                AddMenuItem(menuPanel, Localization.GetText("Rename"), () => ShowRenameDialog(file, screenPos), false);
-                AddMenuItem(menuPanel, Localization.GetText("Hide"), () => operatingSystem.HideUserFile(file));
-                AddMenuItem(menuPanel, Localization.GetText("Delete"), () => operatingSystem.DeleteUserFile(file));
+                AddMenuItem(menuPanel, Localization.GetText("Cut"), () =>
+                    operatingSystem.CutToClipboard(file, operatingSystem.IsElevatedExplorer(explorer)));
+                AddMenuItem(menuPanel, Localization.GetText("Rename"), () => ShowRenameDialog(file, screenPos, explorer), false);
+                AddMenuItem(menuPanel, Localization.GetText("Hide"), () =>
+                    operatingSystem.HideUserFile(file, operatingSystem.IsElevatedExplorer(explorer)));
+                AddMenuItem(menuPanel, Localization.GetText("Delete"), () =>
+                    operatingSystem.DeleteUserFile(file, operatingSystem.IsElevatedExplorer(explorer)));
             }
 
             PositionMenu(menuRect, screenPos);
@@ -519,12 +529,14 @@ namespace PC.Component.Software
             // проводника, и общее «текущее» значение окажется чужим.
             int storage = explorer.CurrentStorageIndex;
 
-            AddCreateSubmenu(menuPanel, folder, storage);
-            if (operatingSystem != null && operatingSystem.HasClipboard)
+            if (!OperatingSystem.IsSystemPath(folder) || explorer.IsAdministrator)
+                AddCreateSubmenu(menuPanel, folder, storage);
+            if (operatingSystem != null && operatingSystem.HasClipboard &&
+                (!OperatingSystem.IsSystemPath(folder) || explorer.IsAdministrator))
                 AddMenuItem(menuPanel, Localization.GetText("Paste"), () =>
                 {
                     operatingSystem.SetActiveStorage(storage);
-                    operatingSystem.PasteClipboard(folder);
+                    operatingSystem.PasteClipboard(folder, explorer.IsAdministrator);
                 });
             AddMenuItem(menuPanel, Localization.GetText("Refresh"), () => explorer.RefreshView());
 
@@ -784,7 +796,7 @@ namespace PC.Component.Software
             submenuRect = null;
         }
 
-        private void ShowRenameDialog(File file, Vector2 screenPos)
+        private void ShowRenameDialog(File file, Vector2 screenPos, FileManager explorer = null)
         {
             CloseMenu();
             if (canvas == null || file == null || operatingSystem == null) return;
@@ -861,7 +873,7 @@ namespace PC.Component.Software
                 input.onEndEdit.AddListener(value =>
                 {
                     if (!string.IsNullOrEmpty(value))
-                        operatingSystem.RenameUserFile(file, value + ext);
+                        operatingSystem.RenameUserFile(file, value + ext, operatingSystem.IsElevatedExplorer(explorer));
                     CloseMenu();
                 });
             }
@@ -871,7 +883,7 @@ namespace PC.Component.Software
                 input.onEndEdit.AddListener(value =>
                 {
                     if (!string.IsNullOrEmpty(value))
-                        operatingSystem.RenameUserFile(file, value);
+                        operatingSystem.RenameUserFile(file, value, operatingSystem.IsElevatedExplorer(explorer));
                     CloseMenu();
                 });
             }
