@@ -79,7 +79,7 @@ namespace SaveManagement
             string packed;
             using (var output = new MemoryStream())
             {
-                using (var zip = new GZipStream(output, CompressionLevel.Optimal, true))
+                using (var zip = new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, true))
                     zip.Write(plain, 0, plain.Length);
                 packed = Convert.ToBase64String(output.ToArray());
             }

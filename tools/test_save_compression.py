@@ -11,7 +11,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1] / 'Assets/Scripts/Assembly-CSharp'
 source = (root / 'SaveManagement/SaveUtility.cs').read_text()
 assert 'CompressedTag = "OPC3:"' in source
-assert 'new GZipStream(output, CompressionLevel.Optimal, true)' in source
+assert 'new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, true)' in source
 assert 'MaxDecodedBytes' in source
 assert 'fileText.StartsWith(CompressedTag' in source
 assert 'if (!FixedEquals(hmac, ComputeHmac(body)))' in source
@@ -25,6 +25,7 @@ using System.Text;
 using System.Security.Cryptography;
 using SaveManagement;
 namespace UnityEngine {
+    public enum CompressionLevel { None, Optimal } // emulate Unity 2022 naming collision
     public static class Application {
         public static string persistentDataPath = "/tmp";
         public static string streamingAssetsPath = "/tmp";
