@@ -451,7 +451,7 @@ namespace PC.Component.Software
                 if (ext == ".exe" || ext == ".lua" || ext == ".tmn")
                     AddMenuItem(menuPanel, Localization.GetLanguage() == "RU"
                         ? "Запуск от имени администратора" : "Run as administrator",
-                        () => operatingSystem.OpenFileAsAdministrator(file));
+                        () => operatingSystem.OpenFileAsAdministrator(file), fitLabel: true);
                 var apps = operatingSystem.GetOpenWithApps(file);
                 if (apps != null && apps.Count > 0)
                 {
@@ -641,7 +641,8 @@ namespace PC.Component.Software
             return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 
-        private void AddMenuItem(GameObject parent, string label, System.Action onClick, bool closeAfter = true)
+        private void AddMenuItem(GameObject parent, string label, System.Action onClick,
+            bool closeAfter = true, bool fitLabel = false)
         {
             var item = new GameObject("MenuItem");
             item.transform.SetParent(parent.transform, false);
@@ -670,6 +671,26 @@ namespace PC.Component.Software
             text.fontSize = 14;
             text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
+
+            if (fitLabel)
+            {
+                // The Russian admin label is longer than the standard 220-unit
+                // menu. Measure it before PositionMenu calculates screen bounds.
+                var panelRect = parent.GetComponent<RectTransform>();
+                if (panelRect != null)
+                {
+                    float required = Mathf.Max(menuWidth, text.preferredWidth + 36f);
+                    float available = canvasRect != null ? canvasRect.rect.width - 12f : required;
+                    float width = Mathf.Min(required, Mathf.Max(menuWidth, available));
+                    panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+                    if (width < required)
+                    {
+                        text.resizeTextForBestFit = true;
+                        text.resizeTextMinSize = 11;
+                        text.resizeTextMaxSize = 14;
+                    }
+                }
+            }
 
             var button = item.AddComponent<Button>();
             button.transition = Selectable.Transition.ColorTint;
