@@ -175,7 +175,7 @@ namespace PC.Component.Software
 			}
 			var vm = new PcosLua();
 			vm.Printer = AppendOut;
-			PcosLuaHost.Bind(vm, system);
+			PcosLuaHost.Bind(vm, system, this);
 			try
 			{
 				vm.DoString(code.text ?? "");
@@ -589,6 +589,13 @@ namespace PC.Component.Software
 				new LuaSnippet { label = "os.id()", insert = "os.id()" },
 				new LuaSnippet { label = "os.installed", insert = "os.installed(\"|\")" },
 				new LuaSnippet { label = "os.shutdown()", insert = "os.shutdown()" },
+                new LuaSnippet { label = "admin.status()", insert = "admin.status()" },
+                new LuaSnippet { label = "admin.request", insert = "admin.request(function(granted)\n  if granted then\n    |\n  end\nend)" },
+                new LuaSnippet { label = "pc.ids()", insert = "pc.ids()" },
+                new LuaSnippet { label = "pc.scan()", insert = "pc.scan()" },
+                new LuaSnippet { label = "pc.command", insert = "pc.command(\"|\", \"startup\")" },
+                new LuaSnippet { label = "pc.connect", insert = "pc.connect(\"|\")" },
+                new LuaSnippet { label = "terminal.run", insert = "terminal.run(\"|\")" },
 				new LuaSnippet { label = "fs.list()", insert = "fs.list()" },
 				new LuaSnippet { label = "fs.read", insert = "fs.read(\"|\")" },
 				new LuaSnippet { label = "fs.write", insert = "fs.write(\"|\", \"\")" },

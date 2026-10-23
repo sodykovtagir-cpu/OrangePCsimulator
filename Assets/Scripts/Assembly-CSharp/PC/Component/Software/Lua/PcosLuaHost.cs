@@ -1,14 +1,53 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using PC.Component.Software.OS;
 
 namespace PC.Component.Software.Lua
 {
 	public static class PcosLuaHost
 	{
-		public static void Bind(PcosLua vm, PC.Component.Software.OS.OperatingSystem os)
+		public static void Bind(PcosLua vm, PC.Component.Software.OS.OperatingSystem os,
+            PC.Component.Software.App owner = null, bool headlessAdministrator = false)
 		{
 			if (vm == null) return;
+            int session = os != null ? os.SessionToken : -1;
+            bool hasOwner = !ReferenceEquals(owner, null);
+            Func<bool> authorized = () => os != null && os.Ready &&
+                os.SessionToken == session &&
+                (hasOwner ? owner != null && owner.IsAdministrator : headlessAdministrator);
+
+            var admin = new LuaTable();
+            admin.Set(LuaValue.String("status"), Native(a => LuaValue.Bool(authorized())));
+            admin.Set(LuaValue.String("request"), Native(a =>
+            {
+                if (os == null || !os.Ready || os.SessionToken != session ||
+                    a.Length == 0 || a[0].Type != LuaType.Function) return LuaValue.Bool(false);
+                var callback = a[0];
+                if (authorized())
+                {
+                    try { vm.Call(callback, new List<LuaValue> { LuaValue.Bool(true) }); }
+                    catch (Exception ex) { os.ShowMessageBox("Lua", ex.Message); }
+                    return LuaValue.Bool(true);
+                }
+                bool requested = os.RequestAdministrator(granted =>
+                {
+                    if (granted && os != null && os.Ready && os.SessionToken == session)
+                    {
+                        if (hasOwner)
+                        {
+                            if (owner != null) owner.SetAdministrator(true);
+                            else granted = false;
+                        }
+                        else headlessAdministrator = true;
+                    }
+                    else granted = false;
+                    try { vm.Call(callback, new List<LuaValue> { LuaValue.Bool(granted) }); }
+                    catch (Exception ex) { if (os != null && os.Ready) os.ShowMessageBox("Lua", ex.Message); }
+                });
+                return LuaValue.Bool(requested); // result arrives in callback, not in Lua's return value
+            }));
+            vm.SetGlobal("admin", LuaValue.FromTable(admin));
 
 			var osTbl = new LuaTable();
 			osTbl.Set(LuaValue.String("alert"), Native(a =>
@@ -23,7 +62,14 @@ namespace PC.Component.Software.Lua
 			osTbl.Set(LuaValue.String("open"), Native(a =>
 			{
 				if (os == null || a.Length == 0) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.LuaOpen(a[0].AsString()));
+                var name = a[0].AsString();
+                // Native .tmn files can run remote commands. Lua must use the
+                // permission-checked terminal.run API, never os.open(.tmn).
+                if (name.EndsWith(".tmn", StringComparison.OrdinalIgnoreCase))
+                    return LuaValue.Bool(false);
+                if (PC.Component.Software.OS.OperatingSystem.IsSystemPath(name) && !authorized())
+                    return LuaValue.Bool(false);
+                return LuaValue.Bool(os.LuaOpen(name));
 			}));
 			osTbl.Set(LuaValue.String("close"), Native(a =>
 			{
@@ -51,39 +97,99 @@ namespace PC.Component.Software.Lua
 				if (os == null || a.Length == 0) return LuaValue.Bool(false);
 				return LuaValue.Bool(os.IsAppInstalled(a[0].AsString()));
 			}));
+            osTbl.Set(LuaValue.String("is_admin"), Native(a => LuaValue.Bool(authorized())));
+            osTbl.Set(LuaValue.String("request_admin"), admin.Get(LuaValue.String("request")));
 			vm.SetGlobal("os", LuaValue.FromTable(osTbl));
 
 			var fs = new LuaTable();
-			fs.Set(LuaValue.String("list"), Native(a => ToArray(os != null ? os.ListUserFiles() : null)));
+			fs.Set(LuaValue.String("list"), Native(a => ToArray(os != null ? os.ListUserFiles(authorized()) : null)));
 			fs.Set(LuaValue.String("read"), Native(a =>
 			{
 				if (os == null || a.Length == 0) return LuaValue.Nil;
 				string text;
-				return os.TryReadFile(a[0].AsString(), out text) ? LuaValue.String(text) : LuaValue.Nil;
+                var path = a[0].AsString();
+                if (PC.Component.Software.OS.OperatingSystem.IsSystemPath(path) && !authorized())
+                    return LuaValue.Nil;
+                return os.TryReadFile(path, out text,
+                    PC.Component.Software.OS.OperatingSystem.IsSystemPath(path) ? 0 : -1) ? LuaValue.String(text) : LuaValue.Nil;
 			}));
 			fs.Set(LuaValue.String("write"), Native(a =>
 			{
 				if (os == null || a.Length < 2) return LuaValue.Bool(false);
 				var path = a[0].AsString();
-				// Защита системных файлов от перезаписи через Lua
-				if (IsProtectedPath(path)) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.TryWriteFile(path, a[1].AsString()));
+                bool systemPath = PC.Component.Software.OS.OperatingSystem.IsSystemPath(path);
+                if (systemPath && !authorized()) return LuaValue.Bool(false);
+                return LuaValue.Bool(os.TryWriteFile(path, a[1].AsString(), systemPath ? 0 : -1));
 			}));
 			fs.Set(LuaValue.String("delete"), Native(a =>
 			{
 				if (os == null || a.Length == 0) return LuaValue.Bool(false);
 				var path = a[0].AsString();
-				// Защита системных файлов от удаления через Lua
-				if (IsProtectedPath(path)) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.TryDeleteFile(path));
+                bool systemPath = PC.Component.Software.OS.OperatingSystem.IsSystemPath(path);
+                if (systemPath && !authorized()) return LuaValue.Bool(false);
+                return LuaValue.Bool(os.TryDeleteFile(path));
 			}));
 			fs.Set(LuaValue.String("exists"), Native(a =>
 			{
 				if (os == null || a.Length == 0) return LuaValue.Bool(false);
-				return LuaValue.Bool(os.FileExists(a[0].AsString()));
+                var path = a[0].AsString();
+                if (PC.Component.Software.OS.OperatingSystem.IsSystemPath(path) && !authorized())
+                    return LuaValue.Bool(false);
+                return LuaValue.Bool(os.FileExists(path));
 			}));
 	
 			vm.SetGlobal("fs", LuaValue.FromTable(fs));
+
+            var pc = new LuaTable();
+            pc.Set(LuaValue.String("ids"), Native(a =>
+            {
+                var list = new LuaTable();
+                if (authorized())
+                {
+                    var ids = os.RegisteredPcIds();
+                    for (int i = 0; i < ids.Count; i++)
+                        list.Set(LuaValue.Number(i + 1), LuaValue.String(ids[i].ToString("X8")));
+                }
+                return LuaValue.FromTable(list);
+            }));
+            pc.Set(LuaValue.String("scan"), Native(a =>
+            {
+                var list = new LuaTable();
+                if (authorized())
+                {
+                    var ids = os.RegisteredPcIds();
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        var board = PC.Component.Software.DeviceAutomation.Find(ids[i]);
+                        var entry = new LuaTable();
+                        entry.Set(LuaValue.String("id"), LuaValue.String(ids[i].ToString("X8")));
+                        entry.Set(LuaValue.String("name"), LuaValue.String(board != null ? board.name : "Offline"));
+                        entry.Set(LuaValue.String("online"), LuaValue.Bool(board != null && board.Running));
+                        list.Set(LuaValue.Number(i + 1), LuaValue.FromTable(entry));
+                    }
+                }
+                return LuaValue.FromTable(list);
+            }));
+            pc.Set(LuaValue.String("command"), Native(a =>
+            {
+                int id;
+                if (!authorized() || a.Length < 2 || !ParsePcId(a[0], out id))
+                    return LuaValue.Bool(false);
+                return LuaValue.Bool(os.RegisteredPcCommand(id, a[1].AsString(),
+                    a.Length > 2 ? a[2].AsString() : ""));
+            }));
+            pc.Set(LuaValue.String("connect"), Native(a =>
+            {
+                int id;
+                return LuaValue.Bool(authorized() && a.Length > 0 &&
+                    ParsePcId(a[0], out id) && os.OpenRegisteredRemoteDesk(id));
+            }));
+            vm.SetGlobal("pc", LuaValue.FromTable(pc));
+
+            var terminal = new LuaTable();
+            terminal.Set(LuaValue.String("run"), Native(a => LuaValue.Bool(
+                authorized() && a.Length > 0 && os.RunAdministratorTerminal(a[0].AsString()))));
+            vm.SetGlobal("terminal", LuaValue.FromTable(terminal));
 
 			var win = new LuaTable();
 			win.Set(LuaValue.String("alert"), Native(a =>
@@ -124,14 +230,24 @@ namespace PC.Component.Software.Lua
 			return LuaValue.FromFn(new LuaFunction { Native = fn });
 		}
 
-		// Защита системных файлов от перезаписи/удаления через Lua
-		static bool IsProtectedPath(string path)
-		{
-			if (string.IsNullOrEmpty(path)) return false;
-			var lower = path.ToLowerInvariant().Replace("\\", "/");
-			if (lower.StartsWith("system/")) return true;
-			if (lower == "system") return true;
-			return false;
-		}
+        // Lua IDs are eight-digit hexadecimal strings; decimal Lua numbers also work.
+        private static bool ParsePcId(LuaValue value, out int id)
+        {
+            id = 0;
+            if (value.Type == LuaType.Number)
+            {
+                if (double.IsNaN(value.N) || double.IsInfinity(value.N) ||
+                    value.N == 0 || value.N < int.MinValue || value.N > int.MaxValue ||
+                    value.N != Math.Floor(value.N))
+                    return false;
+                id = (int)value.N;
+                return true;
+            }
+            if (value.Type != LuaType.String) return false;
+            var text = (value.S ?? "").Trim();
+            if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text.Substring(2);
+            return text.Length == 8 &&
+                int.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out id) && id != 0;
+        }
 	}
 }

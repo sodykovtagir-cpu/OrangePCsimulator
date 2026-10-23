@@ -58,6 +58,7 @@ namespace PC.Component.Software
 		{
 			if (system == null || string.IsNullOrEmpty(path)) return null;
 			string content;
+			if (OS.OperatingSystem.IsSystemPath(path) && !IsAdministrator) return null;
 			if (!system.TryReadFile(path, out content) || string.IsNullOrEmpty(content)) return null;
 			try
 			{
@@ -95,7 +96,7 @@ namespace PC.Component.Software
 			tick = null;
 			vm = new PcosLua();
 			vm.Printer = HandlePrint;
-			PcosLuaHost.Bind(vm, system);
+			PcosLuaHost.Bind(vm, system, this);
 			BindWindowCommands();
 			var font = titleText != null ? titleText.font : null;
 			ui = new LuaUi(contentRoot, font, vm);

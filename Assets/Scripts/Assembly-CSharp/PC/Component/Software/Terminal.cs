@@ -43,6 +43,7 @@ namespace PC.Component.Software
 		private int timeIndex;
 
 		private bool playing;
+		public bool CanAcceptCommand => !playing && system != null && system.Ready;
 
 		private bool useFile;
 
@@ -267,6 +268,8 @@ namespace PC.Component.Software
                 else if (system == null || system.FileManager == null ||
                          !system.FileManager.TryGetFile(0, path, out file) || file == null)
                     WriteLine("File not found: " + path);
+                else if (OS.OperatingSystem.IsSystemPath(path) && !IsAdministrator)
+                    WriteLine("Administrator required: " + path);
                 else if (cmd == "run" && file.Extension() == ".tmn")
                 {
                     if (scriptDepth >= 4) WriteLine("Script nesting limit reached");
