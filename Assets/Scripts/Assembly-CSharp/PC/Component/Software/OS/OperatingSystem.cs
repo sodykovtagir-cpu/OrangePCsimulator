@@ -132,6 +132,7 @@ namespace PC.Component.Software.OS
 
         public ProgressBar ProgressBar => progressBar;
         public SaveDialog SaveDialog => saveDialog;
+        internal OpenDialog OpenPickerTemplate => fileDialog;
         public DevicePicker DevicePicker => devicePicker;
         public bool Ready { get; private set; }
         public int SessionToken { get; private set; }

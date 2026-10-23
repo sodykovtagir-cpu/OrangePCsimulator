@@ -75,13 +75,13 @@ namespace PC.Component
 
 				if (required > Capacity) return file;
 
-				file.content = content;
+                file.content = content;
+                file.size = content.Length;
 				return file;
 			}
 
 			var created = new File(path, content);
-			AddFile(created);
-			return created;
+            return AddFile(created) ? created : null;
 		}
 
 		public bool AddFile(PC.Component.Software.File file)
@@ -89,7 +89,9 @@ namespace PC.Component
 			if (file == null) throw new System.ArgumentNullException(nameof(file));
 
 			int used = Usage();
-			int size = file.size;
+            // Newly exported documents use their content length unless an
+            // explicit size was supplied. A zero size must not bypass capacity.
+			int size = file.StorageSize;
 
 			if (used + size > Capacity) return false;
 

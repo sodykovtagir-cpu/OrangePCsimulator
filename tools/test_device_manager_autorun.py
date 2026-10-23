@@ -38,7 +38,9 @@ assert all(x in installer for x in ('AutorunConfig.Path', 'AutorunConfig.Default
 assert all(x in ready for x in ('AutorunConfig.Path', 'AutorunConfig.Default', 'AutorunConfig.Marker'))
 # .conf, default Text Editor, and explicit Open With all bind the document.
 assert '".conf"' in os and os.count('editor.OpenDocument(file)') >= 2
-assert 'disks[index].files.Contains(openedFile)' in editor and 'FileManager.Write(disk, filePath, content)' in editor
+assert 'disks[n].files.Contains(openedFile)' in editor
+assert 'openedFile != null ? filePath : null, disk, saved =>' in editor
+assert 'openedFile = saved;' in editor and 'filePath = saved.path;' in editor
 assert '"bitcoin"' in miner and 'ChangeMode(bitcoinMode)' in miner and 'public override void Open(string content)' in miner
 for required in ('RunAll', 'FindObjectsOfType<Motherboard>()', 'board.Boot()',
                  'source.StartCoroutine(WhenReady', 'os.TryLaunchApp("EZ Mining", action)',

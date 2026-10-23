@@ -453,7 +453,6 @@ namespace PC.Component.Software
                 (action == "bitcoin" || action == "cash" || action == "video");
             if (!all && targets.Count == 0)
             { status = "Select at least one device in step 1"; Render(); return; }
-            string fileName = name + ".tmn";
             string bodyText = "// Built with Device Manager\n";
             if (all) bodyText += "remote-all " + action + "\n";
             else
@@ -466,20 +465,28 @@ namespace PC.Component.Software
                     bodyText += "\n";
                 }
             }
-            var fm = system.FileManager;
-            var file = fm.Write(0, fileName, bodyText);
-            if (file == null || file.content != bodyText)
-            { status = "Cannot write script"; Render(); return; }
-            file.hidden = false;
-            if (autorun != null && autorun.isOn && !AutorunConfig.AppendCommand(fm, "run \"" + fileName + "\""))
-            { status = "Exported, but could not edit Autorun.conf"; Render(); return; }
-            system.RefreshDesktopIcon();
-            status = "Exported " + fileName + (autorun != null && autorun.isOn ? " (autorun)" : "");
-            scriptNameInput.text = "";
-            autorun.isOn = false;
-            worldToggle.isOn = false;
-            stage = 0;
-            Render();
+            bool addAutorun = autorun != null && autorun.isOn;
+            var owner = system;
+            if (owner.SaveDialog == null) return;
+            owner.SaveDialog.ShowDialog(name, bodyText, new[] { ".tmn" },
+                null, -1, file =>
+                {
+                    if (this == null || owner == null || file == null) return;
+                    bool onSystemDisk = owner.AllStorage != null && owner.AllStorage.Count > 0 &&
+                        owner.AllStorage[0] != null && owner.AllStorage[0].files != null &&
+                        owner.AllStorage[0].files.Contains(file);
+                    if (addAutorun && (!onSystemDisk ||
+                        !AutorunConfig.AppendCommand(owner.FileManager, "run \"" + file.path + "\"")))
+                        status = onSystemDisk ? "Exported, but could not edit Autorun.conf" :
+                            "Exported; autorun requires the system disk";
+                    else
+                        status = "Exported " + file.path + (addAutorun ? " (autorun)" : "");
+                    scriptNameInput.text = "";
+                    autorun.isOn = false;
+                    worldToggle.isOn = false;
+                    stage = 0;
+                    Render();
+                });
         }
     }
 }

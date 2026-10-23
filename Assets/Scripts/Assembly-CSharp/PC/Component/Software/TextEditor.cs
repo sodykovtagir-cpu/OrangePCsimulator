@@ -55,26 +55,23 @@ namespace PC.Component.Software
 			var i = input;
 			if (i == null) return;
 			var content = i.text;
-            // Editing an existing file must update that path, not create
-            // Untitled.txt; in particular System/Autorun.conf is boot-critical.
-            if (openedFile != null)
-            {
-                int disk = -1;
-                var disks = os.AllStorage;
-                if (disks != null)
-                    for (int index = 0; index < disks.Count; index++)
-                        if (disks[index] != null && disks[index].files != null
-                            && disks[index].files.Contains(openedFile)) { disk = index; break; }
-                var saved = disk >= 0 && os.FileManager != null
-                    ? os.FileManager.Write(disk, filePath, content) : null;
-                if (saved == null || saved.content != content)
-                    os.ShowMessageBox("Text Editor", "Could not save " + filePath);
-                return;
-            }
-
             if (dlg == null) return;
+            int disk = -1;
+            var disks = os.AllStorage;
+            if (openedFile != null && disks != null)
+                for (int n = 0; n < disks.Count; n++)
+                    if (disks[n] != null && disks[n].files != null &&
+                        disks[n].files.Contains(openedFile)) { disk = n; break; }
+            // Save always offers a destination. When editing Autorun.conf or
+            // another existing file, start at its actual disk and folder;
+            // replacing it requires explicit confirmation in SaveDialog.
 			var extensions = new[] { ".txt", ".tmn", ".conf" };
-			dlg.ShowDialog(name, content, extensions);
+            dlg.ShowDialog(name, content, extensions,
+                openedFile != null ? filePath : null, disk, saved =>
+                {
+                    openedFile = saved;
+                    filePath = saved.path;
+                }, IsAdministrator);
 		}
 	}
 }
