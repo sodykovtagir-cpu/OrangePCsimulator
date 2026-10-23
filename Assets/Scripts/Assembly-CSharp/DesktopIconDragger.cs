@@ -105,10 +105,10 @@ namespace PC.Component.Software
             if (pointerDownReceived) remotePointerActive = true;
         }
 
-        public void MoveRemoteDrag(Vector2 position)
+        public void MoveRemoteDrag(Vector2 position, bool movedEnough)
         {
             if (!remotePointerActive || !pointerDownReceived || parentRect == null) return;
-            if (!hasDragged && Vector2.Distance(position, pointerDownPos) > PointerInput.Slop)
+            if (!hasDragged && movedEnough)
             {
                 hasDragged = true;
                 isDragging = true;

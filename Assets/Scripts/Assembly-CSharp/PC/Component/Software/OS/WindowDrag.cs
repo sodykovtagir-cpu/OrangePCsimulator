@@ -55,8 +55,12 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
         // Use its CURRENT camera, not the one cached when the window opened.
         var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
             ? canvas.worldCamera : null;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            window, eventData.position, eventCamera, out pointerOffset);
+        // Both press offset and dragging must use the same parent-local space.
+        // Window-local offsets jump when RemoteDesk renders at another scale.
+        Vector2 parentPointer;
+        if (parentRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect, eventData.position, eventCamera, out parentPointer))
+            pointerOffset = parentPointer - window.anchoredPosition;
     }
 
     public void OnDrag(PointerEventData eventData)

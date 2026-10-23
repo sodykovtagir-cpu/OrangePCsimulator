@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Security.Cryptography;
 using System.Threading;
@@ -19,11 +20,13 @@ namespace SaveManagement
 		public static int key = 129;
 
 		/// <summary>
-		/// Маркер нового формата. Когда расшифрованный файл начинается с него —
-		/// значит, это сейв нового формата с HMAC-подписью.
+		/// Маркер прежнего подписанного формата. Его по-прежнему читаем,
+		/// а новые сейвы имеют ASCII-маркер OPC3 и gzip-содержимое.
 		/// (JSON GameData в старых сейвах всегда начинается с '{', поэтому коллизии нет.)
 		/// </summary>
 		public const string Tag = "OPC2:";
+        public const string CompressedTag = "OPC3:";
+        private const int MaxDecodedBytes = 256 * 1024 * 1024;
 
 		/// <summary>
 		/// Секрет для HMAC-подписи содержимого. Зашит в бинарь, поэтому против грамотного
@@ -67,43 +70,71 @@ namespace SaveManagement
 			return new string(dat);
 		}
 
-		/// <summary>
-		/// Кодирует полезную нагрузку (GameData + "\n" + content) в файл нового формата:
-		/// XOR + HMAC-подпись содержимого в шапке.
-		/// </summary>
-		public static string Encode(string payload)
-		{
-			string hmac = ComputeHmac(payload);
-			string inner = Tag + hmac + "\n" + payload;
-			return EncryptDecrypt(inner);
-		}
+        /// <summary>Compress and sign the complete save. OPC3 is ASCII text:
+        /// XOR would turn every base64 character into a two-byte UTF-8 codepoint
+        /// and undo the space savings. OPC2 and legacy XOR saves still load.</summary>
+        public static string Encode(string payload)
+        {
+            byte[] plain = Encoding.UTF8.GetBytes(payload ?? string.Empty);
+            string packed;
+            using (var output = new MemoryStream())
+            {
+                using (var zip = new GZipStream(output, CompressionLevel.Optimal, true))
+                    zip.Write(plain, 0, plain.Length);
+                packed = Convert.ToBase64String(output.ToArray());
+            }
+            return CompressedTag + ComputeHmac(packed) + "\n" + packed;
+        }
 
-		/// <summary>
-		/// Декодирует файл и возвращает полезную нагрузку. Для нового формата проверяет
-		/// HMAC; для старого — просто возвращает расшифрованное содержимое.
-		/// </summary>
-		public static SaveIntegrity Decode(string fileText, out string payload)
-		{
-			string decrypted = EncryptDecrypt(fileText);
+        /// <summary>Decode OPC3 (gzip), OPC2 (uncompressed), and old unsigned XOR saves.</summary>
+        public static SaveIntegrity Decode(string fileText, out string payload)
+        {
+            payload = string.Empty;
+            if (string.IsNullOrEmpty(fileText)) return SaveIntegrity.Tampered;
+            string decrypted = fileText.StartsWith(CompressedTag, StringComparison.Ordinal)
+                ? fileText : EncryptDecrypt(fileText);
+            bool compressed = decrypted.StartsWith(CompressedTag, StringComparison.Ordinal);
+            if (compressed || decrypted.StartsWith(Tag, StringComparison.Ordinal))
+            {
+                string marker = compressed ? CompressedTag : Tag;
+                int nl = decrypted.IndexOf('\n');
+                if (nl < 0 || nl != marker.Length + 44) return SaveIntegrity.Tampered;
+                string hmac = decrypted.Substring(marker.Length, nl - marker.Length);
+                string body = decrypted.Substring(nl + 1);
+                if (!FixedEquals(hmac, ComputeHmac(body))) return SaveIntegrity.Tampered;
+                if (!compressed) { payload = body; return SaveIntegrity.Ok; }
 
-			if (decrypted.StartsWith(Tag))
-			{
-				int nl = decrypted.IndexOf('\n');
-				if (nl < 0)
-				{
-					payload = decrypted;
-					return SaveIntegrity.Tampered; // повреждённый заголовок
-				}
-				string hmac = decrypted.Substring(Tag.Length, nl - Tag.Length);
-				payload = decrypted.Substring(nl + 1);
-				string expected = ComputeHmac(payload);
-				bool ok = FixedEquals(hmac, expected);
-				return ok ? SaveIntegrity.Ok : SaveIntegrity.Tampered;
-			}
-
-			payload = decrypted;
-			return SaveIntegrity.None; // старый формат, HMAC нет
-		}
+                try
+                {
+                    byte[] bytes = Convert.FromBase64String(body);
+                    using (var input = new MemoryStream(bytes))
+                    using (var zip = new GZipStream(input, CompressionMode.Decompress))
+                    using (var output = new MemoryStream())
+                    {
+                        var buffer = new byte[32768];
+                        int count;
+                        while ((count = zip.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            if (output.Length + count > MaxDecodedBytes)
+                                return SaveIntegrity.Tampered;
+                            output.Write(buffer, 0, count);
+                        }
+                        payload = new UTF8Encoding(false, true).GetString(output.ToArray());
+                    }
+                    return SaveIntegrity.Ok;
+                }
+                catch (Exception) // damaged gzip, bad base64, or invalid UTF-8
+                {
+                    payload = string.Empty;
+                    return SaveIntegrity.Tampered;
+                }
+            }
+            // Unknown OPC headers must not accidentally bypass signature checks.
+            if (decrypted.StartsWith("OPC", StringComparison.Ordinal))
+                return SaveIntegrity.Tampered;
+            payload = decrypted;
+            return SaveIntegrity.None;
+        }
 
 		/// <summary>Просто вернуть полезную нагрузку (шапка срезается), без строгой проверки.</summary>
 		public static string ReadPayload(string fileText)
