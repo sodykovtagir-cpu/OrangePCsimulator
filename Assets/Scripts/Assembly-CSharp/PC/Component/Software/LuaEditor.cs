@@ -54,6 +54,7 @@ namespace PC.Component.Software
 		[SerializeField] private Sprite[] extraIcons;
 
 		private string filePath;
+        private int fileDisk = -1;
 		private string compileIconB64 = "";
 		private bool snippetsBuilt;
 		private int lastCaret;
@@ -99,6 +100,7 @@ namespace PC.Component.Software
                 docsText.text = LuaDocs.Text();
 			if (code != null)
 				code.text = string.IsNullOrEmpty(content) ? DefaultSource() : content;
+            if (string.IsNullOrEmpty(content)) fileDisk = -1;
 			filePath = string.IsNullOrEmpty(content) ? defaultFileName : filePath;
 			if (string.IsNullOrEmpty(filePath)) filePath = defaultFileName;
 			AppendOut(Localization.GetText("Lua ready. Click a hint to insert."));
@@ -116,17 +118,35 @@ namespace PC.Component.Software
 			{
 				if (file == null || code == null) return;
 				code.text = file.content ?? "";
-				filePath = file.path;
+                filePath = file.path;
+                fileDisk = DiskFor(file);
 				AppendOut("> " + filePath);
 				if (highlighter != null) highlighter.Refresh();
 			});
 		}
 
+        private int DiskFor(File file)
+        {
+            if (file == null || system == null) return -1;
+            var disks = system.AllStorage;
+            if (disks != null)
+                for (int n = 0; n < disks.Count; n++)
+                    if (disks[n] != null && disks[n].files != null &&
+                        disks[n].files.Contains(file)) return n;
+            return -1;
+        }
+
 		public void Save()
 		{
 			if (system == null || system.SaveDialog == null || code == null) return;
-			var name = File.NameWithoutExtension(string.IsNullOrEmpty(filePath) ? defaultFileName : filePath);
-			system.SaveDialog.ShowDialog(name, code.text ?? "", new[] { ".lua", ".txt" });
+            var path = string.IsNullOrEmpty(filePath) ? defaultFileName : filePath;
+            var name = File.NameWithoutExtension(path);
+            system.SaveDialog.ShowDialog(name, code.text ?? "", new[] { ".lua", ".txt" },
+                fileDisk >= 0 ? path : null, fileDisk, file =>
+                {
+                    filePath = file.path;
+                    fileDisk = DiskFor(file);
+                }, IsAdministrator);
 		}
 
 		public void ToggleDocs()
@@ -287,13 +307,15 @@ namespace PC.Component.Software
 				script = code.text ?? "",
 				icon = compileIconB64 ?? ""
 			};
-			var json = pack.ToJson();
-			var path = name + ".exe";
-			system.FileManager.Write(0, path, json);
-			system.RefreshDesktopIcon();
-			filePath = path;
-			AppendOut(string.Format(Localization.GetText("Compiled: {0}"), path));
-			if (system != null) system.ShowMessageBox("Lua", path);
+            var json = pack.ToJson();
+            var os = system;
+            if (os.SaveDialog == null) return;
+            os.SaveDialog.ShowDialog(name, json, new[] { ".exe" }, null, -1, file =>
+            {
+                if (this == null || os == null || file == null) return;
+                AppendOut(string.Format(Localization.GetText("Compiled: {0}"), file.path));
+                os.ShowMessageBox("Lua", file.path);
+            }, IsAdministrator);
 		}
 
 		void FillIconGrid()
