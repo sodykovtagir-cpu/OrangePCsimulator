@@ -443,7 +443,26 @@ namespace PC.Component.Software.OS
         // A headless PC still owns a real PCOS desktop. Attach its existing UI
         // (not a copy) to an offscreen world-space canvas when RemoteDesk needs it.
         private Canvas virtualRemoteCanvas;
+        private int remoteViewportOwner;
         private static int nextRemoteSlot;
+
+        // Only a headless PC's offscreen display can be resized. Do it when
+        // focus/viewport changes, never while rendering or dispatching input.
+        public void SetRemoteViewportSize(int viewerId, Vector2 size)
+        {
+            if (virtualRemoteCanvas == null || Board == null || Board.monitor != null) return;
+            if (size.x > 1f && size.y > 1f)
+                remoteViewportOwner = viewerId;
+            else if (remoteViewportOwner != viewerId) return;
+            else
+                remoteViewportOwner = 0;
+            var rect = virtualRemoteCanvas.transform as RectTransform;
+            if (rect == null) return;
+            var wanted = remoteViewportOwner == 0 ? new Vector2(840f, 500f) :
+                new Vector2(Mathf.Max(840f, size.x), Mathf.Max(500f, size.y));
+            if ((rect.sizeDelta - wanted).sqrMagnitude > .25f)
+                rect.sizeDelta = wanted;
+        }
 
         public Canvas RemoteCanvas
         {
@@ -472,7 +491,7 @@ namespace PC.Component.Software.OS
                     scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
                 }
                 var desktopRect = transform as RectTransform;
-                if (desktopRect != null)
+                if (desktopRect != null && desktopRect.parent != virtualRemoteCanvas.transform)
                 {
                     desktopRect.SetParent(virtualRemoteCanvas.transform, false);
                     desktopRect.anchorMin = Vector2.zero;

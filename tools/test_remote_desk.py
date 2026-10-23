@@ -32,6 +32,7 @@ assert 'public Canvas RemoteCanvas' in os
 remote_canvas = body(os, 'public Canvas RemoteCanvas')
 assert 'GetDesktopCanvas()' in remote_canvas
 assert 'new GameObject("RemoteDesk virtual display"' in remote_canvas
+assert 'if (desktopRect != null && desktopRect.parent != virtualRemoteCanvas.transform)' in remote_canvas
 assert 'desktopRect.SetParent(virtualRemoteCanvas.transform, false)' in remote_canvas
 assert 'virtualRemoteCanvas.renderMode = RenderMode.WorldSpace' in remote_canvas
 assert 'if (!Ready || Board == null || Board.monitor != null) return null;' in remote_canvas
@@ -67,14 +68,38 @@ assert 'rect.GetWorldCorners(screenCorners)' in camera_setup
 assert ' - normal * depth' in camera_setup and 'Quaternion.LookRotation(normal, up.normalized)' in camera_setup
 assert 'Matrix4x4.Ortho(-width * .5f, width * .5f' in camera_setup
 assert 'Mathf.Clamp(Screen.width, 1280, 1920)' in body(app, 'private Vector2Int FrameSize(')
-# Captures/input may borrow the camera, never resize the remote desktop or
-# change its physical display RT: that made window positions jump mid-drag.
-assert 'FocusedDesktopSize()' not in app
+# Only resize the dedicated headless display at focus/layout transitions.
+# Render and pointer paths must not change the remote geometry mid-drag.
+viewport = body(os, 'public void SetRemoteViewportSize(')
+assert 'virtualRemoteCanvas == null || Board == null || Board.monitor != null' in viewport
+assert 'remoteViewportOwner != viewerId' in viewport
+assert 'new Vector2(840f, 500f)' in viewport
+assert '(rect.sizeDelta - wanted).sqrMagnitude > .25f' in viewport
+layout = body(app, 'private void RefreshLayout()')
+focus_size = body(app, 'private Vector2 FocusedDesktopSize()')
+assert 'float scale = Mathf.Min(view.x / 840f, view.y / 500f)' in focus_size
+assert 'return view / Mathf.Max(.0001f, scale)' in focus_size
+assert 'session.os.SetRemoteViewportSize(GetInstanceID(),' in layout
+assert 'session == selected ? viewportSize : Vector2.zero' in layout
+assert 'SetRemoteViewportSize(GetInstanceID(), Vector2.zero)' in body(app, 'private void RemoveSession(')
+assert '() => { focusedId = 0; RefreshLayout(); }' in app
+assert 'FocusedDesktopSize()' not in body(app, 'private void LateUpdate()')
+assert 'SetRemoteViewportSize' not in capture + renderer + body(app, 'public void Forward(')
+# The virtual RT must follow the viewport aspect; physical monitors retain
+# their native aspect and are centered instead of pinned to the left.
+assert 'imageRect.anchorMin = imageRect.anchorMax = new Vector2(.5f, .5f)' in app
+for w, h in [(576, 238), (576, 600), (120, 90), (1920, 1080)]:
+    scale = min(w / 840., h / 500.)
+    vw, vh = max(840., w / scale), max(500., h / scale)
+    assert abs(vw / vh - w / h) < 1e-8
+# Captures/input may borrow the camera, never mutate the canvas on each frame
+# or replace the physical display RT: that caused window jumps mid-drag.
 assert 'root.sizeDelta' not in capture + renderer
 assert 'originalCamera.targetTexture = session.frame' not in capture
 assert 'displayCamera.targetTexture = session.frame' not in renderer
-assert 'ProThumbnailFramesPerSecond = 8f' in app
-assert 'int budget = premium ? 3 : 1;' in body(app, 'private void LateUpdate()')
+assert 'ProThumbnailFramesPerSecond = 4f' in app
+assert 'lastCanvasUpdateFrame != Time.frameCount' in renderer
+assert 'int budget = premium ? 2 : 1;' in body(app, 'private void LateUpdate()')
 assert 'session.pressSourcePosition = source.position' in app
 assert 'Vector2.Distance(source.position, session.pressSourcePosition)' in app
 assert 'eventTexture == null ? session.frame.width : eventTexture.width' in app
@@ -93,7 +118,13 @@ assert 'RemoteDesk.ForwardingRaycaster.Raycast(pointer, results)' in menu
 assert 'RemoteDesk.ForwardingSystem == os' in menu
 assert 'GetRenderCamera()' in dragger and 'MoveRemoteDrag(Vector2 position, bool movedEnough)' in dragger
 assert 'pointerOffset = parentPointer - window.anchoredPosition' in window_drag
-assert 'canvas.worldCamera' in body(window_drag, 'public void OnDrag(PointerEventData eventData)')
+# Windows can predate the creation of the offscreen canvas. Resolve the
+# current parent canvas on press AND drag, not once in Awake.
+current_camera = body(window_drag, 'private Camera CurrentEventCamera()')
+assert 'window.GetComponentInParent<Canvas>()' in current_camera
+assert 'canvas.worldCamera' in current_camera
+assert 'CurrentEventCamera()' in body(window_drag, 'public void OnPointerDown(')
+assert 'CurrentEventCamera()' in body(window_drag, 'public void OnDrag(')
 build_ui = body(app, 'private void BuildUi()')
 assert 'focusWatermark = Label(' in build_ui
 assert 'proButton = Button("Купить", transform, 220, 8, 120, 30, ShowPromotion)' in build_ui

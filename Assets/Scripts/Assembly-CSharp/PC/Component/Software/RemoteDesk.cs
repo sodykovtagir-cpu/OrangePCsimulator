@@ -39,7 +39,7 @@ namespace PC.Component.Software
         private const int FreeLimit = 5;
         private const float SharedFramesPerSecond = 24f;
         private const float ProFramesPerSecond = 60f;
-        private const float ProThumbnailFramesPerSecond = 8f;
+        private const float ProThumbnailFramesPerSecond = 4f;
         private static readonly List<RemoteDesk> viewers = new List<RemoteDesk>();
         // Only set while dispatching a synthetic event. Existing PCOS hit
         // tests must see the remote canvas, not the local game's UI overlay.
@@ -49,6 +49,7 @@ namespace PC.Component.Software
         private readonly List<int> savedIds = new List<int>();
         private bool savedLoaded;
         private float nextReconnect;
+        private int lastCanvasUpdateFrame = -1;
         private Text windowTitle;
         private RectTransform panel;
         private RectTransform gridContent;
@@ -314,9 +315,8 @@ namespace PC.Component.Software
             RefreshLayout();
         }
 
-        // Keep the remote monitor's aspect in BOTH views: borrowing the OS
-        // canvas size for the focused viewport made its layout oscillate and
-        // converted the same pointer movement into different window positions.
+        // A virtual headless screen is resized on focus/layout changes, not
+        // per frame. Physical monitors keep their own native aspect.
         private Vector2Int FrameSize(Canvas canvas, bool focused)
         {
             float aspect = 16f / 9f;
@@ -365,6 +365,14 @@ namespace PC.Component.Software
                 if (old != null) { old.Release(); Destroy(old); }
                 session.nextFrame = 0f;
             }
+        }
+
+        private Vector2 FocusedDesktopSize()
+        {
+            var view = focusViewport != null ? focusViewport.rect.size : Vector2.zero;
+            if (view.x < 1f || view.y < 1f) return new Vector2(840f, 500f);
+            float scale = Mathf.Min(view.x / 840f, view.y / 500f);
+            return view / Mathf.Max(.0001f, scale);
         }
 
         private void ConnectEntered()
@@ -476,6 +484,7 @@ namespace PC.Component.Software
         {
             if (session == null) return;
             if (session.desktopIcon != null) session.desktopIcon.EndRemoteDrag();
+            if (session.os != null) session.os.SetRemoteViewportSize(GetInstanceID(), Vector2.zero);
             sessions.Remove(session);
             if (session.frame != null) { session.frame.Release(); Destroy(session.frame); }
             if (focusedId == session.id) focusedId = 0;
@@ -558,10 +567,9 @@ namespace PC.Component.Software
                     RefreshLayout();
                 }
             }
-            // Render the focused connection first, and never render all tiles
-            // in one frame. 12 Pro devices at 60 FPS used to request 720 full
-            // camera renders/s, starving pointer processing and shaking UI.
-            int budget = premium ? 3 : 1;
+            // Render the focused connection first and limit thumbnail work:
+            // many offscreen UGUI camera renders in one frame starve input.
+            int budget = premium ? 2 : 1;
             var focused = sessions.Find(s => s.id == focusedId);
             if (focused != null && now >= focused.nextFrame)
             {
@@ -662,7 +670,12 @@ namespace PC.Component.Software
             var canvas = session.canvas;
             if (canvas.renderMode == RenderMode.WorldSpace)
             {
-                Canvas.ForceUpdateCanvases();
+                // Force UGUI layout once per game frame, not once per device.
+                if (lastCanvasUpdateFrame != Time.frameCount)
+                {
+                    Canvas.ForceUpdateCanvases();
+                    lastCanvasUpdateFrame = Time.frameCount;
+                }
                 ConfigureCamera(session);
                 try
                 {
@@ -845,6 +858,10 @@ namespace PC.Component.Software
             var focusRect = focusPage.GetComponent<RectTransform>();
             focusViewport = Box("Screen area", focusRect, 0, 0, 576, 238, Color.black);
             focusImage = NewRect("Remote desktop", focusViewport, 0, 0, 576, 238).gameObject.AddComponent<RawImage>();
+            var imageRect = focusImage.rectTransform;
+            imageRect.anchorMin = imageRect.anchorMax = new Vector2(.5f, .5f);
+            imageRect.pivot = new Vector2(.5f, .5f);
+            imageRect.anchoredPosition = Vector2.zero;
             var fitter = focusImage.gameObject.AddComponent<AspectRatioFitter>();
             fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fitter.aspectRatio = 16f / 9f;
@@ -870,7 +887,7 @@ namespace PC.Component.Software
             if (statusText != null)
                 statusText.text = status + "   Online: " + sessions.Count +
                     "   Stream FPS/device: " + (premium ?
-                        (focusedId != 0 ? "60 (focused) / 8 (tiles)" : "8 (tiles)") :
+                        (focusedId != 0 ? "60 (focused) / 4 (tiles)" : "4 (tiles)") :
                         (lastTotal > 0 ? SharedFramesPerSecond / lastTotal : 0f).ToString("0.#"));
         }
 
@@ -938,6 +955,14 @@ namespace PC.Component.Software
             focusPage.SetActive(focused);
             gridPage.SetActive(!focused);
             Canvas.ForceUpdateCanvases();
+            // The virtual display belongs only to headless PCs. Keep its
+            // focused dimensions stable across rendering AND pointer events.
+            var viewportSize = focused ? FocusedDesktopSize() : Vector2.zero;
+            foreach (var session in sessions)
+                if (session.os != null)
+                    session.os.SetRemoteViewportSize(GetInstanceID(),
+                        session == selected ? viewportSize : Vector2.zero);
+            if (focused) Canvas.ForceUpdateCanvases();
             lastViewportSize = focusViewport.rect.size;
             ResizeStreams();
             focusImage.texture = focused ? selected.frame : null;

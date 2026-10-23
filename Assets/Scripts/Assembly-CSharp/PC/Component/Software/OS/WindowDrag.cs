@@ -45,16 +45,23 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
         }
     }
 
+    private Camera CurrentEventCamera()
+    {
+        // An already-open window can be moved into a virtual display AFTER
+        // Awake. Its cached Canvas is then null (or belongs to the old screen).
+        canvas = window != null ? window.GetComponentInParent<Canvas>() : null;
+        return canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera : null;
+    }
+
     public void OnPointerDown(PointerEventData eventData)
     {
         if (window == null) return;
 
         window.SetAsLastSibling();
 
-        // The canvas may be temporarily mapped to RemoteDesk's render camera.
-        // Use its CURRENT camera, not the one cached when the window opened.
-        var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
-            ? canvas.worldCamera : null;
+        // RemoteDesk temporarily lends the CURRENT canvas its render camera.
+        var eventCamera = CurrentEventCamera();
         // Both press offset and dragging must use the same parent-local space.
         // Window-local offsets jump when RemoteDesk renders at another scale.
         Vector2 parentPointer;
@@ -72,8 +79,7 @@ public class WindowDrag : MonoBehaviour, IPointerDownHandler, IDragHandler
             return;
 
         Vector2 localPointerPos;
-        var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
-            ? canvas.worldCamera : null;
+        var eventCamera = CurrentEventCamera();
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 parentRect, eventData.position, eventCamera, out localPointerPos))
             return;
