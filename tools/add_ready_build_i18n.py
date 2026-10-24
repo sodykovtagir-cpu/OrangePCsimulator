@@ -8,7 +8,8 @@ Translate.txt — TSV: первая колонка ключ, дальше 42 я�
 
 Описания товаров намеренно сделаны спецификациями («i5-8400 / 16 GB / GTX 1060 /
 512 GB SSD + 1 TB HDD»): названия железа не переводятся, строка одинаково читается
-на любом языке и не протухнет при смене комплектующих.
+на любом языке. При замене деталей сверяй строку с generate_ready_builds.py
+и запускай test_ready_build_descriptions.py.
 
 Идемпотентно: существующие ключи обновляются, новые дописываются в конец.
 """
@@ -242,24 +243,25 @@ NAMES = {
     ],
 }
 
-# Описания — спецификации. Названия железа интернациональны, поэтому строка
-# одна и та же для всех языков (тест требует непустое значение в каждой колонке).
+# Описания — спецификации. Названия железа интернациональны; для офиса без
+# дискретной видеокарты RU/UA локализуют термин «встроенная графика».
+# Не приписывай детали, отсутствующие в generate_ready_builds.py.
 SPECS = {
     "Office PC Description":
-        "Celeron G3920 / 8 GB / GT 440 / 500 GB HDD / 300 W / ITX",
+        "Celeron G3920 / 8 GB / Integrated graphics / 500 GB HDD / 300 W / ITX",
     "Home PC Description":
         "Core i5-8400 / 16 GB / GTX 1060 / 512 GB SSD + 1 TB HDD / 500 W / ATX",
     "Gaming PC Description":
         "Core i9-12900K / 64 GB RGB / RTX 4080 / 2 TB + 1 TB SSD / 1 kW / ATX",
     "Cheap Miner Description":
-        "4 x GT 1030 / Celeron G3920 / 4 GB / 128 GB SSD / 500 W",
+        "4 x GT 1030 / Celeron G3920 / 4 GB / 128 GB SSD / 2 kW",
     "Medium Miner Description":
-        "8 x RX 570 / Core i3-8300 / 8 GB / 256 GB SSD / 2 x 1 kW",
+        "8 x RX 570 / Core i3-8300 / 8 GB / 256 GB SSD / 2 x 2 kW",
     "Ultra Miner Description":
-        "24 x RTX 3080 / Core i7-8700K / 32 GB / 2 x 512 GB SSD / 6 x 2 kW",
+        "16 x RTX 3080 / Core i7-8700K / 32 GB / 2 x 512 GB SSD / 4 x 2 kW",
     "Workstation PC Description":
         "Ryzen 9 7950X / 512 GB RGB (8 x 64) / RTX 4080 Ti + Titan V / "
-        "2 x 1 TB M.2 + 2 TB SSD / 2 kW / EXATX",
+        "2 x 1 TB M.2 + 2 TB SSD / 1.1 kW / EXATX",
     "Aquarium PC Description":
         "Core i7-14700K / 128 GB RGB / RTX 5090 / 2 TB + 1 TB SSD / "
         "1.1 kW / Aquarium ATX",
@@ -278,6 +280,16 @@ SPECS = {
 }
 
 
+# У офисной ITX-сборки GPU на материнской плате физически некуда ставить:
+# только встроенная графика. Переводим этот термин для ближайших локалей.
+SPEC_OVERRIDES = {
+    "Office PC Description": {
+        "RU": "Celeron G3920 / 8 GB / Встроенная графика / 500 GB HDD / 300 W / ITX",
+        "UA": "Celeron G3920 / 8 GB / Вбудована графіка / 500 GB HDD / 300 W / ITX",
+    },
+}
+
+
 def build_strings() -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for key, values in NAMES.items():
@@ -287,7 +299,8 @@ def build_strings() -> dict[str, list[str]]:
             )
         out[key] = values
     for key, spec in SPECS.items():
-        out[key] = [spec] * len(LANGS)
+        local = SPEC_OVERRIDES.get(key, {})
+        out[key] = [local.get(lang, spec) for lang in LANGS]
     return out
 
 
