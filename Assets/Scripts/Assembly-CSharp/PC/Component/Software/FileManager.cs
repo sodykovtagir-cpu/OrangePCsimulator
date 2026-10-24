@@ -72,6 +72,7 @@ namespace PC.Component.Software
         private Color folderColor = new Color(1f, 0.9f, 0.6f);
 
         private string startFolderPath;
+        private int startStorageIndex = -1;
 
         private int selectedFile = -1;
 
@@ -136,6 +137,7 @@ namespace PC.Component.Software
             SelectStorage(0);
             InitializeSystemFolders();
             EnsureExplorerPane();
+            if (startStorageIndex > 0) SelectStorage(startStorageIndex);
 
             if (!string.IsNullOrEmpty(startFolderPath))
             {
@@ -361,7 +363,11 @@ namespace PC.Component.Software
 
             foreach (var file in storage.files)
             {
-                if (file == null || (!IsAdministrator && OS.OperatingSystem.IsSystemPath(file.path))) continue;
+                if (file == null) continue;
+                // Show the root System folder again. Its contents still require
+                // an elevated Explorer; do not expose protected child entries.
+                if (!IsAdministrator && OS.OperatingSystem.IsSystemPath(file.path) &&
+                    !OS.OperatingSystem.IsSystemRootFolder(file)) continue;
 
                 string fileFolder = GetFolderPath(file.path);
                 if (fileFolder == currentFolder)
@@ -413,6 +419,13 @@ namespace PC.Component.Software
 
             var file = files[index];
             if (file == null || !file.isFolder) return;
+            if (!IsAdministrator && OS.OperatingSystem.IsSystemPath(file.path))
+            {
+                // The same path is used by double-click and context-menu
+                // Open, so neither can enter System without confirmation.
+                if (system != null) system.OpenFileFromExplorer(file, this);
+                return;
+            }
 
             currentFolder = file.path;
             UpdatePathText();
@@ -599,11 +612,18 @@ namespace PC.Component.Software
             return files[selectedFile];
         }
 
-        public void OpenFolderFromPath(string path)
+        public void OpenFolderFromPath(string path, int storageIndex = -1)
         {
             if (!IsAdministrator && OS.OperatingSystem.IsSystemPath(path)) return;
             startFolderPath = path ?? "";
+            startStorageIndex = storageIndex;
             if (selectedStorage == null) return;
+            if (storageIndex >= 0 && storageIndex != selectedStorageIndex)
+            {
+                var all = system != null ? system.AllStorage : null;
+                if (all == null || storageIndex >= all.Count || all[storageIndex] == null) return;
+                SelectStorage(storageIndex);
+            }
 
             currentFolder = startFolderPath;
             UpdatePathText();

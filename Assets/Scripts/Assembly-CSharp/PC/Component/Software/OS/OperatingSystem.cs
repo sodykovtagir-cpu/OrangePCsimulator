@@ -201,6 +201,12 @@ namespace PC.Component.Software.OS
             });
         }
 
+        public static bool IsSystemRootFolder(File file)
+        {
+            return file != null && file.isFolder &&
+                string.Equals(file.path, "System", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static bool IsSystemPath(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
@@ -1744,8 +1750,19 @@ namespace PC.Component.Software.OS
         {
             if (file == null) return false;
             if (!IsSystemPath(file.path)) return OpenFile(file);
-            if (!IsElevatedExplorer(explorer) || FindStorageOf(file) == null) return false;
-            return OpenFileInternal(file, true);
+            var storage = FindStorageOf(file);
+            if (storage == null) return false;
+            if (IsElevatedExplorer(explorer)) return OpenFileInternal(file, true);
+            // Only the visible root System folder can prompt a normal Explorer.
+            // Protected children remain invisible and inaccessible without an
+            // elevated window; never accept a folder from a different drive.
+            var all = AllStorage;
+            int disk = explorer != null ? explorer.CurrentStorageIndex : -1;
+            if (!IsSystemRootFolder(file) || explorer == null || runningApps == null ||
+                !runningApps.Contains(explorer) || all == null || disk < 0 ||
+                disk >= all.Count || all[disk] != storage) return false;
+            OpenFileAsAdministrator(file);
+            return true;
         }
 
         public bool OpenFileWith(File file, App app)
@@ -1795,7 +1812,7 @@ namespace PC.Component.Software.OS
 
             var fm = LaunchApp(prefab, "", elevated) as PC.Component.Software.FileManager;
             if (fm != null)
-                fm.OpenFolderFromPath(folder.path);
+                fm.OpenFolderFromPath(folder.path, IndexOfStorage(FindStorageOf(folder)));
 
             FocusApp(true);
             return true;
