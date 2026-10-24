@@ -23,28 +23,59 @@ def method(text, signature):
             return text[start:end + 1]
     raise AssertionError('unbalanced braces in ' + signature)
 
-# PCOS has BOTH serialized pickers; Save As reuses the actual OpenDialog
-# scroll/list prefab, not a separate incompatible file representation.
-raw = re.sub(r'--- !u!\d+ &\d+', '---', prefab.replace('%YAML 1.1\n', '').replace('%TAG !u! tag:unity3d.com,2011:\n', ''))
-blocks = list(yaml.safe_load_all(raw))
-assert {'SaveDialog', 'OpenDialog', 'Scroll View'} <= {b['GameObject']['m_Name'] for b in blocks if 'GameObject' in b}
-assert 'internal OpenDialog OpenPickerTemplate => fileDialog;' in os
-assert 'system.OpenPickerTemplate.transform.Find("Panel/Scroll View")' in dialog
-assert 'Instantiate(template.gameObject, panel)' in dialog
+# Save As is authored in PCOS.prefab, not constructed from an OpenDialog
+# clone. Its own scroll view, texts, input and buttons must remain editable.
+blocks = {}
+for match in re.finditer(r'^--- !u!(\d+) &(-?\d+)\n(.*?)(?=^--- !u!|\Z)',
+                         prefab, re.M | re.S):
+    blocks[int(match.group(2))] = (int(match.group(1)), next(iter(yaml.safe_load(match.group(3)).values())))
+assert len(blocks) == len(list(re.finditer(r'^--- !u!', prefab, re.M)))
+by_name = {v['m_Name']: (id, v) for id, (typ, v) in blocks.items() if typ == 1}
+for name in ('SaveDialog', 'OpenDialog', 'Save file list', 'Save location',
+             'Save message', 'File name label'):
+    assert name in by_name, name
+save_id, save_go = by_name['SaveDialog']
+save_comp = next(v for typ, v in blocks.values() if typ == 114 and
+                 v.get('m_Script', {}).get('guid') == '7e83518496a8af3c61eac3de50c20b32')
+assert save_comp['m_GameObject']['fileID'] == save_id
+for key in ('fileNameInput', 'extensionText', 'listView', 'locationText',
+            'messageText', 'saveButtonText'):
+    assert save_comp[key]['fileID'] in blocks, key
+list_id, list_go = by_name['Save file list']
+assert list_go['m_IsActive'] == 1
+list_rect = blocks[list_go['m_Component'][0]['component']['fileID']][1]
+assert list_rect['m_AnchorMin'] == {'x': 0, 'y': 0}
+assert list_rect['m_AnchorMax'] == {'x': 1, 'y': 1}
+assert list_rect['m_SizeDelta'] == {'x': -20, 'y': -239}
+assert list_rect['m_AnchoredPosition'] == {'x': 0, 'y': 19.5}
+panel_rect = blocks[list_rect['m_Father']['fileID']][1]
+assert panel_rect['m_SizeDelta'] == {'x': 600, 'y': 480}
+assert list_rect['m_Father']['fileID'] in [c['fileID'] for c in
+    blocks[save_go['m_Component'][0]['component']['fileID']][1]['m_Children']]
+assert list_go['m_Component'][-1]['component']['fileID'] == save_comp['listView']['fileID']
+# The gray Image and scrollable viewport are authored on this very prefab
+# object; resizing only a runtime copy would not fix the reported white bands.
+list_components = [blocks[c['component']['fileID']][1] for c in list_go['m_Component']]
+assert any(c.get('m_Color') == {'r': 0.9411765, 'g': 0.9411765,
+                               'b': 0.9411765, 'a': 1} for c in list_components)
+assert any(c.get('m_Content', {}).get('fileID') in blocks and
+           c.get('m_Viewport', {}).get('fileID') in blocks
+           for c in list_components if 'm_Content' in c)
+list_view = blocks[save_comp['listView']['fileID']][1]
+assert list_view['itemParent']['fileID'] in blocks
+for key, name in [('locationText', 'Save location'), ('messageText', 'Save message')]:
+    assert blocks[save_comp[key]['fileID']][1]['m_GameObject']['fileID'] == by_name[name][0]
+name_go = by_name['File name label'][1]
+name_rect = blocks[name_go['m_Component'][0]['component']['fileID']][1]
+assert name_rect['m_Pivot'] == {'x': 0, 'y': 1}
+assert name_rect['m_AnchoredPosition'] == {'x': 12, 'y': 137}
+assert 'Instantiate(template.gameObject' not in dialog
+assert 'new GameObject(' not in dialog
+assert 'offsetMin =' not in dialog and 'sizeDelta =' not in dialog
 assert 'listView.SelectedIndexChanged += SelectedIndexChanged;' in dialog
-# In the 600x480 panel the grey file area starts just below the location
-# header and ends immediately before the filename label, not leaving white
-# bands on either side as observed in Unity's Game view.
-assert 'scrollRect.offsetMax = new Vector2(-10f, -100f)' in dialog
-assert 'scrollRect.offsetMin = new Vector2(10f, 139f)' in dialog
-assert 65 + 25 < 100 and 139 > 137  # header and filename stay outside the list
-assert 'new GameObject("Open folder"' not in dialog
-assert 'button.onClick.AddListener(Enter)' not in dialog
-assert 'oldNameLabel.gameObject.SetActive(false)' in dialog
-assert 'MakeText(panel, "File name label", new Vector2(12f, 137f)' in dialog
-assert 'nameLabel.text = "File name";' in dialog
+assert 'pickerInitialized = true;' in dialog
+assert 'internal OpenDialog OpenPickerTemplate => fileDialog;' not in os
 assert 'Enter();' in method(dialog, 'private void SelectedIndexChanged(')
-assert 'Time.unscaledTime' not in dialog
 assert 'fileNameInput.onValueChanged.AddListener(_ => ClearConfirmation())' in dialog
 assert 'gameObject.SetActive(true)' in method(dialog, 'public void ShowDialog(')
 assert 'transform.SetAsLastSibling();' in method(dialog, 'public void ShowDialog(')

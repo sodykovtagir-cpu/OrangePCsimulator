@@ -19,10 +19,11 @@ namespace PC.Component.Software.OS
         private string currentFolder = "";
         private Action<File> saved;
         private bool administrator;
-        private ListView listView;
-        private Text locationText;
-        private Text messageText;
-        private Text saveButtonText;
+        [SerializeField] private ListView listView;
+        [SerializeField] private Text locationText;
+        [SerializeField] private Text messageText;
+        [SerializeField] private Text saveButtonText;
+        private bool pickerInitialized;
         private readonly List<Entry> entries = new List<Entry>();
         private string pendingReplace;
         private int pendingDisk = -1;
@@ -34,88 +35,19 @@ namespace PC.Component.Software.OS
             public bool back;
         }
 
-        // The existing OpenDialog scroll list is the shared PCOS FilePicker
-        // presentation. Clone its wired ListView into the SaveDialog once; the
-        // open picker keeps its own selection and never receives Save events.
+        // All of the Save As layout is authored in PCOS.prefab. Only the
+        // callbacks and selection tint are installed at runtime; never clone
+        // the Open picker or override any RectTransform sizes here.
         private bool EnsurePicker()
         {
-            if (listView != null) return true;
-            var template = system != null && system.OpenPickerTemplate != null
-                ? system.OpenPickerTemplate.transform.Find("Panel/Scroll View") : null;
-            var panel = transform.Find("Panel") as RectTransform;
-            if (template == null || panel == null || fileNameInput == null) return false;
-            var scroll = Instantiate(template.gameObject, panel);
-            scroll.name = "Save file list";
-            scroll.SetActive(true);
-            var scrollRect = scroll.transform as RectTransform;
-            scrollRect.anchorMin = Vector2.zero;
-            scrollRect.anchorMax = Vector2.one;
-            // Fill the unused white bands above and below the file list.
-            // Leave the location/status header and filename label readable.
-            scrollRect.offsetMin = new Vector2(10f, 139f);
-            scrollRect.offsetMax = new Vector2(-10f, -100f);
-            listView = scroll.GetComponent<ListView>();
-            if (listView == null) { Destroy(scroll); return false; }
+            if (listView == null || fileNameInput == null || locationText == null ||
+                messageText == null || saveButtonText == null) return false;
+            if (pickerInitialized) return true;
             listView.SetSelectionTint(new Color(.72f, .72f, .72f, 1f));
             listView.SelectedIndexChanged += SelectedIndexChanged;
-            panel.sizeDelta = new Vector2(600f, 480f);
-
-            // Keep the existing prefab's input, extension selector and buttons.
-            var inputRow = fileNameInput.transform.parent as RectTransform;
-            if (inputRow != null)
-            {
-                inputRow.anchorMin = new Vector2(0f, 0f);
-                inputRow.anchorMax = new Vector2(1f, 0f);
-                inputRow.anchoredPosition = new Vector2(0f, 86f);
-                inputRow.sizeDelta = new Vector2(-20f, 40f);
-            }
-            // The old centered prefab label uses horizontal overflow. Moving
-            // its anchor did not move its rendered text (it clipped at the
-            // left edge in Play Mode). Replace it with a left-aligned label.
-            var oldNameLabel = panel.Find("Text");
-            if (oldNameLabel != null) oldNameLabel.gameObject.SetActive(false);
-            var nameLabel = MakeText(panel, "File name label", new Vector2(12f, 137f),
-                new Vector2(260f, 26f), Vector2.zero, Vector2.zero);
-            nameLabel.text = "File name";
-            var saveButton = panel.Find("Save");
-            if (saveButton != null) saveButtonText = saveButton.GetComponentInChildren<Text>();
-            var title = panel.Find("Title");
-            if (title != null)
-            {
-                var titleText = title.GetComponent<Text>();
-                if (titleText != null) titleText.text = "Save as";
-            }
-            locationText = MakeText(panel, "Save location", new Vector2(12f, -65f),
-                new Vector2(-24f, 25f), new Vector2(0f, 1f), new Vector2(1f, 1f));
-            messageText = MakeText(panel, "Save message", new Vector2(12f, -93f),
-                new Vector2(-24f, 25f), new Vector2(0f, 1f), new Vector2(1f, 1f));
-            messageText.color = new Color(.65f, .18f, .12f, 1f);
             fileNameInput.onValueChanged.AddListener(_ => ClearConfirmation());
+            pickerInitialized = true;
             return true;
-        }
-
-        private Text MakeText(RectTransform parent, string name, Vector2 position,
-            Vector2 size, Vector2 anchorMin, Vector2 anchorMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            go.layer = gameObject.layer;
-            var rect = go.GetComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-            var text = go.GetComponent<Text>();
-            var sample = extensionText != null ? extensionText : fileNameInput.textComponent;
-            text.font = sample != null && sample.font != null
-                ? sample.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 15;
-            text.color = Color.black;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            return text;
         }
 
         public void ShowDialog(string fileName, string body, string[] formats,
