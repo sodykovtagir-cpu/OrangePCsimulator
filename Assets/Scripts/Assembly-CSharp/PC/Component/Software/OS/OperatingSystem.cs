@@ -96,6 +96,7 @@ namespace PC.Component.Software.OS
         private bool busy;
         private bool error;
         private bool faultPending;
+        private BootLog bootLog;
         private bool startupCommandsRan;
         private bool startMenuOpened;
         private Coroutine startMenuRoutine;
@@ -644,8 +645,29 @@ namespace PC.Component.Software.OS
             // Backwards-compatible first boot: install a config only for disks
             // that predate this feature. Once marked, missing lines stay missing.
             AutorunConfig.Ensure(FileManager);
+            AutorunConfig.MigrateBootCommands(FileManager);
             string autorun = AutorunConfig.Read(FileManager);
-            if (OverclockBoot.Enabled(autorun))
+            bool overclockDebug, stockDebug;
+            bool overclock = AutorunConfig.HasBoot(autorun, "overclockerd-boot.bin", out overclockDebug);
+            bool stock = AutorunConfig.HasBoot(autorun, "boot.bin", out stockDebug);
+            bootLog = BootLog.Create(this, overclock ? overclockDebug : stockDebug);
+            if (bootLog != null) bootLog.Add("PCOS: initializing boot sequence");
+            if (FileManager == null || !FileManager.Exists(0, "System/boot.bin"))
+            {
+                yield return FreezeThenFault("Kernel Panic! Can't find boot.bin");
+                yield break;
+            }
+            if (FileManager == null || !FileManager.Exists(0, AutorunConfig.Path))
+            {
+                yield return FreezeThenFault("Kernel panic! Can't find Autorun.conf");
+                yield break;
+            }
+            if (bootLog != null)
+            {
+                bootLog.Add("BIOS: boot.bin located");
+                bootLog.Add("Autorun.conf: loaded");
+            }
+            if (overclock)
             {
                 OverclockBoot.Profile profile;
                 if (!OverclockBoot.TryRead(FileManager, out profile))
@@ -653,33 +675,34 @@ namespace PC.Component.Software.OS
                     // The bad line stays on disk. A healthy PC's Device
                     // Manager can remove it while this PC is in a BSOD loop.
                     if (Board != null) Board.ScheduleOverclockReboot();
-                    yield return FreezeThenFault();
+                    yield return FreezeThenFault(FileManager != null &&
+                        !FileManager.Exists(0, OverclockBoot.Path)
+                        ? "Kernel panic! Can't find overclockerd-boot.bin"
+                        : "Kernel panic! Invalid overclock boot profile");
                     yield break;
                 }
+                if (bootLog != null) bootLog.Add("Overclock profile: GPU " + profile.gpu + "x, RAM " + profile.ram + "x");
                 if (OverclockBoot.Fatal(profile))
                 {
                     OverclockBoot.BreakExtreme(Board, profile);
-                    yield return FreezeThenFault(); // irreversible GPU/RAM damage
+                    yield return FreezeThenFault(OverclockFailure(profile)); // irreversible GPU/RAM damage
                     yield break;
                 }
                 if (OverclockBoot.Unstable(profile))
                 {
                     if (Board != null) Board.ScheduleOverclockReboot();
-                    yield return FreezeThenFault(); // recoverable BSOD bootloop
+                    yield return FreezeThenFault(OverclockFailure(profile)); // recoverable BSOD bootloop
                     yield break;
                 }
                 OverclockBoot.Apply(Board, profile);
             }
-            else if (!AutorunConfig.HasLine(autorun, "run boot.bin") &&
-                !(AutorunConfig.HasLine(autorun, OverclockBoot.Comment) &&
-                  AutorunConfig.HasLine(autorun, "//run boot.bin")))
+            else if (!stock)
             {
-                yield return FreezeThenFault(); // before the OS loads
+                yield return FreezeThenFault("Boot not specified");
                 yield break;
             }
-            // Deleting only the custom `run overclockerd-boot.bin` line from
-            // another PC also restores normal boot. Leave the user's config
-            // untouched; Device Manager can fully restore the stock line.
+            if (bootLog != null) bootLog.Add(overclock
+                ? "Boot: overclockerd-boot.bin" : "Boot: boot.bin");
 
             // Wait for canvas/iconParent to be fully initialized before creating icons.
             // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).
@@ -699,6 +722,7 @@ namespace PC.Component.Software.OS
                 }
             }
 
+            if (bootLog != null) bootLog.Add("Initializing devices and desktop");
             EnsureIconLayoutLoaded();
             LoadFilesFromDisk();
             if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
@@ -719,7 +743,7 @@ namespace PC.Component.Software.OS
 
             if (!AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init user"))
             {
-                yield return FreezeThenFault(); // at the OS -> login transition
+                yield return FreezeThenFault("Failed to init user"); // OS -> login transition
                 yield break;
             }
 
@@ -733,6 +757,7 @@ namespace PC.Component.Software.OS
             if (brandLogo != null) brandLogo.enabled = false;
             if (startupLabel != null) startupLabel.enabled = false;
 
+            if (bootLog != null) { bootLog.Add("User initialized"); bootLog.Close(); bootLog = null; }
             if (user != null) user.SetActive(true);
 
             var fm = FileManager;
@@ -1070,13 +1095,31 @@ namespace PC.Component.Software.OS
         {
             if (error || faultPending) return false;
             if (AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init devices")) return true;
-            StartCoroutine(FreezeThenFault());
+            StartCoroutine(FreezeThenFault("Failed to init devices"));
             return false;
         }
 
         protected override void OnHardwareAdded(Hardware hardware)
         {
             if (hardware is Storage) RequireDevices(); // USB / removable disk
+        }
+
+        private static string OverclockFailure(OverclockBoot.Profile profile)
+        {
+            // Report the component(s) actually beyond the unstable threshold.
+            bool gpu = profile.gpu >= OverclockBoot.UnstableRatio;
+            bool ram = profile.ram >= OverclockBoot.UnstableRatio;
+            if (gpu && ram) return "Kernel panic! GPU failure\nKernel panic! RAM failure";
+            return gpu ? "Kernel panic! GPU failure" : "Kernel panic! RAM failure";
+        }
+
+        private IEnumerator FreezeThenFault(string reason)
+        {
+            if (faultPending || error) yield break;
+            if (bootLog == null) bootLog = BootLog.Create(this, false);
+            if (bootLog != null) bootLog.Fail(reason);
+            yield return FreezeThenFault();
+            // The overlay is not part of the BSOD animation and remains visible.
         }
 
         private IEnumerator FreezeThenFault()

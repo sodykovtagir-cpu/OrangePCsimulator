@@ -18,9 +18,9 @@ benchmark = read('PC/Component/Software/Benchmark.cs')
 three = read('PC/Component/Software/ThreeDMork.cs')
 
 assert 'System/overclockerd-boot.bin' in boot
-assert 'run overclockerd-boot.bin' in boot
-assert '"//run boot.bin"' in boot
-assert '"run boot.bin"' in boot
+assert 'public const string Command = "boot overclockerd-boot.bin"' in boot
+assert '"//boot boot.bin"' in boot
+assert '"boot boot.bin"' in boot
 assert 'fm.Write(0, "System/boot.bin"' not in boot and 'fm.Delete(0, "System/boot.bin"' not in boot  # never modify BIOS file
 assert 'Save(FileManager fm' in boot and 'Recover(Storage disk)' in boot
 assert 'fm.Write(0, AutorunConfig.Path, updated)' in boot
@@ -34,8 +34,8 @@ assert 'OverclockBoot.Unstable(profile)' in os
 assert 'OverclockBoot.Fatal(profile)' in os
 assert 'OverclockBoot.BreakExtreme(Board, profile)' in os
 assert 'OverclockBoot.Apply(Board, profile)' in os
-assert 'AutorunConfig.HasLine(autorun, OverclockBoot.Comment)' in os  # remove only bad line
-assert 'line == OverclockBoot.Command' in config  # not passed to Terminal as user command
+assert 'Boot not specified' in os  # missing active line is now an error
+assert 'line.StartsWith("boot ", StringComparison.Ordinal)' in config  # not passed to Terminal as user command
 assert 'ScheduleOverclockReboot()' in board and 'WaitForSecondsRealtime(3f)' in board
 assert 'OverclockBoot.Apply(this, null)' in board
 assert 'OverclockRatio' in gpu and 'ArtifactStrength' in gpu

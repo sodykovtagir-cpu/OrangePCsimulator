@@ -27,10 +27,10 @@ assert 'm_SizeDelta: {x: 620, y: 540}' in prefab
 assert "EnsureDeviceManager();" in os and '"Device Manager.exe"' in os
 assert 'sys.RequireDevices()' in old_my_devices and 'system.RequireDevices()' in manager
 assert all(x in config for x in ('System/Autorun.conf', 'System/autorun.initialized',
-    '//Initialize system DO NOT REMOVE!!!!', 'run boot.bin\\ninit devices\\ninit user\\n',
+    '//Initialize system DO NOT REMOVE!!!!', 'boot boot.bin\\ninit devices\\ninit user\\n',
     'HasLine', 'UserCommands', 'AppendCommand'))
 assert 'AutorunConfig.Ensure(FileManager)' in os
-assert os.index('"run boot.bin"') < os.index('"init user"') < os.index('if (user != null) user.SetActive(true);')
+assert os.index('Boot not specified') < os.index('"init user"') < os.index('if (user != null) user.SetActive(true);')
 assert 'FreezeThenFault()' in os and 'WaitForSecondsRealtime(1.3f)' in os
 assert 'if (hardware is Storage) RequireDevices()' in os
 assert 'OnHardwareAdded(hardware)' in read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/ComputerSystem.cs')

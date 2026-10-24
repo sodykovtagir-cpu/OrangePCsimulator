@@ -9,7 +9,7 @@ namespace PC.Component.Software.OS
     {
         public const string Path = "System/Autorun.conf";
         public const string Marker = "System/autorun.initialized";
-        public const string Default = "//Initialize system DO NOT REMOVE!!!!\nrun boot.bin\ninit devices\ninit user\n";
+        public const string Default = "//Initialize system DO NOT REMOVE!!!!\nboot boot.bin\ninit devices\ninit user\n";
 
         // Old saves did not have Autorun.conf. Create it only once; after that a
         // deleted/edited file must be allowed to cause the in-game boot failure.
@@ -20,6 +20,52 @@ namespace PC.Component.Software.OS
             if (!fm.Exists(0, Path)) return; // do not mark an unsuccessful migration
             var marker = fm.Write(0, Marker, "1");
             if (marker != null) marker.hidden = true;
+        }
+
+        // Upgrade only directives which actually exist. Missing/edited directives are
+        // never recreated; repeat calls are safe and preserve -debug/custom commands.
+        public static void MigrateBootCommands(FileManager fm)
+        {
+            if (fm == null || !fm.TryGetFile(0, Path, out var file) || file == null) return;
+            var old = file.content ?? "";
+            var lines = old.Replace("\r", "").Split('\n');
+            bool changed = false;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var trimmed = lines[i].Trim();
+                string next = null;
+                if (trimmed == "run boot.bin") next = "boot boot.bin";
+                else if (trimmed == "//run boot.bin") next = "//boot boot.bin";
+                else if (trimmed == "run overclockerd-boot.bin") next = OverclockBoot.Command;
+                else if (trimmed == OverclockBoot.LegacyComment) next = OverclockBoot.Comment;
+                if (next == null) continue;
+                int start = lines[i].IndexOf(trimmed, StringComparison.Ordinal);
+                lines[i] = lines[i].Substring(0, start) + next + lines[i].Substring(start + trimmed.Length);
+                changed = true;
+            }
+            if (changed) fm.Write(0, Path, string.Join("\n", lines));
+        }
+
+        // Recognize only active, explicit startup directives and the optional flag.
+        // An unknown option or commented line must never silently start the OS.
+        public static bool HasBoot(string content, string file, out bool debug)
+        {
+            debug = false;
+            if (string.IsNullOrEmpty(content)) return false;
+            foreach (var raw in content.Replace("\r", "").Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line == "boot " + file) return true;
+                if (line == "boot " + file + " -debug") { debug = true; return true; }
+            }
+            return false;
+        }
+
+        public static bool DebugRequested(string content)
+        {
+            bool debug;
+            return HasBoot(content, "boot.bin", out debug) && debug ||
+                HasBoot(content, "overclockerd-boot.bin", out debug) && debug;
         }
 
         public static string Read(FileManager fm)
@@ -46,7 +92,8 @@ namespace PC.Component.Software.OS
             {
                 var line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal)
-                    || line == "run boot.bin" || line == OverclockBoot.Command ||
+                    || line.StartsWith("boot ", StringComparison.Ordinal) ||
+                    line == "run boot.bin" || line == "run overclockerd-boot.bin" ||
                     line == "init devices" || line == "init user") continue;
                 commands.Add(line);
             }

@@ -18,13 +18,18 @@ namespace PC.Component.Software.OS
         }
 
         public const string Path = "System/overclockerd-boot.bin";
-        public const string Command = "run overclockerd-boot.bin";
-        public const string Comment = "// Overclock boot: remove the next line and uncomment run boot.bin to recover";
+        public const string Command = "boot overclockerd-boot.bin";
+        public const string Comment = "// Overclock boot: remove the next line and uncomment boot boot.bin to recover";
+        public const string LegacyComment = "// Overclock boot: remove the next line and uncomment run boot.bin to recover";
         public const float UnstableRatio = 1.55f;
         public const float FatalRatio = 1.85f;
         private static readonly Dictionary<Motherboard, Profile> active = new Dictionary<Motherboard, Profile>();
 
-        public static bool Enabled(string autorun) => AutorunConfig.HasLine(autorun, Command);
+        public static bool Enabled(string autorun)
+        {
+            bool debug;
+            return AutorunConfig.HasBoot(autorun, "overclockerd-boot.bin", out debug);
+        }
 
         public static bool TryRead(FileManager fm, out Profile profile)
         {
@@ -102,20 +107,26 @@ namespace PC.Component.Software.OS
             foreach (var raw in (content ?? "").Replace("\r", "").Split('\n'))
             {
                 string line = raw.Trim();
-                if (line == Command || line == Comment) continue;
-                if (line == "run boot.bin" || line == "//run boot.bin")
+                if (line == Command || line == Command + " -debug" ||
+                    line == "run overclockerd-boot.bin" || line == Comment || line == LegacyComment) continue;
+                bool stock = line == "boot boot.bin" || line == "boot boot.bin -debug" ||
+                    line == "//boot boot.bin" || line == "//boot boot.bin -debug" ||
+                    line == "run boot.bin" || line == "//run boot.bin";
+                if (stock)
                 {
                     if (!inserted)
                     {
-                        lines.Add("//run boot.bin");
+                        bool debug = line.EndsWith(" -debug", StringComparison.Ordinal) ||
+                            AutorunConfig.DebugRequested(content);
+                        lines.Add("//boot boot.bin" + (debug ? " -debug" : ""));
                         lines.Add(Comment);
-                        lines.Add(Command);
+                        lines.Add(Command + (debug ? " -debug" : ""));
                         inserted = true;
                     }
                 }
                 else if (raw.Length > 0) lines.Add(raw);
             }
-            if (!inserted) return null; // never break a custom/missing boot directive
+            if (!inserted) return null; // do not resurrect a deleted boot directive
             return string.Join("\n", lines.ToArray()) + "\n";
         }
 
@@ -123,21 +134,22 @@ namespace PC.Component.Software.OS
         {
             var lines = new List<string>();
             bool restored = false;
+            bool debug = AutorunConfig.DebugRequested(content) ||
+                AutorunConfig.HasLine(content, "//boot boot.bin -debug");
             foreach (var raw in (content ?? "").Replace("\r", "").Split('\n'))
             {
                 string line = raw.Trim();
-                if (line == Command || line == Comment) continue;
-                if (line == "//run boot.bin")
+                if (line == Command || line == Command + " -debug" ||
+                    line == "run overclockerd-boot.bin" || line == Comment || line == LegacyComment) continue;
+                if (line == "//boot boot.bin" || line == "//boot boot.bin -debug" ||
+                    line == "//run boot.bin" || line == "boot boot.bin" ||
+                    line == "boot boot.bin -debug" || line == "run boot.bin")
                 {
-                    if (!restored) { lines.Add("run boot.bin"); restored = true; }
-                }
-                else if (line == "run boot.bin")
-                {
-                    if (!restored) { lines.Add(raw); restored = true; }
+                    if (!restored) { lines.Add("boot boot.bin" + (debug ? " -debug" : "")); restored = true; }
                 }
                 else if (raw.Length > 0) lines.Add(raw);
             }
-            if (!restored) lines.Insert(0, "run boot.bin");
+            if (!restored) lines.Insert(0, "boot boot.bin" + (debug ? " -debug" : ""));
             return string.Join("\n", lines.ToArray()) + "\n";
         }
 
@@ -177,9 +189,12 @@ namespace PC.Component.Software.OS
             if (fm == null || !fm.TryGetFile(0, AutorunConfig.Path, out var autorun) || autorun == null)
                 return false;
             // Never silently repair a missing/user-replaced boot directive.
+            bool stockDebug;
             if (!Enabled(autorun.content) &&
-                !AutorunConfig.HasLine(autorun.content, "//run boot.bin") &&
-                !AutorunConfig.HasLine(autorun.content, "run boot.bin")) return false;
+                !AutorunConfig.HasBoot(autorun.content, "boot.bin", out stockDebug) &&
+                !AutorunConfig.HasLine(autorun.content, "//boot boot.bin") &&
+                !AutorunConfig.HasLine(autorun.content, "//boot boot.bin -debug") &&
+                !AutorunConfig.HasLine(autorun.content, "//run boot.bin")) return false;
             string body = DisableLine(autorun.content);
             var written = fm.Write(0, AutorunConfig.Path, body);
             if (written == null || written.content != body) return false;
@@ -193,8 +208,11 @@ namespace PC.Component.Software.OS
             if (disk == null || !disk.TryGetFile(AutorunConfig.Path, out autorun) || autorun == null)
                 return false;
             if (!Enabled(autorun.content) &&
-                !(AutorunConfig.HasLine(autorun.content, Comment) &&
-                  AutorunConfig.HasLine(autorun.content, "//run boot.bin"))) return false;
+                !( (AutorunConfig.HasLine(autorun.content, Comment) ||
+                    AutorunConfig.HasLine(autorun.content, LegacyComment)) &&
+                   (AutorunConfig.HasLine(autorun.content, "//boot boot.bin") ||
+                    AutorunConfig.HasLine(autorun.content, "//boot boot.bin -debug") ||
+                    AutorunConfig.HasLine(autorun.content, "//run boot.bin")))) return false;
             string body = DisableLine(autorun.content);
             var written = disk.Write(AutorunConfig.Path, body);
             return written != null && written.content == body;

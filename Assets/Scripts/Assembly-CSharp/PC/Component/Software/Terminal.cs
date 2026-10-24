@@ -260,12 +260,15 @@ namespace PC.Component.Software
                 string args = string.Join(" ", command.ToArray());
                 WriteLine(system != null && system.TryLaunchApp(app, args) ? "Launched " + app : "Cannot launch " + app);
             }
+            else if (cmd == "boot")
+            {
+                WriteLine("Boot directives are only available in System/Autorun.conf");
+            }
             else if (cmd == "open" || cmd == "run")
             {
                 string path = command.Count > 0 ? command.Dequeue() : "";
                 File file;
-                if (cmd == "run" && path == "boot.bin") { /* required boot directive, already validated */ }
-                else if (system == null || system.FileManager == null ||
+                if (system == null || system.FileManager == null ||
                          !system.FileManager.TryGetFile(0, path, out file) || file == null)
                     WriteLine("File not found: " + path);
                 else if (OS.OperatingSystem.IsSystemPath(path) && !IsAdministrator)

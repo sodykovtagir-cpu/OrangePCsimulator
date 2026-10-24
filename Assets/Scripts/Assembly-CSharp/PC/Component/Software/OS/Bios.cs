@@ -49,6 +49,8 @@ namespace PC.Component.Software.OS
 		private Text manufacturerValues;
 
 		private bool enterBios;
+        private BootLog bootLog;
+        private bool bootFailure;
 
 		// Исходная рамка под логотип из префаба.
 		private Vector2 logoBox;
@@ -75,6 +77,12 @@ namespace PC.Component.Software.OS
 			// Логотип — украшение, загрузка компьютера — нет. Поэтому загрузка
 			// планируется первой и не зависит от того, чем кончится ApplyBrand.
 			Invoke("BootOperatingSystem", 2f);
+            var candidate = SystemDisk();
+            File autorun;
+            bool debug = candidate != null && candidate.TryGetFile(AutorunConfig.Path, out autorun) &&
+                autorun != null && AutorunConfig.DebugRequested(autorun.content);
+            bootLog = BootLog.Create(this, debug);
+            if (bootLog != null) bootLog.Add("BIOS: scanning boot devices");
 
 			try
 			{
@@ -159,15 +167,35 @@ namespace PC.Component.Software.OS
 
 			if (enterBios)
 			{
+                if (bootLog != null) bootLog.Close();
 				EnterBiosSettings();
 				return;
 			}
+
+            var systemDisk = SystemDisk();
+            // A previously installed disk with a missing boot.bin is not an
+            // empty machine. Do not silently fall through to BIOS settings or
+            // another disk when it is first in the saved boot order.
+            var order = Board != null && Board.BiosSettings != null ? Board.BiosSettings.order : null;
+            bool preferredMissing = systemDisk != null &&
+                !systemDisk.ContainsFile(bootFile) &&
+                ((order != null && order.Length > 0 && order[0] == systemDisk.Id) ||
+                 bootTypes == null || bootTypes.Count == 0);
+            if (preferredMissing)
+            {
+                bootFailure = true;
+                if (bootLog == null) bootLog = BootLog.Create(this, false);
+                if (bootLog != null) bootLog.Fail("Kernel Panic! Can't find boot.bin");
+                return;
+            }
+            if (bootLog != null) bootLog.Add("BIOS: boot device selected");
 
 			if (bootTypes == null || bootTypes.Count == 0)
 			{
 				// Нет загрузочной записи — уходим в настройки. Это НЕ зависание:
 				// если экран остался прежним, значит не сработал сам переход.
 				Debug.Log("BIOS: загрузочных записей не найдено, открываю настройки");
+                if (bootLog != null) bootLog.Close();
 				EnterBiosSettings();
 				return;
 			}
@@ -195,8 +223,27 @@ namespace PC.Component.Software.OS
 				return;
 			}
 
+            if (bootLog != null) bootLog.Close();
 			EnterBiosSettings();
 		}
+
+        private Storage SystemDisk()
+        {
+            var drives = AllStorage;
+            if (drives == null) return null;
+            var order = Board != null && Board.BiosSettings != null ? Board.BiosSettings.order : null;
+            // Respect the BIOS's first-choice disk rather than an unrelated
+            // data drive with a leftover autorun marker.
+            if (order != null && order.Length > 0)
+                foreach (var disk in drives)
+                    if (disk != null && disk.Id == order[0] &&
+                        (disk.ContainsFile(AutorunConfig.Marker) || disk.ContainsFile(AutorunConfig.Path)))
+                        return disk;
+            foreach (var disk in drives)
+                if (disk != null && (disk.ContainsFile(AutorunConfig.Marker) ||
+                    disk.ContainsFile(AutorunConfig.Path))) return disk;
+            return null;
+        }
 
 		private void EnterBiosSettings()
 		{
@@ -341,6 +388,11 @@ namespace PC.Component.Software.OS
 
 		public override void PowerClicked()
 		{
+            if (bootFailure)
+            {
+                if (Board != null) Board.PowerOff(false);
+                return;
+            }
 			if (utility == null) return;
 			if (!utility.activeSelf)
 			{
