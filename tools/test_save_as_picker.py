@@ -32,6 +32,12 @@ assert 'internal OpenDialog OpenPickerTemplate => fileDialog;' in os
 assert 'system.OpenPickerTemplate.transform.Find("Panel/Scroll View")' in dialog
 assert 'Instantiate(template.gameObject, panel)' in dialog
 assert 'listView.SelectedIndexChanged += SelectedIndexChanged;' in dialog
+# In the 600x480 panel the grey file area starts just below the location
+# header and ends immediately before the filename label, not leaving white
+# bands on either side as observed in Unity's Game view.
+assert 'scrollRect.offsetMax = new Vector2(-10f, -100f)' in dialog
+assert 'scrollRect.offsetMin = new Vector2(10f, 139f)' in dialog
+assert 65 + 25 < 100 and 139 > 137  # header and filename stay outside the list
 assert 'new GameObject("Open folder"' not in dialog
 assert 'button.onClick.AddListener(Enter)' not in dialog
 assert 'oldNameLabel.gameObject.SetActive(false)' in dialog

@@ -50,8 +50,10 @@ namespace PC.Component.Software.OS
             var scrollRect = scroll.transform as RectTransform;
             scrollRect.anchorMin = Vector2.zero;
             scrollRect.anchorMax = Vector2.one;
-            scrollRect.offsetMin = new Vector2(10f, 150f);
-            scrollRect.offsetMax = new Vector2(-10f, -125f);
+            // Fill the unused white bands above and below the file list.
+            // Leave the location/status header and filename label readable.
+            scrollRect.offsetMin = new Vector2(10f, 139f);
+            scrollRect.offsetMax = new Vector2(-10f, -100f);
             listView = scroll.GetComponent<ListView>();
             if (listView == null) { Destroy(scroll); return false; }
             listView.SetSelectionTint(new Color(.72f, .72f, .72f, 1f));
