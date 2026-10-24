@@ -46,8 +46,8 @@ assert list_go['m_IsActive'] == 1
 list_rect = blocks[list_go['m_Component'][0]['component']['fileID']][1]
 assert list_rect['m_AnchorMin'] == {'x': 0, 'y': 0}
 assert list_rect['m_AnchorMax'] == {'x': 1, 'y': 1}
-assert list_rect['m_SizeDelta'] == {'x': -20, 'y': -239}
-assert list_rect['m_AnchoredPosition'] == {'x': 0, 'y': 19.5}
+assert list_rect['m_SizeDelta'] == {'x': -20, 'y': -232}
+assert list_rect['m_AnchoredPosition'] == {'x': 0, 'y': 23}
 panel_rect = blocks[list_rect['m_Father']['fileID']][1]
 assert panel_rect['m_SizeDelta'] == {'x': 600, 'y': 480}
 assert list_rect['m_Father']['fileID'] in [c['fileID'] for c in
@@ -92,6 +92,19 @@ assert 'messageText.text = "File exists. Click Replace' in save
 assert 'fm.Create(currentDisk, result)' in save and 'result.content != content' in save
 assert 'var callback = saved;' in save and 'if (callback != null) callback(result)' in save
 assert 'saved = null;' in method(dialog, 'public void Cancel()')
+# Last location belongs to the current in-game PC, not global PlayerPrefs. Use
+# the stable storage hardware ID, not a removable disk's transient list index.
+assert 'private const string LastLocationPath = "System/SaveDialog.location";' in dialog
+assert 'diskId = all[currentDisk].Id' in method(dialog, 'private void RememberLocation()')
+assert 'all[d].Id != saved.diskId' in method(dialog, 'private void LoadLastLocation()')
+assert 'file.hidden = true;' in method(dialog, 'private void RememberLocation()')
+show = method(dialog, 'public void ShowDialog(')
+assert 'if (string.IsNullOrEmpty(initialPath) && preferredDisk < 0)' in show
+assert show.index('LoadLastLocation();') < show.index('if (!string.IsNullOrEmpty(initialPath))')
+assert 'TryGetFile(currentDisk, currentFolder, out folder)' in show
+assert 'OperatingSystem.IsSystemPath(currentFolder)' in show
+assert save.index('RememberLocation();') > save.index('fm.Create(currentDisk, result)')
+assert 'RememberLocation();' in method(dialog, 'public void Cancel()')
 assert 'file.StorageSize' in storage and 'file.size = content.Length' in storage
 assert 'return AddFile(created) ? created : null;' in storage
 

@@ -27,6 +27,14 @@ namespace PC.Component.Software.OS
         private readonly List<Entry> entries = new List<Entry>();
         private string pendingReplace;
         private int pendingDisk = -1;
+        private const string LastLocationPath = "System/SaveDialog.location";
+
+        [Serializable]
+        private sealed class LastLocation
+        {
+            public int diskId;
+            public string folder;
+        }
 
         private sealed class Entry
         {
@@ -50,6 +58,43 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        private void LoadLastLocation()
+        {
+            File marker;
+            var fm = system != null ? system.FileManager : null;
+            var all = system != null ? system.AllStorage : null;
+            if (fm == null || all == null ||
+                !fm.TryGetFile(0, LastLocationPath, out marker) || marker == null) return;
+            try
+            {
+                var saved = JsonUtility.FromJson<LastLocation>(marker.content ?? "");
+                if (saved == null) return;
+                for (int d = 0; d < all.Count; d++)
+                {
+                    if (all[d] == null || all[d].Id != saved.diskId) continue;
+                    currentDisk = d;
+                    currentFolder = saved.folder ?? "";
+                    return;
+                }
+            }
+            catch (ArgumentException) { /* Old/invalid marker: use the active disk. */ }
+        }
+
+        private void RememberLocation()
+        {
+            var all = system != null ? system.AllStorage : null;
+            var fm = system != null ? system.FileManager : null;
+            if (fm == null || all == null || currentDisk < 0 ||
+                currentDisk >= all.Count || all[currentDisk] == null) return;
+            var body = JsonUtility.ToJson(new LastLocation
+            {
+                diskId = all[currentDisk].Id,
+                folder = currentFolder ?? ""
+            });
+            var file = fm.Write(0, LastLocationPath, body);
+            if (file != null && file.content == body) file.hidden = true;
+        }
+
         public void ShowDialog(string fileName, string body, string[] formats,
             string initialPath = null, int preferredDisk = -1, Action<File> onSaved = null,
             bool administrator = false)
@@ -65,18 +110,21 @@ namespace PC.Component.Software.OS
             currentDisk = preferredDisk >= 0 && all != null && preferredDisk < all.Count
                 ? preferredDisk : system.ActiveStorage;
             currentFolder = "";
+            // An opened document has its own location; new exports inherit the
+            // last destination on this PC, even after a save/load cycle.
+            if (string.IsNullOrEmpty(initialPath) && preferredDisk < 0)
+                LoadLastLocation();
             if (!string.IsNullOrEmpty(initialPath))
             {
                 int slash = initialPath.LastIndexOf('/');
                 if (slash > 0) currentFolder = initialPath.Substring(0, slash);
-                // An older document can have an unusual extension: keep its
-                // location only if the folder still exists on the chosen disk.
-                File folder;
-                if (!string.IsNullOrEmpty(currentFolder) &&
-                    (!system.FileManager.TryGetFile(currentDisk, currentFolder, out folder) ||
-                     folder == null || !folder.isFolder ||
-                     (!administrator && OperatingSystem.IsSystemPath(currentFolder)))) currentFolder = "";
             }
+            // A deleted, moved or protected folder must not be reused.
+            File folder;
+            if (!string.IsNullOrEmpty(currentFolder) &&
+                (!system.FileManager.TryGetFile(currentDisk, currentFolder, out folder) ||
+                 folder == null || !folder.isFolder ||
+                 (!administrator && OperatingSystem.IsSystemPath(currentFolder)))) currentFolder = "";
             var name = string.IsNullOrEmpty(initialPath) ? fileName :
                 initialPath.Substring(initialPath.LastIndexOf('/') + 1);
             for (int i = 0; i < formats.Length; i++)
@@ -257,6 +305,7 @@ namespace PC.Component.Software.OS
                 messageText.text = "Could not save the file. Check free disk space.";
                 return;
             }
+            RememberLocation();
             ClearConfirmation();
             gameObject.SetActive(false);
             var callback = saved;
@@ -266,6 +315,9 @@ namespace PC.Component.Software.OS
 
         public void Cancel()
         {
+            // Browsing elsewhere and cancelling still updates the next Save As
+            // starting folder (but never persists an unchosen "This PC" root).
+            RememberLocation();
             saved = null;
             ClearConfirmation();
             gameObject.SetActive(false);

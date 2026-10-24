@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using UnityEngine.Video;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -145,8 +146,9 @@ namespace PC.Component.Software
 
 		private void AddToList(UnityEngine.Texture2D tex)
 		{
+            if (tex == null || framePrefab == null || frameParent == null) return;
 			var btn = UnityEngine.Object.Instantiate(framePrefab, frameParent);
-			if (btn == null || tex == null) return;
+            if (btn == null) return;
 
 			var raw = btn.GetComponent<UnityEngine.UI.RawImage>();
 			if (raw != null) raw.texture = tex;
@@ -216,6 +218,250 @@ namespace PC.Component.Software
 			if (moveUpButton != null) moveUpButton.interactable = canUp;
 			if (moveDownButton != null) moveDownButton.interactable = canDown;
 		}
+
+        // Imported clips are loops for the in-game .mov format, not full-length
+        // movies. Bound frame count and dimensions to avoid exhausting VRAM or
+        // producing enormous saves on a long/high-resolution phone recording.
+        private const int ImportFps = 8;
+        private const int MaxImportFrames = 96;
+        private const int MaxVideoDimension = 512;
+        private Coroutine mediaImport;
+        private GameObject importHost;
+        private VideoPlayer importPlayer;
+        private RenderTexture importRender;
+        private string importError;
+        private List<Texture2D> pendingVideoFrames;
+        private bool mediaAvailable = true;
+
+        public void ImportGif()
+        {
+            if (!mediaAvailable || mediaImport != null) return;
+            NativeFilePicker.PickFile(path =>
+            {
+                if (this == null || !mediaAvailable || system == null ||
+                    string.IsNullOrEmpty(path) || mediaImport != null) return;
+                try
+                {
+                    var info = new System.IO.FileInfo(path);
+                    if (info.Length > 24000000L)
+                    { ImportFailure("GIF is too large (maximum 24 MB)."); return; }
+                    Texture2D[] pictures;
+                    float[] delays;
+                    if (!GifFrames.TryDecode(System.IO.File.ReadAllBytes(path), out pictures, out delays) ||
+                        pictures == null || pictures.Length == 0)
+                    { ImportFailure("Cannot decode this GIF."); return; }
+                    float total = 0f;
+                    if (delays != null)
+                        foreach (var delay in delays) total += Mathf.Max(.04f, delay);
+                    // The editor's .mov has one FPS, not per-frame GIF delays.
+                    // Mean delay preserves the overall loop duration.
+                    var rate = total > .001f ? pictures.Length / total : ImportFps;
+                    ReplaceImportedFrames(pictures, rate);
+                }
+                catch (Exception ex) { ImportFailure("Cannot import GIF: " + ex.Message); }
+            }, NativeFilePicker.ConvertExtensionToFileType("gif"));
+        }
+
+        public void ImportVideo()
+        {
+            if (!mediaAvailable || mediaImport != null) return;
+            NativeGallery.GetVideoFromGallery(path =>
+            {
+                if (this == null || !mediaAvailable || system == null ||
+                    string.IsNullOrEmpty(path) || mediaImport != null) return;
+                mediaImport = StartCoroutine(ImportVideoFrames(path));
+            }, "Import video into Animator", "video/*");
+        }
+
+        private void ImportFailure(string message)
+        {
+            if (system != null) system.ShowMessageBox("Animator", message);
+        }
+
+        private void ReplaceImportedFrames(Texture2D[] pictures, float rate)
+        {
+            if (pictures == null || pictures.Length == 0 || framePrefab == null || frameParent == null)
+            { DestroyImported(pictures); ImportFailure("No usable animation frames."); return; }
+            int w = pictures[0] != null ? pictures[0].width : 0;
+            int h = pictures[0] != null ? pictures[0].height : 0;
+            if (w < 1 || h < 1)
+            { DestroyImported(pictures); ImportFailure("Invalid frame size."); return; }
+            foreach (var picture in pictures)
+                if (picture == null || picture.width != w || picture.height != h)
+                { DestroyImported(pictures); ImportFailure("Animation frames have different sizes."); return; }
+            ClearTimeline();
+            frames = new List<Frame>(pictures.Length);
+            foreach (var picture in pictures) AddToList(picture);
+            if (fpsSlider != null)
+            {
+                fpsSlider.value = Mathf.Clamp(rate, fpsSlider.minValue, fpsSlider.maxValue);
+                OnValueChangedFps(fpsSlider.value);
+            }
+            else OnValueChangedFps(Mathf.Clamp(rate, 1f, 10f));
+            SelectFrame(-1);
+            RestartPreview();
+        }
+
+        private static void DestroyImported(Texture2D[] textures)
+        {
+            if (textures == null) return;
+            foreach (var texture in textures) if (texture != null) Destroy(texture);
+        }
+
+        private void ClearTimeline()
+        {
+            if (preview != null) preview.texture = null;
+            if (canvas != null) canvas.texture = null;
+            if (frames != null)
+                foreach (var frame in frames)
+                    if (frame != null)
+                    {
+                        if (frame.obj != null) Destroy(frame.obj);
+                        if (frame.tex != null) Destroy(frame.tex);
+                    }
+            frames = new List<Frame>();
+            selectedIndex = -1;
+            index = 0;
+            frameResolution = Vector2Int.zero;
+        }
+
+        // Unity VideoPlayer decodes actual media on the player's device. The
+        // .mov stored by PCOS is a different, PNG-frame format and is NOT sent
+        // to this player. Sample short native clips at eight frames per second.
+        private IEnumerator ImportVideoFrames(string path)
+        {
+            var pictures = new List<Texture2D>();
+            pendingVideoFrames = pictures;
+            bool committed = false;
+            importError = null;
+            try
+            {
+                importHost = new GameObject("Animator video import");
+                importHost.transform.SetParent(system != null ? system.transform.root : transform, false);
+                importPlayer = importHost.AddComponent<VideoPlayer>();
+                var player = importPlayer;
+                player.playOnAwake = false;
+                player.source = VideoSource.Url;
+                player.url = path;
+                player.audioOutputMode = VideoAudioOutputMode.None;
+                player.renderMode = VideoRenderMode.RenderTexture;
+                player.isLooping = false;
+                player.skipOnDrop = false;
+                player.errorReceived += ImportVideoError;
+                try { player.Prepare(); }
+                catch (Exception ex) { importError = ex.Message; }
+                float deadline = Time.realtimeSinceStartup + 20f;
+                while (importError == null && !player.isPrepared && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                if (importError == null && player.isPrepared && player.width > 0 && player.height > 0)
+                {
+                    float scale = Mathf.Min(1f, (float)MaxVideoDimension /
+                        Mathf.Max((float)player.width, (float)player.height));
+                    int w = Mathf.Max(1, Mathf.RoundToInt(player.width * scale));
+                    int h = Mathf.Max(1, Mathf.RoundToInt(player.height * scale));
+                    importRender = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32);
+                    importRender.Create();
+                    player.targetTexture = importRender;
+                    player.Play();
+                    double nextSample = 0.0;
+                    long previousFrame = -1;
+                    float started = Time.realtimeSinceStartup;
+                    while (importError == null && pictures.Count < MaxImportFrames &&
+                           Time.realtimeSinceStartup - started < 30f)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        if (player == null) break;
+                        long frame = player.frame;
+                        // Some VideoPlayer backends report frame = -1 for URL
+                        // sources. In that case use the decoded texture + time.
+                        bool fresh = frame >= 0 ? frame != previousFrame : player.texture != null;
+                        if (fresh && player.time >= nextSample &&
+                            TryReadVideoFrame(importRender, w, h, pictures))
+                        {
+                            previousFrame = frame;
+                            nextSample = (double)pictures.Count / ImportFps;
+                        }
+                        if (!player.isPlaying && (frame >= 0 ||
+                            Time.realtimeSinceStartup - started > 1f)) break;
+                        if (player.time >= (double)MaxImportFrames / ImportFps) break;
+                    }
+                }
+                if (pictures.Count > 0 && importError == null)
+                {
+                    ReplaceImportedFrames(pictures.ToArray(), ImportFps);
+                    committed = true;
+                    if (pictures.Count == MaxImportFrames)
+                        ImportFailure("Imported the first 12 seconds (96 frames). Longer clips are truncated.");
+                }
+                else ImportFailure(importError ?? "Video could not be decoded on this device.");
+            }
+            finally
+            {
+                if (!committed) DestroyImported(pictures.ToArray());
+                pendingVideoFrames = null;
+                TeardownVideoImport();
+                mediaImport = null;
+            }
+        }
+
+        private static bool TryReadVideoFrame(RenderTexture source, int w, int h,
+            List<Texture2D> destination)
+        {
+            if (source == null || !source.IsCreated()) return false;
+            var previous = RenderTexture.active;
+            Texture2D texture = null;
+            try
+            {
+                RenderTexture.active = source;
+                texture = new Texture2D(w, h, TextureFormat.RGB24, false);
+                texture.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                texture.Apply();
+                destination.Add(texture);
+                return true;
+            }
+            catch (Exception)
+            {
+                if (texture != null) Destroy(texture);
+                return false;
+            }
+            finally { RenderTexture.active = previous; }
+        }
+
+        private void ImportVideoError(VideoPlayer player, string message)
+        {
+            importError = string.IsNullOrEmpty(message) ? "Video decoder error." : message;
+        }
+
+        private void TeardownVideoImport()
+        {
+            if (importPlayer != null)
+            {
+                importPlayer.errorReceived -= ImportVideoError;
+                importPlayer.Stop();
+                importPlayer.targetTexture = null;
+                importPlayer = null;
+            }
+            if (importRender != null)
+            {
+                importRender.Release();
+                Destroy(importRender);
+                importRender = null;
+            }
+            if (importHost != null) { Destroy(importHost); importHost = null; }
+        }
+
+        private void CancelVideoImport()
+        {
+            if (mediaImport != null) { StopCoroutine(mediaImport); mediaImport = null; }
+            // Explicitly free captures even on Unity versions that do not
+            // dispose a stopped IEnumerator (and therefore skip its finally).
+            if (pendingVideoFrames != null)
+            {
+                DestroyImported(pendingVideoFrames.ToArray());
+                pendingVideoFrames = null;
+            }
+            TeardownVideoImport();
+        }
 
 		public void Save()
 		{
@@ -404,17 +650,26 @@ namespace PC.Component.Software
 			RestartPreview();
 		}
 
+        public override void OnSystemStop()
+        {
+            mediaAvailable = false;
+            CancelVideoImport();
+            ClearTimeline();
+            base.OnSystemStop();
+        }
+
+        private void OnDestroy()
+        {
+            mediaAvailable = false;
+            CancelVideoImport();
+            ClearTimeline();
+        }
+
 		public override void Close()
 		{
-			var list = frames;
-			if (list != null)
-			{
-				for (int i = 0; i < list.Count; i++)
-				{
-					var f = list[i];
-					if (f != null && f.tex != null) Destroy(f.tex);
-				}
-			}
+            mediaAvailable = false;
+            CancelVideoImport();
+            ClearTimeline();
 			base.Close();
 		}
 	}
