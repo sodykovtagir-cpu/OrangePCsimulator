@@ -45,7 +45,24 @@ assert 'info.Length > 24000000L' in code
 assert 'NativeGallery.GetVideoFromGallery(' in code
 assert '"video/*"' in code
 assert 'private const int MaxImportFrames = 96;' in code
-assert 'private const int MaxVideoDimension = 512;' in code
+assert 'private const int MaxImportDimension = 512;' in code
+assert 'private const int MaxGifPixels = 12000000;' in code
+# Clicking either existing import button must first show the resolution modal.
+assert 'public void ImportGif() { ShowImportResolution(true); }' in code
+assert 'public void ImportVideo() { ShowImportResolution(false); }' in code
+assert 'if (gif) PickGifFromDevice(resolution);' in code
+assert 'else PickVideoFromDevice(resolution);' in code
+assert 'int.TryParse(importWidthInput.text, out width)' in code
+assert 'int.TryParse(importHeightInput.text, out height)' in code
+assert 'width > MaxImportDimension || height > MaxImportDimension' in code
+assert 'ResizeGifFrames(pictures, resolution)' in code
+assert 'Graphics.Blit(original, target);' in code
+assert 'RenderTexture.ReleaseTemporary(target);' in code
+assert 'new Texture2D(width, height, TextureFormat.RGBA32, false)' in code
+assert 'MaxGifPixels / (size.x * size.y)' in code
+assert 'ImportVideoFrames(path, resolution)' in code
+assert 'int w = resolution.x;' in code and 'int h = resolution.y;' in code
+assert 'CancelImportResolution();' in code
 assert 'private const int ImportFps = 8;' in code
 assert 'new WaitForEndOfFrame()' in code and 'TryReadVideoFrame(' in code
 assert 'player.audioOutputMode = VideoAudioOutputMode.None;' in code
@@ -62,5 +79,41 @@ assert 'private void OnDestroy()' in code
 assert 'ClearTimeline();' in code
 assert 'FormatConverter.MovToString' in code and 'dlg.ShowDialog' in code
 assert 'FormatConverter.StringToMov' in code
+# Resolution dialog/controls must be prefab-owned, interactable and initially
+# hidden, not improvised after the device file picker opens.
+animator_go = by_name['Animator'][1]
+animator_component = next(blocks[c['component']['fileID']][1] for c in animator_go['m_Component']
+                          if 'importResolutionDialog' in blocks[c['component']['fileID']][1])
+modal_id, modal_go = by_name['Import resolution dialog']
+modal_rect = blocks[modal_go['m_Component'][0]['component']['fileID']][1]
+assert animator_component['importResolutionDialog']['fileID'] == modal_id
+assert modal_go['m_IsActive'] == 0
+assert modal_rect['m_Father']['fileID'] == animator_go['m_Component'][0]['component']['fileID']
+assert modal_rect['m_AnchorMin'] == {'x': 0, 'y': 0}
+assert modal_rect['m_AnchorMax'] == {'x': 1, 'y': 1}
+assert modal_rect['m_SizeDelta'] == {'x': 0, 'y': 0}
+assert modal_rect['m_Children'] == [{'fileID': by_name['Resolution panel'][1]['m_Component'][0]['component']['fileID']}]
+root_rect = blocks[animator_go['m_Component'][0]['component']['fileID']][1]
+assert root_rect['m_Children'][-1]['fileID'] == modal_go['m_Component'][0]['component']['fileID']
+for attr, go_name in [('importWidthInput', 'Import width'), ('importHeightInput', 'Import height')]:
+    control_id = animator_component[attr]['fileID']
+    assert control_id in [c['component']['fileID'] for c in by_name[go_name][1]['m_Component']]
+    input_comp = blocks[control_id][1]
+    assert input_comp['m_Text'] == 256
+    assert input_comp['m_ContentType'] == 2 and input_comp['m_CharacterValidation'] == 1
+    assert input_comp['m_OnValueChanged']['m_PersistentCalls']['m_Calls'] == []
+    assert input_comp['m_TextComponent']['fileID'] in blocks
+    assert input_comp['m_Placeholder']['fileID'] in blocks
+message_id = animator_component['importResolutionMessage']['fileID']
+assert message_id in [c['component']['fileID'] for c in by_name['Resolution message'][1]['m_Component']]
+for name, method_name in [('Choose file', 'ConfirmImportResolution'),
+                          ('Cancel', 'CancelImportResolution')]:
+    go = by_name[name][1]
+    buttons = [blocks[c['component']['fileID']][1] for c in go['m_Component']
+               if 'm_OnClick' in blocks[c['component']['fileID']][1]]
+    assert len(buttons) == 1
+    call = buttons[0]['m_OnClick']['m_PersistentCalls']['m_Calls'][0]
+    assert call['m_Target']['fileID'] in blocks
+    assert call['m_MethodName'] == method_name
 print('PASS: Animator prefab native GIF/video controls, device pickers, bounded decoding and cleanup')
 print('NOTE: Real media import and rendering still require Unity Play Mode on a supported device')

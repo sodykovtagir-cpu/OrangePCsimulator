@@ -71,6 +71,15 @@ namespace PC.Component.Software
 
 		private Vector2Int frameResolution;
 
+        [SerializeField] private GameObject importResolutionDialog;
+        [SerializeField] private InputField importWidthInput;
+        [SerializeField] private InputField importHeightInput;
+        [SerializeField] private Text importResolutionMessage;
+        private bool importGifSelected;
+        private const int MaxImportDimension = 512;
+        private const int MaxGifPixels = 12000000;
+        private const string ResolutionHint = "Set width and height (1-512 px). Image may stretch.";
+
 		private void Awake()
 		{
 			var prefab = framePrefab;
@@ -224,7 +233,6 @@ namespace PC.Component.Software
         // producing enormous saves on a long/high-resolution phone recording.
         private const int ImportFps = 8;
         private const int MaxImportFrames = 96;
-        private const int MaxVideoDimension = 512;
         private Coroutine mediaImport;
         private GameObject importHost;
         private VideoPlayer importPlayer;
@@ -233,9 +241,49 @@ namespace PC.Component.Software
         private List<Texture2D> pendingVideoFrames;
         private bool mediaAvailable = true;
 
-        public void ImportGif()
+        public void ImportGif() { ShowImportResolution(true); }
+
+        public void ImportVideo() { ShowImportResolution(false); }
+
+        private void ShowImportResolution(bool gif)
         {
-            if (!mediaAvailable || mediaImport != null) return;
+            if (!mediaAvailable || mediaImport != null || importResolutionDialog == null ||
+                importWidthInput == null || importHeightInput == null ||
+                importResolutionMessage == null) return;
+            importGifSelected = gif;
+            importResolutionMessage.text = ResolutionHint;
+            importResolutionDialog.SetActive(true);
+            importResolutionDialog.transform.SetAsLastSibling();
+        }
+
+        public void CancelImportResolution()
+        {
+            if (importResolutionDialog != null) importResolutionDialog.SetActive(false);
+        }
+
+        public void ConfirmImportResolution()
+        {
+            if (!mediaAvailable || importResolutionDialog == null ||
+                !importResolutionDialog.activeSelf || importWidthInput == null ||
+                importHeightInput == null || importResolutionMessage == null) return;
+            int width, height;
+            if (!int.TryParse(importWidthInput.text, out width) ||
+                !int.TryParse(importHeightInput.text, out height) ||
+                width < 1 || height < 1 ||
+                width > MaxImportDimension || height > MaxImportDimension)
+            {
+                importResolutionMessage.text = "Width and height must be 1-512 px.";
+                return;
+            }
+            var resolution = new Vector2Int(width, height);
+            bool gif = importGifSelected;
+            importResolutionDialog.SetActive(false);
+            if (gif) PickGifFromDevice(resolution);
+            else PickVideoFromDevice(resolution);
+        }
+
+        private void PickGifFromDevice(Vector2Int resolution)
+        {
             NativeFilePicker.PickFile(path =>
             {
                 if (this == null || !mediaAvailable || system == null ||
@@ -250,27 +298,86 @@ namespace PC.Component.Software
                     if (!GifFrames.TryDecode(System.IO.File.ReadAllBytes(path), out pictures, out delays) ||
                         pictures == null || pictures.Length == 0)
                     { ImportFailure("Cannot decode this GIF."); return; }
+                    int originalCount = pictures.Length;
+                    var resized = ResizeGifFrames(pictures, resolution);
                     float total = 0f;
                     if (delays != null)
-                        foreach (var delay in delays) total += Mathf.Max(.04f, delay);
+                        for (int i = 0; i < resized.Length && i < delays.Length; i++)
+                            total += Mathf.Max(.04f, delays[i]);
                     // The editor's .mov has one FPS, not per-frame GIF delays.
-                    // Mean delay preserves the overall loop duration.
-                    var rate = total > .001f ? pictures.Length / total : ImportFps;
-                    ReplaceImportedFrames(pictures, rate);
+                    // Mean delay preserves the imported loop duration.
+                    var rate = total > .001f ? resized.Length / total : ImportFps;
+                    ReplaceImportedFrames(resized, rate);
+                    if (resized.Length < originalCount)
+                        ImportFailure("GIF limited to " + resized.Length +
+                            " frames at this resolution to protect memory.");
                 }
                 catch (Exception ex) { ImportFailure("Cannot import GIF: " + ex.Message); }
             }, NativeFilePicker.ConvertExtensionToFileType("gif"));
         }
 
-        public void ImportVideo()
+        private void PickVideoFromDevice(Vector2Int resolution)
         {
-            if (!mediaAvailable || mediaImport != null) return;
             NativeGallery.GetVideoFromGallery(path =>
             {
                 if (this == null || !mediaAvailable || system == null ||
                     string.IsNullOrEmpty(path) || mediaImport != null) return;
-                mediaImport = StartCoroutine(ImportVideoFrames(path));
+                mediaImport = StartCoroutine(ImportVideoFrames(path, resolution));
             }, "Import video into Animator", "video/*");
+        }
+
+        // Resize every GIF frame before it enters the timeline. On failure
+        // nothing replaces the existing animation and all new textures die.
+        private static Texture2D[] ResizeGifFrames(Texture2D[] source, Vector2Int size)
+        {
+            if (source == null || source.Length == 0) return source;
+            int count = Mathf.Min(source.Length, MaxGifPixels / (size.x * size.y));
+            if (count == source.Length && source[0].width == size.x &&
+                source[0].height == size.y) return source;
+            var output = new Texture2D[count];
+            try
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    output[i] = ResizeGifFrame(source[i], size.x, size.y);
+                    Destroy(source[i]);
+                    source[i] = null;
+                }
+                return output;
+            }
+            catch
+            {
+                DestroyImported(output);
+                throw;
+            }
+            finally { DestroyImported(source); }
+        }
+
+        private static Texture2D ResizeGifFrame(Texture2D original, int width, int height)
+        {
+            RenderTexture target = RenderTexture.GetTemporary(width, height, 0,
+                RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            Texture2D result = null;
+            try
+            {
+                Graphics.Blit(original, target);
+                RenderTexture.active = target;
+                result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                result.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                result.Apply();
+                return result;
+            }
+            catch
+            {
+                if (result != null) Destroy(result);
+                throw;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(target);
+            }
         }
 
         private void ImportFailure(string message)
@@ -328,7 +435,7 @@ namespace PC.Component.Software
         // Unity VideoPlayer decodes actual media on the player's device. The
         // .mov stored by PCOS is a different, PNG-frame format and is NOT sent
         // to this player. Sample short native clips at eight frames per second.
-        private IEnumerator ImportVideoFrames(string path)
+        private IEnumerator ImportVideoFrames(string path, Vector2Int resolution)
         {
             var pictures = new List<Texture2D>();
             pendingVideoFrames = pictures;
@@ -355,10 +462,8 @@ namespace PC.Component.Software
                     yield return null;
                 if (importError == null && player.isPrepared && player.width > 0 && player.height > 0)
                 {
-                    float scale = Mathf.Min(1f, (float)MaxVideoDimension /
-                        Mathf.Max((float)player.width, (float)player.height));
-                    int w = Mathf.Max(1, Mathf.RoundToInt(player.width * scale));
-                    int h = Mathf.Max(1, Mathf.RoundToInt(player.height * scale));
+                    int w = resolution.x;
+                    int h = resolution.y;
                     importRender = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32);
                     importRender.Create();
                     player.targetTexture = importRender;
@@ -653,6 +758,7 @@ namespace PC.Component.Software
         public override void OnSystemStop()
         {
             mediaAvailable = false;
+            CancelImportResolution();
             CancelVideoImport();
             ClearTimeline();
             base.OnSystemStop();
@@ -661,6 +767,7 @@ namespace PC.Component.Software
         private void OnDestroy()
         {
             mediaAvailable = false;
+            CancelImportResolution();
             CancelVideoImport();
             ClearTimeline();
         }
@@ -668,6 +775,7 @@ namespace PC.Component.Software
 		public override void Close()
 		{
             mediaAvailable = false;
+            CancelImportResolution();
             CancelVideoImport();
             ClearTimeline();
 			base.Close();
