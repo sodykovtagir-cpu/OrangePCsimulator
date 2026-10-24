@@ -32,9 +32,13 @@ assert 'internal OpenDialog OpenPickerTemplate => fileDialog;' in os
 assert 'system.OpenPickerTemplate.transform.Find("Panel/Scroll View")' in dialog
 assert 'Instantiate(template.gameObject, panel)' in dialog
 assert 'listView.SelectedIndexChanged += SelectedIndexChanged;' in dialog
-assert 'new GameObject("Open folder"' in dialog  # not a cloned persistent Save() event
-assert 'button.onClick.AddListener(Enter)' in dialog
-assert 'RemoveAllListeners()' not in dialog
+assert 'new GameObject("Open folder"' not in dialog
+assert 'button.onClick.AddListener(Enter)' not in dialog
+assert 'oldNameLabel.gameObject.SetActive(false)' in dialog
+assert 'MakeText(panel, "File name label", new Vector2(12f, 137f)' in dialog
+assert 'nameLabel.text = "File name";' in dialog
+assert 'Enter();' in method(dialog, 'private void SelectedIndexChanged(')
+assert 'Time.unscaledTime' not in dialog
 assert 'fileNameInput.onValueChanged.AddListener(_ => ClearConfirmation())' in dialog
 assert 'gameObject.SetActive(true)' in method(dialog, 'public void ShowDialog(')
 assert 'transform.SetAsLastSibling();' in method(dialog, 'public void ShowDialog(')

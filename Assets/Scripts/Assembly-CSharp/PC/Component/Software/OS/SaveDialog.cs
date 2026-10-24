@@ -24,8 +24,6 @@ namespace PC.Component.Software.OS
         private Text messageText;
         private Text saveButtonText;
         private readonly List<Entry> entries = new List<Entry>();
-        private int lastClick = -1;
-        private float lastClickTime;
         private string pendingReplace;
         private int pendingDisk = -1;
 
@@ -69,56 +67,16 @@ namespace PC.Component.Software.OS
                 inputRow.anchoredPosition = new Vector2(0f, 86f);
                 inputRow.sizeDelta = new Vector2(-20f, 40f);
             }
-            var nameLabel = panel.Find("Text") as RectTransform;
-            if (nameLabel != null)
-            {
-                nameLabel.anchorMin = new Vector2(0f, 0f);
-                nameLabel.anchorMax = new Vector2(0f, 0f);
-                nameLabel.anchoredPosition = new Vector2(125f, 124f);
-                var text = nameLabel.GetComponent<Text>();
-                if (text != null) text.text = "File name";
-            }
+            // The old centered prefab label uses horizontal overflow. Moving
+            // its anchor did not move its rendered text (it clipped at the
+            // left edge in Play Mode). Replace it with a left-aligned label.
+            var oldNameLabel = panel.Find("Text");
+            if (oldNameLabel != null) oldNameLabel.gameObject.SetActive(false);
+            var nameLabel = MakeText(panel, "File name label", new Vector2(12f, 137f),
+                new Vector2(260f, 26f), Vector2.zero, Vector2.zero);
+            nameLabel.text = "File name";
             var saveButton = panel.Find("Save");
-            if (saveButton != null)
-            {
-                saveButtonText = saveButton.GetComponentInChildren<Text>();
-                // A single tap selects a folder; Open enters it (double tap
-                // also works), just as in the shared OpenDialog picker.
-                // Do not clone a Button with a persistent prefab Save() call:
-                // RemoveAllListeners only removes runtime listeners in Unity.
-                var openButton = new GameObject("Open folder", typeof(RectTransform),
-                    typeof(CanvasRenderer), typeof(Image), typeof(Button));
-                openButton.layer = gameObject.layer;
-                var openRect = openButton.GetComponent<RectTransform>();
-                openRect.SetParent(panel, false);
-                openRect.anchorMin = openRect.anchorMax = new Vector2(.5f, 0f);
-                openRect.anchoredPosition = new Vector2(0f, 35f);
-                openRect.sizeDelta = new Vector2(120f, 40f);
-                var openImage = openButton.GetComponent<Image>();
-                var sampleImage = saveButton.GetComponent<Image>();
-                if (sampleImage != null)
-                {
-                    openImage.sprite = sampleImage.sprite;
-                    openImage.type = sampleImage.type;
-                    openImage.color = sampleImage.color;
-                }
-                var button = openButton.GetComponent<Button>();
-                button.targetGraphic = openImage;
-                button.onClick.AddListener(Enter);
-                var openLabel = MakeText(openRect, "Text", Vector2.zero, Vector2.zero,
-                    Vector2.zero, Vector2.one);
-                var labelRect = openLabel.rectTransform;
-                labelRect.pivot = new Vector2(.5f, .5f);
-                labelRect.anchoredPosition = Vector2.zero;
-                openLabel.text = "Open";
-                openLabel.alignment = TextAnchor.MiddleCenter;
-                if (saveButtonText != null)
-                {
-                    openLabel.font = saveButtonText.font;
-                    openLabel.fontSize = saveButtonText.fontSize;
-                    openLabel.color = saveButtonText.color;
-                }
-            }
+            if (saveButton != null) saveButtonText = saveButton.GetComponentInChildren<Text>();
             var title = panel.Find("Title");
             if (title != null)
             {
@@ -206,7 +164,6 @@ namespace PC.Component.Software.OS
         private void Fill()
         {
             entries.Clear();
-            lastClick = -1;
             listView.Clear();
             var all = system.AllStorage;
             if (all == null) return;
@@ -269,13 +226,9 @@ namespace PC.Component.Software.OS
                 fileNameInput.text = name.Substring(0, name.Length - ext.Length);
                 return;
             }
-            if (selected == lastClick && Time.unscaledTime - lastClickTime < .35f)
-            {
-                Enter();
-                return;
-            }
-            lastClick = selected;
-            lastClickTime = Time.unscaledTime;
+            // Without a separate Open button, a single tap enters a folder,
+            // goes back, or selects a drive. Files only fill the name field.
+            Enter();
         }
 
         public void Enter()
