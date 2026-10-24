@@ -79,6 +79,24 @@ assert 'private void OnDestroy()' in code
 assert 'ClearTimeline();' in code
 assert 'FormatConverter.MovToString' in code and 'dlg.ShowDialog' in code
 assert 'FormatConverter.StringToMov' in code
+# Tiny sources must use point sampling in thumbnails, including GIFs enlarged
+# to a user-selected output size. Large images keep normal sampling.
+assert 'tex.width < thumbWidth || tex.height < thumbHeight' in code
+assert 'tex.filterMode = FilterMode.Point;' in code
+assert 'thumbnailSize.sizeDelta.x' in code and 'thumbnailSize.sizeDelta.y' in code
+assert 'if (pixelArt && (width > original.width || height > original.height))' in code
+assert 'original.filterMode = FilterMode.Point;' in code
+assert 'result.filterMode = FilterMode.Point;' in code
+# A real video import progress bar is presented during Prepare and decoding,
+# derives percentage from media time/duration, and closes on every exit path.
+assert 'ShowVideoProgress();' in code
+assert 'private void SetVideoProgress(float fraction)' in code
+assert 'duration = player.length;' in code
+assert 'playbackTime / duration' in code
+assert 'SetVideoProgress(1f);' in code
+assert 'HideVideoProgress();' in code
+assert 'public void CancelVideoImport()' in code
+assert 'if (mediaImport != null) { StopCoroutine(mediaImport); mediaImport = null; }' in code
 # Resolution dialog/controls must be prefab-owned, interactable and initially
 # hidden, not improvised after the device file picker opens.
 animator_go = by_name['Animator'][1]
@@ -94,7 +112,29 @@ assert modal_rect['m_AnchorMax'] == {'x': 1, 'y': 1}
 assert modal_rect['m_SizeDelta'] == {'x': 0, 'y': 0}
 assert modal_rect['m_Children'] == [{'fileID': by_name['Resolution panel'][1]['m_Component'][0]['component']['fileID']}]
 root_rect = blocks[animator_go['m_Component'][0]['component']['fileID']][1]
-assert root_rect['m_Children'][-1]['fileID'] == modal_go['m_Component'][0]['component']['fileID']
+assert root_rect['m_Children'][-2]['fileID'] == modal_go['m_Component'][0]['component']['fileID']
+progress_id, progress_go = by_name['Video import progress']
+progress_rect = blocks[progress_go['m_Component'][0]['component']['fileID']][1]
+assert animator_component['videoProgressDialog']['fileID'] == progress_id
+assert progress_go['m_IsActive'] == 0
+assert progress_rect['m_Father']['fileID'] == animator_go['m_Component'][0]['component']['fileID']
+assert progress_rect['m_AnchorMin'] == {'x': 0, 'y': 0}
+assert progress_rect['m_AnchorMax'] == {'x': 1, 'y': 1}
+assert root_rect['m_Children'][-1]['fileID'] == progress_go['m_Component'][0]['component']['fileID']
+fill_id = animator_component['videoProgressFill']['fileID']
+fill_rect = blocks[fill_id][1]
+assert fill_rect['m_AnchorMin'] == {'x': 0, 'y': 0}
+assert fill_rect['m_AnchorMax'] == {'x': 0, 'y': 1}
+assert fill_rect['m_Father']['fileID'] == by_name['Video progress track'][1]['m_Component'][0]['component']['fileID']
+assert animator_component['videoProgressLabel']['fileID'] in [
+    c['component']['fileID'] for c in by_name['Video progress status'][1]['m_Component']]
+cancel_go = by_name['Cancel video import'][1]
+cancel_buttons = [blocks[c['component']['fileID']][1] for c in cancel_go['m_Component']
+                  if 'm_OnClick' in blocks[c['component']['fileID']][1]]
+assert len(cancel_buttons) == 1
+cancel_call = cancel_buttons[0]['m_OnClick']['m_PersistentCalls']['m_Calls'][0]
+assert cancel_call['m_MethodName'] == 'CancelVideoImport'
+assert cancel_call['m_Target']['fileID'] in blocks
 for attr, go_name in [('importWidthInput', 'Import width'), ('importHeightInput', 'Import height')]:
     control_id = animator_component[attr]['fileID']
     assert control_id in [c['component']['fileID'] for c in by_name[go_name][1]['m_Component']]
@@ -115,5 +155,5 @@ for name, method_name in [('Choose file', 'ConfirmImportResolution'),
     call = buttons[0]['m_OnClick']['m_PersistentCalls']['m_Calls'][0]
     assert call['m_Target']['fileID'] in blocks
     assert call['m_MethodName'] == method_name
-print('PASS: Animator prefab native GIF/video controls, device pickers, bounded decoding and cleanup')
+print('PASS: Animator prefab, crisp tiny thumbnails, device import progress, bounds and cleanup')
 print('NOTE: Real media import and rendering still require Unity Play Mode on a supported device')

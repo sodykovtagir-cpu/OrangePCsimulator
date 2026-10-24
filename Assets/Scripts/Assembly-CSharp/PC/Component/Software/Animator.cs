@@ -75,6 +75,9 @@ namespace PC.Component.Software
         [SerializeField] private InputField importWidthInput;
         [SerializeField] private InputField importHeightInput;
         [SerializeField] private Text importResolutionMessage;
+        [SerializeField] private GameObject videoProgressDialog;
+        [SerializeField] private RectTransform videoProgressFill;
+        [SerializeField] private Text videoProgressLabel;
         private bool importGifSelected;
         private const int MaxImportDimension = 512;
         private const int MaxGifPixels = 12000000;
@@ -159,6 +162,15 @@ namespace PC.Component.Software
 			var btn = UnityEngine.Object.Instantiate(framePrefab, frameParent);
             if (btn == null) return;
 
+            // Tiny source frames are magnified in the timeline. Nearest-neighbor
+            // sampling keeps their pixels crisp instead of blurring the icon.
+            var thumbnailSize = btn.GetComponent<RectTransform>();
+            float thumbWidth = thumbnailSize != null ?
+                Mathf.Max(64f, Mathf.Max(thumbnailSize.rect.width, thumbnailSize.sizeDelta.x)) : 64f;
+            float thumbHeight = thumbnailSize != null ?
+                Mathf.Max(64f, Mathf.Max(thumbnailSize.rect.height, thumbnailSize.sizeDelta.y)) : 64f;
+            if (tex.width < thumbWidth || tex.height < thumbHeight)
+                tex.filterMode = FilterMode.Point;
 			var raw = btn.GetComponent<UnityEngine.UI.RawImage>();
 			if (raw != null) raw.texture = tex;
 
@@ -361,11 +373,17 @@ namespace PC.Component.Software
             Texture2D result = null;
             try
             {
+                // Small GIFs often contain pixel art. Keep hard edges when
+                // scaling those frames up to the resolution chosen for import.
+                bool pixelArt = original.width <= 64 || original.height <= 64;
+                if (pixelArt && (width > original.width || height > original.height))
+                    original.filterMode = FilterMode.Point;
                 Graphics.Blit(original, target);
                 RenderTexture.active = target;
                 result = new Texture2D(width, height, TextureFormat.RGBA32, false);
                 result.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 result.Apply();
+                if (original.filterMode == FilterMode.Point) result.filterMode = FilterMode.Point;
                 return result;
             }
             catch
@@ -435,8 +453,33 @@ namespace PC.Component.Software
         // Unity VideoPlayer decodes actual media on the player's device. The
         // .mov stored by PCOS is a different, PNG-frame format and is NOT sent
         // to this player. Sample short native clips at eight frames per second.
+        private void ShowVideoProgress()
+        {
+            if (videoProgressDialog == null) return;
+            if (videoProgressFill != null)
+                videoProgressFill.anchorMax = new Vector2(0f, 1f);
+            if (videoProgressLabel != null) videoProgressLabel.text = "Preparing video...";
+            videoProgressDialog.SetActive(true);
+            videoProgressDialog.transform.SetAsLastSibling();
+        }
+
+        private void SetVideoProgress(float fraction)
+        {
+            fraction = Mathf.Clamp01(fraction);
+            if (videoProgressFill != null)
+                videoProgressFill.anchorMax = new Vector2(fraction, 1f);
+            if (videoProgressLabel != null)
+                videoProgressLabel.text = "Importing video: " + Mathf.RoundToInt(fraction * 100f) + "%";
+        }
+
+        private void HideVideoProgress()
+        {
+            if (videoProgressDialog != null) videoProgressDialog.SetActive(false);
+        }
+
         private IEnumerator ImportVideoFrames(string path, Vector2Int resolution)
         {
+            ShowVideoProgress();
             var pictures = new List<Texture2D>();
             pendingVideoFrames = pictures;
             bool committed = false;
@@ -468,6 +511,13 @@ namespace PC.Component.Software
                     importRender.Create();
                     player.targetTexture = importRender;
                     player.Play();
+                    // Known durations yield real progress; for streams without
+                    // metadata fall back to the 12-second import limit.
+                    double duration = player.length;
+                    if (double.IsNaN(duration) || double.IsInfinity(duration) || duration <= 0)
+                        duration = (double)MaxImportFrames / ImportFps;
+                    duration = Math.Min(duration, (double)MaxImportFrames / ImportFps);
+                    SetVideoProgress(0f);
                     double nextSample = 0.0;
                     long previousFrame = -1;
                     float started = Time.realtimeSinceStartup;
@@ -486,6 +536,13 @@ namespace PC.Component.Software
                             previousFrame = frame;
                             nextSample = (double)pictures.Count / ImportFps;
                         }
+                        // 99% is reserved until the frames are attached to the
+                        // Animator; do not claim completion just because video
+                        // decoding reached the end of the playable segment.
+                        double playbackTime = player.time;
+                        if (double.IsNaN(playbackTime) || double.IsInfinity(playbackTime) ||
+                            playbackTime < 0) playbackTime = 0;
+                        SetVideoProgress(Mathf.Min(.99f, (float)(playbackTime / duration)));
                         if (!player.isPlaying && (frame >= 0 ||
                             Time.realtimeSinceStartup - started > 1f)) break;
                         if (player.time >= (double)MaxImportFrames / ImportFps) break;
@@ -495,8 +552,13 @@ namespace PC.Component.Software
                 {
                     ReplaceImportedFrames(pictures.ToArray(), ImportFps);
                     committed = true;
+                    // The timeline owns these textures now; cancelling while
+                    // the 100% state is shown must not destroy imported frames.
+                    pendingVideoFrames = null;
+                    SetVideoProgress(1f);
                     if (pictures.Count == MaxImportFrames)
                         ImportFailure("Imported the first 12 seconds (96 frames). Longer clips are truncated.");
+                    yield return null; // Let the full bar be visible for a frame.
                 }
                 else ImportFailure(importError ?? "Video could not be decoded on this device.");
             }
@@ -504,6 +566,7 @@ namespace PC.Component.Software
             {
                 if (!committed) DestroyImported(pictures.ToArray());
                 pendingVideoFrames = null;
+                HideVideoProgress();
                 TeardownVideoImport();
                 mediaImport = null;
             }
@@ -555,7 +618,7 @@ namespace PC.Component.Software
             if (importHost != null) { Destroy(importHost); importHost = null; }
         }
 
-        private void CancelVideoImport()
+        public void CancelVideoImport()
         {
             if (mediaImport != null) { StopCoroutine(mediaImport); mediaImport = null; }
             // Explicitly free captures even on Unity versions that do not
@@ -565,6 +628,7 @@ namespace PC.Component.Software
                 DestroyImported(pendingVideoFrames.ToArray());
                 pendingVideoFrames = null;
             }
+            HideVideoProgress();
             TeardownVideoImport();
         }
 
