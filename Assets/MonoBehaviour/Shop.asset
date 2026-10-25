@@ -21,6 +21,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0c8ac4837b5219b4ea62f5322974b990, type: 2}
   - pageName: Cables & Power
     item:
+    - {fileID: 11400000, guid: d8b8b03aee364caaadc05f28625041e9, type: 2}
     - {fileID: 11400000, guid: 424d269631234fb7b980d80a4facfc29, type: 2}
     - {fileID: 11400000, guid: 14169cf57ea9482685dbe7c767d3a0f7, type: 2}
     - {fileID: 11400000, guid: 07ab8d7127cf4092aaf72a86e30840ae, type: 2}

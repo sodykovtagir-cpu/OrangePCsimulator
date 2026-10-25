@@ -18,10 +18,21 @@ namespace PC.Component.Cabling
             if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
-                Vector3.Distance(other.Connected.transform.position, port.transform.position) > Cable.Length * .95f)
+                Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
                 return false;
-            if (!restoring && Vector3.Distance(transform.position, port.transform.position) > .18f) return false;
-            transform.position = port.transform.position;
+            if (!restoring && Vector3.Distance(transform.position, port.TriggerCenter) > port.CaptureRadius) return false;
+            // Enlarged outlet triggers overlap. Pick the nearest free socket
+            // rather than whichever OnTriggerStay happens to run first.
+            if (!restoring && port.kind == PortKind.Outlet && port.owner != null)
+            {
+                float distance = Vector3.Distance(transform.position, port.Snap.position);
+                foreach (var otherPort in port.owner.GetComponentsInChildren<CablePort>(true))
+                    if (otherPort != port && otherPort.kind == PortKind.Outlet &&
+                        otherPort.plug == null && otherPort.Powered &&
+                        Vector3.Distance(transform.position, otherPort.Snap.position) < distance)
+                        return false;
+            }
+            transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
             var rb = GetComponent<Rigidbody>();
             rb.velocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
@@ -30,8 +41,8 @@ namespace PC.Component.Cabling
             pin.autoConfigureConnectedAnchor = false;
             pin.anchor = Vector3.zero;
             pin.connectedAnchor = pin.connectedBody != null
-                ? pin.connectedBody.transform.InverseTransformPoint(port.transform.position)
-                : port.transform.position;
+                ? pin.connectedBody.transform.InverseTransformPoint(port.Snap.position)
+                : port.Snap.position;
             pin.enableCollision = false;
             Connected = port;
             port.plug = this;

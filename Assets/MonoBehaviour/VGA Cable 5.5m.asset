@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: VGA Cable 5.5m
   m_EditorClassIdentifier:
-  itemName: '{VGA Cable} 5.5m'
+  itemName: '{VGA Cable} 11m'
   price: 112
   bitcoin: 0
   sprite: {fileID: 21300000, guid: ebd7cc47e45c4037b8f555796dffb3b3, type: 2}
   spawn: {fileID: 100000, guid: c47bfee1531a4661a8e5fd50e2eb1470, type: 2}
   large: 1
   translateDescription: 0
-  description: Drag the plugs to compatible ports. Maximum length 5.5 m.
+  description: Drag either plug to a compatible socket. Length 11 m.

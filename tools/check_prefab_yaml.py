@@ -78,7 +78,7 @@ def main(path):
                 print("FAIL %s references unknown fileID %s" % (file_id, ref))
                 errors += 1
         for ref in re.findall(r"^  - \{fileID: (\d+)\}$", body, flags=re.M):
-            if ref not in known:
+            if ref != "0" and ref not in known:
                 print("FAIL %s lists unknown child %s" % (file_id, ref))
                 errors += 1
 

@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: Power Cable 1.5m
   m_EditorClassIdentifier:
-  itemName: '{Power Cable} 1.5m'
+  itemName: '{Power Cable} 3m'
   price: 52
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 2c9bab45c7b7400698be14b8500a9009, type: 2}
   spawn: {fileID: 100000, guid: 1e745b7de9d440b192341ebe05fac604, type: 2}
   large: 1
   translateDescription: 0
-  description: Drag the plugs to compatible ports. Maximum length 1.5 m.
+  description: Drag either plug to a compatible socket. Length 3 m.

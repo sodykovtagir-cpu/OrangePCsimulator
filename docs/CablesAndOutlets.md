@@ -1,21 +1,39 @@
-# Physical PC wiring (Unity Play Mode checklist)
+# Кабели: подготовка префабов для ручной расстановки
 
-## Shop and installation
+Это **первый этап**. Система, редактируемые штекеры/триггеры, физика и шаблоны готовы. Координаты на конкретных моделях пока **не перенесены по семействам**: сначала владелец проекта вручную ставит эталонные порты и присылает изменённые prefab + `.meta` (или коммит). Не выдавать временное автоматическое положение за точное расположение сокетов.
 
-- The **Cables & Power** page sells 2- and 3-socket wall outlets and three length variants of **each** cable: AC (1.5/3/5 m), VGA (1.5/3.5/5.5 m), HDMI (2/4/6 m).
-- Move an outlet against a wall as you would a wall shelf. Its existing `Hook` fixes it in place; it only supplies power while mounted. Each numbered socket accepts one plug. Unmounting it cuts connected power.
-- Grab either solid plug using the game's existing object-drag controls and bring it to a small matching rear-panel port. The wire body cannot be selected with the drag ray but is physically collidable; its joints and length limit remain active. Grab a connected plug to unplug it; snapping is temporarily suppressed while you pull it away.
-- Supply AC from the outlet to **both** the PC (PSU rear or accessible case AC port; mini-PC adapter/AC port) **and** the monitor. VGA fits only the CRT. HDMI fits the other displays. Connect the video cable's second plug to the GPU video port (blue) or motherboard video port (green), including the corresponding rear-case ports.
-- Both ends of a cable are interchangeable. Two devices or two outlets cannot be joined with a power cord; a video cord cannot connect two outputs or two inputs. Each port accepts one plug. Endpoints beyond 95% of the cable length are rejected.
+## Что редактировать в Unity
 
-## Expected behavior / smoke tests
+1. Открой prefab нужного устройства. В Project выбери prefab и выполни **Tools → Cables → Prepare sockets in selected prefab**. Команда только создаёт недостающие пары `CablePort` + `SphereCollider (Is Trigger)` + дочерний `Snap Pivot`; координаты НЕ считает «правильными». Альтернатива — перетащить `Assets/Resources/components/Cable Socket TEMPLATE.prefab` внутрь prefab, переименовать его корень согласно таблице ниже, задать тип, переместить trigger и Snap Pivot вручную. Когда скрипт устройства устанавливает порт, он привязывает `owner` и нужный `kind`, не двигая авторский trigger. Порт можно размещать глубоко в иерархии, но под **своим Item**; нельзя вложить порт GPU под другой Item и ожидать, что он привяжется к видеокарте.
+2. Передвигай **корень порта** к модели разъёма и настрой радиус `SphereCollider` (начальный радиус .42 м на устройствах, .28 м на розетке). Двигай `Snap Pivot` в точку, где должен остановиться и повернуться штекер; жёлтая точка и луч — положение и направление. Это **разные** координаты: триггер может быть снаружи корпуса, а посадочное место — в гнезде. Не добавляй `Rigidbody` на порт. У модели гнезда собственный видимый меш; временные кубики добавляются только к автоматическим портам, не к твоим.
+3. В каждом из 9 префабов кабелей есть дочерние `Plug A` и `Plug B` с Rigidbody/BoxCollider/CablePlug. Вложи свои меши вилок под эти объекты, оставив их корневые компоненты; временный кубик создаётся только если не найден ни один Renderer. Корневой `CableItem` уже содержит LineRenderer и редактируемый материал (`Assets/Material/Cable *.mat`) для цельной толстой оболочки; физические капсулы не самосталкиваются, но сталкиваются с миром. Толщина задаётся `cableDiameter` в CableItem (первоначально .14 м): при запуске она применяется и к оболочке, и к физической цепи. Существующие технические имена файлов и `spawnId` сохранены ради совместимости сохранений; **видимые** названия и длины в магазине — новые.
+4. Для блока питания поставь порт `AC input` на заднюю сторону БП, а не на переднюю плоскость его BoxCollider. Если сплошной BoxCollider корпуса перекрывает *реальную* дыру под БП, перетащи `PSU Opening TEMPLATE.prefab` дочерним объектом в prefab корпуса и размести над дырой. В `CableCaseOpening` укажи перекрывающий `solidCase` BoxCollider (если не указан — выбирается содержащий маркер основной box); отредактируй `holeSize` под отверстие. При запуске этот **один** сплошной collider заменяется четырьмя бортиками, проход остаётся открытым, остальной корпус твёрдый. Не отключай все коллизии корпуса и не увеличивай размер отверстия без нужды.
+5. Есть prefab **Wall Outlet 1**, также товар в `Cables & Power`. Можно заменить временную внешность всех трёх розеток на свои модели; в prefab каждой розетки расставить `Outlet 1`, `Outlet 2`, `Outlet 3` по числу гнёзд. После настенного монтажа розетки питаются автоматически.
 
-1. Old saves also require new wiring: PC cannot start without an energized PSU/adapter cord. An unpowered monitor is black; powered monitor without valid video shows No Signal.
-2. CRT rejects HDMI; other monitors reject VGA. A GPU cable outputs via an installed, working GPU. Motherboard video needs a working CPU with integrated graphics; without it the powered monitor shows No Signal. Only the selected GPU can create VRAM artifacts on that monitor.
-3. Pulling either PC power plug or unmounting an outlet powers the PC off. Pulling only video/power from the display removes the picture without breaking the PC. Reinsert to restore it.
-4. Save and reload: sockets, cable endpoint positions and their links to a case, monitor, PSU, GPU, motherboard and outlets should survive. Buying two identical cables at the same delivery point must not be deduplicated on load.
-5. For collision, drag the middle cable around a table/wall and verify the cable capsule bodies cannot cross solid colliders. On an idle powered PC the rope bodies sleep: no per-frame mesh rebuilding or whole-room scan is performed.
+### Имена для портов (оставь их такими для сохранений)
 
-The game generates connector markers once per device; a designer can override each location by adding a child with the listed connector name to its prefab. Power sockets do not require adding wiring into scene walls.
+| Устройство | Имена дочерних объектов с CablePort |
+| --- | --- |
+| Видеокарта | `GPU video` |
+| БП | `AC input` |
+| Материнская плата | `Board video` |
+| Мини-ПК / интегрированная плата | `Board video`, `Mini PC AC input` |
+| CRT монитор | `VGA input`, `Display AC input` |
+| Остальные мониторы / ТВ / проекторы | `HDMI input`, `Display AC input` |
+| Корпус (доступный задний ввод) | `Case AC input`, `Case board video`, `Case GPU video` |
+| Розетка | `Outlet 1` (и `Outlet 2`/`Outlet 3`) |
 
-**Important:** Static source and prefab checks cannot substitute for Unity 2022.3 Play Mode, particularly joint stability and rear-panel position on every hardware model.
+### Эталоны, которые расставляет владелец проекта
+
+- `RTX 3090` → все RTX; `GTX 1060` → все GTX, Titan V и MTS Radeon. Отдельно GT 440, GT 1030, RX 5080.
+- `300W` → остальные блоки питания; `2000W` отдельно.
+- Большой телевизор, телевизор, изогнутый, плоский, стандартный чёрный монитор → стандартный белый; другой белый → цветные; CRT, проектор, напольный, портативный — отдельно.
+- `ATX` → семейство ATX; `ITX` → семейство ITX. `x32box` отдельно.
+
+**Важно:** переносить координаты/повороты на варианты только после получения вручную исправленных prefab. Для устройств, которые ещё не подготовлены, остаётся старый временный автопорт, чтобы существующие сборки не лишились гнёзд во время перехода. Не копировать слепо мировые координаты между моделями с разным масштабом; использовать локальные transform эталона и проверять в Unity.
+
+## Длины и проверки
+
+Магазин: питание 3/6/10 м, VGA 3/7/11 м, HDMI 4/8/12 м. Два конца кабеля можно подключать в любом порядке. ПК и монитор питаются **отдельными** шнурами; CRT получает только VGA, прочие дисплеи — HDMI. Выход материнской платы требует работающей встроенной графики; мини-ПК тоже требует свой кабель питания. Длину между Snap Pivot двух гнёзд нельзя превысить. Старые сохранения не получают автоматического обхода питания/видео.
+
+Тест в Unity: купить короткий и длинный кабель, поднять/бросить без распада цепи, протащить по столу и через подготовленное отверстие корпуса к БП, подключить каждый конец, отключить и загрузить сохранение. Автотест исходников `python3 tools/test_physical_cables.py` проверяет ссылки/геометрию YAML, **но не воспроизводит физику в Play Mode**. Если цепь вновь рвётся, нужен короткий видеоролик и первые ошибки Physics/Console.
