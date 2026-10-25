@@ -44,17 +44,9 @@ public class GpuArtifacts : MonoBehaviour
 
     private float Strength()
     {
-        if (display == null || !display.Power || display.ConnectedBoard == null) return 0f;
-        var cards = display.ConnectedBoard.GetHardwares(HardwareType.GPU);
-        float strength = 0f;
-        if (cards != null)
-            foreach (var item in cards)
-            {
-                var gpu = item as GPU;
-                if (gpu != null && !gpu.Damaged)
-                    strength = Mathf.Max(strength, gpu.ArtifactStrength);
-            }
-        return Mathf.Clamp01(strength);
+        if (display == null || !display.Power || !display.VideoFromGpu || display.ConnectedBoard == null) return 0f;
+        var gpu = display.VideoGpu;
+        return gpu != null && !gpu.Damaged ? Mathf.Clamp01(gpu.ArtifactStrength) : 0f;
     }
 
     private void EnsureView()

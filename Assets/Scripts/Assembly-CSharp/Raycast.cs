@@ -497,6 +497,11 @@ public class Raycast : MonoBehaviour
                     return;
                 }
 
+                // Pulling a plug releases it from its socket before the spring
+                // takes over; the other end and physical cable remain in place.
+                var plug = hitRb.GetComponent<PC.Component.Cabling.CablePlug>();
+                if (plug != null) plug.Unplug();
+
                 if (!spring)
                 {
                     var go = new GameObject("Rigidbody dragger");
@@ -639,7 +644,7 @@ public class Raycast : MonoBehaviour
         var mb = FindMotherboard(t);
         if (!mb) return false;
 
-        mb.ConnectMonitor(selectedMonitor);
+        Main.Instance?.FadeText("Use a VGA or HDMI cable: drag both plugs into the monitor and PC ports.");
         ConfigurationStateChanged?.Invoke(true);
         return true;
     }

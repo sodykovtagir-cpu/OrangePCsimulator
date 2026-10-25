@@ -146,6 +146,7 @@ namespace PC.Component
         {
 			Source = GetComponent<AudioSource>();
 			AddExternal(external);
+            PC.Component.Cabling.CablePorts.Install(this);
         }
 
 		public void Switch()
@@ -173,6 +174,8 @@ namespace PC.Component
 
 		public string Boot()
 		{
+            if (!PC.Component.Cabling.CablePower.BoardHasPower(this))
+                return "<color=red>Connect the PC power cable to a wall outlet.</color>";
 			if (!Done(out var message))
 			{
 				// Сообщение на экране в хардкоре не показывается -- это правило
@@ -344,9 +347,9 @@ namespace PC.Component
 
 				if (monitor != null)
 				{
-					monitor.Switch(true, false);
 					monitor.AllowZoom(true);
 				}
+                PC.Component.Cabling.CablePower.RefreshAll();
 				var main = Main.Instance;
 				if (main != null && !main.example)
 				{
@@ -426,6 +429,7 @@ namespace PC.Component
 				Destroy(System.gameObject);
 			}
 
+            PC.Component.Cabling.CablePower.RefreshAll();
 			if (restart)
 			{
 				Invoke("Boot", 1f);
@@ -941,15 +945,8 @@ namespace PC.Component
 			// System/boot.bin на встроенной памяти.
 			BuiltInDisksFromData(jObject["builtInDisks"] as JArray);
 
-			if (id != 0)
-			{
-				var main = Main.Instance;
-				if (main)
-				{
-					var disp = main.GetItemById(id) as Display;
-					if (disp) ConnectMonitor(disp);
-				}
-			}
+            // Saved monitor links from old versions are intentionally ignored:
+            // every display now requires an actual powered video cable.
 
 			base.FromData(jObject);
 		}

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -327,7 +328,18 @@ public class SaveManager : MonoBehaviour
             }
             else TryRestoreLegacySlot(pair.Item2, restored);
         }
+        StartCoroutine(RestoreCableConnections());
         return failCount;
+    }
+
+    private IEnumerator RestoreCableConnections()
+    {
+        // Port owners and slot-attached hardware need their Start/slot pass
+        // before restoring joints, otherwise saved endpoints attach to air.
+        yield return null;
+        yield return null;
+        foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
+            cable.RestorePorts();
     }
 
     private static bool HasSavedHost(List<Tuple<ItemData, Item>> restored, Item item)
@@ -460,6 +472,11 @@ public class SaveManager : MonoBehaviour
     {
         if (placed == null || it == null || string.IsNullOrEmpty(it.spawnId))
             return false;
+        // A cable root is an invisible spawn anchor: two separately purchased
+        // cables can share it while their plugs have different saved positions.
+        if (it.spawnId.StartsWith("Power Cable ", StringComparison.Ordinal) ||
+            it.spawnId.StartsWith("VGA Cable ", StringComparison.Ordinal) ||
+            it.spawnId.StartsWith("HDMI Cable ", StringComparison.Ordinal)) return false;
 
         Vector3 pos = it.pos;
 

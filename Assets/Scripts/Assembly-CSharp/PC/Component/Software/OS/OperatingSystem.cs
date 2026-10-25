@@ -391,6 +391,15 @@ namespace PC.Component.Software.OS
             }
             else workStrength = 0f;
 
+            // A display connected to the motherboard uses the CPU's iGPU for
+            // shell drawing; discrete GPU workloads (mining/benchmarks) remain
+            // on the card and are accounted independently.
+            if (Board.monitor != null && !Board.monitor.VideoFromGpu)
+            {
+                cpuDemand += 100f + Mathf.Min(.25f, gpuDemand) * capacity * .25f;
+                gpuDemand = Mathf.Max(0f, gpuDemand - .15f);
+            }
+
             // Reserve the mining device first; UI and benchmarks compete for the
             // remaining capacity, never reduce the miner's coins per second.
             if (gpuMining) { gpuDemand = 1f; cpuDemand += 180f; ramMb += 180; }

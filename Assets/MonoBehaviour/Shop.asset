@@ -19,6 +19,19 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0a6f558889b54ff9baea594fc2761e2f, type: 2}
     - {fileID: 11400000, guid: c61dbee05a8cb7244ac0af15c709fad9, type: 2}
     - {fileID: 11400000, guid: 0c8ac4837b5219b4ea62f5322974b990, type: 2}
+  - pageName: Cables & Power
+    item:
+    - {fileID: 11400000, guid: 424d269631234fb7b980d80a4facfc29, type: 2}
+    - {fileID: 11400000, guid: 14169cf57ea9482685dbe7c767d3a0f7, type: 2}
+    - {fileID: 11400000, guid: 07ab8d7127cf4092aaf72a86e30840ae, type: 2}
+    - {fileID: 11400000, guid: 8c481b3cb4ec44f49a1eb05fe2721a5c, type: 2}
+    - {fileID: 11400000, guid: fb853159f1d74f949d8a6f895ff6032d, type: 2}
+    - {fileID: 11400000, guid: 2bfa9035d8ea49b0a13dffc1279b5e75, type: 2}
+    - {fileID: 11400000, guid: 4a04dc4eb9cc4961baa0eba84051a2e5, type: 2}
+    - {fileID: 11400000, guid: a5840b4cac274ce0bef7a3d49a74d22b, type: 2}
+    - {fileID: 11400000, guid: 2103f7e1db1a4e1fa65c184ee0d4f414, type: 2}
+    - {fileID: 11400000, guid: a26633212ce34122aba12a6ce188058e, type: 2}
+    - {fileID: 11400000, guid: 810839c2e6ac49ad818a50146b375f71, type: 2}
   - pageName: Processor
     item:
     - {fileID: 11400000, guid: 475ac741b8c9f564aa6750287786d22e, type: 2}

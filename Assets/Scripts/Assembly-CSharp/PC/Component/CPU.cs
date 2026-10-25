@@ -161,6 +161,7 @@ namespace PC.Component
 		public override void Damage()
 		{
 			base.Damage();
+            PC.Component.Cabling.CablePower.RefreshAll();
 			StartCoroutine(nameof(Render));
 		}
 
