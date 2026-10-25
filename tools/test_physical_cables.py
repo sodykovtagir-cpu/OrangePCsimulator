@@ -31,6 +31,19 @@ assert 'plug.Unplug();' in read('Raycast.cs')
 assert 'RestoreCableConnections' in read('SaveManager.cs')
 assert 'VideoFromGpu' in read('PC/Component/Software/OS/OperatingSystem.cs')
 assert 'display.VideoGpu' in read('GpuArtifacts.cs')
+# CS0136 in Board() prevented Unity from compiling CableItem/OutletStrip,
+# which made every new prefab appear to have a missing script.
+assert 'var pcCase = connector.slot.GetComponentInParent<Case>();' not in read('PC/Component/Cabling/CablePorts.cs')
+
+def script_guid(relative):
+    meta=(code/(relative+'.meta')).read_text()
+    return re.search(r'^guid: ([a-f0-9]{32})$',meta,re.M).group(1)
+
+cable_script=script_guid('PC/Component/Cabling/CableItem.cs')
+outlet_script=script_guid('PC/Component/Cabling/OutletStrip.cs')
+hook_script=script_guid('Hook.cs')
+def prefab_scripts(prefab):
+    return re.findall(r'^  m_Script: \{fileID: 11500000, guid: ([a-f0-9]{32}), type: 3\}$',prefab,re.M)
 
 shop=(root/'Assets/MonoBehaviour/Shop.asset').read_text()
 assert 'pageName: Cables & Power' in shop
@@ -44,6 +57,7 @@ for kind in ('Power','VGA','HDMI'):
         text=p.read_text()
         assert check_prefab(str(p))==0
         assert f'spawnId: {p.stem}' in text
+        assert prefab_scripts(text)==[cable_script],p
         lengths.add(float(re.search(r'^  length: ([0-9.]+)$',text,re.M).group(1)))
         ids.append(re.search(r'^guid: ([a-f0-9]{32})$',p.with_suffix('.prefab.meta').read_text(),re.M).group(1))
     assert len(lengths)==3
@@ -51,6 +65,7 @@ for sockets in (2,3):
     p=root/f'Assets/Resources/components/Wall Outlet {sockets}.prefab'
     assert check_prefab(str(p))==0
     assert f'  sockets: {sockets}' in p.read_text()
+    assert prefab_scripts(p.read_text())==[hook_script,outlet_script],p
     ids.append(re.search(r'^guid: ([a-f0-9]{32})$',p.with_suffix('.prefab.meta').read_text(),re.M).group(1))
 assert len(set(ids))==11
 rows=(root/'Assets/Resources/Translate.txt').read_text().splitlines()

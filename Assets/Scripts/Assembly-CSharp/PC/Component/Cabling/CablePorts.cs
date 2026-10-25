@@ -78,9 +78,9 @@ namespace PC.Component.Cabling
                 var connector = supply.GetComponent<Connector>();
                 if (connector != null && connector.slot != null)
                 {
-                    var pcCase = connector.slot.GetComponentInParent<Case>();
-                    if (pcCase != null && pcCase.Motherboard != null)
-                        return pcCase.Motherboard.Hardware as Motherboard;
+                    var supplyCase = connector.slot.GetComponentInParent<Case>();
+                    if (supplyCase != null && supplyCase.Motherboard != null)
+                        return supplyCase.Motherboard.Hardware as Motherboard;
                 }
             }
             var pcCase = port.owner.GetComponent<Case>();
