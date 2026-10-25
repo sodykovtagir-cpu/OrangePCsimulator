@@ -38,9 +38,15 @@ assert 'CablePower.BoardHasPower(this)' in read('PC/Component/Motherboard.cs')
 assert 'CablePower.RefreshAll()' in read('PC/Component/Motherboard.cs')
 assert 'ConnectMonitor(selectedMonitor);' not in read('Raycast.cs')
 raycast=read('Raycast.cs')
-assert 'plug.Unplug();' in raycast
-assert 'plug.SetHeld(true)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
-assert '(!restoring && IsHeld)' in plug  # dragger must release before snapping
+assert 'plug.Unplug();' not in raycast  # connected plugs resist a grab
+assert 'plug.SetHeld(true, ReleaseHeldPlug)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
+assert 'releaseDrag?.Invoke(this)' in plug and 'private void ReleaseHeldPlug(' in raycast
+assert 'pin.breakForce = PullOutForce' in plug and 'OnJointBreak(float force)' in plug
+assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
+assert 'currentDrag.grabbedCable.HoldSection(null)' in raycast
+assert 'maxPullMass = 5f' in rope and 'CanPull(Rigidbody rb, int depth)' in rope
+assert 'PullOutIfOverloaded(tension)' in rope and 'yankedPort = old' in plug
+assert 'GetComponentInParent<PC.Component.Cabling.CableItem>()' in raycast
 assert 'CablePorts.Install(this)' not in read('PC/Component/Case.cs')
 assert 'Case AC input' not in read('PC/Component/Cabling/CablePorts.cs')
 assert 'Case board video' not in read('PC/Component/Cabling/CablePorts.cs')

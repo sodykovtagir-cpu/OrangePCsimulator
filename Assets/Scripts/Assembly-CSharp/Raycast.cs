@@ -25,6 +25,7 @@ public class Raycast : MonoBehaviour
 
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
+        public PC.Component.Cabling.CableItem grabbedCable;
 
     }
 
@@ -497,14 +498,14 @@ public class Raycast : MonoBehaviour
                     return;
                 }
 
-                // Pulling a plug releases it from its socket before the spring
-                // takes over; the other end and physical cable remain in place.
+                // Holding a connected plug does NOT unplug it. Its FixedJoint
+                // has the same break force as Slot; pulling can move light
+                // hardware before the connection finally yields.
                 var plug = hitRb.GetComponent<PC.Component.Cabling.CablePlug>();
-                if (plug != null)
-                {
-                    plug.Unplug();
-                    plug.SetHeld(true);
-                }
+                if (plug != null) plug.SetHeld(true, ReleaseHeldPlug);
+                var grabbedCable = hitRb.GetComponentInParent<PC.Component.Cabling.CableItem>();
+                if (plug == null && grabbedCable != null)
+                    grabbedCable.HoldSection(hitRb);
 
                 if (!spring)
                 {
@@ -522,7 +523,8 @@ public class Raycast : MonoBehaviour
                     target = hit.transform,
                     oldDrag = hitRb.drag,
                     oldAngularDrag = hitRb.angularDrag,
-                    oldConstrains = hitRb.constraints
+                    oldConstrains = hitRb.constraints,
+                    grabbedCable = plug == null ? grabbedCable : null
                 };
                 currentDrag = drag;
 
@@ -577,7 +579,16 @@ public class Raycast : MonoBehaviour
             }
         }
 
-        if (hit.transform && hit.transform.TryGetComponent<Item>(out var item))
+        // Plugs and jacket sections are child rigidbodies; show the cable's
+        // product name regardless of which of its many colliders was picked.
+        var cableItem = hit.transform ?
+            hit.transform.GetComponentInParent<PC.Component.Cabling.CableItem>() : null;
+        if (cableItem != null)
+        {
+            var value = cableItem.GetInfo();
+            if (!string.IsNullOrEmpty(value) && detailText) detailText.text = value;
+        }
+        else if (hit.transform && hit.transform.TryGetComponent<Item>(out var item))
         {
             var value = item.GetInfo();
             if (!string.IsNullOrEmpty(value) && detailText) detailText.text = value;
@@ -2310,6 +2321,15 @@ public class Raycast : MonoBehaviour
         drag.distance = (maxDistance - 2f) * v + 2f;
     }
 
+    private void ReleaseHeldPlug(PC.Component.Cabling.CablePlug plug)
+    {
+        if (plug == null || currentDrag == null || spring == null ||
+            spring.connectedBody != plug.GetComponent<Rigidbody>()) return;
+        var rb = spring.connectedBody;
+        End(); // detach the drag spring before CablePlug snaps to the port
+        if (selectedBody == rb) ClearSelection();
+    }
+
     public void End()
     {
         // Обычную мягкую пружину вернём до того, как отпустим тело
@@ -2355,6 +2375,7 @@ public class Raycast : MonoBehaviour
             // Even if the spring was interrupted, release the held-state so
             // OnTriggerStay can snap the plug on the next physics step.
             if (releasedPlug != null) releasedPlug.SetHeld(false);
+            if (currentDrag.grabbedCable != null) currentDrag.grabbedCable.HoldSection(null);
 
             if (distanceObj) distanceObj.SetActive(false);
             currentDrag = null;
