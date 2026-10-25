@@ -500,7 +500,11 @@ public class Raycast : MonoBehaviour
                 // Pulling a plug releases it from its socket before the spring
                 // takes over; the other end and physical cable remain in place.
                 var plug = hitRb.GetComponent<PC.Component.Cabling.CablePlug>();
-                if (plug != null) plug.Unplug();
+                if (plug != null)
+                {
+                    plug.Unplug();
+                    plug.SetHeld(true);
+                }
 
                 if (!spring)
                 {
@@ -2319,6 +2323,8 @@ public class Raycast : MonoBehaviour
 
         if (currentDrag != null)
         {
+            var releasedPlug = currentDrag.target
+                ? currentDrag.target.GetComponentInParent<PC.Component.Cabling.CablePlug>() : null;
             StopCoroutine("DragObject");
 
             if (spring && spring.connectedBody)
@@ -2346,6 +2352,9 @@ public class Raycast : MonoBehaviour
 
                 spring.connectedBody = null;
             }
+            // Even if the spring was interrupted, release the held-state so
+            // OnTriggerStay can snap the plug on the next physics step.
+            if (releasedPlug != null) releasedPlug.SetHeld(false);
 
             if (distanceObj) distanceObj.SetActive(false);
             currentDrag = null;

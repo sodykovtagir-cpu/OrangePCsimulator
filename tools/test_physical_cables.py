@@ -27,7 +27,14 @@ assert all(x in power for x in ('Energized', 'BoardHasPower', 'VideoPort', 'cpu.
 assert 'CablePower.BoardHasPower(this)' in read('PC/Component/Motherboard.cs')
 assert 'CablePower.RefreshAll()' in read('PC/Component/Motherboard.cs')
 assert 'ConnectMonitor(selectedMonitor);' not in read('Raycast.cs')
-assert 'plug.Unplug();' in read('Raycast.cs')
+raycast=read('Raycast.cs')
+assert 'plug.Unplug();' in raycast
+assert 'plug.SetHeld(true)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
+assert '(!restoring && IsHeld)' in plug  # dragger must release before snapping
+assert 'CablePorts.Install(this)' not in read('PC/Component/Case.cs')
+assert 'Case AC input' not in read('PC/Component/Cabling/CablePorts.cs')
+assert 'Case board video' not in read('PC/Component/Cabling/CablePorts.cs')
+assert 'Case GPU video' not in read('PC/Component/Cabling/CablePorts.cs')
 assert 'RestoreCableConnections' in read('SaveManager.cs')
 assert 'VideoFromGpu' in read('PC/Component/Software/OS/OperatingSystem.cs')
 assert 'display.VideoGpu' in read('GpuArtifacts.cs')
@@ -40,6 +47,7 @@ assert all(side in read('PC/Component/Cabling/CableCaseOpening.cs')
 editor_sockets=(root/'Assets/Editor/PrepareCableSockets.cs').read_text()
 assert 'Prepare sockets in selected prefab' in editor_sockets
 assert 'GetComponentsInChildren<PC.Component.Display>' in editor_sockets  # UnityEngine.Display is ambiguous
+assert 'Case AC input' not in editor_sockets and 'Case GPU video' not in editor_sockets
 
 def script_guid(relative):
     meta=(code/(relative+'.meta')).read_text()

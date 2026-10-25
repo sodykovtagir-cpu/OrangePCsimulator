@@ -37,14 +37,6 @@ public static class PrepareCableSockets
                     crt ? "VGA input" : "HDMI input");
                 added += Add(display, PortKind.MonitorPower, "Display AC input");
             }
-            foreach (var pcCase in root.GetComponentsInChildren<Case>(true))
-            {
-                var item = pcCase.GetComponent<Item>();
-                if (item == null) continue;
-                added += Add(item, PortKind.PcPower, "Case AC input");
-                added += Add(item, PortKind.BoardVideo, "Case board video");
-                added += Add(item, PortKind.GpuVideo, "Case GPU video");
-            }
             foreach (var strip in root.GetComponentsInChildren<OutletStrip>(true))
             {
                 var item = strip.GetComponent<Item>();

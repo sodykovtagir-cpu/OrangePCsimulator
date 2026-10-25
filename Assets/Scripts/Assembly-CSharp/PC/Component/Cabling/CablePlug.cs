@@ -10,12 +10,16 @@ namespace PC.Component.Cabling
         public CablePort Connected { get; private set; }
         private FixedJoint pin;
         private float cooldown;
+        public bool IsHeld { get; private set; }
 
         public void Init(CableItem cable, int end) { Cable = cable; End = end; }
+        public void SetHeld(bool held) { IsHeld = held; }
 
         public bool TryInsert(CablePort port, bool restoring = false)
         {
-            if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
+            // Wait until the player's spring drag has been detached. Otherwise
+            // the plug is snapped and simultaneously pulled away from its port.
+            if ((!restoring && IsHeld) || Time.time < cooldown || port == null || !port.Accepts(this)) return false;
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
                 Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
@@ -62,6 +66,7 @@ namespace PC.Component.Cabling
             CablePower.RefreshAll();
         }
 
+        private void OnDisable() { IsHeld = false; }
         private void OnDestroy() { Unplug(); }
     }
 }
