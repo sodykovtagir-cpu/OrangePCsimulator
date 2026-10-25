@@ -46,6 +46,13 @@ assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
 assert 'currentDrag.grabbedCable.HoldSection(null)' in raycast
 assert 'maxPullMass = 5f' in rope and 'CanPull(Rigidbody rb, int depth)' in rope
 assert 'PullOutIfOverloaded(tension)' in rope and 'yankedPort = old' in plug
+# The yanked-port lock must be cleared while the plug is AWAY, not only during
+# TryInsert (which is never called away from a port). Otherwise reinsertion is
+# blocked until the save is reloaded.
+assert 'private void RefreshYankedPort()' in plug
+assert 'if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;' in plug
+assert 'private void FixedUpdate()\n        {\n            RefreshYankedPort();' in plug
+assert 'if (port == yankedPort) return false;' in plug
 # The HDMI BoxCollider is offset from its Rigidbody origin. A port touching
 # its body must accept it even when the origin lies outside the trigger.
 assert 'solid.ClosestPoint(port.TriggerCenter)' in plug
