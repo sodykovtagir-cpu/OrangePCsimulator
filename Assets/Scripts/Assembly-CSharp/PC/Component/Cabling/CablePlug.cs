@@ -155,7 +155,7 @@ namespace PC.Component.Cabling
             return boardConnector.slot.GetComponentInParent<Case>();
         }
 
-        private void AddPairs(List<Pair> list, Component device, Item owner)
+        private void AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)
         {
             if (device == null || owner == null) return;
             var adjacent = Cable != null ? Cable.NearEndCollider(End) : null;

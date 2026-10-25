@@ -22,6 +22,7 @@ assert 'Physics' not in rope or 'CapsuleCollider' in rope
 assert all(x in rope for x in ('CapsuleCollider','CharacterJoint','Rigidbody','ContinuousSpeculative','Physics.IgnoreCollision', 'LineRenderer', 'Length', 'JObject', 'RestorePorts()'))
 assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f' in plug
 assert 'FixedJoint' in plug and 'connectedBody' in plug and 'cooldown' in plug
+assert 'AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)' in plug
 assert 'Physics.IgnoreCollision(ours, target, true)' in plug
 assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
 assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
