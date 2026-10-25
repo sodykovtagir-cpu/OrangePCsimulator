@@ -20,18 +20,20 @@ namespace PC.Component.Cabling
         public bool IsHeld { get; private set; }
 
         // Physics.IgnoreCollision is PER PAIR. Only this plug and the nearest
-        // rope capsule may pass through their own GPU and enclosing case; all
-        // other world/PC/cable contacts remain physical.
+        // rope capsule may pass through their own GPU (or an installed PSU)
+        // and enclosing case; all other world/PC/cable contacts remain physical.
         private struct Pair
         {
             public Collider plug;
             public Collider target;
         }
         private readonly List<Pair> gpuPairs = new List<Pair>();
+        private readonly List<Pair> psuPairs = new List<Pair>();
         private readonly List<Pair> casePairs = new List<Pair>();
         private readonly List<Pair> pendingRestore = new List<Pair>();
         private Coroutine restoreRoutine;
         private GPU watchedGpu;
+        private Supply watchedSupply;
         private Case currentCase;
         private CablePort approachPort;
         // Unity can miss a trigger callback when a small socket and a dragged
@@ -112,6 +114,14 @@ namespace PC.Component.Cabling
                 AddPairs(gpuPairs, gpu, gpu);
                 SyncCase();
             }
+            else if (port.kind == PortKind.PcPower && port.owner is Supply supply)
+            {
+                // A loose PSU keeps its collisions. Only when installed in a
+                // case may this plug and its adjacent segment pass through the
+                // PSU socket and that case's rear panel.
+                watchedSupply = supply;
+                SyncCase();
+            }
             approachPort = null;
             transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
             var rb = GetComponent<Rigidbody>();
@@ -137,13 +147,17 @@ namespace PC.Component.Cabling
         // exterior trigger; insertion now releases the grab automatically.
         public void PrepareApproach(CablePort port)
         {
-            if (!IsHeld || Connected != null || port == null ||
-                port.kind != PortKind.GpuVideo || !(port.owner is GPU gpu) || !port.Accepts(this)) return;
+            if (!IsHeld || Connected != null || port == null || !port.Accepts(this)) return;
+            var gpu = port.kind == PortKind.GpuVideo ? port.owner as GPU : null;
+            var supply = port.kind == PortKind.PcPower ? port.owner as Supply : null;
+            // The PSU exception is ONLY for one actually installed in a case.
+            if (gpu == null && (supply == null || FindCase(supply) == null)) return;
             if (approachPort == port) return;
             if (approachPort != null) LeaveApproach(approachPort);
             approachPort = port;
             watchedGpu = gpu;
-            AddPairs(gpuPairs, gpu, gpu);
+            watchedSupply = supply;
+            if (gpu != null) AddPairs(gpuPairs, gpu, gpu);
             SyncCase();
         }
 
@@ -152,8 +166,10 @@ namespace PC.Component.Cabling
             if (approachPort != port || Connected != null) return;
             approachPort = null;
             watchedGpu = null;
+            watchedSupply = null;
             currentCase = null;
             DeferRestore(gpuPairs);
+            DeferRestore(psuPairs);
             DeferRestore(casePairs);
         }
 
@@ -164,15 +180,17 @@ namespace PC.Component.Cabling
             // While the player holds the plug, also look for a genuinely nearby
             // port. This does not move authored triggers or snap from a distance.
             if (IsHeld && Connected == null) TryNearbyPort();
-            // A GPU may be wired while loose and then installed in a case.
+            // A GPU/PSU may be wired while loose and then installed in a case.
             // Reassert pairs after Unity resets them when a collider is toggled.
             if (Connected == null && approachPort != null &&
                 Vector3.Distance(transform.position, approachPort.TriggerCenter) >
                 approachPort.CaptureRadius + .25f)
                 LeaveApproach(approachPort);
-            if ((Connected == null && approachPort == null) || watchedGpu == null) return;
+            if ((Connected == null && approachPort == null) ||
+                (watchedGpu == null && watchedSupply == null)) return;
             SyncCase();
             Reinstate(gpuPairs);
+            Reinstate(psuPairs);
             Reinstate(casePairs);
         }
 
@@ -206,12 +224,14 @@ namespace PC.Component.Cabling
 
         private void SyncCase()
         {
-            var next = FindCase(watchedGpu);
+            var next = watchedGpu != null ? FindCase(watchedGpu) : FindCase(watchedSupply);
             if (next == currentCase) return;
             DeferRestore(casePairs);
+            DeferRestore(psuPairs);
             currentCase = next;
-            if (currentCase != null)
-                AddPairs(casePairs, currentCase.transform, currentCase.GetComponent<Item>());
+            if (currentCase == null) return;
+            if (watchedSupply != null) AddPairs(psuPairs, watchedSupply, watchedSupply);
+            AddPairs(casePairs, currentCase.transform, currentCase.GetComponent<Item>());
         }
 
         private static Case FindCase(GPU gpu)
@@ -228,6 +248,17 @@ namespace PC.Component.Cabling
             var boardConnector = board != null ? board.GetComponent<Connector>() : null;
             if (boardConnector == null || boardConnector.slot == null) return null;
             return boardConnector.slot.GetComponentInParent<Case>();
+        }
+
+        private static Case FindCase(Supply supply)
+        {
+            if (supply == null) return null;
+            var direct = supply.GetComponentInParent<Case>();
+            if (direct != null) return direct;
+            var connector = supply.GetComponent<Connector>();
+            var slot = connector != null ? connector.slot as HardwareSlot : null;
+            if (slot == null || !slot.Ready || slot.Hardware != supply) return null;
+            return slot.GetComponentInParent<Case>();
         }
 
         private void AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)
@@ -312,8 +343,10 @@ namespace PC.Component.Cabling
             if (pin != null) Destroy(pin);
             pin = null;
             watchedGpu = null;
+            watchedSupply = null;
             currentCase = null;
             DeferRestore(gpuPairs);
+            DeferRestore(psuPairs);
             DeferRestore(casePairs);
             cooldown = Time.time + .5f;
             CablePower.RefreshAll();
