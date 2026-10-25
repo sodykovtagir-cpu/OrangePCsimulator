@@ -25,6 +25,10 @@ namespace PC.Component.Cabling
         public CableKind Kind => kind;
         public float Length => length;
         public CablePlug End(int i) => plugs != null && i >= 0 && i < 2 ? plugs[i] : null;
+        // The first physical capsule meets the panel at an inset socket.
+        // Exempt only this short adjacent section from that panel's colliders.
+        public Collider NearEndCollider(int end) => bodies != null && bodies.Length > 0
+            ? bodies[end == 0 ? 0 : bodies.Length - 1].GetComponent<Collider>() : null;
 
         private void Awake()
         {

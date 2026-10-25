@@ -22,6 +22,15 @@ assert 'Physics' not in rope or 'CapsuleCollider' in rope
 assert all(x in rope for x in ('CapsuleCollider','CharacterJoint','Rigidbody','ContinuousSpeculative','Physics.IgnoreCollision', 'LineRenderer', 'Length', 'JObject', 'RestorePorts()'))
 assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f' in plug
 assert 'FixedJoint' in plug and 'connectedBody' in plug and 'cooldown' in plug
+assert 'Physics.IgnoreCollision(ours, target, true)' in plug
+assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
+assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
+assert 'port.kind == PortKind.GpuVideo && port.owner is GPU gpu' in plug
+assert 'slot.Hardware != gpu' in plug and 'AddPairs(casePairs' in plug
+assert 'Cable.NearEndCollider(End)' in plug
+assert 'candidate.PrepareApproach(this)' in ports and 'candidate.LeaveApproach(this)' in ports
+assert 'approachPort.CaptureRadius + .25f' in plug
+assert 'Physics.IgnoreLayerCollision' not in plug and 'Physics.IgnoreLayerCollision' not in rope
 assert 'Hooked' in outlet and 'sockets' in outlet and 'CablePort.Add' in outlet
 assert all(x in power for x in ('Energized', 'BoardHasPower', 'VideoPort', 'cpu.HasIntegratedGraphics', 'display.VideoGpu', 'board.PowerOff(false)', 'ShowNoSignal'))
 assert 'CablePower.BoardHasPower(this)' in read('PC/Component/Motherboard.cs')
@@ -79,7 +88,7 @@ for kind in ('Power','VGA','HDMI'):
         assert text.count('  m_Name: Plug ') == 2
         assert '  plugA: {fileID: 1140010}' in text and '  plugB: {fileID: 1140020}' in text
         assert '  jacket: {fileID: 1200000}' in text and 'LineRenderer:' in text
-        assert '  cableDiameter: .14' in text
+        assert float(re.search(r'^  cableDiameter: ([0-9.]+)$',text,re.M).group(1)) == .14
         material=root/f'Assets/Material/Cable {kind}.mat.meta'
         mat_guid=re.search(r'^guid: ([a-f0-9]{32})$',material.read_text(),re.M).group(1)
         assert mat_guid in text,p
