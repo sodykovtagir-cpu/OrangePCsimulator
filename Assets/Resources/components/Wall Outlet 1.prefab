@@ -319,8 +319,8 @@ MonoBehaviour:
   glue: 0
   detectInterval: 0.5
   detectDistance: 0.23
-  hookOffset: {x: 0, y: 0, z: -0.07}
-  hookDirection: {x: 0, y: 0, z: -1}
+  hookOffset: {x: 0, y: 0, z: 0.07}
+  hookDirection: {x: 0, y: 0, z: 1}
   fixSound: {fileID: 0}
   releaseSound: {fileID: 0}
   removeModeOnly: 1
