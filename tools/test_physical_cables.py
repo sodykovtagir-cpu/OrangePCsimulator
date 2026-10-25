@@ -28,6 +28,14 @@ assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
 assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
 assert 'port.kind == PortKind.GpuVideo && port.owner is GPU gpu' in plug
 assert 'slot.Hardware != gpu' in plug and 'AddPairs(casePairs' in plug
+# An installed PSU uses the GPU's scoped plug/adjacent-section exceptions;
+# a loose PSU, unrelated hardware and other cable segments stay collidable.
+assert 'private static Case FindCase(Supply supply)' in plug
+assert 'slot.Hardware != supply' in plug
+assert 'supply == null || FindCase(supply) == null' in plug
+assert 'port.kind == PortKind.PcPower && port.owner is Supply supply' in plug
+assert 'if (watchedSupply != null) AddPairs(psuPairs, watchedSupply, watchedSupply);' in plug
+assert 'Reinstate(psuPairs);' in plug and plug.count('DeferRestore(psuPairs);') >= 3
 assert 'Cable.NearEndCollider(End)' in plug
 assert 'candidate.PrepareApproach(this)' in ports and 'candidate.LeaveApproach(this)' in ports
 assert 'approachPort.CaptureRadius + .25f' in plug
@@ -142,7 +150,8 @@ for sockets in (1,2,3):
     p=root/f'Assets/Resources/components/Wall Outlet {sockets}.prefab'
     assert check_prefab(str(p))==0
     assert f'  sockets: {sockets}' in p.read_text()
-    assert prefab_scripts(p.read_text())==[hook_script,outlet_script],p
+    # Designer-authored Outlet 1/2/3 ports are part of these prefabs now.
+    assert prefab_scripts(p.read_text())==[hook_script,outlet_script]+[port_script]*sockets,p
     prefab_guid=re.search(r'^guid: ([a-f0-9]{32})$',p.with_suffix('.prefab.meta').read_text(),re.M).group(1)
     item=root/f'Assets/MonoBehaviour/Wall Outlet {sockets}.asset'
     assert prefab_guid in item.read_text(),p
