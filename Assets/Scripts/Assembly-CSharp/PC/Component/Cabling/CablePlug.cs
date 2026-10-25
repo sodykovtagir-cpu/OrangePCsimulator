@@ -48,6 +48,15 @@ namespace PC.Component.Cabling
             return (solid.ClosestPoint(port.TriggerCenter) - port.TriggerCenter).sqrMagnitude <=
                 reach * reach;
         }
+        // Re-arm an unplugged connector as soon as its collider has actually
+        // cleared the old trigger. This must run even when no insertion is being
+        // attempted: once the plug returns to the socket it is too late to
+        // infer that it left in between.
+        private void RefreshYankedPort()
+        {
+            if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;
+        }
+
         public void SetHeld(bool held, Action<CablePlug> onAutoSnap = null)
         {
             IsHeld = held;
@@ -60,14 +69,14 @@ namespace PC.Component.Cabling
 
         public bool TryInsert(CablePort port, bool restoring = false)
         {
+            // Do not let trigger events attach a saved plug to a nearby wrong
+            // socket before SaveManager has restored its original port.
+            if (!restoring && Cable != null && Cable.RestoringPhysics) return false;
             if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
-            // A yanked connector cannot magically reinsert itself while still
-            // overlapping the same large trigger. Move it clear first.
-            if (yankedPort != null)
-            {
-                if (!NearPort(yankedPort, .04f)) yankedPort = null;
-                else if (port == yankedPort) return false;
-            }
+            // Prevent immediate reinsertion inside the same trigger, but allow
+            // insertion again once FixedUpdate observed the plug leaving it.
+            RefreshYankedPort();
+            if (port == yankedPort) return false;
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
                 Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
@@ -150,6 +159,7 @@ namespace PC.Component.Cabling
 
         private void FixedUpdate()
         {
+            RefreshYankedPort();
             // Trigger events alone are not reliable for a small moving socket.
             // While the player holds the plug, also look for a genuinely nearby
             // port. This does not move authored triggers or snap from a distance.

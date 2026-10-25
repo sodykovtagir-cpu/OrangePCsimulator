@@ -25,8 +25,16 @@ namespace PC.Component.Cabling
         private readonly string[] restoredPorts = new string[2];
         private readonly Vector3[] restoredPositions = new Vector3[2];
         private bool restorePositions;
+        private bool restoringPhysics;
 
+        // The root is an invisible spawn anchor: dragging the physical cable
+        // moves its child rigidbodies, not this transform. SaveManager must use
+        // the visible cable instead of the portal's unchanged root position.
+        public Vector3 SavePosition => plugs != null && plugs[0] != null && plugs[1] != null
+            ? (plugs[0].transform.position + plugs[1].transform.position) * .5f
+            : transform.position;
         public CableKind Kind => kind;
+        public bool RestoringPhysics => restoringPhysics;
         public float Length => length;
         public CablePlug End(int i) => plugs != null && i >= 0 && i < 2 ? plugs[i] : null;
         // The first physical capsule meets the panel at an inset socket.
@@ -186,7 +194,7 @@ namespace PC.Component.Cabling
 
         private void FixedUpdate()
         {
-            if (plugs == null || bodies == null) return;
+            if (plugs == null || bodies == null || restoringPhysics) return;
             // Physics joints alone can stretch when a rope of many segments is
             // pulled quickly. Supplement their force only while the player is
             // holding a plug or section, and only once that span is nearly taut.
@@ -281,8 +289,12 @@ namespace PC.Component.Cabling
             {
                 var plug = End(i);
                 if (plug == null) continue;
-                data["cablePos" + i] = new JObject { ["x"] = plug.transform.position.x,
-                    ["y"] = plug.transform.position.y, ["z"] = plug.transform.position.z };
+                var rb = plug.GetComponent<Rigidbody>();
+                var p = rb.position;
+                var q = rb.rotation;
+                data["cablePos" + i] = new JObject { ["x"] = p.x,
+                    ["y"] = p.y, ["z"] = p.z };
+                data["cableRot" + i] = new JArray(q.x, q.y, q.z, q.w);
                 var port = plug.Connected;
                 data["cableOwner" + i] = port != null && port.owner != null ? port.owner.Id : 0;
                 data["cablePort" + i] = port != null ? port.name : "";
@@ -302,44 +314,85 @@ namespace PC.Component.Cabling
         public override void FromData(JObject data)
         {
             base.FromData(data);
+            var havePosition = new bool[2];
             for (int i = 0; i < 2; i++)
             {
                 restoredOwners[i] = data.Value<int?>("cableOwner" + i) ?? 0;
                 restoredPorts[i] = data.Value<string>("cablePort" + i);
-                var pos = data["cablePos" + i];
-                if (pos == null) continue;
+                var pos = data["cablePos" + i] as JObject;
+                if (pos == null) continue; // saves predating physical cable poses
                 restoredPositions[i] = new Vector3(pos.Value<float>("x"),
                     pos.Value<float>("y"), pos.Value<float>("z"));
-                restorePositions = true;
+                havePosition[i] = true;
             }
-            if (!restorePositions || plugs == null) return;
-            for (int i = 0; i < 2; i++) plugs[i].GetComponent<Rigidbody>().position = restoredPositions[i];
+            restorePositions = havePosition[0] && havePosition[1];
+            if (!restorePositions || plugs == null || bodies == null) return;
+
+            // Instantiate creates a coil at the prefab/portal before FromData.
+            // Freeze ALL of its bodies while we replace it with the saved pose;
+            // the loader will attach saved sockets and then unfreeze the chain.
+            restoringPhysics = true;
+            for (int i = 0; i < 2; i++)
+            {
+                var rb = plugs[i].GetComponent<Rigidbody>();
+                rb.isKinematic = true;
+                rb.position = restoredPositions[i];
+                var rot = data["cableRot" + i] as JArray;
+                if (rot != null && rot.Count == 4)
+                    rb.rotation = new Quaternion(rot[0].Value<float>(), rot[1].Value<float>(),
+                        rot[2].Value<float>(), rot[3].Value<float>());
+            }
             var poses = data["cableBodies"] as JArray;
-            if (bodies == null) return;
             if (poses != null && poses.Count == bodies.Length)
             {
                 for (int i = 0; i < bodies.Length; i++)
                 {
+                    var rb = bodies[i];
+                    rb.isKinematic = true;
                     var a = poses[i] as JArray;
                     if (a == null || a.Count < 7) continue;
-                    bodies[i].position = new Vector3(a[0].Value<float>(), a[1].Value<float>(), a[2].Value<float>());
-                    bodies[i].rotation = new Quaternion(a[3].Value<float>(), a[4].Value<float>(),
+                    rb.position = new Vector3(a[0].Value<float>(), a[1].Value<float>(), a[2].Value<float>());
+                    rb.rotation = new Quaternion(a[3].Value<float>(), a[4].Value<float>(),
                         a[5].Value<float>(), a[6].Value<float>());
                 }
             }
             else
             {
+                // Old saves have plug positions but no individual segments.
                 var axis = restoredPositions[1] - restoredPositions[0];
                 var direction = axis.sqrMagnitude > .0001f ? axis.normalized : Vector3.right;
                 var rotation = Quaternion.FromToRotation(Vector3.forward, direction);
                 for (int i = 0; i < bodies.Length; i++)
                 {
-                    bodies[i].position = Vector3.Lerp(restoredPositions[0], restoredPositions[1],
+                    var rb = bodies[i];
+                    rb.isKinematic = true;
+                    rb.position = Vector3.Lerp(restoredPositions[0], restoredPositions[1],
                         (i + .5f) / bodies.Length) + Vector3.up * .16f;
-                    bodies[i].rotation = rotation;
+                    rb.rotation = rotation;
                 }
             }
+            Physics.SyncTransforms();
             UpdateJacket();
+        }
+
+        public void FinishRestore()
+        {
+            if (!restoringPhysics) return;
+            foreach (var plug in plugs)
+            {
+                if (plug == null) continue;
+                var rb = plug.GetComponent<Rigidbody>();
+                rb.isKinematic = false;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+            foreach (var rb in bodies)
+            {
+                rb.isKinematic = false;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+            restoringPhysics = false;
         }
 
         public void RestorePorts()

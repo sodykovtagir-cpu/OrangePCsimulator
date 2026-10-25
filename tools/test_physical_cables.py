@@ -46,6 +46,13 @@ assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
 assert 'currentDrag.grabbedCable.HoldSection(null)' in raycast
 assert 'maxPullMass = 5f' in rope and 'CanPull(Rigidbody rb, int depth)' in rope
 assert 'PullOutIfOverloaded(tension)' in rope and 'yankedPort = old' in plug
+# The yanked-port lock must be cleared while the plug is AWAY, not only during
+# TryInsert (which is never called away from a port). Otherwise reinsertion is
+# blocked until the save is reloaded.
+assert 'private void RefreshYankedPort()' in plug
+assert 'if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;' in plug
+assert 'private void FixedUpdate()\n        {\n            RefreshYankedPort();' in plug
+assert 'if (port == yankedPort) return false;' in plug
 # The HDMI BoxCollider is offset from its Rigidbody origin. A port touching
 # its body must accept it even when the origin lies outside the trigger.
 assert 'solid.ClosestPoint(port.TriggerCenter)' in plug
@@ -59,7 +66,21 @@ assert 'CablePorts.Install(this)' not in read('PC/Component/Case.cs')
 assert 'Case AC input' not in read('PC/Component/Cabling/CablePorts.cs')
 assert 'Case board video' not in read('PC/Component/Cabling/CablePorts.cs')
 assert 'Case GPU video' not in read('PC/Component/Cabling/CablePorts.cs')
-assert 'RestoreCableConnections' in read('SaveManager.cs')
+save = read('SaveManager.cs')
+assert 'RestoreCableConnections' in save
+# The cable root stays at the delivery portal. The item save position and
+# below-world filter must use the actual physical cable, not that anchor.
+assert 'item is PC.Component.Cabling.CableItem cable' in save
+assert 'cable.SavePosition : item.transform.position' in save
+assert 'if (savePos.y < -20f) continue;' in save
+assert 'pos = new { x = savePos.x, y = savePos.y, z = savePos.z }' in save
+assert save.index('cable.RestorePorts();') < save.index('cable.FinishRestore();')
+assert 'data["cableRot" + i] = new JArray(' in rope
+assert 'data["cableBodies"] = poses;' in rope
+assert 'restoringPhysics = true;' in rope and 'restoringPhysics = false;' in rope
+assert 'Physics.SyncTransforms();' in rope and 'rb.isKinematic = true;' in rope
+assert 'rb.isKinematic = false;' in rope and 'public void FinishRestore()' in rope
+assert 'if (!restoring && Cable != null && Cable.RestoringPhysics) return false;' in plug
 assert 'VideoFromGpu' in read('PC/Component/Software/OS/OperatingSystem.cs')
 assert 'display.VideoGpu' in read('GpuArtifacts.cs')
 # CS0136 in Board() prevented Unity from compiling CableItem/OutletStrip,
