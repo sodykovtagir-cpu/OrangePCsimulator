@@ -11,6 +11,7 @@ namespace PC.Component.Cabling
         public CableItem Cable { get; private set; }
         public int End { get; private set; }
         public CablePort Connected { get; private set; }
+        public float ConnectedAt { get; private set; }
         private FixedJoint pin;
         private float cooldown;
         private CablePort yankedPort;
@@ -64,11 +65,6 @@ namespace PC.Component.Cabling
             IsHeld = held;
             releaseDrag = held ? onAutoSnap : null;
         }
-        public void PullOutIfOverloaded(float tension)
-        {
-            if (Connected != null && tension >= PullOutForce) Unplug();
-        }
-
         public bool TryInsert(CablePort port, bool restoring = false)
         {
             // Do not let trigger events attach a saved plug to a nearby wrong
@@ -138,6 +134,7 @@ namespace PC.Component.Cabling
             pin.breakForce = PullOutForce; // same default force as Slot.cs
             pin.breakTorque = PullOutForce;
             Connected = port;
+            ConnectedAt = Time.time;
             port.plug = this;
             CablePower.RefreshAll();
             return true;

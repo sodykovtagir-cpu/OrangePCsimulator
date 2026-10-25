@@ -26,6 +26,8 @@ namespace PC.Component.Cabling
         private readonly Vector3[] restoredPositions = new Vector3[2];
         private bool restorePositions;
         private bool restoringPhysics;
+        private int overstretchSteps;
+        private float strainCooldownUntil;
 
         // The root is an invisible spawn anchor: dragging the physical cable
         // moves its child rigidbodies, not this transform. SaveManager must use
@@ -132,10 +134,17 @@ namespace PC.Component.Cabling
             rb.sleepThreshold = .03f;
             rb.maxDepenetrationVelocity = 1.5f;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
         }
 
         private static void Limit(CharacterJoint joint)
         {
+            // The solver alone can separate a long chain when a plugged-in
+            // device is heavy. Project only failed linear constraints; do not
+            // straighten or lock the bends of the cable.
+            joint.enableProjection = true;
+            joint.projectionDistance = .02f;
+            joint.projectionAngle = 180f;
             joint.lowTwistLimit = new SoftJointLimit { limit = -55f };
             joint.highTwistLimit = new SoftJointLimit { limit = 55f };
             joint.swing1Limit = new SoftJointLimit { limit = 85f };
@@ -195,17 +204,20 @@ namespace PC.Component.Cabling
         private void FixedUpdate()
         {
             if (plugs == null || bodies == null || restoringPhysics) return;
+            // A falling PSU/monitor can stretch the chain with neither plug
+            // held by the player. Release a connection before it can oscillate.
+            if (ReleaseOverstretchedEnd()) return;
+            if (Time.time < strainCooldownUntil) return;
             // Physics joints alone can stretch when a rope of many segments is
-            // pulled quickly. Supplement their force only while the player is
-            // holding a plug or section, and only once that span is nearly taut.
+            // pulled quickly. Pull a light device when the span is nearly taut.
             for (int end = 0; end < 2; end++)
             {
                 var attached = plugs[end];
                 if (attached == null || attached.Connected == null || attached.IsHeld) continue;
                 var other = plugs[1 - end];
                 bool sectionHeld = heldSegment != null && heldSegmentIndex >= 0;
-                if (!sectionHeld && (other == null || !other.IsHeld)) continue;
-                Vector3 target = sectionHeld ? heldSegment.position : other.transform.position;
+                if (!sectionHeld && (other == null || (!other.IsHeld && other.Connected == null))) continue;
+                Vector3 target = sectionHeld ? heldSegment.position : other.GetComponent<Rigidbody>().position;
                 float restLength = sectionHeld
                     ? length * (end == 0 ? heldSegmentIndex + .5f : bodies.Length - heldSegmentIndex - .5f)
                         / bodies.Length : length;
@@ -217,15 +229,105 @@ namespace PC.Component.Cabling
                 if (CanPull(rb, 0))
                 {
                     Vector3 direction = (target - attached.Connected.Snap.position).normalized;
-                    float force = Mathf.Min(tension,
-                        Mathf.Min(attached.PullOutForce * .25f, rb.mass * 12f));
+                    Vector3 targetVelocity = sectionHeld ? heldSegment.velocity :
+                        other.GetComponent<Rigidbody>().velocity;
+                    float closingSpeed = Vector3.Dot(
+                        rb.GetPointVelocity(attached.Connected.Snap.position) - targetVelocity, direction);
+                    // Stop pulling as the item catches up, rather than
+                    // repeatedly overshooting and shaking at full force.
+                    float drive = Mathf.Max(0f, tension - Mathf.Max(0f, closingSpeed) * rb.mass * 8f);
+                    float force = Mathf.Min(drive,
+                        Mathf.Min(attached.PullOutForce * .4f, rb.mass * 20f));
                     rb.AddForceAtPosition(direction * force, attached.Connected.Snap.position);
                 }
-                // A heavy/anchored device resists; the connector comes out
-                // before the multi-joint rope can stretch into separate pieces.
-                if (distance > restLength + .2f)
-                    attached.PullOutIfOverloaded(tension);
+                // Pulling a *middle* section can overstretch just that half
+                // while the other half is slack; total end-to-end span misses
+                // it. Release the strained side before its joints separate.
+                if (sectionHeld && distance > restLength + .08f &&
+                    Time.time - attached.ConnectedAt > .25f)
+                {
+                    attached.Unplug();
+                    overstretchSteps = 0;
+                    strainCooldownUntil = Time.time + .35f;
+                    return;
+                }
             }
+        }
+
+        private bool ReleaseOverstretchedEnd()
+        {
+            if ((plugs[0].Connected == null && plugs[1].Connected == null) ||
+                bodies.Length == 0 || Time.time < strainCooldownUntil)
+                return false;
+            // Snapping a plug into its authored pivot or restoring a saved
+            // pose takes a few physics steps. Don't misidentify that transient
+            // as a long cable under load.
+            if ((plugs[0].Connected != null && Time.time - plugs[0].ConnectedAt < .25f) ||
+                (plugs[1].Connected != null && Time.time - plugs[1].ConnectedAt < .25f))
+            {
+                overstretchSteps = 0;
+                return false;
+            }
+
+            // Use physics poses consistently; interpolated Transform poses are
+            // meant for rendering and can falsely appear to stretch the path.
+            Vector3 start = plugs[0].GetComponent<Rigidbody>().position;
+            Vector3 end = plugs[1].GetComponent<Rigidbody>().position;
+            float span = Vector3.Distance(start, end);
+            float path = 0f;
+            Vector3 previous = start;
+            foreach (var body in bodies)
+            {
+                path += Vector3.Distance(previous, body.position);
+                previous = body.position;
+            }
+            path += Vector3.Distance(previous, end);
+            // Centre-line length catches a cable bent around furniture even
+            // when its two plugs are close together. The small allowance
+            // covers the chord error of the initial coil and solver tolerance.
+            bool tooLong = path > length + Mathf.Max(.06f, length * .02f) ||
+                           span > length + .02f;
+            overstretchSteps = tooLong ? overstretchSteps + 1 : 0;
+            bool hardLimit = overstretchSteps >= 2;
+            Vector3 relativeVelocity = plugs[1].GetComponent<Rigidbody>().velocity -
+                                       plugs[0].GetComponent<Rigidbody>().velocity;
+            bool movingApart = span > length * .97f && span > .001f &&
+                Vector3.Dot(relativeVelocity, (end - start) / span) > .35f;
+            if (!hardLimit && !movingApart) return false;
+            var release = StrainedEnd();
+            if (release == null) return false;
+            // If either connected device is light and movable, give the
+            // damped pull a chance before treating the span as unmovable.
+            if (!hardLimit &&
+                ((plugs[0].Connected != null && CanPull(plugs[0].Connected.GetComponentInParent<Rigidbody>(), 0)) ||
+                 (plugs[1].Connected != null && CanPull(plugs[1].Connected.GetComponentInParent<Rigidbody>(), 0))))
+                return false;
+
+            release.Unplug(); // break the device connection before the chain can stretch
+            overstretchSteps = 0;
+            strainCooldownUntil = Time.time + .35f; // let the loose cable settle
+            return true;
+        }
+
+        private CablePlug StrainedEnd()
+        {
+            var a = plugs[0].Connected != null ? plugs[0] : null;
+            var b = plugs[1].Connected != null ? plugs[1] : null;
+            if (a == null) return b;
+            if (b == null) return a;
+            // A held plug comes out when pulled past its limit. Otherwise
+            // keep mains outlets mounted; for video prefer the display input.
+            if (a.IsHeld) return a;
+            if (b.IsHeld) return b;
+            if (a.Connected.kind == PortKind.Outlet) return b;
+            if (b.Connected.kind == PortKind.Outlet) return a;
+            if (a.Connected.kind == PortKind.VgaInput || a.Connected.kind == PortKind.HdmiInput) return a;
+            if (b.Connected.kind == PortKind.VgaInput || b.Connected.kind == PortKind.HdmiInput) return b;
+            bool canA = CanPull(a.Connected.GetComponentInParent<Rigidbody>(), 0);
+            bool canB = CanPull(b.Connected.GetComponentInParent<Rigidbody>(), 0);
+            if (!canA && canB) return a;
+            if (!canB && canA) return b;
+            return b;
         }
 
         private bool CanPull(Rigidbody rb, int depth)
@@ -252,7 +354,7 @@ namespace PC.Component.Cabling
         {
             jacket.SetPosition(0, plugA.transform.position);
             for (int i = 0; i < bodies.Length; i++)
-                jacket.SetPosition(i + 1, bodies[i].position);
+                jacket.SetPosition(i + 1, bodies[i].transform.position);
             jacket.SetPosition(bodies.Length + 1, plugB.transform.position);
         }
 
@@ -393,6 +495,8 @@ namespace PC.Component.Cabling
                 rb.angularVelocity = Vector3.zero;
             }
             restoringPhysics = false;
+            overstretchSteps = 0;
+            strainCooldownUntil = Time.time + .35f;
         }
 
         public void RestorePorts()

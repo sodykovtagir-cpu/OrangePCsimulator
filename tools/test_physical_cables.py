@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static wiring/asset integrity guards; Unity Play Mode is still required."""
 from pathlib import Path
+import math
 import re
 from check_prefab_yaml import main as check_prefab
 
@@ -60,7 +61,28 @@ assert 'pin.breakForce = PullOutForce' in plug and 'OnJointBreak(float force)' i
 assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
 assert 'currentDrag.grabbedCable.HoldSection(null)' in raycast
 assert 'maxPullMass = 5f' in rope and 'CanPull(Rigidbody rb, int depth)' in rope
-assert 'PullOutIfOverloaded(tension)' in rope and 'yankedPort = old' in plug
+assert 'yankedPort = old' in plug
+# Heavy passive loads (e.g. a PSU hanging from an outlet) need the same
+# protection as a hand-held cable. Project overstretched joints, damp light
+# item pulls, and release one end at the hard limit even when nothing is held.
+assert 'joint.enableProjection = true;' in rope
+assert 'joint.projectionDistance = .02f;' in rope
+assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
+assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
+assert 'path += Vector3.Distance(previous, body.position);' in rope
+assert 'if (ReleaseOverstretchedEnd()) return;' in rope
+assert 'other.Connected == null' in rope
+assert 'path > length + Mathf.Max(.06f, length * .02f)' in rope
+assert 'span > length * .97f' in rope
+assert 'if (sectionHeld && distance > restLength + .08f &&' in rope
+assert 'Mathf.Max(0f, tension - Mathf.Max(0f, closingSpeed)' in rope
+assert 'if (a.Connected.kind == PortKind.Outlet) return b;' in rope
+assert 'if (b.Connected.kind == PortKind.VgaInput || b.Connected.kind == PortKind.HdmiInput) return b;' in rope
+assert 'if (!hardLimit &&' in rope and 'CanPull(plugs[1].Connected.GetComponentInParent<Rigidbody>(), 0)' in rope
+assert 'release.Unplug();' in rope and 'strainCooldownUntil = Time.time + .35f;' in rope
+assert 'ConnectedAt = Time.time;' in plug
+assert 'Time.time - plugs[0].ConnectedAt < .25f' in rope
+assert 'restoringPhysics = false;\n            overstretchSteps = 0;' in rope
 # The yanked-port lock must be cleared while the plug is AWAY, not only during
 # TryInsert (which is never called away from a port). Otherwise reinsertion is
 # blocked until the save is reloaded.
@@ -145,7 +167,17 @@ for kind in ('Power','VGA','HDMI'):
         material=root/f'Assets/Material/Cable {kind}.mat.meta'
         mat_guid=re.search(r'^guid: ([a-f0-9]{32})$',material.read_text(),re.M).group(1)
         assert mat_guid in text,p
-        lengths.add(float(re.search(r'^  length: ([0-9.]+)$',text,re.M).group(1)))
+        cable_length=float(re.search(r'^  length: ([0-9.]+)$',text,re.M).group(1))
+        lengths.add(cable_length)
+        # The initial loose coil must stay below the anti-stretch threshold;
+        # otherwise a newly connected prefab could falsely unplug at spawn.
+        count=max(7,min(26,int(re.search(r'^  segments: (\d+)$',text,re.M).group(1))))
+        turns=2 if count>=15 else 1
+        radius=(cable_length/count)/(2*math.sin(math.pi*turns/count))
+        points=[(radius*math.cos(2*math.pi*turns*i/count)+.5*(i/count-.5),
+                 radius*math.sin(2*math.pi*turns*i/count)) for i in range(count+1)]
+        coil=sum(math.dist(points[i],points[i+1]) for i in range(count))
+        assert coil<cable_length+max(.06,cable_length*.02),p
         prefab_guid=re.search(r'^guid: ([a-f0-9]{32})$',p.with_suffix('.prefab.meta').read_text(),re.M).group(1)
         item=root/f'Assets/MonoBehaviour/{p.stem}.asset'
         assert prefab_guid in item.read_text(),p
