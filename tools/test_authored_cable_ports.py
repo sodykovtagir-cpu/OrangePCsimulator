@@ -103,20 +103,38 @@ for template, targets in FAMILIES.items():
                                    docs[instance][1], re.M)
                 assert parent and parent.group(1) == pivot, target
 
-# The mounting ray must point behind the authored socket face for all three
-# outlet variants; their trigger/pivot geometry remains untouched.
+# The socket face lies on local +Y, NOT -Z: Z is the row of outlets.
+# Check the ray, backface depth and port geometry of all three variants.
 for sockets in (1, 2, 3):
     text = (ROOT / f'Wall Outlet {sockets}.prefab').read_text()
-    assert '  hookOffset: {x: 0, y: 0, z: 0.07}' in text
-    assert '  hookDirection: {x: 0, y: 0, z: 1}' in text
+    docs = blocks(text)
+    assert '  detectDistance: 0.35' in text
+    assert '  hookOffset: {x: 0, y: -0.12, z: 0}' in text
+    assert '  hookDirection: {x: 0, y: -1, z: 0}' in text
+    assert '  outletBackDepth: 0.31' in text
     assert text.count('guid: ' + PORT_GUID) == sockets
+    solids = [(float(re.search(r'm_Center: \{x: [^,]+, y: ([^,]+)', doc).group(1)),
+               float(re.search(r'm_Size: \{x: [^,]+, y: ([^,]+)', doc).group(1)))
+              for kind, doc in docs.values() if kind == 65 and field(doc, 'm_IsTrigger') == '0']
+    assert abs(max(-center + size / 2 for center, size in solids) - .3062) < .002, sockets
+    ports = authored_ports(docs)
+    assert len(ports) == sockets
+    for go, _ in ports.values():
+        tr = next(fid for fid in re.findall(r'^  - component: \{fileID: (-?\d+)\}$', docs[go][1], re.M)
+                  if docs[fid][0] == 4)
+        assert field(docs[tr][1], 'm_LocalPosition').split(', y: ')[1].split(',')[0] == '0'
 
-# Floor/ceiling contacts cannot mount a wall outlet; generic Hook behaviour
-# for other items is unchanged. RTX 2080/2080Ti and unique samples stay authored.
+# Floor/ceiling contacts cannot mount a wall outlet. Fix() aligns the socket
+# face and the row on the wall; saved old orientations are rechecked on load.
+# Generic Hook behaviour and author-owned GPU/monitor ports remain unchanged.
 hook = (ROOT.parents[1] / 'Scripts/Assembly-CSharp/Hook.cs').read_text()
 assert 'GetComponent<PC.Component.Cabling.OutletStrip>() != null' in hook
 assert 'Mathf.Abs(hit.normal.y) > .35f' in hook
+assert 'Vector3.Dot(dir, -hit.normal) < .35f' in hook
+assert 'Quaternion.LookRotation(row, face)' in hook
+assert 'transform.SetPositionAndRotation(position, rotation);' in hook
 assert 'if (savedHooked && GetComponent<PC.Component.Cabling.OutletStrip>() != null)' in hook
-assert 'savedHooked = IsWall();' in hook  # reject old floor-mounted outlets on load
+assert 'savedHooked = TryGetSurface(out surface);' in hook
+assert 'if (savedHooked)\n                SnapOutletToWall(surface);' in hook
 assert 'hit.transform.CompareTag("Wall") || (hit.collider.attachedRigidbody == null' in hook
 print('Authored cable ports and prefab hierarchy: OK')
