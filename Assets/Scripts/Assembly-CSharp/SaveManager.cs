@@ -81,7 +81,12 @@ public class SaveManager : MonoBehaviour
         var items = new List<object>();
         foreach (var item in FindObjectsOfType<Item>())
         {
-            if (item.transform.position.y < -20f) continue;
+            // A cable's root remains at the delivery portal while its plugs
+            // and physical jacket move. Use the actual cable for save position
+            // and the below-world filter; do not serialize the portal anchor.
+            var savePos = item is PC.Component.Cabling.CableItem cable
+                ? cable.SavePosition : item.transform.position;
+            if (savePos.y < -20f) continue;
 
             // Распаянная начинка и прочие детали, вложенные в префаб
             // предмета в редакторе, — часть этого предмета, а не отдельная
@@ -117,7 +122,7 @@ public class SaveManager : MonoBehaviour
                 id = item.Id,
                 hostId = hostId,
                 slotPath = slotPath,
-                pos = new { x = item.transform.position.x, y = item.transform.position.y, z = item.transform.position.z },
+                pos = new { x = savePos.x, y = savePos.y, z = savePos.z },
                 rot = new { x = item.transform.rotation.x, y = item.transform.rotation.y, z = item.transform.rotation.z, w = item.transform.rotation.w },
                 data = data
             });
@@ -339,7 +344,11 @@ public class SaveManager : MonoBehaviour
         yield return null;
         yield return null;
         foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
-            cable.RestorePorts();
+        {
+            try { cable.RestorePorts(); }
+            catch (Exception ex) { Debug.LogWarning($"Save: failed to restore cable ports: {ex}"); }
+            finally { cable.FinishRestore(); } // never leave a saved cable frozen
+        }
     }
 
     private static bool HasSavedHost(List<Tuple<ItemData, Item>> restored, Item item)

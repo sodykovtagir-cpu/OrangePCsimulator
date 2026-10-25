@@ -69,6 +69,9 @@ namespace PC.Component.Cabling
 
         public bool TryInsert(CablePort port, bool restoring = false)
         {
+            // Do not let trigger events attach a saved plug to a nearby wrong
+            // socket before SaveManager has restored its original port.
+            if (!restoring && Cable != null && Cable.RestoringPhysics) return false;
             if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
             // Prevent immediate reinsertion inside the same trigger, but allow
             // insertion again once FixedUpdate observed the plug leaving it.
