@@ -55,7 +55,7 @@ MonoBehaviour:
   kind: 2
   length: 4
   segments: 9
-  cableDiameter: 0.14
+  cableDiameter: 0.13
   plugA: {fileID: 1140010}
   plugB: {fileID: 1140020}
   jacket: {fileID: 1200000}
