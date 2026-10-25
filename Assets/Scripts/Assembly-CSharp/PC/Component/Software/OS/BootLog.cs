@@ -29,15 +29,15 @@ namespace PC.Component.Software.OS
             rect.offsetMax = Vector2.zero;
             rect.SetAsLastSibling();
 
-            // A compact, translucent corner panel leaves the motherboard logo,
-            // account details and password form visible and clickable.
+            // A compact upper-left panel stays clear of the centered logo,
+            // account name, loading spinner and optional password form.
             var panel = new GameObject("Startup log panel", typeof(RectTransform),
                 typeof(CanvasRenderer), typeof(Image));
             panel.transform.SetParent(rect, false);
             panel.layer = root.gameObject.layer;
             var panelRect = (RectTransform)panel.transform;
-            panelRect.anchorMin = new Vector2(0.02f, 0.03f);
-            panelRect.anchorMax = new Vector2(0.57f, 0.55f);
+            panelRect.anchorMin = new Vector2(0.02f, 0.55f);
+            panelRect.anchorMax = new Vector2(0.37f, 0.97f);
             panelRect.offsetMin = Vector2.zero;
             panelRect.offsetMax = Vector2.zero;
             var background = panel.GetComponent<Image>();

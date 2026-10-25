@@ -36,6 +36,10 @@ assert 'rect.anchorMin = Vector2.zero' in log and 'rect.anchorMax = Vector2.one'
 assert 'if (!verbose) lines.Clear();' in log and 'gameObject.SetActive(true);' in log
 assert 'background.raycastTarget = false;' in log and 'text.raycastTarget = false;' in log
 assert 'new Color(0.015f, 0.02f, 0.03f, 0.68f)' in log
+assert 'panelRect.anchorMin = new Vector2(0.02f, 0.55f)' in log
+assert 'panelRect.anchorMax = new Vector2(0.37f, 0.97f)' in log
+assert os.index('if (password != null) password.SetActive(false);') < os.index('if (user != null) user.SetActive(true);')
+assert os.index('if (user != null) user.SetActive(true);') < os.index('if (password != null) password.SetActive(true);')
 assert 'rect.anchorMin = Vector2.zero' in log and 'rect.anchorMax = Vector2.one' in log
 assert 'bootLog.Stage("01 / KERNEL AND DEVICES")' in os
 assert 'bootLog.Stage("02 / USER SESSION")' in os

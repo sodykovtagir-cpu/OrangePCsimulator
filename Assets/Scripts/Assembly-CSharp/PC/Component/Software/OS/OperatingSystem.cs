@@ -762,7 +762,11 @@ namespace PC.Component.Software.OS
             yield return new WaitForSeconds(Mathf.Max(0.15f, wait * 0.65f));
             if (bootLog != null) bootLog.Add("Kernel and devices initialized");
 
-            // Stage 2 is drawn over the existing account loading animation.
+            // The prefab may leave Password active under the User group. Turn
+            // it off BEFORE showing that group or yielding for account loading:
+            // otherwise a passwordless PC flashes a login field over its spinner.
+            if (password != null) password.SetActive(false);
+            if (loading != null) loading.SetActive(true);
             if (startup != null) startup.SetActive(false);
             if (user != null) user.SetActive(true);
             if (bootLog != null)
