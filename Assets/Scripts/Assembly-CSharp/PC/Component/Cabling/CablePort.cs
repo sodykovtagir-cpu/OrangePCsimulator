@@ -136,13 +136,28 @@ namespace PC.Component.Cabling
         private void OnTriggerEnter(Collider other)
         {
             var candidate = other != null ? other.GetComponent<CablePlug>() : null;
-            if (candidate != null) candidate.TryInsert(this);
+            if (candidate != null)
+            {
+                candidate.PrepareApproach(this);
+                candidate.TryInsert(this);
+            }
         }
 
         private void OnTriggerStay(Collider other)
         {
             var candidate = other != null ? other.GetComponent<CablePlug>() : null;
-            if (candidate != null && !candidate.Connected) candidate.TryInsert(this);
+            if (candidate != null && !candidate.Connected)
+            {
+                candidate.PrepareApproach(this);
+                candidate.TryInsert(this);
+            }
+        }
+
+        private void OnTriggerExit(Collider other)
+        {
+            var candidate = other != null ? other.GetComponent<CablePlug>() : null;
+            if (candidate != null && Vector3.Distance(candidate.transform.position, TriggerCenter) >
+                CaptureRadius + .25f) candidate.LeaveApproach(this);
         }
 
         private void OnDrawGizmosSelected()
