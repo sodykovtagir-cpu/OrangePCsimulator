@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,6 +13,10 @@ namespace PC.Component.Cabling
         public CablePort Connected { get; private set; }
         private FixedJoint pin;
         private float cooldown;
+        private CablePort yankedPort;
+        private Action<CablePlug> releaseDrag;
+        [SerializeField, Min(10f)] private float pullOutForce = 200f;
+        public float PullOutForce => pullOutForce >= 10f ? pullOutForce : 200f;
         public bool IsHeld { get; private set; }
 
         // Physics.IgnoreCollision is PER PAIR. Only this plug and the nearest
@@ -31,12 +36,27 @@ namespace PC.Component.Cabling
         private CablePort approachPort;
 
         public void Init(CableItem cable, int end) { Cable = cable; End = end; }
-        public void SetHeld(bool held) { IsHeld = held; }
+        public void SetHeld(bool held, Action<CablePlug> onAutoSnap = null)
+        {
+            IsHeld = held;
+            releaseDrag = held ? onAutoSnap : null;
+        }
+        public void PullOutIfOverloaded(float tension)
+        {
+            if (Connected != null && tension >= PullOutForce) Unplug();
+        }
 
         public bool TryInsert(CablePort port, bool restoring = false)
         {
-            // The spring drag must be detached before any snapping.
-            if ((!restoring && IsHeld) || Time.time < cooldown || port == null || !port.Accepts(this)) return false;
+            if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
+            // A yanked connector cannot magically reinsert itself while still
+            // overlapping the same large trigger. Move it clear first.
+            if (yankedPort != null)
+            {
+                if (Vector3.Distance(transform.position, yankedPort.TriggerCenter) >
+                    yankedPort.CaptureRadius + .25f) yankedPort = null;
+                else if (port == yankedPort) return false;
+            }
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
                 Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
@@ -50,6 +70,13 @@ namespace PC.Component.Cabling
                         otherPort.plug == null && otherPort.Powered &&
                         Vector3.Distance(transform.position, otherPort.Snap.position) < distance)
                         return false;
+            }
+            // Connect as soon as the plug reaches the trigger. End the player's
+            // spring drag first, otherwise it would pull against the new joint.
+            if (!restoring && IsHeld)
+            {
+                releaseDrag?.Invoke(this);
+                if (IsHeld) return false; // only the active grabber may release it
             }
             // Drop temporary approach exclusions if this end connects to a
             // different port (for example the display on the other end).
@@ -75,6 +102,8 @@ namespace PC.Component.Cabling
                 ? pin.connectedBody.transform.InverseTransformPoint(port.Snap.position)
                 : port.Snap.position;
             pin.enableCollision = false;
+            pin.breakForce = PullOutForce; // same default force as Slot.cs
+            pin.breakTorque = PullOutForce;
             Connected = port;
             port.plug = this;
             CablePower.RefreshAll();
@@ -82,7 +111,7 @@ namespace PC.Component.Cabling
         }
 
         // Give a held plug a passage through its target while it approaches an
-        // exterior trigger; insertion itself still waits for player release.
+        // exterior trigger; insertion now releases the grab automatically.
         public void PrepareApproach(CablePort port)
         {
             if (!IsHeld || Connected != null || port == null ||
@@ -231,6 +260,7 @@ namespace PC.Component.Cabling
         {
             if (Connected == null) return;
             var old = Connected;
+            yankedPort = old;
             Connected = null;
             if (old != null && old.plug == this) old.plug = null;
             if (pin != null) Destroy(pin);
@@ -243,6 +273,13 @@ namespace PC.Component.Cabling
             CablePower.RefreshAll();
         }
 
+        private void OnJointBreak(float force)
+        {
+            // The rope's end CharacterJoint has no break limit; the pin is the
+            // breakable connection. Clear both ends of the logical link too.
+            if (Connected != null) Unplug();
+        }
+
         private void OnEnable()
         {
             if (pendingRestore.Count > 0 && restoreRoutine == null)
@@ -251,7 +288,7 @@ namespace PC.Component.Cabling
 
         private void OnDisable()
         {
-            IsHeld = false;
+            SetHeld(false);
             if (restoreRoutine != null)
             {
                 StopCoroutine(restoreRoutine);

@@ -3,9 +3,9 @@ using UnityEngine;
 
 namespace PC.Component.Cabling
 {
-    // A short, self-collision-free rigidbody chain. Only the plugs are selectable;
-    // one continuous LineRenderer makes the jacket continuous even while joints
-    // are settling. The physical capsules still collide with the environment.
+    // A self-collision-free rigidbody chain. Plugs and jacket sections are
+    // selectable; one continuous LineRenderer hides joint settling. The physical
+    // capsules still collide with the environment.
     public sealed class CableItem : Item
     {
         [SerializeField] private CableKind kind;
@@ -15,8 +15,12 @@ namespace PC.Component.Cabling
         [SerializeField] private CablePlug plugA;
         [SerializeField] private CablePlug plugB;
         [SerializeField] private LineRenderer jacket;
+        [SerializeField, Min(.1f)] private float maxPullMass = 5f;
+        [SerializeField, Min(10f)] private float tensionStiffness = 1000f;
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
+        private Rigidbody heldSegment;
+        private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
         private readonly string[] restoredPorts = new string[2];
         private readonly Vector3[] restoredPositions = new Vector3[2];
@@ -29,6 +33,20 @@ namespace PC.Component.Cabling
         // Exempt only this short adjacent section from that panel's colliders.
         public Collider NearEndCollider(int end) => bodies != null && bodies.Length > 0
             ? bodies[end == 0 ? 0 : bodies.Length - 1].GetComponent<Collider>() : null;
+
+        public void HoldSection(Rigidbody section)
+        {
+            heldSegment = null;
+            heldSegmentIndex = -1;
+            if (section == null || bodies == null) return;
+            for (int i = 0; i < bodies.Length; i++)
+                if (bodies[i] == section)
+                {
+                    heldSegment = section;
+                    heldSegmentIndex = i;
+                    break;
+                }
+        }
 
         private void Awake()
         {
@@ -57,7 +75,7 @@ namespace PC.Component.Cabling
             for (int i = 0; i < count; i++)
             {
                 var body = new GameObject("Cable segment " + i);
-                body.layer = 2; // ignored by player raycast, not by physics
+                body.layer = 0; // any physical section can be picked up by the player
                 body.transform.SetParent(transform, true);
                 body.transform.position = (points[i] + points[i + 1]) * .5f;
                 body.transform.rotation = Quaternion.LookRotation(points[i + 1] - points[i]);
@@ -164,6 +182,56 @@ namespace PC.Component.Cabling
             jacket.numCornerVertices = 4;
             if (jacket.sharedMaterial == null) jacket.sharedMaterial = CableMaterial(kind);
             UpdateJacket();
+        }
+
+        private void FixedUpdate()
+        {
+            if (plugs == null || bodies == null) return;
+            // Physics joints alone can stretch when a rope of many segments is
+            // pulled quickly. Supplement their force only while the player is
+            // holding a plug or section, and only once that span is nearly taut.
+            for (int end = 0; end < 2; end++)
+            {
+                var attached = plugs[end];
+                if (attached == null || attached.Connected == null || attached.IsHeld) continue;
+                var other = plugs[1 - end];
+                bool sectionHeld = heldSegment != null && heldSegmentIndex >= 0;
+                if (!sectionHeld && (other == null || !other.IsHeld)) continue;
+                Vector3 target = sectionHeld ? heldSegment.position : other.transform.position;
+                float restLength = sectionHeld
+                    ? length * (end == 0 ? heldSegmentIndex + .5f : bodies.Length - heldSegmentIndex - .5f)
+                        / bodies.Length : length;
+                float distance = Vector3.Distance(attached.Connected.Snap.position, target);
+                float tension = Mathf.Max(0f, distance - restLength * .85f) *
+                    (tensionStiffness >= 10f ? tensionStiffness : 1000f);
+                if (tension <= 0f) continue;
+                var rb = attached.Connected.GetComponentInParent<Rigidbody>();
+                if (CanPull(rb, 0))
+                {
+                    Vector3 direction = (target - attached.Connected.Snap.position).normalized;
+                    float force = Mathf.Min(tension,
+                        Mathf.Min(attached.PullOutForce * .25f, rb.mass * 12f));
+                    rb.AddForceAtPosition(direction * force, attached.Connected.Snap.position);
+                }
+                // A heavy/anchored device resists; the connector comes out
+                // before the multi-joint rope can stretch into separate pieces.
+                if (distance > restLength + .2f)
+                    attached.PullOutIfOverloaded(tension);
+            }
+        }
+
+        private bool CanPull(Rigidbody rb, int depth)
+        {
+            if (rb == null || rb.isKinematic || rb.mass >
+                (maxPullMass > 0f ? maxPullMass : 5f) || depth > 3) return false;
+            foreach (var joint in rb.GetComponents<FixedJoint>())
+            {
+                if (joint == null) continue;
+                if (joint.connectedBody == null) return false; // bolted to the world
+                if (joint.connectedBody != rb && !CanPull(joint.connectedBody, depth + 1))
+                    return false;
+            }
+            return true;
         }
 
         private void LateUpdate()
