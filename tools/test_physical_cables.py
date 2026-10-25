@@ -18,6 +18,13 @@ assert 'cable.Kind == CableKind.VGA' in ports and 'cable.Kind == CableKind.HDMI'
 assert 'plug != null' in ports and 'plug = this' in plug
 assert 'cable.End(1 - candidate.End)' in ports and 'input.Cable.End(1 - input.End)' in power
 assert 'cable.End(1 - input.plug.End)' in power
+# The wall plug (A = end 0) and IEC/device plug (B = end 1) have different
+# meshes. Reject opposite sockets even when the other cable end is still free;
+# Accepts is also called by TryInsert during save restoration.
+assert 'candidate.End == 0 && Powered' in ports
+assert 'candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet)' in ports
+assert 'if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;' in plug
+assert 'kind == CableKind.Power && end == 0 ? OutletPlugMaterial()' in rope
 assert 'Physics' not in rope or 'CapsuleCollider' in rope
 assert all(x in rope for x in ('CapsuleCollider','CharacterJoint','Rigidbody','ContinuousSpeculative','Physics.IgnoreCollision', 'LineRenderer', 'Length', 'JObject', 'RestorePorts()'))
 assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f' in plug
