@@ -37,17 +37,6 @@ namespace PC.Component.Cabling
             CablePort.Add(display, PortKind.MonitorPower, "Display AC input", new Vector3(.12f, 0f, rear));
         }
 
-        public static void Install(Case pcCase)
-        {
-            if (pcCase == null) return;
-            var owner = pcCase.GetComponent<Item>();
-            if (owner == null) return;
-            float rear = RearZ(owner, -.23f);
-            CablePort.Add(owner, PortKind.PcPower, "Case AC input", new Vector3(.24f, .15f, rear));
-            CablePort.Add(owner, PortKind.BoardVideo, "Case board video", new Vector3(-.24f, .15f, rear));
-            CablePort.Add(owner, PortKind.GpuVideo, "Case GPU video", new Vector3(-.24f, -.10f, rear));
-        }
-
         private static float RearZ(Item owner, float fallback)
         {
             // Scene meshes have very different scales (CRT depth > 2 units,

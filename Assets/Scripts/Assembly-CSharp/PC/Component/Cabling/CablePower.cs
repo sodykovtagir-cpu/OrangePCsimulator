@@ -17,21 +17,17 @@ namespace PC.Component.Cabling
             // An integrated mini PC uses its own adapter port.
             if (board.Integrated && PoweredPort(board, PortKind.PcPower)) return true;
             var supplies = board.GetHardwares(HardwareType.Supply);
-            bool workingSupply = false;
             if (supplies != null) foreach (var part in supplies)
-                if (part is Supply supply && !supply.Damaged)
-                {
-                    workingSupply = true;
-                    if (PoweredPort(supply, PortKind.PcPower)) return true;
-                }
+                if (part is Supply supply && !supply.Damaged && PoweredPort(supply, PortKind.PcPower))
+                    return true;
             var pcCase = board.GetComponentInParent<Case>();
             var connector = board.GetComponent<Connector>();
             if (pcCase == null && connector != null && connector.slot != null)
                 pcCase = connector.slot.GetComponentInParent<Case>();
-            // The accessible case-rear inlet represents the installed PSU; a
-            // damaged or missing PSU must never be bypassed by this port.
-            if (pcCase != null && PoweredPort(pcCase.GetComponent<Item>(), PortKind.PcPower) &&
-                (board.Integrated || workingSupply)) return true;
+            // Only a mini PC may expose its adapter on the case. A normal PC
+            // must actually be cabled to its working PSU, never to the case.
+            if (board.Integrated && pcCase != null &&
+                PoweredPort(pcCase.GetComponent<Item>(), PortKind.PcPower)) return true;
             return false;
         }
 

@@ -45,7 +45,6 @@ namespace PC.Component
 		private void Awake()
 		{
 			motherboard.onChanged.AddListener(MotherboardChanged);
-            PC.Component.Cabling.CablePorts.Install(this);
 		}
 
 		private void Start()
