@@ -135,7 +135,7 @@ namespace PC.Component.Cabling
 
         private void OnTriggerEnter(Collider other)
         {
-            var candidate = other != null ? other.GetComponent<CablePlug>() : null;
+            var candidate = other != null ? other.GetComponentInParent<CablePlug>() : null;
             if (candidate != null)
             {
                 candidate.PrepareApproach(this);
@@ -145,7 +145,7 @@ namespace PC.Component.Cabling
 
         private void OnTriggerStay(Collider other)
         {
-            var candidate = other != null ? other.GetComponent<CablePlug>() : null;
+            var candidate = other != null ? other.GetComponentInParent<CablePlug>() : null;
             if (candidate != null && !candidate.Connected)
             {
                 candidate.PrepareApproach(this);
@@ -155,7 +155,7 @@ namespace PC.Component.Cabling
 
         private void OnTriggerExit(Collider other)
         {
-            var candidate = other != null ? other.GetComponent<CablePlug>() : null;
+            var candidate = other != null ? other.GetComponentInParent<CablePlug>() : null;
             if (candidate != null && Vector3.Distance(candidate.transform.position, TriggerCenter) >
                 CaptureRadius + .25f) candidate.LeaveApproach(this);
         }

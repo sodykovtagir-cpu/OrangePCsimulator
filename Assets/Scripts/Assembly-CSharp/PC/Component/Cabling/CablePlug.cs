@@ -34,8 +34,20 @@ namespace PC.Component.Cabling
         private GPU watchedGpu;
         private Case currentCase;
         private CablePort approachPort;
+        // Unity can miss a trigger callback when a small socket and a dragged
+        // rigidbody move past one another between physics steps.
+        private readonly Collider[] nearbyPortColliders = new Collider[24];
 
         public void Init(CableItem cable, int end) { Cable = cable; End = end; }
+
+        private bool NearPort(CablePort port, float extra = 0f)
+        {
+            var solid = GetComponent<Collider>();
+            if (port == null || solid == null || !solid.enabled) return false;
+            float reach = port.CaptureRadius + extra;
+            return (solid.ClosestPoint(port.TriggerCenter) - port.TriggerCenter).sqrMagnitude <=
+                reach * reach;
+        }
         public void SetHeld(bool held, Action<CablePlug> onAutoSnap = null)
         {
             IsHeld = held;
@@ -53,15 +65,17 @@ namespace PC.Component.Cabling
             // overlapping the same large trigger. Move it clear first.
             if (yankedPort != null)
             {
-                if (Vector3.Distance(transform.position, yankedPort.TriggerCenter) >
-                    yankedPort.CaptureRadius + .25f) yankedPort = null;
+                if (!NearPort(yankedPort, .04f)) yankedPort = null;
                 else if (port == yankedPort) return false;
             }
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
                 Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
                 return false;
-            if (!restoring && Vector3.Distance(transform.position, port.TriggerCenter) > port.CaptureRadius) return false;
+            // The model's BoxCollider is offset from its Rigidbody origin.
+            // A real overlap must not be rejected because the origin is outside
+            // the sphere while the visible plug is already touching the socket.
+            if (!restoring && !NearPort(port)) return false;
             if (!restoring && port.kind == PortKind.Outlet && port.owner != null)
             {
                 float distance = Vector3.Distance(transform.position, port.Snap.position);
@@ -136,6 +150,10 @@ namespace PC.Component.Cabling
 
         private void FixedUpdate()
         {
+            // Trigger events alone are not reliable for a small moving socket.
+            // While the player holds the plug, also look for a genuinely nearby
+            // port. This does not move authored triggers or snap from a distance.
+            if (IsHeld && Connected == null) TryNearbyPort();
             // A GPU may be wired while loose and then installed in a case.
             // Reassert pairs after Unity resets them when a collider is toggled.
             if (Connected == null && approachPort != null &&
@@ -146,6 +164,24 @@ namespace PC.Component.Cabling
             SyncCase();
             Reinstate(gpuPairs);
             Reinstate(casePairs);
+        }
+
+        private void TryNearbyPort()
+        {
+            var solid = GetComponent<Collider>();
+            if (solid == null || !solid.enabled) return;
+            float radius = Mathf.Max(.7f, solid.bounds.extents.magnitude + .5f);
+            // CablePort.Add places authored and fallback port triggers on layer 2.
+            int count = Physics.OverlapSphereNonAlloc(transform.position, radius,
+                nearbyPortColliders, 1 << 2, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < count && IsHeld && Connected == null; i++)
+            {
+                var port = nearbyPortColliders[i] != null
+                    ? nearbyPortColliders[i].GetComponent<CablePort>() : null;
+                if (port == null || !NearPort(port)) continue;
+                PrepareApproach(port);
+                TryInsert(port);
+            }
         }
 
         private static void Reinstate(List<Pair> pairs)

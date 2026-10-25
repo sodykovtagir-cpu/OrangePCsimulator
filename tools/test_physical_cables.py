@@ -46,6 +46,14 @@ assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
 assert 'currentDrag.grabbedCable.HoldSection(null)' in raycast
 assert 'maxPullMass = 5f' in rope and 'CanPull(Rigidbody rb, int depth)' in rope
 assert 'PullOutIfOverloaded(tension)' in rope and 'yankedPort = old' in plug
+# The HDMI BoxCollider is offset from its Rigidbody origin. A port touching
+# its body must accept it even when the origin lies outside the trigger.
+assert 'solid.ClosestPoint(port.TriggerCenter)' in plug
+assert 'if (!restoring && !NearPort(port)) return false;' in plug
+assert 'Vector3.Distance(transform.position, port.TriggerCenter) > port.CaptureRadius) return false' not in plug
+assert 'if (IsHeld && Connected == null) TryNearbyPort();' in plug
+assert 'Physics.OverlapSphereNonAlloc' in plug and 'QueryTriggerInteraction.Collide' in plug
+assert ports.count('other.GetComponentInParent<CablePlug>()') == 3
 assert 'GetComponentInParent<PC.Component.Cabling.CableItem>()' in raycast
 assert 'CablePorts.Install(this)' not in read('PC/Component/Case.cs')
 assert 'Case AC input' not in read('PC/Component/Cabling/CablePorts.cs')
@@ -95,7 +103,9 @@ for kind in ('Power','VGA','HDMI'):
         assert text.count('  m_Name: Plug ') == 2
         assert '  plugA: {fileID: 1140010}' in text and '  plugB: {fileID: 1140020}' in text
         assert '  jacket: {fileID: 1200000}' in text and 'LineRenderer:' in text
-        assert float(re.search(r'^  cableDiameter: ([0-9.]+)$',text,re.M).group(1)) == .14
+        # Author-adjusted HDMI jackets are 0.13 m; preserve prefab values.
+        diameter = float(re.search(r'^  cableDiameter: ([0-9.]+)$',text,re.M).group(1))
+        assert .08 <= diameter <= .25, p
         material=root/f'Assets/Material/Cable {kind}.mat.meta'
         mat_guid=re.search(r'^guid: ([a-f0-9]{32})$',material.read_text(),re.M).group(1)
         assert mat_guid in text,p
