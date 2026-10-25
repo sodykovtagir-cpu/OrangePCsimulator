@@ -122,6 +122,7 @@ namespace PC.Component
 		protected override void Start()
 		{
 			base.Start();
+            PC.Component.Cabling.CablePorts.Install(this);
 			source = GetComponent<AudioSource>();
 		}
 
@@ -183,6 +184,12 @@ namespace PC.Component
             if (ArtifactLevel > 0) AddArtifactLevel(1);
             return true;
 		}
+
+        public override void Damage()
+        {
+            base.Damage();
+            PC.Component.Cabling.CablePower.RefreshAll();
+        }
 
 		public override void ToData(JObject jObject)
 		{

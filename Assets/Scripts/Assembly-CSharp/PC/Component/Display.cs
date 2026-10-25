@@ -36,6 +36,12 @@ namespace PC.Component
 		/// ConnectBoard и DisconnectBoard.
 		/// </remarks>
 		public Motherboard ConnectedBoard { get { return currentBoard; } }
+        public bool VideoFromGpu { get; set; }
+        public GPU VideoGpu { get; set; }
+        public void ShowNoSignal(bool visible)
+        {
+            if (noSignal != null) noSignal.SetActive(visible);
+        }
 
 		private RectTransform rect;
 
@@ -68,6 +74,7 @@ namespace PC.Component
 		protected override void Start()
 		{
 			base.Start();
+            PC.Component.Cabling.CablePorts.Install(this);
 
 			canvas = GetComponentInChildren<Canvas>();
 			Debug.Assert(canvas != null, "canvas is null");
@@ -97,14 +104,9 @@ namespace PC.Component
 
 		public void RefreshScreen(bool on)
 		{
-			if (on)
-			{
-				StopNoSignalAnimation();
-				return;
-			}
-
-			var routine = DisplayNoSignal();
-			coroutine = StartCoroutine(routine);
+            // Unplugged power means a dark monitor. A powered monitor without
+            // video displays No Signal via CablePower.RefreshAll instead.
+            StopNoSignalAnimation();
 		}
 
 		private void StopNoSignalAnimation()

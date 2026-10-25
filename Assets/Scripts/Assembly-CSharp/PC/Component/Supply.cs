@@ -38,6 +38,8 @@ namespace PC.Component
 
 		protected override void Start()
         {
+            base.Start();
+            PC.Component.Cabling.CablePorts.Install(this);
 			source = GetComponent<AudioSource>();
 			fan = GetComponent<FanSpin>();
 			PowerChanged += UpdatePower;
@@ -91,6 +93,7 @@ namespace PC.Component
             burning = true;
 
             base.Damage(); // ставит Broken статус
+            PC.Component.Cabling.CablePower.RefreshAll();
 
             if (spark != null)
             {
@@ -104,6 +107,7 @@ namespace PC.Component
         public override void Damage()
         {
             base.Damage();
+            PC.Component.Cabling.CablePower.RefreshAll();
             StartCoroutine(RenderBurn());
         }
 

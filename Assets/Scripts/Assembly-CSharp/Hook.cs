@@ -51,6 +51,8 @@ public class Hook : Item, ISave
 	private void SetHooked(bool value)
 	{
 		hooked = value;
+        if (GetComponent<PC.Component.Cabling.OutletStrip>() != null)
+            PC.Component.Cabling.CablePower.RefreshAll();
 		if (rb != null)
 		{
 			rb.isKinematic = value;
