@@ -1,20 +1,25 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace PC.Component.Software.OS
 {
-    /// <summary>Full-monitor startup diagnostics, independent of the PCOS/BIOS prefab animation.</summary>
+    /// <summary>Non-blocking diagnostics over the existing PCOS loading screens.</summary>
     public sealed class BootLog : MonoBehaviour
     {
+        private const int MaxLines = 12;
+        private readonly Queue<string> lines = new Queue<string>();
         private Text output;
         private bool verbose;
-        private string lines = "";
 
         public static BootLog Create(ComputerSystem system, bool debug)
         {
             var root = system != null ? system.GetComponent<RectTransform>() : null;
             if (root == null) return null;
-            var screen = new GameObject("Boot diagnostics", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+
+            // Cover the monitor for layout purposes, but do not paint over PCOS
+            // or intercept the account/password UI underneath the overlay.
+            var screen = new GameObject("Boot diagnostics", typeof(RectTransform));
             screen.transform.SetParent(root, false);
             screen.layer = root.gameObject.layer;
             var rect = (RectTransform)screen.transform;
@@ -22,25 +27,39 @@ namespace PC.Component.Software.OS
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            var image = screen.GetComponent<Image>();
-            image.color = new Color(0.018f, 0.023f, 0.035f, 1f);
-            image.raycastTarget = true;
+            rect.SetAsLastSibling();
 
-            var label = new GameObject("Startup messages", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            label.transform.SetParent(rect, false);
+            // A compact, translucent corner panel leaves the motherboard logo,
+            // account details and password form visible and clickable.
+            var panel = new GameObject("Startup log panel", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(Image));
+            panel.transform.SetParent(rect, false);
+            panel.layer = root.gameObject.layer;
+            var panelRect = (RectTransform)panel.transform;
+            panelRect.anchorMin = new Vector2(0.02f, 0.03f);
+            panelRect.anchorMax = new Vector2(0.57f, 0.55f);
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+            var background = panel.GetComponent<Image>();
+            background.color = new Color(0.015f, 0.02f, 0.03f, 0.68f);
+            background.raycastTarget = false;
+
+            var label = new GameObject("Startup messages", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(Text));
+            label.transform.SetParent(panelRect, false);
             label.layer = root.gameObject.layer;
             var textRect = (RectTransform)label.transform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(24f, 24f);
-            textRect.offsetMax = new Vector2(-24f, -24f);
+            textRect.offsetMin = new Vector2(10f, 8f);
+            textRect.offsetMax = new Vector2(-10f, -8f);
             var text = label.GetComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = 20;
+            text.fontSize = 14;
             text.alignment = TextAnchor.UpperLeft;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.color = new Color(0.85f, 0.9f, 0.92f, 1f);
+            text.color = new Color(0.85f, 0.92f, 0.96f, 1f);
             text.raycastTarget = false;
 
             var log = screen.AddComponent<BootLog>();
@@ -50,16 +69,26 @@ namespace PC.Component.Software.OS
             return log;
         }
 
+        public void Stage(string title)
+        {
+            lines.Clear();
+            Add("=== " + title + " ===");
+        }
+
         public void Add(string message)
         {
-            lines += message + "\n";
-            if (output != null) output.text = lines;
+            foreach (var line in (message ?? "").Split('\n'))
+            {
+                lines.Enqueue(line);
+                while (lines.Count > MaxLines) lines.Dequeue();
+            }
+            if (output != null) output.text = string.Join("\n", lines.ToArray());
         }
 
         public void Fail(string reason)
         {
-            // Even without -debug the real cause must be visible, not just a BSOD.
-            if (!verbose) lines = "";
+            // Without -debug, show only the reason; with it, retain the stage.
+            if (!verbose) lines.Clear();
             Add(reason);
             gameObject.SetActive(true);
             transform.SetAsLastSibling();

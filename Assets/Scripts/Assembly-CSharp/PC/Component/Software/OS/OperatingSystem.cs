@@ -97,6 +97,8 @@ namespace PC.Component.Software.OS
         private bool error;
         private bool faultPending;
         private BootLog bootLog;
+        private bool desktopPreRendered;
+        private bool awaitingPassword;
         private bool startupCommandsRan;
         private bool startMenuOpened;
         private Coroutine startMenuRoutine;
@@ -624,6 +626,8 @@ namespace PC.Component.Software.OS
         {
             busy = true;
             running = true;
+            desktopPreRendered = false;
+            awaitingPassword = false;
 
             if (startup != null) startup.SetActive(true);
             if (user != null) user.SetActive(false);
@@ -651,7 +655,12 @@ namespace PC.Component.Software.OS
             bool overclock = AutorunConfig.HasBoot(autorun, "overclockerd-boot.bin", out overclockDebug);
             bool stock = AutorunConfig.HasBoot(autorun, "boot.bin", out stockDebug);
             bootLog = BootLog.Create(this, overclock ? overclockDebug : stockDebug);
-            if (bootLog != null) bootLog.Add("PCOS: initializing boot sequence");
+            if (bootLog != null)
+            {
+                bootLog.Stage("01 / KERNEL AND DEVICES");
+                bootLog.Add("Starting process: kernel.bootstrap");
+                bootLog.Add("Loading PCOS kernel image");
+            }
             if (FileManager == null || !FileManager.Exists(0, "System/boot.bin"))
             {
                 yield return FreezeThenFault("Kernel Panic! Can't find boot.bin");
@@ -664,8 +673,8 @@ namespace PC.Component.Software.OS
             }
             if (bootLog != null)
             {
-                bootLog.Add("BIOS: boot.bin located");
-                bootLog.Add("Autorun.conf: loaded");
+                bootLog.Add("Kernel image: boot.bin found");
+                bootLog.Add("Startup configuration: Autorun.conf loaded");
             }
             if (overclock)
             {
@@ -701,8 +710,12 @@ namespace PC.Component.Software.OS
                 yield return FreezeThenFault("Boot not specified");
                 yield break;
             }
-            if (bootLog != null) bootLog.Add(overclock
-                ? "Boot: overclockerd-boot.bin" : "Boot: boot.bin");
+            if (bootLog != null)
+            {
+                bootLog.Add(overclock ? "Boot profile: overclockerd-boot.bin" : "Boot profile: boot.bin");
+                bootLog.Add("Starting process: component.initializer");
+            }
+            yield return new WaitForSecondsRealtime(0.16f);
 
             // Wait for canvas/iconParent to be fully initialized before creating icons.
             // Without this, parentRT.rect may be (0,0) and all icons spawn at (0,0).
@@ -722,10 +735,12 @@ namespace PC.Component.Software.OS
                 }
             }
 
-            if (bootLog != null) bootLog.Add("Initializing devices and desktop");
-            EnsureIconLayoutLoaded();
-            LoadFilesFromDisk();
-            if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
+            if (bootLog != null)
+                bootLog.Add(AutorunConfig.HasLine(autorun, "init devices")
+                    ? "Device initialization directive: ready"
+                    : "Device initialization directive: missing (checked when used)");
+            if (bootLog != null) bootLog.Add("Starting process: device.enumerator");
+            yield return new WaitForSecondsRealtime(0.16f);
 
             storageScore = 0;
             var all = AllStorage;
@@ -733,21 +748,28 @@ namespace PC.Component.Software.OS
             {
                 for (int i = 0; i < all.Count; i++)
                 {
-                    var s = all[i];
-                    if (s != null) storageScore += s.Score;
+                    var disk = all[i];
+                    if (disk != null) storageScore += disk.Score;
                 }
             }
+            if (bootLog != null) bootLog.Add("Storage devices enumerated: " + (all != null ? all.Count : 0));
 
+            // Split the original storage-dependent pause so the real progress
+            // is visible instead of dumping all lines in a single frame.
             float wait = storageScore > 0 ? 10000f / storageScore : 0f;
-            if (wait > 0f) yield return new UnityEngine.WaitForSeconds(wait);
+            yield return new WaitForSeconds(Mathf.Max(0.15f, wait * 0.35f));
+            if (bootLog != null) bootLog.Add("Starting process: driver.manager");
+            yield return new WaitForSeconds(Mathf.Max(0.15f, wait * 0.65f));
+            if (bootLog != null) bootLog.Add("Kernel and devices initialized");
 
-            if (!AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init user"))
-            {
-                yield return FreezeThenFault("Failed to init user"); // OS -> login transition
-                yield break;
-            }
-
+            // Stage 2 is drawn over the existing account loading animation.
             if (startup != null) startup.SetActive(false);
+            if (user != null) user.SetActive(true);
+            if (bootLog != null)
+            {
+                bootLog.Stage("02 / USER SESSION");
+                bootLog.Add("Starting process: account.profile");
+            }
 
             // Логотип платы принадлежит этапу запуска. Дальше идёт вход в
             // учётную запись -- аватар, имя и кружок ожидания, -- и логотип
@@ -756,9 +778,6 @@ namespace PC.Component.Software.OS
             // startup он не выключается.
             if (brandLogo != null) brandLogo.enabled = false;
             if (startupLabel != null) startupLabel.enabled = false;
-
-            if (bootLog != null) { bootLog.Add("User initialized"); bootLog.Close(); bootLog = null; }
-            if (user != null) user.SetActive(true);
 
             var fm = FileManager;
             File uf;
@@ -786,6 +805,8 @@ namespace PC.Component.Software.OS
             var tex = UserPicture();
             if (userPicture != null) userPicture.texture = tex;
             if (userData != null && userText != null) userText.text = userData.userName;
+            if (bootLog != null) bootLog.Add("Account profile loaded");
+            yield return new WaitForSecondsRealtime(0.16f);
 
             bool hasPassword = false;
             if (all != null && all.Count > 0 && all[0] != null)
@@ -793,21 +814,66 @@ namespace PC.Component.Software.OS
                 var pwd = all[0].password;
                 hasPassword = !string.IsNullOrEmpty(pwd);
             }
+            if (hasPassword)
+            {
+                if (bootLog != null) bootLog.Add("Requesting account password");
+                if (loading != null) loading.SetActive(false);
+                if (password != null) password.SetActive(true);
+                if (passwordInput != null) passwordInput.text = "";
+            }
+            else if (bootLog != null) bootLog.Add("Account has no password; continuing login");
+
+            // Password UI stays on screen while the desktop is prepared. No
+            // simulated authentication or bypass: a correct entry is required.
+            if (bootLog != null) bootLog.Add("Starting process: desktop.renderer");
+            EnsureIconLayoutLoaded();
+            LoadFilesFromDisk();
+            if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
+            if (bootLog != null) bootLog.Add("Pre-rendering desktop resources");
+            yield return new WaitForSecondsRealtime(0.16f);
+            desktopPreRendered = true;
+            if (bootLog != null) bootLog.Add("Desktop resources prepared");
 
             if (!hasPassword)
             {
-                if (loading != null) loading.SetActive(true);
-                if (password != null) password.SetActive(false);
                 yield return new WaitForSeconds(1f);
-                busy = false;
-                Desktop();
+                yield return FinishLogin();
                 yield break;
             }
 
             busy = false;
-            if (loading != null) loading.SetActive(false);
-            if (password != null) password.SetActive(true);
-            if (passwordInput != null) passwordInput.text = "";
+            awaitingPassword = true;
+            if (bootLog != null) bootLog.Add("Authentication pending: waiting for password");
+            while (awaitingPassword && !error)
+            {
+                yield return new WaitForSecondsRealtime(3f);
+                if (awaitingPassword && !error && bootLog != null)
+                    bootLog.Add("Authentication pending: waiting for password");
+            }
+        }
+
+        private IEnumerator FinishLogin()
+        {
+            // This is the final user-stage check, after a successful password
+            // entry (or the normal loading spinner when no password is set).
+            while (!desktopPreRendered) yield return null;
+            if (bootLog != null) bootLog.Add("Checking user directives in Autorun.conf");
+            yield return new WaitForSecondsRealtime(0.18f);
+            if (!AutorunConfig.HasLine(AutorunConfig.Read(FileManager), "init user"))
+            {
+                yield return FreezeThenFault("Failed to init user");
+                yield break;
+            }
+            var commands = AutorunConfig.UserCommands(AutorunConfig.Read(FileManager));
+            if (bootLog != null)
+            {
+                bootLog.Add("User directives: ready; startup commands queued: " + commands.Length);
+                bootLog.Add("Starting process: desktop.shell");
+            }
+            yield return new WaitForSecondsRealtime(0.18f);
+            if (bootLog != null) { bootLog.Close(); bootLog = null; }
+            busy = false;
+            Desktop();
         }
 
         private void Desktop()
@@ -1036,7 +1102,7 @@ namespace PC.Component.Software.OS
         {
             var input = passwordInput;
             var all = AllStorage;
-            if (input == null || all == null || all.Count == 0) return;
+            if (input == null || all == null || all.Count == 0 || busy || error || faultPending) return;
 
             var typed = input.text;
             var storage = all[0];
@@ -1045,10 +1111,14 @@ namespace PC.Component.Software.OS
             var correct = storage.password;
             if (string.Equals(typed, correct))
             {
-                Desktop();
+                busy = true;
+                awaitingPassword = false;
+                if (bootLog != null) bootLog.Add("Password accepted; initializing user session");
+                StartCoroutine(FinishLogin());
                 return;
             }
 
+            if (bootLog != null) bootLog.Add("Password rejected; waiting for account password");
             if (passwordAnimator != null) passwordAnimator.SetTrigger("Wrong");
 
             var board = Board;
@@ -1152,6 +1222,7 @@ namespace PC.Component.Software.OS
             if (!running) return;
             running = false;
             Ready = false;
+            awaitingPassword = false;
             SessionToken++;
 
             // Гасим самостоятельные медиа/звук всех открытых приложений (видео и

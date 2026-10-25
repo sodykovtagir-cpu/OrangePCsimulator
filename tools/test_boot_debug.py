@@ -31,8 +31,22 @@ assert 'Kernel panic! Can\'t find Autorun.conf' in os
 assert 'bootLog.Close(); bootLog = null;' in os
 assert 'SystemDisk()' in bios and 'bootFailure = true;' in bios
 assert 'Kernel Panic! Can\'t find boot.bin' in bios
-assert 'BootLog.Create(this, debug)' in bios
+assert 'BootLog.Create(this, debug)' not in bios and 'BootLog.Create(this, false)' in bios
 assert 'rect.anchorMin = Vector2.zero' in log and 'rect.anchorMax = Vector2.one' in log
-assert 'if (!verbose) lines = "";' in log and 'gameObject.SetActive(true);' in log
+assert 'if (!verbose) lines.Clear();' in log and 'gameObject.SetActive(true);' in log
+assert 'background.raycastTarget = false;' in log and 'text.raycastTarget = false;' in log
+assert 'new Color(0.015f, 0.02f, 0.03f, 0.68f)' in log
+assert 'rect.anchorMin = Vector2.zero' in log and 'rect.anchorMax = Vector2.one' in log
+assert 'bootLog.Stage("01 / KERNEL AND DEVICES")' in os
+assert 'bootLog.Stage("02 / USER SESSION")' in os
+assert os.index('bootLog.Stage("01 / KERNEL AND DEVICES")') < os.index('Starting process: device.enumerator') < os.index('bootLog.Stage("02 / USER SESSION")')
+assert os.index('bootLog.Stage("02 / USER SESSION")') < os.index('Requesting account password') < os.index('Pre-rendering desktop resources') < os.index('Checking user directives in Autorun.conf')
+assert 'while (awaitingPassword && !error)' in os and 'StartCoroutine(FinishLogin())' in os
+assert 'awaitingPassword = false;' in os and 'awaitingPassword = true;' in os
+assert 'while (!desktopPreRendered) yield return null;' in os
+assert os.index('Checking user directives in Autorun.conf') < os.index('"init user"') < os.index('bootLog.Close(); bootLog = null;')
+assert 'desktopPreRendered = true;' in os and 'bool hasPassword = false;' in os
+assert 'if (bootLog != null) bootLog.Add("Password accepted; initializing user session")' in os
+assert 'System/autorun.exec' not in os
 assert 'else if (cmd == "boot")' in terminal and 'required boot directive, already validated' not in terminal
-print('Boot command, migration, fullscreen debug, and failure-stage guards: OK')
+print('Boot command, PCOS overlay, two startup stages, password, and failure guards: OK')

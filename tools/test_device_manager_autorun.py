@@ -30,7 +30,7 @@ assert all(x in config for x in ('System/Autorun.conf', 'System/autorun.initiali
     '//Initialize system DO NOT REMOVE!!!!', 'boot boot.bin\\ninit devices\\ninit user\\n',
     'HasLine', 'UserCommands', 'AppendCommand'))
 assert 'AutorunConfig.Ensure(FileManager)' in os
-assert os.index('Boot not specified') < os.index('"init user"') < os.index('if (user != null) user.SetActive(true);')
+assert os.index('Boot not specified') < os.index('if (user != null) user.SetActive(true);') < os.index('"init user"')
 assert 'FreezeThenFault()' in os and 'WaitForSecondsRealtime(1.3f)' in os
 assert 'if (hardware is Storage) RequireDevices()' in os
 assert 'OnHardwareAdded(hardware)' in read('Assets/Scripts/Assembly-CSharp/PC/Component/Software/OS/ComputerSystem.cs')

@@ -77,13 +77,6 @@ namespace PC.Component.Software.OS
 			// Логотип — украшение, загрузка компьютера — нет. Поэтому загрузка
 			// планируется первой и не зависит от того, чем кончится ApplyBrand.
 			Invoke("BootOperatingSystem", 2f);
-            var candidate = SystemDisk();
-            File autorun;
-            bool debug = candidate != null && candidate.TryGetFile(AutorunConfig.Path, out autorun) &&
-                autorun != null && AutorunConfig.DebugRequested(autorun.content);
-            bootLog = BootLog.Create(this, debug);
-            if (bootLog != null) bootLog.Add("BIOS: scanning boot devices");
-
 			try
 			{
 				ApplyBrand();
@@ -167,7 +160,6 @@ namespace PC.Component.Software.OS
 
 			if (enterBios)
 			{
-                if (bootLog != null) bootLog.Close();
 				EnterBiosSettings();
 				return;
 			}
@@ -188,14 +180,12 @@ namespace PC.Component.Software.OS
                 if (bootLog != null) bootLog.Fail("Kernel Panic! Can't find boot.bin");
                 return;
             }
-            if (bootLog != null) bootLog.Add("BIOS: boot device selected");
 
 			if (bootTypes == null || bootTypes.Count == 0)
 			{
 				// Нет загрузочной записи — уходим в настройки. Это НЕ зависание:
 				// если экран остался прежним, значит не сработал сам переход.
 				Debug.Log("BIOS: загрузочных записей не найдено, открываю настройки");
-                if (bootLog != null) bootLog.Close();
 				EnterBiosSettings();
 				return;
 			}
@@ -223,7 +213,6 @@ namespace PC.Component.Software.OS
 				return;
 			}
 
-            if (bootLog != null) bootLog.Close();
 			EnterBiosSettings();
 		}
 
