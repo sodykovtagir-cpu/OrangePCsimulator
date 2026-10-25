@@ -30,7 +30,7 @@ public static class PrepareCableSockets
                 added += Add(board, PortKind.BoardVideo, "Board video");
                 if (board.Integrated) added += Add(board, PortKind.PcPower, "Mini PC AC input");
             }
-            foreach (var display in root.GetComponentsInChildren<Display>(true))
+            foreach (var display in root.GetComponentsInChildren<PC.Component.Display>(true))
             {
                 bool crt = display is Monitor && display.spawnId == "CRT_Monitor";
                 added += Add(display, crt ? PortKind.VgaInput : PortKind.HdmiInput,

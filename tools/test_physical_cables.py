@@ -37,7 +37,9 @@ assert 'var pcCase = connector.slot.GetComponentInParent<Case>();' not in read('
 assert 'solidCase.enabled = false' in read('PC/Component/Cabling/CableCaseOpening.cs')
 assert all(side in read('PC/Component/Cabling/CableCaseOpening.cs')
            for side in ('"Left"','"Right"','"Below"','"Above"'))
-assert 'Prepare sockets in selected prefab' in (root/'Assets/Editor/PrepareCableSockets.cs').read_text()
+editor_sockets=(root/'Assets/Editor/PrepareCableSockets.cs').read_text()
+assert 'Prepare sockets in selected prefab' in editor_sockets
+assert 'GetComponentsInChildren<PC.Component.Display>' in editor_sockets  # UnityEngine.Display is ambiguous
 
 def script_guid(relative):
     meta=(code/(relative+'.meta')).read_text()
