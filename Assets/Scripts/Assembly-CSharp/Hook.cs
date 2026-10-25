@@ -106,6 +106,13 @@ public class Hook : Item, ISave
 			if (hit.transform == tr || hit.transform.IsChildOf(tr))
 				continue;
 
+            // Wall outlets require a nearly vertical surface. The generic Hook
+            // accepts any static collider, including the floor; keep that
+            // existing behaviour for all other hookable items.
+            if (GetComponent<PC.Component.Cabling.OutletStrip>() != null &&
+                Mathf.Abs(hit.normal.y) > .35f)
+                continue;
+
 			if (hit.transform.CompareTag("Wall") || (hit.collider.attachedRigidbody == null && !hit.transform.CompareTag("Player")))
 				return true;
 		}
@@ -175,7 +182,15 @@ public class Hook : Item, ISave
 
 	public override void FromData(JObject jObject)
 	{
-		Hooked = jObject.Value<bool>("hooked");
+        bool savedHooked = jObject.Value<bool>("hooked");
+        // Old saves may already contain an outlet attached to the floor.
+        // Revalidate only outlets; other Hook-based objects keep their state.
+        if (savedHooked && GetComponent<PC.Component.Cabling.OutletStrip>() != null)
+        {
+            Physics.SyncTransforms();
+            savedHooked = IsWall();
+        }
+		Hooked = savedHooked;
 		base.FromData(jObject);
 	}
 }
