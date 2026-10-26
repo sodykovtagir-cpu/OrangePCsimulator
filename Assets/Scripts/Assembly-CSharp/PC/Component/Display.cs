@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace PC.Component
@@ -99,8 +100,23 @@ namespace PC.Component
 			Switch(false, false);
 			StopNoSignalAnimation();
 			DisconnectBoard();
-			screen.material = brokenScreenMaterial;
+            ApplyBrokenScreen();
 		}
+
+        public override void FromData(JObject data)
+        {
+            base.FromData(data); // restore the flag without replaying Damage() effects
+            if (Damaged) ApplyBrokenScreen();
+        }
+
+        private void ApplyBrokenScreen()
+        {
+            // A newly instantiated monitor starts with its prefab material.
+            // Hardware.FromData restores Damaged, but does not call Damage(),
+            // so restore the visual material explicitly in both save modes.
+            if (screen != null && brokenScreenMaterial != null)
+                screen.material = brokenScreenMaterial;
+        }
 
 		public void RefreshScreen(bool on)
 		{

@@ -189,6 +189,16 @@ def prefab_scripts(prefab):
 
 shop=(root/'Assets/MonoBehaviour/Shop.asset').read_text()
 assert 'pageName: Cables & Power' in shop
+# 1 m and 3 m Power/VGA products were explicitly removed, not merely hidden.
+# Beware: old filename "Power Cable 3m" actually stores a 6 m cable.
+for removed in ('Power Cable (1m)','Power Cable 1.5m',
+                'VGA Cable (1m)','VGA Cable 1.5m'):
+    for folder,ext in (('Resources/components','.prefab'),('MonoBehaviour','.asset')):
+        path=root/'Assets'/folder/(removed+ext)
+        assert not path.exists() and not path.with_suffix(ext+'.meta').exists(), path
+assert all(guid not in shop for guid in (
+    '16cd354ef95a522889ed3e7ef2d8aa20', '424d269631234fb7b980d80a4facfc29',
+    'c043dbbdf026577c9095f60a82469157', '8c481b3cb4ec44f49a1eb05fe2721a5c'))
 assert 'guid: 78348b2c142bcb88381354c04ae3fce7' in shop  # keep first ready PC
 def plug_visuals(yaml, end):
     blocks={fid:body for fid,body in re.findall(
@@ -209,12 +219,12 @@ ids=[]
 shop_ids=[]
 for kind in ('Power','VGA','HDMI'):
     reference=(root/'Assets/Resources/components'/
-               {'Power':'Power Cable 1.5m.prefab','VGA':'VGA Cable 1.5m.prefab',
+               {'Power':'Power Cable 3m.prefab','VGA':'VGA Cable 3.5m.prefab',
                 'HDMI':'HDMI Cable 2m.prefab'}[kind]).read_text()
     expected_visuals={end:plug_visuals(reference,end) for end in ('A','B')}
     paths=list((root/'Assets/Resources/components').glob(f'{kind} Cable *.prefab'))
-    assert len(paths)==6,kind
-    expected={'Power':{1,3,5,6,10,15},'VGA':{1,3,5,7,11,15},
+    assert len(paths)==(6 if kind=='HDMI' else 4),kind
+    expected={'Power':{5,6,10,15},'VGA':{5,7,11,15},
               'HDMI':{2,4,6,8,12,16}}[kind]
     lengths=set()
     for p in paths:
@@ -279,7 +289,7 @@ for sockets in (1,2,3):
     assert shop_guid in shop,p
     ids.append(prefab_guid)
     shop_ids.append(shop_guid)
-assert len(set(ids))==21
+assert len(set(ids))==17
 for template,script_name in (("Cable Socket TEMPLATE",port_script),("PSU Opening TEMPLATE",opening_script)):
     p=root/f"Assets/Resources/components/{template}.prefab"
     assert check_prefab(str(p))==0
@@ -292,7 +302,7 @@ for key in ('Cables & Power','Power Cable','VGA Cable','HDMI Cable','Wall Outlet
 shop_page=shop.split('  - pageName: Cables & Power\n')[1].split('  - pageName:',1)[0]
 page_guids=re.findall(r'^    - \{fileID: 11400000, guid: ([a-f0-9]{32}), type: 2\}$',
                       shop_page,re.M)
-assert len(page_guids)==21 and len(set(page_guids))==21
+assert len(page_guids)==17 and len(set(page_guids))==17
 assert sorted(page_guids)==sorted(shop_ids)
 for kind in ('power','vga','hdmi','outlet'):
     image=root/f'Assets/Texture2D/icon_cable_{kind}.png'
@@ -302,4 +312,4 @@ for kind in ('power','vga','hdmi','outlet'):
     sprite_guid=re.search(r'^guid: ([a-f0-9]{32})$',image.with_suffix('.png.meta').read_text(),re.M).group(1)
     assets=(root/'Assets/MonoBehaviour').glob((kind.upper() if kind in ('vga','hdmi') else 'Power' if kind=='power' else 'Wall Outlet')+'*.asset')
     assert any(sprite_guid in asset.read_text() for asset in assets)
-print('Physical cables, power/video routes, persistence, 21 shop items: OK')
+print('Physical cables, power/video routes, persistence, 17 shop items: OK')

@@ -16,8 +16,10 @@ ITEMS = ROOT / 'Assets/MonoBehaviour'
 SHOP = ITEMS / 'Shop.asset'
 # Source prefab, new lengths, and linear shop prices matching existing prices.
 FAMILIES = {
-    'Power': ('Power Cable 1.5m', (1, 5, 15), 30, 7.5),
-    'VGA': ('VGA Cable 1.5m', (1, 5, 15), 29.5, 7.5),
+    # The 1 m and 3 m products/prefabs were deliberately removed. Use
+    # surviving authored plugs as templates; never regenerate removed SKUs.
+    'Power': ('Power Cable 3m', (5, 15), 30, 7.5),
+    'VGA': ('VGA Cable 3.5m', (5, 15), 29.5, 7.5),
     'HDMI': ('HDMI Cable 2m', (2, 6, 16), 30, 7.5),
 }
 
@@ -105,7 +107,7 @@ def main():
     if page is None: raise ValueError('missing Cables & Power shop page')
     old_guids = re.findall(r'^    - \{fileID: 11400000, guid: ([0-9a-f]{32}), type: 2\}$',
                            page.group(1), re.M)
-    if len(old_guids) not in (12, 21):
+    if len(old_guids) != 17:
         raise ValueError(f'unexpected shop page size: {len(old_guids)}')
     entries = []
     for kind, (reference, lengths, _, _) in FAMILIES.items():
@@ -123,13 +125,13 @@ def main():
         (entry for entry in entries if entry[0] == kind), key=lambda entry: entry[1])]
     # The three author-made outlet products retain their existing links/order.
     outlet_guids = [g for g in old_guids if g not in new_guids]
-    if len(new_guids) != 18 or len(set(new_guids)) != 18 or len(outlet_guids) != 3:
+    if len(new_guids) != 14 or len(set(new_guids)) != 14 or len(outlet_guids) != 3:
         raise ValueError('wrong cable/outlet catalog composition')
     new_page = '  - pageName: Cables & Power\n    item:\n' + ''.join(
         f'    - {{fileID: 11400000, guid: {g}, type: 2}}\n' for g in new_guids + outlet_guids)
     shop_text = shop_text[:page.start()] + new_page + shop_text[page.end():]
     SHOP.write_text(shop_text)
-    print('shop: 18 cable lengths and 3 outlet variants')
+    print('shop: 14 cable lengths and 3 outlet variants')
 
 
 if __name__ == '__main__':

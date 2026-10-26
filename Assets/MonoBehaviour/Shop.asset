@@ -21,14 +21,10 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0c8ac4837b5219b4ea62f5322974b990, type: 2}
   - pageName: Cables & Power
     item:
-    - {fileID: 11400000, guid: 16cd354ef95a522889ed3e7ef2d8aa20, type: 2}
-    - {fileID: 11400000, guid: 424d269631234fb7b980d80a4facfc29, type: 2}
     - {fileID: 11400000, guid: 962de0bd86cd5fa9b62ed7fd8a52244e, type: 2}
     - {fileID: 11400000, guid: 14169cf57ea9482685dbe7c767d3a0f7, type: 2}
     - {fileID: 11400000, guid: 07ab8d7127cf4092aaf72a86e30840ae, type: 2}
     - {fileID: 11400000, guid: ca4b787a1214533ca8b253d7a7dad825, type: 2}
-    - {fileID: 11400000, guid: c043dbbdf026577c9095f60a82469157, type: 2}
-    - {fileID: 11400000, guid: 8c481b3cb4ec44f49a1eb05fe2721a5c, type: 2}
     - {fileID: 11400000, guid: 3aad27b564b45c8e929af54aa0a45767, type: 2}
     - {fileID: 11400000, guid: fb853159f1d74f949d8a6f895ff6032d, type: 2}
     - {fileID: 11400000, guid: 2bfa9035d8ea49b0a13dffc1279b5e75, type: 2}
