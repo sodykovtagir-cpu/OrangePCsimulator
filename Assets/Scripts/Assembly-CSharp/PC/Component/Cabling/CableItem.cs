@@ -243,17 +243,9 @@ namespace PC.Component.Cabling
                         Mathf.Min(attached.PullOutForce * .4f, rb.mass * 20f));
                     rb.AddForceAtPosition(direction * force, attached.Connected.Snap.position);
                 }
-                // Pulling a *middle* section can overstretch just that half
-                // while the other half is slack; total end-to-end span misses
-                // it. Release the strained side before its joints separate.
-                if (sectionHeld && distance > restLength + .08f &&
-                    Time.time - attached.ConnectedAt > .25f)
-                {
-                    attached.Unplug();
-                    overstretchSteps = 0;
-                    strainCooldownUntil = Time.time + .35f;
-                    return;
-                }
+                // Holding any section must never call Unplug. Pulling hard
+                // enough breaks the plug's own FixedJoint (pullOutForce), not
+                // a geometry threshold that can already be met on pickup.
             }
         }
 
@@ -262,14 +254,15 @@ namespace PC.Component.Cabling
             if ((plugs[0].Connected == null && plugs[1].Connected == null) ||
                 bodies.Length == 0 || Time.time < strainCooldownUntil)
                 return false;
-            // A free 0.11 kg plug settling under its own weight is not a
-            // second heavy endpoint. Only police the one-ended span when the
-            // player is actually pulling a plug or part of the jacket. With
-            // both ends attached, keep guarding passive heavy devices.
+            // A click/drag is not a request to unplug. The actual FixedJoint
+            // with pullOutForce handles deliberate pulling; this emergency
+            // length guard is ONLY for passive loads between two devices.
+            // A single free plug settling under gravity must not release the
+            // other end either.
             var a = plugs[0];
             var b = plugs[1];
-            if ((a.Connected == null) != (b.Connected == null) &&
-                !a.IsHeld && !b.IsHeld && heldSegment == null)
+            if (a.Connected == null || b.Connected == null ||
+                a.IsHeld || b.IsHeld || heldSegment != null)
             {
                 overstretchSteps = 0;
                 return false;
@@ -330,10 +323,8 @@ namespace PC.Component.Cabling
             var b = plugs[1].Connected != null ? plugs[1] : null;
             if (a == null) return b;
             if (b == null) return a;
-            // A held plug comes out when pulled past its limit. Otherwise
-            // keep mains outlets mounted; for video prefer the display input.
-            if (a.IsHeld) return a;
-            if (b.IsHeld) return b;
+            // Passive heavy load: keep mains outlets mounted and prefer the
+            // display input over an installed GPU for video cables.
             if (a.Connected.kind == PortKind.Outlet) return b;
             if (b.Connected.kind == PortKind.Outlet) return a;
             if (a.Connected.kind == PortKind.VgaInput || a.Connected.kind == PortKind.HdmiInput) return a;

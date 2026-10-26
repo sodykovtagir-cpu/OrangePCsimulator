@@ -54,8 +54,16 @@ assert 'CablePower.BoardHasPower(this)' in read('PC/Component/Motherboard.cs')
 assert 'CablePower.RefreshAll()' in read('PC/Component/Motherboard.cs')
 assert 'ConnectMonitor(selectedMonitor);' not in read('Raycast.cs')
 raycast=read('Raycast.cs')
-assert 'plug.Unplug();' not in raycast  # connected plugs resist a grab
+# Disassembly is an explicit click action BEFORE ordinary dragging; normal
+# clicks only grab, with no automatic Unplug on any cable type.
+assert raycast.index('if (RemoveMode && hit.transform != null)') < raycast.index('if (dragRigidbody)', raycast.index('public void ShootRaycast'))
+assert 'if (plug != null && plug.Connected != null) plug.Unplug();' in raycast
+assert raycast.count('plug.Unplug();') == 1
+assert 'var cable = hit.transform.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
+assert 'Vector3.SqrMagnitude(hit.point - a.transform.position)' in raycast
 assert 'plug.SetHeld(true, ReleaseHeldPlug)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
+assert 'if (!AutoRotation || grabbedCable != null)' in raycast
+assert 'if (rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null) return;' in raycast
 assert 'releaseDrag?.Invoke(this)' in plug and 'private void ReleaseHeldPlug(' in raycast
 assert 'pin.breakForce = PullOutForce' in plug and 'OnJointBreak(float force)' in plug
 assert 'body.layer = 0' in rope and 'HoldSection(Rigidbody section)' in rope
@@ -72,14 +80,14 @@ assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope
-assert 'if ((a.Connected == null) != (b.Connected == null) &&' in rope
-assert '!a.IsHeld && !b.IsHeld && heldSegment == null' in rope
+assert 'a.Connected == null || b.Connected == null ||' in rope
+assert 'a.IsHeld || b.IsHeld || heldSegment != null' in rope
+assert 'if (sectionHeld && distance > restLength + .08f' not in rope
 assert 'overstretchSteps = 0;\n                return false;' in rope
 assert 'float spread = Mathf.Min(.5f, length * .15f);' in rope
 assert 'count >= 24 && length > 12f ? 3' in rope
 assert 'path > length + Mathf.Max(.06f, length * .02f)' in rope
 assert 'span > length * .97f' in rope
-assert 'if (sectionHeld && distance > restLength + .08f &&' in rope
 assert 'Mathf.Max(0f, tension - Mathf.Max(0f, closingSpeed)' in rope
 assert 'if (a.Connected.kind == PortKind.Outlet) return b;' in rope
 assert 'if (b.Connected.kind == PortKind.VgaInput || b.Connected.kind == PortKind.HdmiInput) return b;' in rope

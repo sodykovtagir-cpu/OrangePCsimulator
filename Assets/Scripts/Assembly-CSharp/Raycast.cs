@@ -458,6 +458,29 @@ public class Raycast : MonoBehaviour
             return;
         }
 
+        // Disassembly is an intentional disconnect, not a drag. On a plug,
+        // remove only that plug; on the jacket, choose the nearest connected
+        // end. Normal clicks below never disconnect any type of cable.
+        if (RemoveMode && hit.transform != null)
+        {
+            var cable = hit.transform.GetComponentInParent<PC.Component.Cabling.CableItem>();
+            if (cable != null)
+            {
+                var plug = hit.transform.GetComponentInParent<PC.Component.Cabling.CablePlug>();
+                if (plug == null)
+                {
+                    var a = cable.End(0);
+                    var b = cable.End(1);
+                    if (a == null || a.Connected == null) plug = b;
+                    else if (b == null || b.Connected == null) plug = a;
+                    else plug = Vector3.SqrMagnitude(hit.point - a.transform.position) <=
+                                     Vector3.SqrMagnitude(hit.point - b.transform.position) ? a : b;
+                }
+                if (plug != null && plug.Connected != null) plug.Unplug();
+                return;
+            }
+        }
+
         if (dragRigidbody)
         {
             var hitRb = hit.rigidbody;
@@ -529,7 +552,10 @@ public class Raycast : MonoBehaviour
                 currentDrag = drag;
 
                 var sTr = spring.transform;
-                if (!AutoRotation)
+                // Start a cable drag exactly at the contact point. Camera-
+                // facing auto placement can jump the spring on the first frame
+                // and rip out a plug before the player actually pulls it.
+                if (!AutoRotation || grabbedCable != null)
                 {
                     sTr.position = hit.point;
                     drag.distance = hit.distance;
@@ -2283,6 +2309,9 @@ public class Raycast : MonoBehaviour
         var j = spring;
         var rb = j?.connectedBody;
         if (rb == null || rb.isKinematic) return;
+        // Auto-facing a dragged plug/section turns a still-inserted connector
+        // against its socket and can break the joint on the very first click.
+        if (rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null) return;
 
         var t = transform;
         var target = currentDrag?.target;
