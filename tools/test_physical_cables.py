@@ -34,17 +34,27 @@ assert 'AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)' in 
 assert 'Physics.IgnoreCollision(ours, target, true)' in plug
 assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
 assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
-assert 'port.kind == PortKind.GpuVideo && port.owner is GPU gpu' in plug
-assert 'slot.Hardware != gpu' in plug and 'AddPairs(casePairs' in plug
-# An installed PSU uses the GPU's scoped plug/adjacent-section exceptions;
-# a loose PSU, unrelated hardware and other cable segments stay collidable.
-assert 'private static Case FindCase(Supply supply)' in plug
-assert 'slot.Hardware != supply' in plug
-assert 'supply == null || FindCase(supply) == null' in plug
-assert 'port.kind == PortKind.PcPower && port.owner is Supply supply' in plug
-assert 'if (watchedSupply != null) AddPairs(psuPairs, watchedSupply, watchedSupply);' in plug
-assert 'Reinstate(psuPairs);' in plug and plug.count('DeferRestore(psuPairs);') >= 3
+# Every CablePort owner (GPU, PSU, motherboard, display and wall outlet)
+# ignores ONLY this plug and its adjacent capsule. The installed GPU/PSU/board
+# additionally exempts their case, never unrelated devices or full cable.
+assert 'WatchPort(port);' in plug and 'watchedOwner = port.owner;' in plug
+assert 'AddPairs(devicePairs, watchedOwner.transform, watchedOwner);' in plug
+assert 'if (!IsHeld || Connected != null || port == null || !port.Accepts(this)) return;' in plug
+assert 'approachPort = port;\n            WatchPort(port);' in plug
+assert 'Reinstate(devicePairs);' in plug and plug.count('DeferRestore(devicePairs);') >= 3
+assert 'private static Case FindCase(GPU gpu)' in plug and 'slot.Hardware != gpu' in plug
+assert 'private static Case FindCase(Supply supply)' in plug and 'slot.Hardware != supply' in plug
+assert 'private static Case FindCase(Motherboard board)' in plug and 'slot.Hardware != board' in plug
+assert 'if (watchedOwner is GPU gpu) next = FindCase(gpu);' in plug
+assert 'else if (watchedOwner is Supply supply) next = FindCase(supply);' in plug
+assert 'else if (watchedOwner is Motherboard board) next = FindCase(board);' in plug
+assert 'AddPairs(casePairs, currentCase.transform, caseOwner);' in plug
+assert 'gpuPairs' not in plug and 'psuPairs' not in plug
+assert 'if (caseOwner != watchedOwner)' in plug
 assert 'Cable.NearEndCollider(End)' in plug
+assert 'target.GetComponentInParent<Item>() != owner' in plug
+assert 'target == null || target.isTrigger || !target.enabled' in plug
+assert 'AddPair(list, adjacent, target);' in plug
 assert 'candidate.PrepareApproach(this)' in ports and 'candidate.LeaveApproach(this)' in ports
 assert 'approachPort.CaptureRadius + .25f' in plug
 assert 'Physics.IgnoreLayerCollision' not in plug and 'Physics.IgnoreLayerCollision' not in rope
