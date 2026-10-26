@@ -170,9 +170,28 @@ def prefab_scripts(prefab):
 shop=(root/'Assets/MonoBehaviour/Shop.asset').read_text()
 assert 'pageName: Cables & Power' in shop
 assert 'guid: 78348b2c142bcb88381354c04ae3fce7' in shop  # keep first ready PC
+def plug_visuals(yaml, end):
+    blocks={fid:body for fid,body in re.findall(
+        r'(?m)^--- !u!\d+ &(-?\d+)\n([\s\S]*?)(?=^--- !u!|\Z)', yaml)}
+    owner='100010' if end=='A' else '100020'
+    go=blocks[owner]
+    assert f'  m_Name: Plug {end}\n' in go
+    components=[blocks[fid] for fid in re.findall(r'^  - component: \{fileID: (\d+)\}$',go,re.M)]
+    mesh=[b for b in components if b.startswith('MeshFilter:\n')]
+    renderer=[b for b in components if b.startswith('MeshRenderer:\n')]
+    assert len(mesh)==len(renderer)==1
+    assert all(f'  m_GameObject: {{fileID: {owner}}}' in b for b in mesh+renderer)
+    return (re.search(r'^  m_Mesh: (.+)$',mesh[0],re.M).group(1),
+            tuple(re.findall(r'^  - \{fileID: -?\d+, guid: [a-f0-9]{32}, type: 3\}$',
+                             renderer[0],re.M)))
+
 ids=[]
 shop_ids=[]
 for kind in ('Power','VGA','HDMI'):
+    reference=(root/'Assets/Resources/components'/
+               {'Power':'Power Cable 1.5m.prefab','VGA':'VGA Cable 1.5m.prefab',
+                'HDMI':'HDMI Cable 2m.prefab'}[kind]).read_text()
+    expected_visuals={end:plug_visuals(reference,end) for end in ('A','B')}
     paths=list((root/'Assets/Resources/components').glob(f'{kind} Cable *.prefab'))
     assert len(paths)==6,kind
     expected={'Power':{1,3,5,6,10,15},'VGA':{1,3,5,7,11,15},
@@ -185,6 +204,11 @@ for kind in ('Power','VGA','HDMI'):
         assert prefab_scripts(text)==[cable_script,plug_script,plug_script],p
         assert text.count('  m_Name: Plug ') == 2
         assert '  plugA: {fileID: 1140010}' in text and '  plugB: {fileID: 1140020}' in text
+        # Both physical ends must render the author's connector, not the
+        # runtime fallback cube. This includes the two legacy 6/10 m power
+        # cables that predated the authored plug meshes.
+        assert text.count('MeshFilter:') == 2 and text.count('MeshRenderer:') == 2, p
+        assert all(plug_visuals(text,end)==expected_visuals[end] for end in ('A','B')),p
         assert '  jacket: {fileID: 1200000}' in text and 'LineRenderer:' in text
         # Author-adjusted HDMI jackets are 0.13 m; preserve prefab values.
         diameter = float(re.search(r'^  cableDiameter: ([0-9.]+)$',text,re.M).group(1))
