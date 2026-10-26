@@ -5,6 +5,7 @@ These checks do not replace testing menu interactions and physics in Unity.
 """
 from pathlib import Path
 import re
+from check_prefab_yaml import main as check_prefab
 
 root=Path(__file__).resolve().parents[1]
 cs=root/'Assets/Scripts/Assembly-CSharp'
@@ -42,11 +43,36 @@ assert 'ConnectMonitor(disp);' in board and 'monitor.Switch(true, false);' in bo
 raycast=read('Raycast.cs')
 assert 'if (PC.Component.Cabling.CableMode.Enabled)' in raycast
 assert 'else\n            mb.ConnectMonitor(selectedMonitor);' in raycast
-assert 'CableModeMenu.Install();' in main
-assert 'Scroll View/Viewport/Content' in menu and 'Physical Cables' in menu
-assert 'toggle.onValueChanged = new Toggle.ToggleEvent();' in menu
+# The main-menu checkbox must be an editable prefab instance in Settings,
+# not a clone of ShowFps created when the menu starts.
+prefab_path=root/'Assets/GameObject/CableModeToggle.prefab'
+prefab=prefab_path.read_text()
+prefab_guid=re.search(r'^guid: ([0-9a-f]{32})$',
+    (root/'Assets/GameObject/CableModeToggle.prefab.meta').read_text(), re.M).group(1)
+menu_script_guid=re.search(r'^guid: ([0-9a-f]{32})$',
+    (cs/'CableModeMenu.cs.meta').read_text(), re.M).group(1)
+assert check_prefab(str(prefab_path)) == 0
+assert 'CableModeMenu.Install' not in main and 'Instantiate(' not in menu
 assert 'toggle.SetIsOnWithoutNotify(CableMode.Selected);' in menu
 assert 'toggle.onValueChanged.AddListener(CableMode.SetSelected);' in menu
+assert 'Localization.LanguageChanged += UpdateLabel;' in menu
+assert 'Физические провода' in menu and 'Physical cables' in menu
 assert '  m_Name: Settings\n' in scene and '  m_Name: ShowFps\n' in scene
 assert '  m_Name: Content\n' in scene
-print('Cable mode menu, save branches and legacy route: OK')
+assert '  m_Name: CableModeToggle\n' in prefab
+assert '  m_Name: Label\n' in prefab and '  m_Name: Background\n' in prefab
+assert '  m_Text: Physical cables\n' in prefab
+assert '  m_AnchoredPosition: ' in prefab
+assert f'm_Script: {{fileID: 11500000, guid: {menu_script_guid}, type: 3}}' in prefab
+assert '  toggle: {fileID: 870000000000000011}\n' in prefab
+assert '  label: {fileID: 870000000000000006}\n' in prefab
+assert 'm_TargetAssemblyTypeName: ShowFps' not in prefab
+assert 'm_MethodName: ShowFpsDisplay' not in prefab
+assert '  onValueChanged:\n    m_PersistentCalls:\n      m_Calls: []\n' in prefab
+assert f'm_SourcePrefab: {{fileID: 100100000, guid: {prefab_guid}, type: 3}}' in scene
+assert f'm_CorrespondingSourceObject: {{fileID: 870000000000000002, guid: {prefab_guid}, type: 3}}' in scene
+assert '    m_TransformParent: {fileID: 1323815698}\n' in scene
+assert '  - {fileID: 790000000000000002}\n' in scene
+assert re.search(r'--- !u!224 &1323815698\nRectTransform:.*?m_Children:\n'
+    r'(?:  - \{fileID: \d+\}\n)*  - \{fileID: 790000000000000002\}',scene,re.S)
+print('Cable mode prefab, menu, save branches and legacy route: OK')

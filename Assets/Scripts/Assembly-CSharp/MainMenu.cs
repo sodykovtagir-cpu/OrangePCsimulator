@@ -44,7 +44,6 @@ public class MainMenu : MonoBehaviour
 
     private void Start()
     {
-        CableModeMenu.Install();
         FpsSetting.RestoreSetting();
 
         // Настройки разрешения/RTX/отражений применяются автоматически
