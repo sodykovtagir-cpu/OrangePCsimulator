@@ -44,6 +44,7 @@ public class MainMenu : MonoBehaviour
 
     private void Start()
     {
+        CableModeMenu.Install();
         FpsSetting.RestoreSetting();
 
         // Настройки разрешения/RTX/отражений применяются автоматически
@@ -159,6 +160,7 @@ public class MainMenu : MonoBehaviour
 
     public void LoadFile(DataLoader loader)
     {
+        PC.Component.Cabling.CableMode.SelectForLoad(loader);
         SaveManager.Loader = loader;
         int roomType = loader.GameData.room;
         LoadScene(roomType);

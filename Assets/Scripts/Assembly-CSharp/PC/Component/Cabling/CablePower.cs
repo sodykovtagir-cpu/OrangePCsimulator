@@ -14,6 +14,9 @@ namespace PC.Component.Cabling
         public static bool BoardHasPower(Motherboard board)
         {
             if (board == null) return false;
+            // Legacy branch uses the original PC assembly/power rules, without
+            // wall outlets or separate power cords.
+            if (!CableMode.Enabled) return true;
             // An integrated mini PC uses its own adapter port.
             if (board.Integrated && PoweredPort(board, PortKind.PcPower)) return true;
             var supplies = board.GetHardwares(HardwareType.Supply);
@@ -60,6 +63,9 @@ namespace PC.Component.Cabling
         // every frame. Port count is small; disconnected displays are unpowered.
         public static void RefreshAll()
         {
+            // Manual monitor linking and motherboard power were the legacy
+            // rules; physical cable events must not override that branch.
+            if (!CableMode.Enabled) return;
             // Removing either end of a live mains cable immediately removes
             // power from that PC, not merely its image on the monitor.
             foreach (var board in Object.FindObjectsOfType<Motherboard>())

@@ -62,8 +62,11 @@ assert 'Hooked' in outlet and 'sockets' in outlet and 'CablePort.Add' in outlet
 assert all(x in power for x in ('Energized', 'BoardHasPower', 'VideoPort', 'cpu.HasIntegratedGraphics', 'display.VideoGpu', 'board.PowerOff(false)', 'ShowNoSignal'))
 assert 'CablePower.BoardHasPower(this)' in read('PC/Component/Motherboard.cs')
 assert 'CablePower.RefreshAll()' in read('PC/Component/Motherboard.cs')
-assert 'ConnectMonitor(selectedMonitor);' not in read('Raycast.cs')
 raycast=read('Raycast.cs')
+# Manual configuration is available only in the no-wire save branch; it
+# must never bypass the physical VGA/HDMI route when wires are required.
+assert 'if (PC.Component.Cabling.CableMode.Enabled)\n            Main.Instance?.FadeText(' in raycast
+assert 'else\n            mb.ConnectMonitor(selectedMonitor);' in raycast
 # Disassembly is an explicit click action BEFORE ordinary dragging; normal
 # clicks only grab, with no automatic Unplug on any cable type.
 assert raycast.index('if (RemoveMode && hit.transform != null)') < raycast.index('if (dragRigidbody)', raycast.index('public void ShootRaycast'))

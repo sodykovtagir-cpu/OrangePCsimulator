@@ -38,4 +38,22 @@ public class GameData
 	public string workshopAuthor;
 
 	public string workshopDesc;
+
+    // Version 0 (missing in older saves) always means cable-required mode.
+    public int cableModeVersion;
+    public bool cablesEnabled = true;
+    // The other mode has its own complete world snapshot in this same .opc.
+    public CableModeSnapshot otherCableMode;
+}
+
+[Serializable]
+public class CableModeSnapshot
+{
+    public string content;
+    public int coin;
+    public float playtime;
+    public float temperature;
+    public bool ac;
+    public bool light;
+    public string icon;
 }

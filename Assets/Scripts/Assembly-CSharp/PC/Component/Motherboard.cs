@@ -345,10 +345,12 @@ namespace PC.Component
 
 				SwitchSystem(-1, biosPrefab);
 
-				if (monitor != null)
-				{
-					monitor.AllowZoom(true);
-				}
+                if (monitor != null)
+                {
+                    if (!PC.Component.Cabling.CableMode.Enabled)
+                        monitor.Switch(true, false);
+                    monitor.AllowZoom(true);
+                }
                 PC.Component.Cabling.CablePower.RefreshAll();
 				var main = Main.Instance;
 				if (main != null && !main.example)
@@ -609,6 +611,8 @@ namespace PC.Component
 					m.ApplyScreen(rt);
 				}
 
+                if (!PC.Component.Cabling.CableMode.Enabled && running)
+                    m.Switch(true, false);
 				m.AllowZoom(running);
 
 				monitor = m;
@@ -945,8 +949,14 @@ namespace PC.Component
 			// System/boot.bin на встроенной памяти.
 			BuiltInDisksFromData(jObject["builtInDisks"] as JArray);
 
-            // Saved monitor links from old versions are intentionally ignored:
-            // every display now requires an actual powered video cable.
+            // In the no-cable branch restore the original manual monitor
+            // association. Wired saves never use monitorId as a shortcut.
+            if (!PC.Component.Cabling.CableMode.Enabled && id != 0)
+            {
+                var main = Main.Instance;
+                if (main != null && main.GetItemById(id) is Display disp)
+                    ConnectMonitor(disp);
+            }
 
 			base.FromData(jObject);
 		}

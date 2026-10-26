@@ -685,7 +685,10 @@ public class Raycast : MonoBehaviour
         var mb = FindMotherboard(t);
         if (!mb) return false;
 
-        Main.Instance?.FadeText("Use a VGA or HDMI cable: drag both plugs into the monitor and PC ports.");
+        if (PC.Component.Cabling.CableMode.Enabled)
+            Main.Instance?.FadeText("Use a VGA or HDMI cable: drag both plugs into the monitor and PC ports.");
+        else
+            mb.ConnectMonitor(selectedMonitor); // original manual no-wire route
         ConfigurationStateChanged?.Invoke(true);
         return true;
     }
