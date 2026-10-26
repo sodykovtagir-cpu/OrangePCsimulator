@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: HDMI Cable (2m)
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   itemName: '{HDMI Cable} 2m'
   price: 45
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: ace9cd0973124300818e85972b6e5a69, type: 2}
-  spawn: {fileID: 100000, guid: 2c1f50d08e92533eb01f01cabf3a2751, type: 2}
+  sprite: {fileID: 21300000, guid: e220c30a6e6b78b4abfc5318867ee532, type: 3}
+  spawn: {fileID: 100000, guid: 2c1f50d08e92533eb01f01cabf3a2751, type: 3}
   large: 1
   translateDescription: 0
   description: Drag either plug to a compatible socket. Length 2 m.

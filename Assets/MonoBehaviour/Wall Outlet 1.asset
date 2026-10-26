@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: Wall Outlet 1
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   itemName: '{Wall Outlet} (1)'
   price: 45
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 0b87302c4a2f4d45ae26845a368f9460, type: 2}
-  spawn: {fileID: 100000, guid: a90323d6a1174017800c96a21125f7cb, type: 2}
+  sprite: {fileID: 21300000, guid: 2e39626189f929d4989bcf4fcbdcf1cd, type: 3}
+  spawn: {fileID: 100000, guid: a90323d6a1174017800c96a21125f7cb, type: 3}
   large: 1
   translateDescription: 0
   description: Wall-mounted outlet with one usable sockets.

@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: VGA Cable 3.5m
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   itemName: '{VGA Cable} 7m'
   price: 82
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: ebd7cc47e45c4037b8f555796dffb3b3, type: 2}
-  spawn: {fileID: 100000, guid: a7be5111d58846bb9d98aed4e65ae2a4, type: 2}
+  sprite: {fileID: 21300000, guid: 1a53c15d3b5e2074989519ad454a74b2, type: 3}
+  spawn: {fileID: 100000, guid: a7be5111d58846bb9d98aed4e65ae2a4, type: 3}
   large: 1
   translateDescription: 0
   description: Drag either plug to a compatible socket. Length 7 m.

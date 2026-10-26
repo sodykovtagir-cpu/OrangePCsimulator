@@ -11,12 +11,13 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: Power Cable (5m)
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   itemName: '{Power Cable} 5m'
   price: 68
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 2c9bab45c7b7400698be14b8500a9009, type: 2}
-  spawn: {fileID: 100000, guid: 1c1b830a9cc85093a927efdc09d132ad, type: 2}
+  sprite: {fileID: 21300000, guid: 189d5b3154559d9419d0d48153994fe7, type: 3}
+  spawn: {fileID: 100000, guid: 1c1b830a9cc85093a927efdc09d132ad, type: 3}
   large: 1
   translateDescription: 0
-  description: Plug A goes to a mounted outlet; Plug B goes to the device. Length 5 m.
+  description: Plug A goes to a mounted outlet; Plug B goes to the device. Length
+    5 m.
