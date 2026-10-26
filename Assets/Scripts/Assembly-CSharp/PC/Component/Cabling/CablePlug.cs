@@ -199,6 +199,14 @@ namespace PC.Component.Cabling
             }
         }
 
+        // Called before the first physics step after a loaded cable becomes
+        // solid again. Do not wait for FixedUpdate to reapply these scoped pairs.
+        internal void RefreshCollisionExceptions()
+        {
+            Reinstate(devicePairs);
+            Reinstate(casePairs);
+        }
+
         private static void Reinstate(List<Pair> pairs)
         {
             foreach (var pair in pairs)

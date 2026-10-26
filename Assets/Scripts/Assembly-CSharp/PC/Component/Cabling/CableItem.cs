@@ -26,6 +26,8 @@ namespace PC.Component.Cabling
         private readonly Vector3[] restoredPositions = new Vector3[2];
         private bool restorePositions;
         private bool restoringPhysics;
+        private readonly bool[] restorePlugContacts = new bool[2];
+        private bool[] restoreBodyContacts;
         private int overstretchSteps;
         private float strainCooldownUntil;
 
@@ -437,12 +439,19 @@ namespace PC.Component.Cabling
             if (!restorePositions || plugs == null || bodies == null) return;
 
             // Instantiate creates a coil at the prefab/portal before FromData.
-            // Freeze ALL of its bodies while we replace it with the saved pose;
-            // the loader will attach saved sockets and then unfreeze the chain.
+            // The socket owners have not finished Start/slot restoration yet.
+            // A kinematic cable STILL pushes dynamic monitors/cases during the
+            // two frames spent waiting for ports; suppress its contacts until
+            // the saved pins and their scoped IgnoreCollision pairs exist.
+            // Keep colliders enabled: disabling them would reset the cable's
+            // self-collision exceptions and prevent WatchPort from adding pairs.
             restoringPhysics = true;
+            restoreBodyContacts = new bool[bodies.Length];
             for (int i = 0; i < 2; i++)
             {
                 var rb = plugs[i].GetComponent<Rigidbody>();
+                restorePlugContacts[i] = rb.detectCollisions;
+                rb.detectCollisions = false;
                 rb.isKinematic = true;
                 rb.position = restoredPositions[i];
                 var rot = data["cableRot" + i] as JArray;
@@ -456,6 +465,8 @@ namespace PC.Component.Cabling
                 for (int i = 0; i < bodies.Length; i++)
                 {
                     var rb = bodies[i];
+                    restoreBodyContacts[i] = rb.detectCollisions;
+                    rb.detectCollisions = false;
                     rb.isKinematic = true;
                     var a = poses[i] as JArray;
                     if (a == null || a.Count < 7) continue;
@@ -473,6 +484,8 @@ namespace PC.Component.Cabling
                 for (int i = 0; i < bodies.Length; i++)
                 {
                     var rb = bodies[i];
+                    restoreBodyContacts[i] = rb.detectCollisions;
+                    rb.detectCollisions = false;
                     rb.isKinematic = true;
                     rb.position = Vector3.Lerp(restoredPositions[0], restoredPositions[1],
                         (i + .5f) / bodies.Length) + Vector3.up * .16f;
@@ -500,6 +513,20 @@ namespace PC.Component.Cabling
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
+            Physics.SyncTransforms();
+            // All pins have now been placed at their actual author-made pivots.
+            // Enable contacts only after their per-device exceptions are in
+            // place, so the first solver step cannot eject a monitor or case.
+            for (int i = 0; i < plugs.Length; i++)
+            {
+                if (plugs[i] == null) continue;
+                plugs[i].GetComponent<Rigidbody>().detectCollisions = restorePlugContacts[i];
+            }
+            for (int i = 0; i < bodies.Length; i++)
+                bodies[i].detectCollisions = restoreBodyContacts[i];
+            foreach (var plug in plugs)
+                if (plug != null) plug.RefreshCollisionExceptions();
+            restoreBodyContacts = null;
             restoringPhysics = false;
             overstretchSteps = 0;
             strainCooldownUntil = Time.time + .35f;

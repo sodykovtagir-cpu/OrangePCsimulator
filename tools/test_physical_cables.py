@@ -143,6 +143,23 @@ assert 'data["cableBodies"] = poses;' in rope
 assert 'restoringPhysics = true;' in rope and 'restoringPhysics = false;' in rope
 assert 'Physics.SyncTransforms();' in rope and 'rb.isKinematic = true;' in rope
 assert 'rb.isKinematic = false;' in rope and 'public void FinishRestore()' in rope
+# Merely making the restored rope kinematic still pushes free monitors and
+# cases during the two frames before their ports have finished installing.
+# Keep the colliders enabled for scoped exceptions, but pause contact solving
+# on every rope rigidbody until the saved ports/pins have been restored.
+restore = rope[rope.index('public override void FromData(JObject data)'):]
+freeze = restore[:restore.index('public void FinishRestore()')]
+thaw = restore[restore.index('public void FinishRestore()'):restore.index('public void RestorePorts()')]
+assert freeze.count('rb.detectCollisions = false;') == 3
+assert 'restorePlugContacts[i] = rb.detectCollisions;' in freeze
+assert freeze.count('restoreBodyContacts[i] = rb.detectCollisions;') == 2
+assert 'restoreBodyContacts = new bool[bodies.Length];' in freeze
+assert 'plugs[i].GetComponent<Rigidbody>().detectCollisions = restorePlugContacts[i];' in thaw
+assert 'bodies[i].detectCollisions = restoreBodyContacts[i];' in thaw
+assert thaw.index('plug.RefreshCollisionExceptions();') < thaw.index('restoringPhysics = false;')
+assert 'internal void RefreshCollisionExceptions()' in plug
+assert 'Reinstate(devicePairs);\n            Reinstate(casePairs);' in plug
+assert save.index('cable.RestorePorts();') < save.index('cable.FinishRestore();')
 assert 'if (!restoring && Cable != null && Cable.RestoringPhysics) return false;' in plug
 assert 'VideoFromGpu' in read('PC/Component/Software/OS/OperatingSystem.cs')
 assert 'display.VideoGpu' in read('GpuArtifacts.cs')
