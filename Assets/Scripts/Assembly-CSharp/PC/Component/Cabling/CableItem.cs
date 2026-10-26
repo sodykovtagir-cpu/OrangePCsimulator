@@ -64,14 +64,17 @@ namespace PC.Component.Cabling
             float step = length / count;
             // Spawn a loose coil instead of a 12 m straight rod through the
             // furniture. Chord length is approximately the segment length.
-            int turns = count >= 15 ? 2 : 1;
+            int turns = count >= 24 && length > 12f ? 3 : count >= 11 ? 2 : 1;
             float radius = step / (2f * Mathf.Sin(Mathf.PI * turns / count));
+            // A fixed half-metre lateral spread can make a 1 m cable longer
+            // than its nominal length before it is even touched.
+            float spread = Mathf.Min(.5f, length * .15f);
             var points = new Vector3[count + 1];
             for (int i = 0; i <= count; i++)
             {
                 float angle = 2f * Mathf.PI * turns * i / count;
                 points[i] = transform.position + new Vector3(
-                    radius * Mathf.Cos(angle) + .5f * (i / (float)count - .5f),
+                    radius * Mathf.Cos(angle) + spread * (i / (float)count - .5f),
                     .45f, radius * Mathf.Sin(angle));
             }
             plugA = SetupPlug(plugA, "Plug A", 0, points[0]);
@@ -259,6 +262,18 @@ namespace PC.Component.Cabling
             if ((plugs[0].Connected == null && plugs[1].Connected == null) ||
                 bodies.Length == 0 || Time.time < strainCooldownUntil)
                 return false;
+            // A free 0.11 kg plug settling under its own weight is not a
+            // second heavy endpoint. Only police the one-ended span when the
+            // player is actually pulling a plug or part of the jacket. With
+            // both ends attached, keep guarding passive heavy devices.
+            var a = plugs[0];
+            var b = plugs[1];
+            if ((a.Connected == null) != (b.Connected == null) &&
+                !a.IsHeld && !b.IsHeld && heldSegment == null)
+            {
+                overstretchSteps = 0;
+                return false;
+            }
             // Snapping a plug into its authored pivot or restoring a saved
             // pose takes a few physics steps. Don't misidentify that transient
             // as a long cable under load.

@@ -19,4 +19,4 @@ MonoBehaviour:
   spawn: {fileID: 100000, guid: 5594a04d0cbb4908b710f2d0dd30b2f9, type: 2}
   large: 1
   translateDescription: 0
-  description: Drag either plug to a compatible socket. Length 6 m.
+  description: Plug A goes to a mounted outlet; Plug B goes to the device. Length 6 m.

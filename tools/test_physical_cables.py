@@ -72,6 +72,11 @@ assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope
+assert 'if ((a.Connected == null) != (b.Connected == null) &&' in rope
+assert '!a.IsHeld && !b.IsHeld && heldSegment == null' in rope
+assert 'overstretchSteps = 0;\n                return false;' in rope
+assert 'float spread = Mathf.Min(.5f, length * .15f);' in rope
+assert 'count >= 24 && length > 12f ? 3' in rope
 assert 'path > length + Mathf.Max(.06f, length * .02f)' in rope
 assert 'span > length * .97f' in rope
 assert 'if (sectionHeld && distance > restLength + .08f &&' in rope
@@ -148,10 +153,12 @@ shop=(root/'Assets/MonoBehaviour/Shop.asset').read_text()
 assert 'pageName: Cables & Power' in shop
 assert 'guid: 78348b2c142bcb88381354c04ae3fce7' in shop  # keep first ready PC
 ids=[]
+shop_ids=[]
 for kind in ('Power','VGA','HDMI'):
     paths=list((root/'Assets/Resources/components').glob(f'{kind} Cable *.prefab'))
-    assert len(paths)==3,kind
-    expected={'Power':{3,6,10},'VGA':{3,7,11},'HDMI':{4,8,12}}[kind]
+    assert len(paths)==6,kind
+    expected={'Power':{1,3,5,6,10,15},'VGA':{1,3,5,7,11,15},
+              'HDMI':{2,4,6,8,12,16}}[kind]
     lengths=set()
     for p in paths:
         text=p.read_text()
@@ -169,21 +176,33 @@ for kind in ('Power','VGA','HDMI'):
         assert mat_guid in text,p
         cable_length=float(re.search(r'^  length: ([0-9.]+)$',text,re.M).group(1))
         lengths.add(cable_length)
+        if '(' in p.stem:
+            assert f'  spawnId: {p.stem}\n' in text
+            assert f'  itemName: \'{{{kind} Cable}} {int(cable_length)}m\'' in (
+                root/f'Assets/MonoBehaviour/{p.stem}.asset').read_text()
+            assert text.count('MeshFilter:') == 2, p  # retain authored plug models
+            points_block=text.split('  m_Positions:\n',1)[1].split('  m_Parameters:',1)[0]
+            assert len(re.findall(r'^  - \{x: ',points_block,re.M)) == max(7,min(26,
+                int(re.search(r'^  segments: (\d+)$',text,re.M).group(1))))+1,p
         # The initial loose coil must stay below the anti-stretch threshold;
         # otherwise a newly connected prefab could falsely unplug at spawn.
         count=max(7,min(26,int(re.search(r'^  segments: (\d+)$',text,re.M).group(1))))
-        turns=2 if count>=15 else 1
+        turns=3 if count>=24 and cable_length>12 else 2 if count>=11 else 1
         radius=(cable_length/count)/(2*math.sin(math.pi*turns/count))
-        points=[(radius*math.cos(2*math.pi*turns*i/count)+.5*(i/count-.5),
+        spread=min(.5,cable_length*.15)
+        points=[(radius*math.cos(2*math.pi*turns*i/count)+spread*(i/count-.5),
                  radius*math.sin(2*math.pi*turns*i/count)) for i in range(count+1)]
         coil=sum(math.dist(points[i],points[i+1]) for i in range(count))
         assert coil<cable_length+max(.06,cable_length*.02),p
         prefab_guid=re.search(r'^guid: ([a-f0-9]{32})$',p.with_suffix('.prefab.meta').read_text(),re.M).group(1)
         item=root/f'Assets/MonoBehaviour/{p.stem}.asset'
         assert prefab_guid in item.read_text(),p
+        if kind=='Power':
+            assert 'Plug A goes to a mounted outlet; Plug B goes to the device.' in item.read_text(),p
         shop_guid=re.search(r'^guid: ([a-f0-9]{32})$',item.with_suffix('.asset.meta').read_text(),re.M).group(1)
         assert shop_guid in shop,p
         ids.append(prefab_guid)
+        shop_ids.append(shop_guid)
     assert lengths==expected
 for sockets in (1,2,3):
     p=root/f'Assets/Resources/components/Wall Outlet {sockets}.prefab'
@@ -197,7 +216,8 @@ for sockets in (1,2,3):
     shop_guid=re.search(r'^guid: ([a-f0-9]{32})$',item.with_suffix('.asset.meta').read_text(),re.M).group(1)
     assert shop_guid in shop,p
     ids.append(prefab_guid)
-assert len(set(ids))==12
+    shop_ids.append(shop_guid)
+assert len(set(ids))==21
 for template,script_name in (("Cable Socket TEMPLATE",port_script),("PSU Opening TEMPLATE",opening_script)):
     p=root/f"Assets/Resources/components/{template}.prefab"
     assert check_prefab(str(p))==0
@@ -207,8 +227,11 @@ header=rows[0].split('\t')
 for key in ('Cables & Power','Power Cable','VGA Cable','HDMI Cable','Wall Outlet'):
     row=next(r.split('\t') for r in rows if r.startswith(key+'\t'))
     assert row[header.index('RU')] and row[header.index('EN')]
-assert len(re.findall(r'^    - \{fileID: 11400000, guid: [a-f0-9]{32}, type: 2\}$',
-    shop.split('  - pageName: Cables & Power\n')[1].split('  - pageName:',1)[0],re.M))==12
+shop_page=shop.split('  - pageName: Cables & Power\n')[1].split('  - pageName:',1)[0]
+page_guids=re.findall(r'^    - \{fileID: 11400000, guid: ([a-f0-9]{32}), type: 2\}$',
+                      shop_page,re.M)
+assert len(page_guids)==21 and len(set(page_guids))==21
+assert sorted(page_guids)==sorted(shop_ids)
 for kind in ('power','vga','hdmi','outlet'):
     image=root/f'Assets/Texture2D/icon_cable_{kind}.png'
     assert image.exists() and image.with_suffix('.png.meta').exists()
@@ -217,4 +240,4 @@ for kind in ('power','vga','hdmi','outlet'):
     sprite_guid=re.search(r'^guid: ([a-f0-9]{32})$',image.with_suffix('.png.meta').read_text(),re.M).group(1)
     assets=(root/'Assets/MonoBehaviour').glob((kind.upper() if kind in ('vga','hdmi') else 'Power' if kind=='power' else 'Wall Outlet')+'*.asset')
     assert any(sprite_guid in asset.read_text() for asset in assets)
-print('Physical cables, power/video routes, persistence, 12 shop items: OK')
+print('Physical cables, power/video routes, persistence, 21 shop items: OK')
