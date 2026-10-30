@@ -66,6 +66,10 @@ namespace PC.Shop
             // действительно открыл.
             for (int i = 0; i < component.pages.Length; i++)
             {
+                // This whole tab contains physical cables and wall sockets.
+                // Do not create its button or cards in the no-wire room.
+                if (!PC.Component.Cabling.CableMode.Enabled &&
+                    component.pages[i].pageName == "Cables & Power") continue;
                 var pageGo = Instantiate(pagePrefab, pageParent);
                 contents[i].page = pageGo;
 
@@ -153,8 +157,9 @@ namespace PC.Shop
 
         private void DisplayPage(int index)
         {
+            if (contents == null || index < 0 || index >= contents.Length ||
+                contents[index].page == null) return;
             selectedPage = index;
-            if (contents == null || contents.Length == 0) return;
 
             for (int i = 0; i < contents.Length; i++)
             {

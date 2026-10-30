@@ -26,20 +26,24 @@ assert all(f'public {typ} {key};' in game for typ,key in (
 assert 'game.cableModeVersion == 0' in mode and 'game.cablesEnabled = true;' in mode
 assert 'if (game.cablesEnabled == target)' in mode
 assert 'Uninitialized(game, loader.Content)' in mode
-assert 'var repaired = WithoutCables(game.otherCableMode);' in mode
+assert 'loader.Content = WithoutCables(wired.content);' in mode
 assert 'var outgoing = Snapshot(game, loader.Content);' in mode
-assert 'var incoming = game.otherCableMode;' in mode
-assert 'incoming = target ? outgoing : WithoutCables(outgoing);' in mode
-assert '(!target && Uninitialized(incoming) &&' in mode
+assert 'var previous = game.otherCableMode;' in mode
+assert 'var merged = MergeWorld(loader.Content, previous != null ? previous.content : null, target);' in mode
 assert 'game.otherCableMode = outgoing;' in mode
-assert 'Restore(game, incoming);' in mode
-assert 'loader.Content = incoming.content ?? string.Empty;' in mode
+assert 'loader.Content = merged;' in mode
 assert 'if (!string.IsNullOrEmpty(loader.Path)) loader.WriteToFile();' in mode
-assert 'target ? loader.Content : WithoutCables(loader.Content)' not in mode
+assert 'Restore(game, incoming);' not in mode
 assert 'var incoming = !target ? Snapshot' not in mode
-assert 'content = WithoutCables(wired.content)' in mode
-assert 'coin = wired.coin, playtime = wired.playtime' in mode
-assert 'light = wired.light, icon = wired.icon' in mode
+assert 'var world = JObject.Parse(wired ? current : WithoutCables(current));' in mode
+assert 'var copy = (JObject)cable.DeepClone();' in mode
+assert 'items.Add(copy);' in mode
+assert 'data["monitorId"] = sameMonitor ? monitorId : 0;' in mode
+assert 'oldBoard.Value<string>("spawnId") != board.Value<string>("spawnId")' in mode
+assert 'oldMonitor.Value<string>("spawnId") == monitor.Value<string>("spawnId")' in mode
+assert 'var manual = BoardData(oldBoard);' in mode
+assert 'GroupBy(item => item.Value<int>("id"))' in mode
+assert 'copy["id"] = id = nextId;' in mode
 assert all(f'id.StartsWith("{kind} Cable ", StringComparison.Ordinal)' in mode for kind in ('Power','VGA','HDMI'))
 assert 'data.Value<int?>("cableOwner" + input)' in mode
 assert 'data.Value<string>("cablePort" + input)' in mode
@@ -54,6 +58,14 @@ assert 'if (!CableMode.Enabled) return true;' in power
 assert 'if (!CableMode.Enabled) return;' in power
 assert 'if (!PC.Component.Cabling.CableMode.Enabled && id != 0)' in board
 assert 'ConnectMonitor(disp);' in board and 'monitor.Switch(true, false);' in board
+shop=read('PC/Shop/ShopPanel.cs')
+display=read('PC/Component/Display.cs')
+assert 'component.pages[i].pageName == "Cables & Power") continue;' in shop
+assert 'contents[index].page == null) return;' in shop
+assert 'if (coroutine == null && noSignal != null)' in display
+assert 'coroutine = StartCoroutine(DisplayNoSignal());' in display
+assert 'if (!visible) { StopNoSignalAnimation(); return; }' in display
+assert 'coroutine = null;' in display
 raycast=read('Raycast.cs')
 assert 'if (PC.Component.Cabling.CableMode.Enabled)' in raycast
 assert 'else\n            mb.ConnectMonitor(selectedMonitor);' in raycast

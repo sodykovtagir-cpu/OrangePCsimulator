@@ -41,7 +41,15 @@ namespace PC.Component
         public GPU VideoGpu { get; set; }
         public void ShowNoSignal(bool visible)
         {
-            if (noSignal != null) noSignal.SetActive(visible);
+            if (!visible) { StopNoSignalAnimation(); return; }
+            // The message is temporary, just as on the ordinary monitor.
+            // RefreshAll can fire more than once while plugs settle: do not
+            // restart the countdown or keep the banner on indefinitely.
+            if (coroutine == null && noSignal != null)
+            {
+                noSignal.SetActive(false);
+                coroutine = StartCoroutine(DisplayNoSignal());
+            }
         }
 
 		private RectTransform rect;
@@ -130,6 +138,7 @@ namespace PC.Component
 			if (coroutine != null)
 			{
 				StopCoroutine(coroutine);
+                coroutine = null;
 			}
 
 			if (noSignal != null)
@@ -144,6 +153,7 @@ namespace PC.Component
 			if (noSignal != null) noSignal.SetActive(true);
 			yield return new WaitForSeconds(2f);
 			if (noSignal != null) noSignal.SetActive(false);
+            coroutine = null;
 		}
 
 		public void ApplyScreen(RectTransform display)
