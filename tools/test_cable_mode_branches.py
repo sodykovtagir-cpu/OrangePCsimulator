@@ -26,12 +26,19 @@ assert all(f'public {typ} {key};' in game for typ,key in (
 assert 'game.cableModeVersion == 0' in mode and 'game.cablesEnabled = true;' in mode
 assert 'if (game.cablesEnabled == target) return;' in mode
 assert 'var outgoing = Snapshot(game, loader.Content);' in mode
+assert 'var incoming = !target ? Snapshot(game, WithoutCables(loader.Content)) :' in mode
+assert 'game.otherCableMode ?? Snapshot(game, loader.Content);' in mode
 assert 'game.otherCableMode = outgoing;' in mode
 assert 'Restore(game, incoming);' in mode
 assert 'loader.Content = incoming.content ?? string.Empty;' in mode
 assert 'if (!string.IsNullOrEmpty(loader.Path)) loader.WriteToFile();' in mode
-assert 'target ? loader.Content : WithoutCables(loader.Content)' in mode
+assert 'target ? loader.Content : WithoutCables(loader.Content)' not in mode
 assert all(f'id.StartsWith("{kind} Cable ", StringComparison.Ordinal)' in mode for kind in ('Power','VGA','HDMI'))
+assert 'data.Value<int?>("cableOwner" + input)' in mode
+assert 'data.Value<string>("cablePort" + input)' in mode
+assert 'source.Value<int?>("hostId")' in mode
+assert 'board["monitorId"] = link.Value.Contains(previous) ? previous : link.Value[0];' in mode
+assert 'BoardData(board) == null' in mode
 assert 'PC.Component.Cabling.CableMode.SelectForLoad(loader);' in main
 assert main.index('CableMode.SelectForLoad(loader);') < main.index('SaveManager.Loader = loader;',main.index('public void LoadFile('))
 assert 'game.coin = main.Money;' in saver and 'loader.Content = JsonConvert.SerializeObject' in saver
