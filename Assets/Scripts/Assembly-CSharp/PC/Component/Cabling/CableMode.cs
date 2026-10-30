@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using SaveManagement;
@@ -34,9 +35,13 @@ namespace PC.Component.Cabling
             bool target = Selected;
             if (game.cablesEnabled == target) return;
 
+            // Always rebuild the no-wire room from the CURRENT wired room.
+            // A previously saved empty/obsolete no-wire branch must never
+            // replace the player's items, money, lights or computer files.
+            // When returning to wires, restore the untouched wired snapshot.
             var outgoing = Snapshot(game, loader.Content);
-            var incoming = game.otherCableMode ?? Snapshot(game,
-                target ? loader.Content : WithoutCables(loader.Content));
+            var incoming = !target ? Snapshot(game, WithoutCables(loader.Content)) :
+                game.otherCableMode ?? Snapshot(game, loader.Content);
             game.otherCableMode = outgoing;
             Restore(game, incoming);
             game.cablesEnabled = target;
@@ -69,10 +74,62 @@ namespace PC.Component.Cabling
         private static string WithoutCables(string content)
         {
             if (string.IsNullOrEmpty(content)) return string.Empty;
-            // The first legacy branch inherits the room and computers, not
-            // powered cable connections. The wired branch is saved unchanged.
+            // Keep the entire room/player/computer payload. Before removing
+            // physical cables, convert each saved VGA/HDMI pair into the old
+            // explicit motherboard -> monitor link (monitorId). Never guess a
+            // nearby PC: the cable's saved owners and GPU's saved slot decide.
             var world = JObject.Parse(content);
             if (world["itemData"] is JArray items)
+            {
+                var byId = new Dictionary<int, JObject>();
+                foreach (var entry in items.OfType<JObject>())
+                {
+                    int id = entry.Value<int?>("id") ?? 0;
+                    if (id != 0 && !byId.ContainsKey(id)) byId.Add(id, entry);
+                }
+
+                var links = new Dictionary<int, List<int>>();
+                foreach (var cable in items.OfType<JObject>())
+                {
+                    string spawnId = cable.Value<string>("spawnId");
+                    bool vga = spawnId != null &&
+                        spawnId.StartsWith("VGA Cable ", StringComparison.Ordinal);
+                    bool hdmi = spawnId != null &&
+                        spawnId.StartsWith("HDMI Cable ", StringComparison.Ordinal);
+                    if (!vga && !hdmi) continue;
+                    var data = cable["data"] as JObject;
+                    if (data == null) continue;
+                    for (int input = 0; input < 2; input++)
+                    {
+                        string inputName = data.Value<string>("cablePort" + input);
+                        if (inputName != (vga ? "VGA input" : "HDMI input")) continue;
+                        int monitorId = data.Value<int?>("cableOwner" + input) ?? 0;
+                        int output = 1 - input;
+                        int ownerId = data.Value<int?>("cableOwner" + output) ?? 0;
+                        if (monitorId == 0 || !byId.ContainsKey(monitorId) ||
+                            !byId.TryGetValue(ownerId, out var source)) continue;
+                        string outputName = data.Value<string>("cablePort" + output);
+                        JObject board = null;
+                        if (outputName == "Board video") board = source;
+                        else if (outputName == "GPU video")
+                        {
+                            int hostId = source.Value<int?>("hostId") ?? 0;
+                            byId.TryGetValue(hostId, out board);
+                        }
+                        if (BoardData(board) == null) continue;
+                        int boardId = board.Value<int>("id");
+                        if (!links.TryGetValue(boardId, out var monitors))
+                            links.Add(boardId, monitors = new List<int>());
+                        if (!monitors.Contains(monitorId)) monitors.Add(monitorId);
+                    }
+                }
+                foreach (var link in links)
+                {
+                    var board = BoardData(byId[link.Key]);
+                    int previous = board.Value<int?>("monitorId") ?? 0;
+                    board["monitorId"] = link.Value.Contains(previous) ? previous : link.Value[0];
+                }
+
                 foreach (var item in items.ToList())
                 {
                     string id = item.Value<string>("spawnId");
@@ -81,7 +138,16 @@ namespace PC.Component.Cabling
                         id.StartsWith("HDMI Cable ", StringComparison.Ordinal)))
                         item.Remove();
                 }
+            }
             return world.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private static JObject BoardData(JObject item)
+        {
+            // Only Motherboard.ToData writes monitorId; a loose GPU or case
+            // must never be mistaken for the board that owns its video output.
+            var data = item?["data"] as JObject;
+            return data != null && data.Property("monitorId") != null ? data : null;
         }
     }
 }
