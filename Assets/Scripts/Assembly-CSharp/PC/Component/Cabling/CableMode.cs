@@ -33,15 +33,33 @@ namespace PC.Component.Cabling
                 game.cableModeVersion = 1;
             }
             bool target = Selected;
-            if (game.cablesEnabled == target) return;
+            if (game.cablesEnabled == target)
+            {
+                // Earlier versions could store a blank no-wire branch (zero
+                // money, lights off). Recover only that clearly uninitialized
+                // state from the intact wired snapshot; never reset a played
+                // no-wire branch just because the player loaded it again.
+                if (!target && Uninitialized(game, loader.Content) &&
+                    game.otherCableMode != null &&
+                    !string.IsNullOrEmpty(game.otherCableMode.content))
+                {
+                    var repaired = WithoutCables(game.otherCableMode);
+                    Restore(game, repaired);
+                    loader.Content = repaired.content;
+                    if (!string.IsNullOrEmpty(loader.Path)) loader.WriteToFile();
+                }
+                return;
+            }
 
-            // Always rebuild the no-wire room from the CURRENT wired room.
-            // A previously saved empty/obsolete no-wire branch must never
-            // replace the player's items, money, lights or computer files.
-            // When returning to wires, restore the untouched wired snapshot.
+            // Each mode keeps its own complete snapshot. In particular, a
+            // manual monitor link saved in the no-wire room remains in the
+            // inactive snapshot while physical cables are active. On the very
+            // first conversion, take the exact video route from saved cables.
             var outgoing = Snapshot(game, loader.Content);
-            var incoming = !target ? Snapshot(game, WithoutCables(loader.Content)) :
-                game.otherCableMode ?? Snapshot(game, loader.Content);
+            var incoming = game.otherCableMode;
+            if (incoming == null || (!target && Uninitialized(incoming) &&
+                !string.IsNullOrEmpty(loader.Content)))
+                incoming = target ? outgoing : WithoutCables(outgoing);
             game.otherCableMode = outgoing;
             Restore(game, incoming);
             game.cablesEnabled = target;
@@ -69,6 +87,29 @@ namespace PC.Component.Cabling
             game.ac = state.ac;
             game.light = state.light;
             game.icon = state.icon;
+        }
+
+        private static bool Uninitialized(GameData game, string content)
+        {
+            return string.IsNullOrEmpty(content) && game.coin == 0 &&
+                game.playtime == 0f && !game.light && string.IsNullOrEmpty(game.icon);
+        }
+
+        private static bool Uninitialized(CableModeSnapshot branch)
+        {
+            return string.IsNullOrEmpty(branch.content) && branch.coin == 0 &&
+                branch.playtime == 0f && !branch.light && string.IsNullOrEmpty(branch.icon);
+        }
+
+        private static CableModeSnapshot WithoutCables(CableModeSnapshot wired)
+        {
+            return new CableModeSnapshot
+            {
+                content = WithoutCables(wired.content),
+                coin = wired.coin, playtime = wired.playtime,
+                temperature = wired.temperature, ac = wired.ac,
+                light = wired.light, icon = wired.icon
+            };
         }
 
         private static string WithoutCables(string content)

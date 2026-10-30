@@ -24,15 +24,22 @@ assert all(f'public {typ} {key};' in game for typ,key in (
     ('string','content'),('int','coin'),('float','playtime'),('float','temperature'),
     ('bool','ac'),('bool','light'),('string','icon')))
 assert 'game.cableModeVersion == 0' in mode and 'game.cablesEnabled = true;' in mode
-assert 'if (game.cablesEnabled == target) return;' in mode
+assert 'if (game.cablesEnabled == target)' in mode
+assert 'Uninitialized(game, loader.Content)' in mode
+assert 'var repaired = WithoutCables(game.otherCableMode);' in mode
 assert 'var outgoing = Snapshot(game, loader.Content);' in mode
-assert 'var incoming = !target ? Snapshot(game, WithoutCables(loader.Content)) :' in mode
-assert 'game.otherCableMode ?? Snapshot(game, loader.Content);' in mode
+assert 'var incoming = game.otherCableMode;' in mode
+assert 'incoming = target ? outgoing : WithoutCables(outgoing);' in mode
+assert '(!target && Uninitialized(incoming) &&' in mode
 assert 'game.otherCableMode = outgoing;' in mode
 assert 'Restore(game, incoming);' in mode
 assert 'loader.Content = incoming.content ?? string.Empty;' in mode
 assert 'if (!string.IsNullOrEmpty(loader.Path)) loader.WriteToFile();' in mode
 assert 'target ? loader.Content : WithoutCables(loader.Content)' not in mode
+assert 'var incoming = !target ? Snapshot' not in mode
+assert 'content = WithoutCables(wired.content)' in mode
+assert 'coin = wired.coin, playtime = wired.playtime' in mode
+assert 'light = wired.light, icon = wired.icon' in mode
 assert all(f'id.StartsWith("{kind} Cable ", StringComparison.Ordinal)' in mode for kind in ('Power','VGA','HDMI'))
 assert 'data.Value<int?>("cableOwner" + input)' in mode
 assert 'data.Value<string>("cablePort" + input)' in mode
