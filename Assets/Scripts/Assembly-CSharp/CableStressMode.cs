@@ -188,7 +188,7 @@ public sealed class CableStressMode : MonoBehaviour
             { Fail("One of the test Resources prefabs is missing"); yield break; }
 
             var builds = new GameObject[Lanes];
-            var monitors = new Display[Lanes];
+            var monitors = new PC.Component.Display[Lanes];
             var outlets = new OutletStrip[Lanes];
             for (int lane = 0; lane < Lanes; lane++)
             {
@@ -198,7 +198,7 @@ public sealed class CableStressMode : MonoBehaviour
                 // floor, apart from the wall and from each other.
                 builds[lane] = Instantiate(buildPrefab, basePos + new Vector3(0f, 2.1f, 0f), Quaternion.identity);
                 monitors[lane] = Instantiate(monitorPrefab, basePos + new Vector3(0f, 1.7f, -4.4f),
-                    Quaternion.identity).GetComponent<Display>();
+                    Quaternion.identity).GetComponent<PC.Component.Display>();
                 // -Y of the authored outlet faces the test wall (+Z).
                 outlets[lane] = Instantiate(outletPrefab, basePos + new Vector3(0f, 1.2f, 2.8f),
                     Quaternion.FromToRotation(Vector3.down, Vector3.forward)).GetComponent<OutletStrip>();
@@ -428,7 +428,7 @@ public sealed class CableStressMode : MonoBehaviour
         }
         foreach (var pair in monitorPowerOwners)
         {
-            var monitor = Main.Instance.GetItemById(pair.Key) as Display;
+            var monitor = Main.Instance.GetItemById(pair.Key) as PC.Component.Display;
             var inlet = monitor != null ? Port(monitor, PortKind.MonitorPower) : null;
             var plug = inlet != null ? inlet.plug : null;
             var source = plug != null ? plug.Cable.End(1 - plug.End).Connected : null;
