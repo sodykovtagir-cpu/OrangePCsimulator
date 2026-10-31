@@ -48,7 +48,28 @@ public sealed class CableStressMode : MonoBehaviour
             var obj = new GameObject("Cable stress test (Editor only, F8)");
             DontDestroyOnLoad(obj);
             obj.AddComponent<CableStressMode>();
+            Debug.Log("[CableStress] Test ready. Load a save, focus Game and press F8, " +
+                "or use Tools > OrangePC > Start cable stress test.");
         }
+    }
+
+    // The Editor menu calls this even when Game has no keyboard focus. It also
+    // repairs a missed bootstrap instead of leaving a silent/nonfunctional F8.
+    public static void RequestFromEditor()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("[CableStress] Enter Play Mode and load a save first.");
+            return;
+        }
+        var runner = FindObjectOfType<CableStressMode>();
+        if (runner == null)
+        {
+            Install();
+            runner = FindObjectOfType<CableStressMode>();
+        }
+        if (runner != null) runner.RequestStart("Tools menu");
+        else Debug.LogError("[CableStress] Failed to create the stress-test runner.");
     }
 
     private void OnEnable() { SceneManager.sceneLoaded += SceneLoaded; }
@@ -56,18 +77,30 @@ public sealed class CableStressMode : MonoBehaviour
 
     private void Update()
     {
-        if (busy || !Input.GetKeyDown(KeyCode.F8)) return;
+        if (Input.GetKeyDown(KeyCode.F8)) RequestStart("Game view F8");
+    }
+
+    private void RequestStart(string source)
+    {
+        if (busy)
+        {
+            Debug.Log("[CableStress] Already running; see the Console for progress.");
+            return;
+        }
         if (SaveManager.Instance == null || SaveManager.Loader == null ||
             Player.Instance == null || Main.Instance == null || SaveManager.RestoringSave)
         {
-            Debug.LogWarning("[CableStress] Press F8 only after entering a room and finishing load.");
+            Debug.LogWarning("[CableStress] " + source + ": load a save into a room first " +
+                "and wait for loading to finish (not the main menu).");
             return;
         }
         if (!CableMode.Enabled)
         {
-            Debug.LogWarning("[CableStress] Enable 'Physical cables' in the main menu before loading the room.");
+            Debug.LogWarning("[CableStress] " + source + ": enable 'Physical cables' " +
+                "in the main menu before loading the room.");
             return;
         }
+        Debug.Log("[CableStress] " + source + ": starting isolated test room...");
         StartCoroutine(Run());
     }
 

@@ -11,6 +11,10 @@ rope = (scripts/'PC/Component/Cabling/CableItem.cs').read_text()
 assert s.startswith('#if UNITY_EDITOR') and s.rstrip().endswith('#endif')
 assert 'KeyCode.F8' in s and 'private const int Lanes = 8;' in s
 assert 'private const int Reloads = 5;' in s
+menu = (root/'Assets/Editor/CableStressMenu.cs').read_text()
+assert 'MenuItem("Tools/OrangePC/Start cable stress test _F8"' in menu
+assert 'CableStressMode.RequestFromEditor();' in menu and 'RequestStart("Tools menu")' in s
+assert 'Test ready. Load a save' in s and 'starting isolated test room' in s
 assert 'new ItemData[0]' in s and 'JsonUtility.FromJson<GameData>(JsonUtility.ToJson(original.GameData))' in s
 assert 'Path.Combine(Application.persistentDataPath, "CableStress")' in s
 assert 'SaveManager.Loader = new DataLoader(savePath, data)' in s
