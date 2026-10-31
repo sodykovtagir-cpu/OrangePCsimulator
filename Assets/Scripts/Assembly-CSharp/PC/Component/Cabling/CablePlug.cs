@@ -110,8 +110,14 @@ namespace PC.Component.Cabling
             approachPort = null;
             transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
             var rb = GetComponent<Rigidbody>();
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            // A saved plug is kinematic until CableItem.FinishRestore.
+            // PhysX rejects writes to its velocity in that state. Ordinary
+            // inserted (dynamic) plugs must still lose their throw velocity.
+            if (!rb.isKinematic)
+            {
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
             pin = gameObject.AddComponent<FixedJoint>();
             pin.connectedBody = port.GetComponentInParent<Rigidbody>();
             pin.autoConfigureConnectedAnchor = false;

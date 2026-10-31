@@ -765,6 +765,28 @@ namespace PC.Component.Cabling
         }
 #endif
 
+        // Read only during the short save-load transition. Include rotation
+        // at the end of a plug as an approximate linear tip speed (0.15 m).
+        public float RestoreMotion()
+        {
+            float max = 0f;
+            if (bodies != null)
+                foreach (var body in bodies)
+                    if (body != null && !body.isKinematic)
+                        max = Mathf.Max(max, body.velocity.magnitude +
+                            .15f * body.angularVelocity.magnitude);
+            if (plugs != null)
+                foreach (var plug in plugs)
+                {
+                    if (plug == null) continue;
+                    var body = plug.GetComponent<Rigidbody>();
+                    if (body != null && !body.isKinematic)
+                        max = Mathf.Max(max, body.velocity.magnitude +
+                            .15f * body.angularVelocity.magnitude);
+                }
+            return max;
+        }
+
         public void FinishRestore()
         {
             if (!restoringPhysics) return;

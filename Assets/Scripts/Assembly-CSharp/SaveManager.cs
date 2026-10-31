@@ -369,7 +369,8 @@ public class SaveManager : MonoBehaviour
         yield return null;
         try
         {
-            foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
+            var cables = FindObjectsOfType<PC.Component.Cabling.CableItem>();
+            foreach (var cable in cables)
             {
                 try { cable.RestorePorts(); }
                 catch (Exception ex) { Debug.LogWarning($"Save: failed to restore cable ports: {ex}"); }
@@ -379,9 +380,51 @@ public class SaveManager : MonoBehaviour
                     catch (Exception ex) { Debug.LogWarning($"Save: failed to release cable: {ex}"); }
                 }
             }
-            // Let the cable solver settle against stationary hardware first.
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
+            // All plugs/joints and their scoped collision exceptions now
+            // exist. Restore the owners' ORIGINAL collider state BEFORE the
+            // first cable solver step, while the owners remain kinematic.
+            // Otherwise ropes fall through the case/monitor for two steps and
+            // the reappearing solids eject a board or tear out a restored pin.
+            foreach (var frozen in frozenDisplays)
+                if (frozen.Item1 != null) frozen.Item1.detectCollisions = frozen.Item3;
+            Physics.SyncTransforms();
+#if UNITY_EDITOR
+            if (CableStressMode.Recording)
+                foreach (var cable in cables)
+                {
+                    if (cable == null) continue;
+                    string joints = cable.StressJointErrors();
+                    string overlaps = cable.StressInitialOverlaps();
+                    if (!string.IsNullOrEmpty(joints) || !string.IsNullOrEmpty(overlaps))
+                        Debug.LogWarning("Cable restore: id=" + cable.Id +
+                            " joints=" + joints + " overlaps=" + overlaps);
+                }
+#endif
+
+            // Saved poses have no velocities. Allow initial rope/contact
+            // impulses to dissipate against immovable but solid hardware.
+            // This runs only during loading (no ordinary-game update cost),
+            // and is bounded for cables that continue swinging forever.
+            int stableSteps = 0;
+            int settleSteps = 0;
+            float maxMotion = 0f;
+            while (cables.Length > 0 && settleSteps < 100)
+            {
+                yield return new WaitForFixedUpdate();
+                settleSteps++;
+                maxMotion = 0f;
+                foreach (var cable in cables)
+                    if (cable != null)
+                        maxMotion = Mathf.Max(maxMotion, cable.RestoreMotion());
+                stableSteps = maxMotion < .25f ? stableSteps + 1 : 0;
+                if (settleSteps >= 4 && stableSteps >= 3) break;
+            }
+#if UNITY_EDITOR
+            if (CableStressMode.Recording)
+                Debug.Log("Cable restore: solid-host settle=" + settleSteps +
+                    " steps, maxMotion=" + maxMotion.ToString("0.000") +
+                    " m/s, stable=" + stableSteps);
+#endif
         }
         finally
         {

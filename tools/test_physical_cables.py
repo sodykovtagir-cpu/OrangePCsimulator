@@ -167,6 +167,15 @@ assert 'if (!restoring && Cable != null && Cable.RestoringPhysics) return false;
 assert 'if (!restoring) CablePower.RefreshAll();' in plug
 assert 'PC.Component.Cabling.CablePower.RefreshAll();' in save
 assert 'body.detectCollisions = false;' in save and 'body.isKinematic = true;' in save
+# Kinematic owners must be SOLID while the loaded rope gets its first
+# physics steps; otherwise it falls into the case and the ensuing re-enabled
+# contacts can tear slot joints and cable pins apart.
+transition = save[save.index('private IEnumerator RestoreCableConnections('):save.index('private static bool HasSavedHost(')]
+assert transition.index('cable.FinishRestore();') < transition.index('frozen.Item1.detectCollisions = frozen.Item3;')
+assert transition.index('frozen.Item1.detectCollisions = frozen.Item3;') < transition.index('yield return new WaitForFixedUpdate();')
+assert transition.index('yield return new WaitForFixedUpdate();') < transition.index('frozen.Item1.isKinematic = frozen.Item2;')
+assert 'maxMotion = Mathf.Max(maxMotion, cable.RestoreMotion());' in transition
+assert 'if (!rb.isKinematic)' in plug
 assert 'frozen.Item1.isKinematic = frozen.Item2;' in save
 assert 'if (RestoringSave) return false;' in save
 assert 'RestoringSave = false;' in save
