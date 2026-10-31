@@ -176,6 +176,9 @@ assert transition.index('frozen.Item1.detectCollisions = frozen.Item3;') < trans
 assert transition.index('yield return new WaitForFixedUpdate();') < transition.index('frozen.Item1.isKinematic = frozen.Item2;')
 assert 'maxMotion = Mathf.Max(maxMotion, cable.RestoreMotion());' in transition
 assert 'if (!rb.isKinematic)' in plug
+assert 'rb.position = port.Snap.position;' in plug and 'rb.rotation = port.Snap.rotation;' in plug
+assert 'plugs[1].GetComponent<Rigidbody>().position - restoredPositions[1]' in rope
+assert 'plugs[1].transform.position - restoredPositions[1]' not in rope
 assert 'frozen.Item1.isKinematic = frozen.Item2;' in save
 assert 'if (RestoringSave) return false;' in save
 assert 'RestoringSave = false;' in save

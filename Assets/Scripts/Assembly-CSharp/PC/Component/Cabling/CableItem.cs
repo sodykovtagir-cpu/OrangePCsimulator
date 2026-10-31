@@ -792,8 +792,18 @@ namespace PC.Component.Cabling
             if (!restoringPhysics) return;
             if (restorePositions)
             {
-                Vector3 a = plugs[0].transform.position - restoredPositions[0];
-                Vector3 b = plugs[1].transform.position - restoredPositions[1];
+                // Use the same physics poses that were saved and that the
+                // CharacterJoints solve. Interpolated Transform positions can
+                // lag one simulation step behind a just-restored Rigidbody.
+                Vector3 a = plugs[0].GetComponent<Rigidbody>().position - restoredPositions[0];
+                Vector3 b = plugs[1].GetComponent<Rigidbody>().position - restoredPositions[1];
+#if UNITY_EDITOR
+                if (CableStressMode.Recording &&
+                    (a.sqrMagnitude > .025f * .025f || b.sqrMagnitude > .025f * .025f))
+                    Debug.LogWarning("Cable restore: id=" + Id + " snap offsets=" +
+                        a.magnitude.ToString("0.000") + "/" +
+                        b.magnitude.ToString("0.000") + "m");
+#endif
                 if (a.sqrMagnitude > .0001f || b.sqrMagnitude > .0001f)
                     for (int i = 0; i < bodies.Length; i++)
                         bodies[i].position += Vector3.Lerp(a, b, (i + 1f) / (bodies.Length + 1f));

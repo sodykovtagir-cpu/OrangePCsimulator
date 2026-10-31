@@ -108,8 +108,13 @@ namespace PC.Component.Cabling
             // includes monitor video/power, outlets, boards and loose PSUs.
             WatchPort(port);
             approachPort = null;
-            transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
+            // Move the PHYSICS pose, not only the interpolated Transform. The
+            // saved CharacterJoint anchors refer to Rigidbody.position; the
+            // first loaded cable could otherwise have a visually snapped plug
+            // but a physics endpoint over a metre from its last saved link.
             var rb = GetComponent<Rigidbody>();
+            rb.position = port.Snap.position;
+            rb.rotation = port.Snap.rotation;
             // A saved plug is kinematic until CableItem.FinishRestore.
             // PhysX rejects writes to its velocity in that state. Ordinary
             // inserted (dynamic) plugs must still lose their throw velocity.

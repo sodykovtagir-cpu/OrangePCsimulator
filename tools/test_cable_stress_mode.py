@@ -47,6 +47,7 @@ assert 'yield return new WaitForFixedUpdate();' in restore
 # relaxing any of the 48-end or five-reload acceptance checks.
 assert 'Cable restore: id=' in restore and 'cable.StressInitialOverlaps()' in restore
 assert 'Cable restore: solid-host settle=' in restore and 'message.Contains("Cable restore:")' in s
+assert 'Cable restore: id=' in rope and 'snap offsets=' in rope
 assert 'pin.breakForce = Mathf.Infinity;' in plug and 'restoredPin.breakForce = PullOutForce;' in plug
 assert 'CableStressMode.Recording' in (scripts/'Connector.cs').read_text()
 for prefab in ('ready/ReadyPC_Home_Black', 'Monitor(Black)', 'Wall Outlet 3',
