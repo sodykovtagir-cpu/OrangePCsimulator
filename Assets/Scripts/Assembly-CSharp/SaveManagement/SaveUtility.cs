@@ -86,7 +86,48 @@ namespace SaveManagement
             return CompressedTag + ComputeHmac(packed) + "\n" + packed;
         }
 
-        /// <summary>Decode OPC3 (gzip), OPC2 (uncompressed), and old unsigned XOR saves.</summary>
+        // Save list needs only GameData (first JSON line). Authenticate the
+        // entire OPC3 payload, but stop inflating gzip after that line instead
+        // of parsing every item's files/cable poses for every row in the menu.
+        public static SaveIntegrity DecodeHeader(string fileText, out string header)
+        {
+            header = string.Empty;
+            if (string.IsNullOrEmpty(fileText)) return SaveIntegrity.Tampered;
+            if (!fileText.StartsWith(CompressedTag, StringComparison.Ordinal))
+            {
+                var status = Decode(fileText, out var oldPayload);
+                if (status != SaveIntegrity.Tampered)
+                {
+                    int end = oldPayload.IndexOf('\n');
+                    header = end < 0 ? oldPayload : oldPayload.Substring(0, end);
+                }
+                return status;
+            }
+            int nl = fileText.IndexOf('\n');
+            if (nl != CompressedTag.Length + 44) return SaveIntegrity.Tampered;
+            string body = fileText.Substring(nl + 1);
+            if (!FixedEquals(fileText.Substring(CompressedTag.Length, 44), ComputeHmac(body)))
+                return SaveIntegrity.Tampered;
+            try
+            {
+                using (var input = new MemoryStream(Convert.FromBase64String(body)))
+                using (var zip = new GZipStream(input, CompressionMode.Decompress))
+                using (var reader = new StreamReader(zip, new UTF8Encoding(false, true)))
+                {
+                    header = reader.ReadLine();
+                    if (string.IsNullOrEmpty(header) || header.Length > 8 * 1024 * 1024)
+                        return SaveIntegrity.Tampered;
+                }
+                return SaveIntegrity.Ok;
+            }
+            catch (Exception)
+            {
+                header = string.Empty;
+                return SaveIntegrity.Tampered;
+            }
+        }
+
+		/// <summary>Decode OPC3 (gzip), OPC2 (uncompressed), and old unsigned XOR saves.</summary>
         public static SaveIntegrity Decode(string fileText, out string payload)
         {
             payload = string.Empty;

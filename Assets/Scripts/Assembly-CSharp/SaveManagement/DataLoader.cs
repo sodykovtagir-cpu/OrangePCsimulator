@@ -8,7 +8,28 @@ namespace SaveManagement
     {
         public GameData GameData { get; private set; }
 
-        public string Content { get; set; } = string.Empty;
+        private string content = string.Empty;
+        private bool headerOnly;
+        public string Content
+        {
+            get
+            {
+                if (headerOnly)
+                {
+                    // Do not replace GameData: a menu may already have edited
+                    // its name/workshop fields before writing the file.
+                    string payload;
+                    if (SaveUtility.Decode(File.ReadAllText(Path), out payload) ==
+                        SaveUtility.SaveIntegrity.Tampered)
+                        throw new Exception("Save integrity check failed (file may be modified).");
+                    int split = payload.IndexOf('\n');
+                    content = split < 0 ? string.Empty : payload.Substring(split + 1);
+                    headerOnly = false;
+                }
+                return content;
+            }
+            set { content = value ?? string.Empty; headerOnly = false; }
+        }
 
         public string Path { get; private set; }
 
@@ -34,6 +55,21 @@ namespace SaveManagement
                 return;
 
             LoadFromString(File.ReadAllText(Path));
+        }
+
+        public void LoadHeaderFromPath()
+        {
+            if (string.IsNullOrEmpty(Path) || !File.Exists(Path))
+                throw new FileNotFoundException("Save file is missing.", Path);
+            string header;
+            if (SaveUtility.DecodeHeader(File.ReadAllText(Path), out header) ==
+                SaveUtility.SaveIntegrity.Tampered)
+                throw new Exception("Save integrity check failed (file may be modified).");
+            var parsed = JsonUtility.FromJson<GameData>(header);
+            if (parsed == null) throw new Exception("Invalid GameData.");
+            GameData = parsed;
+            content = string.Empty;
+            headerOnly = true;
         }
 
         public void LoadFromString(string data)

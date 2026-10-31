@@ -15,6 +15,14 @@ assert 'new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, t
 assert 'MaxDecodedBytes' in source
 assert 'fileText.StartsWith(CompressedTag' in source
 assert 'if (!FixedEquals(hmac, ComputeHmac(body)))' in source
+assert 'public static SaveIntegrity DecodeHeader(' in source
+assert 'using (var reader = new StreamReader(zip, new UTF8Encoding(false, true)))' in source
+loader_source = (root / 'SaveManagement/DataLoader.cs').read_text()
+assert 'public void LoadHeaderFromPath()' in loader_source
+assert 'SaveUtility.DecodeHeader(File.ReadAllText(Path), out header)' in loader_source
+assert 'if (headerOnly)' in loader_source and 'SaveUtility.Decode(File.ReadAllText(Path), out payload)' in loader_source
+file_menu = (root / 'FileMenu.cs').read_text()
+assert 'l.LoadHeaderFromPath();' in file_menu and 'var world = l.Content;' in file_menu
 if not shutil.which('mcs') or not shutil.which('mono'):
     print('NOTE: Mono unavailable; checked OPC3 source guards only')
     raise SystemExit(0)
@@ -66,10 +74,14 @@ class Harness {
         Check(modern.Length < text.Length / 8, "repeated JSON was not compressed");
         Check(SaveUtility.Decode(modern, out decoded) == SaveUtility.SaveIntegrity.Ok && decoded == text,
               "OPC3 round-trip / Unicode");
+        Check(SaveUtility.DecodeHeader(modern, out decoded) == SaveUtility.SaveIntegrity.Ok &&
+              decoded == "{\"name\":\"Привет 🖥\"}", "OPC3 header-only preview");
         var modified = modern.ToCharArray(); modified[modified.Length - 10] =
             modified[modified.Length - 10] == 'A' ? 'B' : 'A';
         Check(SaveUtility.Decode(new string(modified), out decoded) == SaveUtility.SaveIntegrity.Tampered,
               "tampered OPC3 accepted");
+        Check(SaveUtility.DecodeHeader(new string(modified), out decoded) == SaveUtility.SaveIntegrity.Tampered,
+              "tampered OPC3 header accepted");
         Check(SaveUtility.Decode(SignedOld(text), out decoded) == SaveUtility.SaveIntegrity.Ok && decoded == text,
               "OPC2 backwards compatibility");
         var media = new byte[262144]; new Random(138).NextBytes(media);
@@ -86,6 +98,9 @@ class Harness {
         var loader = new DataLoader(path, new GameData()); loader.Content = text;
         loader.WriteToFile();
         Check(File.ReadAllText(path).StartsWith(SaveUtility.CompressedTag), "loader did not write OPC3");
+        var preview = new DataLoader(path); preview.LoadHeaderFromPath();
+        Check(preview.GameData != null, "header-only loader failed");
+        Check(preview.Content == text, "lazy world hydration failed");
         var reopened = new DataLoader(path); reopened.LoadFromPath();
         Check(reopened.Content == text && reopened.GameData != null, "DataLoader reload failed");
         Console.WriteLine("PASS: compressed OPC3 roundtrip, HMAC, OPC2/legacy reads, Unicode, DataLoader");

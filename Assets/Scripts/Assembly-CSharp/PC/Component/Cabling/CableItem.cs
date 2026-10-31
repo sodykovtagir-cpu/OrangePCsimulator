@@ -436,15 +436,12 @@ namespace PC.Component.Cabling
                 havePosition[i] = true;
             }
             restorePositions = havePosition[0] && havePosition[1];
-            if (!restorePositions || plugs == null || bodies == null) return;
+            if (plugs == null || bodies == null) return;
 
-            // Instantiate creates a coil at the prefab/portal before FromData.
-            // The socket owners have not finished Start/slot restoration yet.
-            // A kinematic cable STILL pushes dynamic monitors/cases during the
-            // two frames spent waiting for ports; suppress its contacts until
-            // the saved pins and their scoped IgnoreCollision pairs exist.
-            // Keep colliders enabled: disabling them would reset the cable's
-            // self-collision exceptions and prevent WatchPort from adding pairs.
+            // Even pre-pose saves contain live cable rigidbodies. Freeze the
+            // whole chain before the first physics tick, not just newer saves:
+            // a loose spawn coil otherwise can hit/break a saved monitor while
+            // ports and slotted hardware are still being restored.
             restoringPhysics = true;
             restoreBodyContacts = new bool[bodies.Length];
             for (int i = 0; i < 2; i++)
@@ -453,43 +450,36 @@ namespace PC.Component.Cabling
                 restorePlugContacts[i] = rb.detectCollisions;
                 rb.detectCollisions = false;
                 rb.isKinematic = true;
-                rb.position = restoredPositions[i];
+                if (havePosition[i]) rb.position = restoredPositions[i];
                 var rot = data["cableRot" + i] as JArray;
-                if (rot != null && rot.Count == 4)
+                if (havePosition[i] && rot != null && rot.Count == 4)
                     rb.rotation = new Quaternion(rot[0].Value<float>(), rot[1].Value<float>(),
                         rot[2].Value<float>(), rot[3].Value<float>());
             }
             var poses = data["cableBodies"] as JArray;
-            if (poses != null && poses.Count == bodies.Length)
+            for (int i = 0; i < bodies.Length; i++)
             {
-                for (int i = 0; i < bodies.Length; i++)
+                var rb = bodies[i];
+                restoreBodyContacts[i] = rb.detectCollisions;
+                rb.detectCollisions = false;
+                rb.isKinematic = true;
+                if (poses != null && poses.Count == bodies.Length)
                 {
-                    var rb = bodies[i];
-                    restoreBodyContacts[i] = rb.detectCollisions;
-                    rb.detectCollisions = false;
-                    rb.isKinematic = true;
-                    var a = poses[i] as JArray;
-                    if (a == null || a.Count < 7) continue;
-                    rb.position = new Vector3(a[0].Value<float>(), a[1].Value<float>(), a[2].Value<float>());
-                    rb.rotation = new Quaternion(a[3].Value<float>(), a[4].Value<float>(),
-                        a[5].Value<float>(), a[6].Value<float>());
+                    var pose = poses[i] as JArray;
+                    if (pose == null || pose.Count < 7) continue;
+                    rb.position = new Vector3(pose[0].Value<float>(), pose[1].Value<float>(),
+                        pose[2].Value<float>());
+                    rb.rotation = new Quaternion(pose[3].Value<float>(), pose[4].Value<float>(),
+                        pose[5].Value<float>(), pose[6].Value<float>());
                 }
-            }
-            else
-            {
-                // Old saves have plug positions but no individual segments.
-                var axis = restoredPositions[1] - restoredPositions[0];
-                var direction = axis.sqrMagnitude > .0001f ? axis.normalized : Vector3.right;
-                var rotation = Quaternion.FromToRotation(Vector3.forward, direction);
-                for (int i = 0; i < bodies.Length; i++)
+                else if (restorePositions)
                 {
-                    var rb = bodies[i];
-                    restoreBodyContacts[i] = rb.detectCollisions;
-                    rb.detectCollisions = false;
-                    rb.isKinematic = true;
+                    // Older saved endpoints without segment poses.
+                    var axis = restoredPositions[1] - restoredPositions[0];
+                    var direction = axis.sqrMagnitude > .0001f ? axis.normalized : Vector3.right;
                     rb.position = Vector3.Lerp(restoredPositions[0], restoredPositions[1],
                         (i + .5f) / bodies.Length) + Vector3.up * .16f;
-                    rb.rotation = rotation;
+                    rb.rotation = Quaternion.FromToRotation(Vector3.forward, direction);
                 }
             }
             Physics.SyncTransforms();
@@ -499,6 +489,23 @@ namespace PC.Component.Cabling
         public void FinishRestore()
         {
             if (!restoringPhysics) return;
+            if (restorePositions)
+            {
+                Vector3 a = plugs[0].transform.position - restoredPositions[0];
+                Vector3 b = plugs[1].transform.position - restoredPositions[1];
+                if (a.sqrMagnitude > .0001f || b.sqrMagnitude > .0001f)
+                    for (int i = 0; i < bodies.Length; i++)
+                        bodies[i].position += Vector3.Lerp(a, b, (i + 1f) / (bodies.Length + 1f));
+            }
+            else if (plugs[0].Connected != null || plugs[1].Connected != null)
+            {
+                // Legacy cable without saved poses: its initial coil is at
+                // the portal, not at the connected devices. Lay it between
+                // its actual plugs before releasing physical contacts.
+                for (int i = 0; i < bodies.Length; i++)
+                    bodies[i].position = Vector3.Lerp(plugs[0].transform.position,
+                        plugs[1].transform.position, (i + .5f) / bodies.Length) + Vector3.up * .16f;
+            }
             foreach (var plug in plugs)
             {
                 if (plug == null) continue;

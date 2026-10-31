@@ -69,14 +69,16 @@ namespace PC.Component.Cabling
             // Do not let trigger events attach a saved plug to a nearby wrong
             // socket before SaveManager has restored its original port.
             if (!restoring && Cable != null && Cable.RestoringPhysics) return false;
-            if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;
+            if ((!restoring && Time.time < cooldown) || port == null ||
+                !port.Accepts(this, restoring)) return false;
             // Prevent immediate reinsertion inside the same trigger, but allow
             // insertion again once FixedUpdate observed the plug leaving it.
             RefreshYankedPort();
-            if (port == yankedPort) return false;
+            if (!restoring && port == yankedPort) return false;
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null &&
-                Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f)
+                Vector3.Distance(other.Connected.Snap.position, port.Snap.position) >
+                    Cable.Length * (restoring ? 1f : .95f))
                 return false;
             // The model's BoxCollider is offset from its Rigidbody origin.
             // A real overlap must not be rejected because the origin is outside
@@ -123,7 +125,9 @@ namespace PC.Component.Cabling
             Connected = port;
             ConnectedAt = Time.time;
             port.plug = this;
-            CablePower.RefreshAll();
+            // Saved plugs are restored as one batch. Recomputing power/video
+            // after each end would see a half-wired PC and turn it off.
+            if (!restoring) CablePower.RefreshAll();
             return true;
         }
 

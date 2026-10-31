@@ -22,13 +22,14 @@ assert 'cable.End(1 - input.plug.End)' in power
 # The wall plug (A = end 0) and IEC/device plug (B = end 1) have different
 # meshes. Reject opposite sockets even when the other cable end is still free;
 # Accepts is also called by TryInsert during save restoration.
-assert 'candidate.End == 0 && Powered' in ports
+assert 'candidate.End == 0 && (restoring || Powered)' in ports
 assert 'candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet)' in ports
-assert 'if (Time.time < cooldown || port == null || !port.Accepts(this)) return false;' in plug
+assert '!port.Accepts(this, restoring)' in plug
+assert 'if (!restoring) CablePower.RefreshAll();' in plug
 assert 'kind == CableKind.Power && end == 0 ? OutletPlugMaterial()' in rope
 assert 'Physics' not in rope or 'CapsuleCollider' in rope
 assert all(x in rope for x in ('CapsuleCollider','CharacterJoint','Rigidbody','ContinuousSpeculative','Physics.IgnoreCollision', 'LineRenderer', 'Length', 'JObject', 'RestorePorts()'))
-assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) > Cable.Length * .95f' in plug
+assert 'Cable.Length * (restoring ? 1f : .95f)' in plug
 assert 'FixedJoint' in plug and 'connectedBody' in plug and 'cooldown' in plug
 assert 'AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)' in plug
 assert 'Physics.IgnoreCollision(ours, target, true)' in plug
@@ -115,7 +116,7 @@ assert 'restoringPhysics = false;\n            overstretchSteps = 0;' in rope
 assert 'private void RefreshYankedPort()' in plug
 assert 'if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;' in plug
 assert 'private void FixedUpdate()\n        {\n            RefreshYankedPort();' in plug
-assert 'if (port == yankedPort) return false;' in plug
+assert 'if (!restoring && port == yankedPort) return false;' in plug
 # The HDMI BoxCollider is offset from its Rigidbody origin. A port touching
 # its body must accept it even when the origin lies outside the trigger.
 assert 'solid.ClosestPoint(port.TriggerCenter)' in plug
@@ -150,9 +151,11 @@ assert 'rb.isKinematic = false;' in rope and 'public void FinishRestore()' in ro
 restore = rope[rope.index('public override void FromData(JObject data)'):]
 freeze = restore[:restore.index('public void FinishRestore()')]
 thaw = restore[restore.index('public void FinishRestore()'):restore.index('public void RestorePorts()')]
-assert freeze.count('rb.detectCollisions = false;') == 3
+assert freeze.count('rb.detectCollisions = false;') == 2
 assert 'restorePlugContacts[i] = rb.detectCollisions;' in freeze
-assert freeze.count('restoreBodyContacts[i] = rb.detectCollisions;') == 2
+assert freeze.count('restoreBodyContacts[i] = rb.detectCollisions;') == 1
+assert 'if (havePosition[i]) rb.position = restoredPositions[i];' in freeze
+assert 'bodies[i].position += Vector3.Lerp(a, b,' in thaw
 assert 'restoreBodyContacts = new bool[bodies.Length];' in freeze
 assert 'plugs[i].GetComponent<Rigidbody>().detectCollisions = restorePlugContacts[i];' in thaw
 assert 'bodies[i].detectCollisions = restoreBodyContacts[i];' in thaw
@@ -161,6 +164,15 @@ assert 'internal void RefreshCollisionExceptions()' in plug
 assert 'Reinstate(devicePairs);\n            Reinstate(casePairs);' in plug
 assert save.index('cable.RestorePorts();') < save.index('cable.FinishRestore();')
 assert 'if (!restoring && Cable != null && Cable.RestoringPhysics) return false;' in plug
+assert 'if (!restoring) CablePower.RefreshAll();' in plug
+assert 'PC.Component.Cabling.CablePower.RefreshAll();' in save
+assert 'body.detectCollisions = false;' in save and 'body.isKinematic = true;' in save
+assert 'frozen.Item1.isKinematic = frozen.Item2;' in save
+assert 'if (RestoringSave) return false;' in save
+assert 'RestoringSave = false;' in save
+breakable = read('Breakable.cs')
+assert 'SaveManager.RestoringSave || Time.time < SaveManager.IgnoreLoadImpactsUntil' in breakable
+assert 'collision.collider.GetComponentInParent<PC.Component.Cabling.CableItem>()' in breakable
 assert 'VideoFromGpu' in read('PC/Component/Software/OS/OperatingSystem.cs')
 assert 'display.VideoGpu' in read('GpuArtifacts.cs')
 # CS0136 in Board() prevented Unity from compiling CableItem/OutletStrip,
@@ -310,6 +322,24 @@ for kind in ('power','vga','hdmi','outlet'):
     from PIL import Image
     with Image.open(image) as graphic: graphic.verify()
     sprite_guid=re.search(r'^guid: ([a-f0-9]{32})$',image.with_suffix('.png.meta').read_text(),re.M).group(1)
-    assets=(root/'Assets/MonoBehaviour').glob((kind.upper() if kind in ('vga','hdmi') else 'Power' if kind=='power' else 'Wall Outlet')+'*.asset')
-    assert any(sprite_guid in asset.read_text() for asset in assets)
+    assets=list((root/'Assets/MonoBehaviour').glob(
+        (kind.upper() if kind in ('vga','hdmi') else 'Power' if kind=='power' else 'Wall Outlet')+'*.asset'))
+    # The artist replaced the old generic icons with power/vgap/HDMIp and
+    # outlet1..3. Accept either artwork but require every sold product's
+    # actual sprite GUID to point to a real importable PNG in this project.
+    candidates={'power': ['power.png'], 'vga': ['vgap.png'],
+                'hdmi': ['HDMIp.png'], 'outlet': ['outlet1.png','outlet2.png','outlet3.png']}
+    valid={sprite_guid}
+    for name in candidates[kind]:
+        meta=root/'Assets/Texture2D'/(name+'.meta')
+        png=root/'Assets/Texture2D'/name
+        if png.exists() and meta.exists():
+            from PIL import Image
+            with Image.open(png) as graphic: graphic.verify()
+            valid.add(re.search(r'^guid: ([a-f0-9]{32})$',meta.read_text(),re.M).group(1))
+    assert assets
+    for asset in assets:
+        match=re.search(r'^  sprite: \{fileID: \d+, guid: ([a-f0-9]{32})',
+                        asset.read_text(), re.M)
+        assert match and match.group(1) in valid, asset
 print('Physical cables, power/video routes, persistence, 17 shop items: OK')
