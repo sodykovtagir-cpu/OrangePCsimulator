@@ -1,6 +1,8 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
+using PC.Component.Networking;
 
 namespace PC.Component.Software
 {
@@ -12,6 +14,7 @@ namespace PC.Component.Software
             public string url;
             public Website page;
             public bool visible;
+            [Min(0f)] public float trafficMB = 5f; // fake download size for locally authored pages
 
             [TextArea(2, 4)]
             public string description;
@@ -43,6 +46,8 @@ namespace PC.Component.Software
         }
 
         private Website currentPage;
+        private GameObject networkPage;
+        private Coroutine pendingLoad;
 
         protected override void Start()
         {
@@ -62,12 +67,73 @@ namespace PC.Component.Software
 
         public void Search()
         {
-            string query = addressBar.text.ToLower();
-
-            if (string.IsNullOrEmpty(query))
+            if (addressBar == null) return;
+            string query = addressBar.text.Trim();
+            if (string.IsNullOrEmpty(query)) return;
+            var url = NormalizeUrl(query);
+            // An authored Website prefab wins over the temporary UI when the
+            // user later builds their own router/provider pages.
+            if (websites != null) foreach (var site in websites)
+                if (site != null && site.page != null && NormalizeUrl(site.url) == url)
+                { OpenSite(site); return; }
+            if (RouterWebPages.IsLocalAddress(url))
+            {
+                ShowNetworkPage(url);
                 return;
+            }
+            // Searching is a real (simulated) request, even though site
+            // prefabs themselves are local assets.
+            LoadOnline(url, .3f, () => ShowResults(query.ToLowerInvariant()));
+        }
 
-            ShowResults(query);
+        private static string NormalizeUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return "";
+            url = url.Trim().ToLowerInvariant();
+            if (url.StartsWith("https://")) url = url.Substring(8);
+            else if (url.StartsWith("http://")) url = url.Substring(7);
+            return url.TrimEnd('/');
+        }
+
+        public void ShowNetworkPage(string url)
+        {
+            url = NormalizeUrl(url);
+            ClearPage();
+            oggleHome.SetActive(false);
+            networkPage = RouterWebPages.Create(this, pageContainer,
+                system != null ? system.Board : null, url);
+        }
+
+        private void LoadOnline(string url, float mb, Action completed)
+        {
+            ClearPage();
+            oggleHome.SetActive(false);
+            var service = InternetService.Instance;
+            var board = system != null ? system.Board : null;
+            if (service == null || !service.TryTransfer(board, url, mb, out var delay, out var error))
+            {
+                networkPage = RouterWebPages.Message(pageContainer,
+                    error ?? "Нет подключения к интернету");
+                return;
+            }
+            networkPage = RouterWebPages.Message(pageContainer, "Загрузка... " + url);
+            pendingLoad = StartCoroutine(FinishLoad(delay, completed));
+        }
+
+        private IEnumerator FinishLoad(float delay, Action completed)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            pendingLoad = null;
+            // A router/power outage mid-transfer must cancel the page.
+            var board = system != null ? system.Board : null;
+            var status = InternetService.Instance != null ? InternetService.Instance.Status(board) : null;
+            if (status == null || status.Quality <= 0f)
+            {
+                ClearPage();
+                networkPage = RouterWebPages.Message(pageContainer, "Соединение прервано");
+                yield break;
+            }
+            completed();
         }
 
         public void SearchFromHome()
@@ -123,19 +189,40 @@ namespace PC.Component.Software
         /// </remarks>
         protected virtual void OpenSite(WebsiteItem site)
         {
-            ClearPage();
-
-            oggleHome.SetActive(false);
-
-            var instance = Instantiate(site.page, pageContainer);
-            currentPage = instance;
-            currentPage.Init(system);
+            if (site == null || site.page == null) return;
+            if (RouterWebPages.IsLocalAddress(NormalizeUrl(site.url)))
+            {
+                ClearPage();
+                oggleHome.SetActive(false);
+                string address = NormalizeUrl(site.url);
+                if (address != "wifi-settings" && address != "wifi" &&
+                    (InternetService.Instance == null ||
+                     !InternetService.Instance.CanOpenLocalPanel(
+                         system != null ? system.Board : null, out var localRouter)))
+                {
+                    networkPage = RouterWebPages.Message(pageContainer,
+                        "Сначала подключись к роутеру через wifi-settings");
+                    return;
+                }
+                currentPage = Instantiate(site.page, pageContainer);
+                currentPage.Init(system);
+                return;
+            }
+            LoadOnline(site.url, Mathf.Max(.1f, site.trafficMB), () =>
+            {
+                ClearPage();
+                oggleHome.SetActive(false);
+                currentPage = Instantiate(site.page, pageContainer);
+                currentPage.Init(system);
+            });
         }
 
         // ================= CLEAR =================
 
         private void ClearPage()
         {
+            if (pendingLoad != null) { StopCoroutine(pendingLoad); pendingLoad = null; }
+            if (networkPage != null) { Destroy(networkPage); networkPage = null; }
             resultsPage.SetActive(false);
 
             if (currentPage != null)
