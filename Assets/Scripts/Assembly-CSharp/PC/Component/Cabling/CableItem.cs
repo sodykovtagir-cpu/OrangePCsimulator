@@ -564,19 +564,19 @@ namespace PC.Component.Cabling
         }
 
 #if UNITY_EDITOR
-        private static Vector3 StressArcPoint(Vector3 a, Vector3 b, float height, float t)
+        private static Vector3 StressArcPoint(Vector3 a, Vector3 b, float height, Vector3 bend, float t)
         {
-            return Vector3.Lerp(a, b, t) + Vector3.up *
-                (height * Mathf.Sin(Mathf.PI * t));
+            float wave = Mathf.Sin(Mathf.PI * t);
+            return Vector3.Lerp(a, b, t) + (Vector3.up * height + bend) * wave;
         }
 
-        private static float StressArcLength(Vector3 a, Vector3 b, float height)
+        private static float StressArcLength(Vector3 a, Vector3 b, float height, Vector3 bend)
         {
             Vector3 previous = a;
             float total = 0f;
             for (int i = 1; i <= 64; i++)
             {
-                Vector3 point = StressArcPoint(a, b, height, i / 64f);
+                Vector3 point = StressArcPoint(a, b, height, bend, i / 64f);
                 total += Vector3.Distance(previous, point);
                 previous = point;
             }
@@ -602,9 +602,11 @@ namespace PC.Component.Cabling
         // Collapsing its 22 capsules into a one-metre line (the old fixture)
         // made ten overlapping capsules hit the PSU/case in one physics step.
         // Space centres along ~82% of the REAL cable length, arching into free
-        // space; preserve normal radius, segment masses and pin break force.
+        // space. Bend candidates point away from case/monitor colliders and
+        // are preflight-tested before any physics step. Preserve normal radius,
+        // segment masses and pin break force.
         // Nothing about gameplay cable placement or collision rules changes.
-        public float PrepareStressTestSpan()
+        public float PrepareStressTestSpan(Vector3 bend)
         {
             if (plugs == null || bodies == null || bodies.Length == 0) return 0f;
             Vector3 a = plugs[0].transform.position;
@@ -616,7 +618,7 @@ namespace PC.Component.Cabling
             for (int i = 0; i < 16; i++)
             {
                 float middle = (low + high) * .5f;
-                if (StressArcLength(a, b, middle) < targetLength) low = middle;
+                if (StressArcLength(a, b, middle, bend) < targetLength) low = middle;
                 else high = middle;
             }
             var points = new Vector3[129];
@@ -624,7 +626,7 @@ namespace PC.Component.Cabling
             points[0] = a;
             for (int i = 1; i < points.Length; i++)
             {
-                points[i] = StressArcPoint(a, b, high, i / 128f);
+                points[i] = StressArcPoint(a, b, high, bend, i / 128f);
                 distances[i] = distances[i - 1] + Vector3.Distance(points[i - 1], points[i]);
             }
             float total = distances[128];
