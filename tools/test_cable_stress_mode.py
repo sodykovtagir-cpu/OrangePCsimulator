@@ -25,8 +25,10 @@ assert 'if (!Observe("reload step " + step))' in s and 'Recording = false;' in s
 assert 'finally' in s and 'all five reloads completed' in s
 assert 'ReadyBuildSpawner' in s and 'OwnPorts' in s and 'CablePower.BoardHasPower' in s
 assert 'outlet.IsMounted' in s and 'CablePower.Energized' in s
-assert 'PrepareStressTestSpan();' in s and '#if UNITY_EDITOR' in rope
-assert 'StressArcLength(a, b, middle)' in rope and 'length * .82f' in rope
+assert 'PrepareStressTestSpan(bend);' in s and '#if UNITY_EDITOR' in rope
+assert 'StressArcLength(a, b, middle, bend)' in rope and 'length * .82f' in rope
+assert 'Vector3.back * .5f' in s and 'Vector3.back * .9f' in s
+assert 'rejected.Append(" {bend=")' in s and 'bend=" + chosenBend' in s
 assert 'StressArcSample(points, distances, centre)' in rope
 assert 'Physics.ComputePenetration(' in rope and 'Physics.GetIgnoreCollision(own, other)' in rope
 assert 'data["cableJoints"] = anchors;' in rope and 'var savedJoints = data["cableJoints"] as JArray;' in rope
