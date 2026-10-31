@@ -29,6 +29,9 @@ namespace PC.Component.Cabling
         private readonly bool[] restorePlugContacts = new bool[2];
         private bool[] restoreBodyContacts;
         private int overstretchSteps;
+        private CablePlug loadedEnd;
+        private float loadedSince;
+        private readonly Collider[] supportHits = new Collider[24];
         private float strainCooldownUntil;
 
         // The root is an invisible spawn anchor: dragging the physical cable
@@ -322,7 +325,10 @@ namespace PC.Component.Cabling
         {
             if ((plugs[0].Connected == null && plugs[1].Connected == null) ||
                 bodies.Length == 0 || Time.time < strainCooldownUntil)
+            {
+                loadedEnd = null;
                 return false;
+            }
             // A click/drag is not a request to unplug. The actual FixedJoint
             // with pullOutForce handles deliberate pulling; this emergency
             // length guard is ONLY for passive loads between two devices.
@@ -334,6 +340,7 @@ namespace PC.Component.Cabling
                 a.IsHeld || b.IsHeld || heldSegment != null)
             {
                 overstretchSteps = 0;
+                loadedEnd = null;
                 return false;
             }
             // Snapping a plug into its authored pivot or restoring a saved
@@ -343,6 +350,7 @@ namespace PC.Component.Cabling
                 (plugs[1].Connected != null && Time.time - plugs[1].ConnectedAt < .25f))
             {
                 overstretchSteps = 0;
+                loadedEnd = null;
                 return false;
             }
 
@@ -370,7 +378,9 @@ namespace PC.Component.Cabling
                                        plugs[0].GetComponent<Rigidbody>().velocity;
             bool movingApart = span > length * .97f && span > .001f &&
                 Vector3.Dot(relativeVelocity, (end - start) / span) > .35f;
-            if (!hardLimit && !movingApart) return false;
+            if (!hardLimit && !movingApart)
+                return ReleaseSustainedTautLoad(path);
+            loadedEnd = null;
             var release = StrainedEnd();
             if (release == null) return false;
             // If either connected device is light and movable, give the
@@ -391,6 +401,91 @@ namespace PC.Component.Cabling
             overstretchSteps = 0;
             strainCooldownUntil = Time.time + .35f; // let the loose cable settle
             return true;
+        }
+
+        // A monitor resting on a table is supported by the table; a suspended
+        // one can remain on a 200 N pin forever because its 1 kg weight is
+        // only ~10 N. Do not lower the ordinary pull-out strength: require a
+        // measured, steady solver load on a NEARLY TAUT, two-ended rope before
+        // releasing the movable device-side connector. No raycasts/allocations
+        // or extra rope traversals on the normal slack path.
+        private bool ReleaseSustainedTautLoad(float path)
+        {
+            if (path < length * .96f || Physics.gravity.y >= -.5f ||
+                SaveManager.RestoringSave || Time.time < SaveManager.IgnoreLoadImpactsUntil)
+            {
+                loadedEnd = null;
+                return false;
+            }
+            CablePlug candidate = null;
+            for (int i = 0; i < 2; i++)
+            {
+                var plug = plugs[i];
+                var other = plugs[1 - i];
+                if (plug == null || plug.Connected == null || other == null ||
+                    other.Connected == null) continue;
+                var owner = plug.Connected.owner;
+                var rb = owner != null ? owner.GetComponent<Rigidbody>() : null;
+                if (rb == null || !CanPull(rb, 0)) continue;
+                float weight = rb.mass * Physics.gravity.magnitude;
+                if (plug.PinLoad < Mathf.Max(2.5f, weight * .4f) ||
+                    HasSolidSupport(rb)) continue;
+                candidate = plug;
+                break;
+            }
+            if (candidate == null)
+            {
+                loadedEnd = null;
+                return false;
+            }
+            if (loadedEnd != candidate)
+            {
+                loadedEnd = candidate;
+                loadedSince = Time.time;
+                return false;
+            }
+            if (Time.time - loadedSince < .5f) return false;
+#if UNITY_EDITOR
+            Debug.Log("[CableLoad] suspended cable=" + Id + " end=" + candidate.End +
+                " path=" + path.ToString("0.00") + "m length=" +
+                length.ToString("0.00") + "m pinLoad=" +
+                candidate.PinLoad.ToString("0.0") + "N");
+#endif
+            candidate.Unplug();
+            loadedEnd = null;
+            strainCooldownUntil = Time.time + .35f;
+            return true;
+        }
+
+        // Test for a solid surface immediately beneath a movable device.
+        // Query only after the rope is already taut and its joint carries a
+        // meaningful load; never mistake this rope or a socket trigger for
+        // a shelf. The fixed-size buffer avoids allocations during physics.
+        private bool HasSolidSupport(Rigidbody rb)
+        {
+            var own = rb.GetComponent<Collider>();
+            if (own == null || !own.enabled || own.isTrigger)
+                return true; // unknown geometry: do not auto-unplug
+            Bounds b = own.bounds;
+            Vector3 center = new Vector3(b.center.x, b.min.y - .035f, b.center.z);
+            Vector3 extents = new Vector3(Mathf.Max(.06f, b.extents.x * .7f),
+                .12f, Mathf.Max(.06f, b.extents.z * .7f));
+            int count = Physics.OverlapBoxNonAlloc(center, extents, supportHits,
+                Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+            // If our buffer filled, treat the environment as supported rather
+            // than auto-unplugging on an incomplete query of a crowded table.
+            if (count == supportHits.Length) return true;
+            for (int i = 0; i < count; i++)
+            {
+                var other = supportHits[i];
+                if (other == null || other == own || other.isTrigger ||
+                    other.attachedRigidbody == rb ||
+                    other.transform.IsChildOf(rb.transform) ||
+                    other.GetComponentInParent<CableItem>() != null) continue;
+                if (other.bounds.max.y >= b.min.y - .17f &&
+                    other.bounds.min.y <= b.min.y + .03f) return true;
+            }
+            return false;
         }
 
         private CablePlug StrainedEnd()
@@ -985,6 +1080,7 @@ namespace PC.Component.Cabling
             restoringPhysics = false;
             overstretchSteps = 0;
             strainCooldownUntil = Time.time + .35f;
+            loadedEnd = null;
         }
 
         public void RestorePorts()

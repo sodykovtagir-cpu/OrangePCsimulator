@@ -114,7 +114,7 @@ assert 'restoringPhysics = false;\n            overstretchSteps = 0;' in rope
 # TryInsert (which is never called away from a port). Otherwise reinsertion is
 # blocked until the save is reloaded.
 assert 'private void RefreshYankedPort()' in plug
-assert 'if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;' in plug
+assert 'if (yankedPort != null && !NearPort(yankedPort, .10f)) yankedPort = null;' in plug
 assert 'private void FixedUpdate()\n        {\n            RefreshYankedPort();' in plug
 assert 'if (!restoring && port == yankedPort) return false;' in plug
 # The HDMI BoxCollider is offset from its Rigidbody origin. A port touching

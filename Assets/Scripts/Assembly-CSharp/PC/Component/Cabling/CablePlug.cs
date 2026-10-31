@@ -18,6 +18,10 @@ namespace PC.Component.Cabling
         private Action<CablePlug> releaseDrag;
         [SerializeField, Min(10f)] private float pullOutForce = 200f;
         public float PullOutForce => pullOutForce >= 10f ? pullOutForce : 200f;
+        // Current solver load is read only when a two-ended rope is nearly
+        // taut. A 1 kg monitor supplies ~10 N: too little to break the normal
+        // 200 N manual-pull pin, but enough to suspend it indefinitely.
+        internal float PinLoad => pin != null ? pin.currentForce.magnitude : 0f;
         public bool IsHeld { get; private set; }
 
         // Physics.IgnoreCollision is PER PAIR. Only this plug and its nearest
@@ -56,7 +60,10 @@ namespace PC.Component.Cabling
         // infer that it left in between.
         private void RefreshYankedPort()
         {
-            if (yankedPort != null && !NearPort(yankedPort, -.10f)) yankedPort = null;
+            // Stay disarmed until the plug has cleared the ENTIRE trigger,
+            // not just its inner core. Otherwise a taut rope can immediately
+            // reinsert the plug while it still brushes the socket's edge.
+            if (yankedPort != null && !NearPort(yankedPort, .10f)) yankedPort = null;
         }
 
         public void SetHeld(bool held, Action<CablePlug> onAutoSnap = null)
