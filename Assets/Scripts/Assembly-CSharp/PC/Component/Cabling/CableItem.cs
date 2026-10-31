@@ -622,12 +622,11 @@ namespace PC.Component.Cabling
         public float PrepareStressTestSpan(Vector3 bend)
         {
             if (plugs == null || bodies == null || bodies.Length == 0) return 0f;
-            // TryInsert snaps Rigidbody.position. Its interpolated Transform
-            // can still show the prefab coil in this same frame; an arc built
-            // from that stale pose crosses the fixture wall even though both
-            // physical endpoints are correctly placed at their ports.
-            Vector3 a = plugs[0].GetComponent<Rigidbody>().position;
-            Vector3 b = plugs[1].GetComponent<Rigidbody>().position;
+            // The fixture uses normal (non-loading) port insertion; lay out
+            // the arc at its visible snap positions, then compute joint local
+            // anchors from the placed Rigidbody poses below.
+            Vector3 a = plugs[0].transform.position;
+            Vector3 b = plugs[1].transform.position;
             float span = Vector3.Distance(a, b);
             if (span < .001f) return 0f;
             float targetLength = Mathf.Max(span, length * .82f);
@@ -718,6 +717,25 @@ namespace PC.Component.Cabling
             }
             return maxGap > .025f ? worst + " gap=" + maxGap.ToString("0.000") + "m" :
                 string.Empty;
+        }
+
+        public string StressRestoreOffsets()
+        {
+            if (!restorePositions || plugs == null) return "no saved end poses";
+            var result = new System.Text.StringBuilder();
+            for (int i = 0; i < 2; i++)
+            {
+                var rb = plugs[i].GetComponent<Rigidbody>();
+                result.Append(" end").Append(i).Append(" saved-to-RB=")
+                    .Append(Vector3.Distance(restoredPositions[i], rb.position).ToString("0.000"))
+                    .Append(" saved-to-Transform=")
+                    .Append(Vector3.Distance(restoredPositions[i], plugs[i].transform.position).ToString("0.000"));
+                if (plugs[i].Connected != null)
+                    result.Append(" RB-to-Snap=")
+                        .Append(Vector3.Distance(rb.position,
+                            plugs[i].Connected.Snap.position).ToString("0.000"));
+            }
+            return result.ToString();
         }
 
         public string StressEndAngles()

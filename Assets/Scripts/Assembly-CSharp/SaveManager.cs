@@ -376,6 +376,15 @@ public class SaveManager : MonoBehaviour
                 catch (Exception ex) { Debug.LogWarning($"Save: failed to restore cable ports: {ex}"); }
                 finally
                 {
+#if UNITY_EDITOR
+                    if (CableStressMode.Recording && cable != null)
+                    {
+                        string before = cable.StressJointErrors();
+                        if (!string.IsNullOrEmpty(before))
+                            Debug.LogWarning("Cable restore: pre-finish id=" + cable.Id +
+                                " joints=" + before + cable.StressRestoreOffsets());
+                    }
+#endif
                     try { cable.FinishRestore(); }
                     catch (Exception ex) { Debug.LogWarning($"Save: failed to release cable: {ex}"); }
                 }

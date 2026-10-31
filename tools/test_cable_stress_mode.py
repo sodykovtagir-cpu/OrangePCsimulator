@@ -36,9 +36,8 @@ assert 'StressJointErrors();' in s and 'ROPE JOINTS INVALID' in s
 assert s.index('cable.PrepareStressTestSpan(Vector3.zero);') < s.index('cable.End(0).TryInsert(a, true)')
 assert 'Quaternion.Inverse(body.rotation) * (world - body.position)' in rope
 arc = rope[rope.index('public float PrepareStressTestSpan('):rope.index('public string StressJointErrors()')]
-assert 'Vector3 a = plugs[0].GetComponent<Rigidbody>().position;' in arc
-assert 'Vector3 b = plugs[1].GetComponent<Rigidbody>().position;' in arc
-assert 'Vector3 a = plugs[0].transform.position;' not in arc
+assert 'Vector3 a = plugs[0].transform.position;' in arc
+assert 'Vector3 b = plugs[1].transform.position;' in arc
 assert 'PASS 1: lay down EVERY physical body' in rope and 'PASS 2: anchor every CharacterJoint' in rope
 assert 'data["cableJoints"] = anchors;' in rope and 'var savedJoints = data["cableJoints"] as JArray;' in rope
 assert 'RestoreJoint(bodies[i].GetComponent<CharacterJoint>(), savedJoints[i])' in rope
@@ -51,6 +50,8 @@ assert 'yield return new WaitForFixedUpdate();' in restore
 # relaxing any of the 48-end or five-reload acceptance checks.
 assert 'Cable restore: id=' in restore and 'cable.StressInitialOverlaps()' in restore
 assert 'Cable restore: solid-host settle=' in restore and 'message.Contains("Cable restore:")' in s
+assert 'Cable restore: pre-finish id=' in restore and 'cable.StressRestoreOffsets()' in restore
+assert 'if (Cable != null && Cable.RestoringPhysics)' in plug
 assert 'Cable restore: id=' in rope and 'snap offsets=' in rope
 assert 'pin.breakForce = Mathf.Infinity;' in plug and 'restoredPin.breakForce = PullOutForce;' in plug
 assert 'CableStressMode.Recording' in (scripts/'Connector.cs').read_text()
