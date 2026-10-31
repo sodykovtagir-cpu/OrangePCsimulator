@@ -458,6 +458,19 @@ namespace PC.Component.Cabling
             return true;
         }
 
+        // Rigidbody interpolation may show a previous visual Transform pose.
+        // Joint anchors must be calculated from the *physics* pose, not from
+        // transform.InverseTransformPoint immediately after moving a Rigidbody.
+        private static Vector3 BodyLocalPoint(Rigidbody body, Vector3 world)
+        {
+            return Quaternion.Inverse(body.rotation) * (world - body.position);
+        }
+
+        private static Vector3 BodyWorldPoint(Rigidbody body, Vector3 local)
+        {
+            return body.position + body.rotation * local;
+        }
+
         private void ReanchorChainFromLoadedPose()
         {
             if (bodies == null || plugs == null) return;
@@ -472,8 +485,8 @@ namespace PC.Component.Cabling
                 // after the next save the exact local anchors are preserved.
                 Vector3 boundary = i == 0 ? previous.position :
                     (previous.position + current.position) * .5f;
-                joint.anchor = current.transform.InverseTransformPoint(boundary);
-                joint.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+                joint.anchor = BodyLocalPoint(current, boundary);
+                joint.connectedAnchor = BodyLocalPoint(previous, boundary);
                 previous = current;
             }
             var last = plugs[1].GetComponent<CharacterJoint>();
@@ -481,8 +494,8 @@ namespace PC.Component.Cabling
             {
                 var end = plugs[1].GetComponent<Rigidbody>();
                 Vector3 boundary = end.position;
-                last.anchor = end.transform.InverseTransformPoint(boundary);
-                last.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+                last.anchor = BodyLocalPoint(end, boundary);
+                last.connectedAnchor = BodyLocalPoint(previous, boundary);
             }
         }
 
@@ -630,7 +643,9 @@ namespace PC.Component.Cabling
                 distances[i] = distances[i - 1] + Vector3.Distance(points[i - 1], points[i]);
             }
             float total = distances[128];
-            Rigidbody previous = plugs[0].GetComponent<Rigidbody>();
+            // PASS 1: lay down EVERY physical body at its new physics pose.
+            // Do not configure any joint until all connected bodies have been
+            // placed: Transform may still show their old interpolated coil.
             for (int i = 0; i < bodies.Length; i++)
             {
                 var rb = bodies[i];
@@ -641,19 +656,74 @@ namespace PC.Component.Cabling
                 rb.rotation = Quaternion.LookRotation(after - before);
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
-                var link = rb.GetComponent<CharacterJoint>();
+            }
+            Physics.SyncTransforms();
+            // PASS 2: anchor every CharacterJoint at the exact shared boundary
+            // in BOTH of its neighbouring bodies' physics coordinate frames.
+            Rigidbody previous = plugs[0].GetComponent<Rigidbody>();
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                var rb = bodies[i];
                 Vector3 boundary = StressArcSample(points, distances,
                     total * i / bodies.Length);
-                link.anchor = rb.transform.InverseTransformPoint(boundary);
-                link.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+                var link = rb.GetComponent<CharacterJoint>();
+                link.anchor = BodyLocalPoint(rb, boundary);
+                link.connectedAnchor = BodyLocalPoint(previous, boundary);
                 previous = rb;
             }
             var last = plugs[1].GetComponent<CharacterJoint>();
-            last.anchor = Vector3.zero;
-            last.connectedAnchor = previous.transform.InverseTransformPoint(b);
+            last.anchor = BodyLocalPoint(plugs[1].GetComponent<Rigidbody>(), b);
+            last.connectedAnchor = BodyLocalPoint(previous, b);
             Physics.SyncTransforms();
             UpdateJacket();
             return total;
+        }
+
+        // Check every section, the final link, and both inserted pins BEFORE
+        // physics is allowed to run. A bad joint anchor can tear a PSU off its
+        // slot despite zero collider overlaps and metres of spare cable.
+        public string StressJointErrors()
+        {
+            if (bodies == null || plugs == null) return "missing bodies/plugs";
+            float maxGap = 0f;
+            string worst = "";
+            for (int i = 0; i <= bodies.Length; i++)
+            {
+                var rb = i == bodies.Length ? plugs[1].GetComponent<Rigidbody>() : bodies[i];
+                var joint = rb.GetComponent<CharacterJoint>();
+                if (joint == null || joint.connectedBody == null)
+                    return "missing link " + i;
+                float gap = Vector3.Distance(BodyWorldPoint(rb, joint.anchor),
+                    BodyWorldPoint(joint.connectedBody, joint.connectedAnchor));
+                if (gap > maxGap) { maxGap = gap; worst = "link " + i; }
+            }
+            foreach (var plug in plugs)
+            {
+                var rb = plug.GetComponent<Rigidbody>();
+                foreach (var pin in plug.GetComponents<FixedJoint>())
+                {
+                    if (pin == null || plug.Connected == null) continue;
+                    // World-fixed outlets have no Rigidbody; their connected
+                    // anchor is already a world-space point.
+                    var target = pin.connectedBody != null ?
+                        BodyWorldPoint(pin.connectedBody, pin.connectedAnchor) :
+                        pin.connectedAnchor;
+                    float gap = Vector3.Distance(BodyWorldPoint(rb, pin.anchor), target);
+                    if (gap > maxGap) { maxGap = gap; worst = "pin " + plug.End; }
+                }
+            }
+            return maxGap > .025f ? worst + " gap=" + maxGap.ToString("0.000") + "m" :
+                string.Empty;
+        }
+
+        public string StressEndAngles()
+        {
+            if (plugs == null || bodies == null || bodies.Length == 0) return "missing ends";
+            float a = Quaternion.Angle(plugs[0].GetComponent<Rigidbody>().rotation,
+                bodies[0].rotation);
+            float b = Quaternion.Angle(plugs[1].GetComponent<Rigidbody>().rotation,
+                bodies[bodies.Length - 1].rotation);
+            return "endAngles=" + a.ToString("0.0") + "/" + b.ToString("0.0") + "deg";
         }
 
         // Diagnostic is TEST-ONLY and called once before enabling a new rope.
@@ -668,17 +738,20 @@ namespace PC.Component.Cabling
             {
                 var own = body.GetComponent<Collider>();
                 if (own == null) continue;
-                foreach (var other in Physics.OverlapBox(own.bounds.center,
-                    own.bounds.extents, Quaternion.identity, ~0,
-                    QueryTriggerInteraction.Ignore))
+                // Bounds/Transform can still be interpolated at the old coil
+                // position. Broad-phase around the actual Rigidbody pose and
+                // evaluate exact penetration at that same physics pose.
+                float radius = Mathf.Max(.5f, own.bounds.extents.magnitude) + .5f;
+                foreach (var other in Physics.OverlapSphere(body.position, radius,
+                    ~0, QueryTriggerInteraction.Ignore))
                 {
                     if (other == null || other == own || other.isTrigger ||
                         other.GetComponentInParent<CableItem>() == this ||
                         Physics.GetIgnoreCollision(own, other)) continue;
                     Vector3 direction;
                     float depth;
-                    if (!Physics.ComputePenetration(own, own.transform.position,
-                        own.transform.rotation, other, other.transform.position,
+                    if (!Physics.ComputePenetration(own, body.position,
+                        body.rotation, other, other.transform.position,
                         other.transform.rotation, out direction, out depth) ||
                         depth < .02f) continue;
                     count++;

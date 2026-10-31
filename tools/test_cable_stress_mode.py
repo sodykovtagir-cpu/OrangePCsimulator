@@ -31,6 +31,11 @@ assert 'Vector3.back * .5f' in s and 'Vector3.back * .9f' in s
 assert 'rejected.Append(" {bend=")' in s and 'bend=" + chosenBend' in s
 assert 'StressArcSample(points, distances, centre)' in rope
 assert 'Physics.ComputePenetration(' in rope and 'Physics.GetIgnoreCollision(own, other)' in rope
+assert 'Physics.OverlapSphere(body.position, radius' in rope
+assert 'StressJointErrors();' in s and 'ROPE JOINTS INVALID' in s
+assert s.index('cable.PrepareStressTestSpan(Vector3.zero);') < s.index('cable.End(0).TryInsert(a, true)')
+assert 'Quaternion.Inverse(body.rotation) * (world - body.position)' in rope
+assert 'PASS 1: lay down EVERY physical body' in rope and 'PASS 2: anchor every CharacterJoint' in rope
 assert 'data["cableJoints"] = anchors;' in rope and 'var savedJoints = data["cableJoints"] as JArray;' in rope
 assert 'RestoreJoint(bodies[i].GetComponent<CharacterJoint>(), savedJoints[i])' in rope
 assert 'ReanchorChainFromLoadedPose();' in rope

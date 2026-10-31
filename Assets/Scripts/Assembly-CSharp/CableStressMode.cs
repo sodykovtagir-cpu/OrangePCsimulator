@@ -414,9 +414,18 @@ public sealed class CableStressMode : MonoBehaviour
         }
         if (cable != null)
         {
-            cable.End(0).GetComponent<Rigidbody>().position = a.Snap.position;
-            cable.End(1).GetComponent<Rigidbody>().position = b.Snap.position;
+            // Fully lay out both plugs AND ALL rope sections/anchors before
+            // creating a single breakable pin on either device. Previously we
+            // attached the ends to a still-coiled chain, then teleported its
+            // centres; that can kick the PSU slot in the first solver steps.
+            var endA = cable.End(0).GetComponent<Rigidbody>();
+            var endB = cable.End(1).GetComponent<Rigidbody>();
+            endA.position = a.Snap.position;
+            endA.rotation = a.Snap.rotation;
+            endB.position = b.Snap.position;
+            endB.rotation = b.Snap.rotation;
             Physics.SyncTransforms();
+            cable.PrepareStressTestSpan(Vector3.zero);
         }
         if (cable == null || !cable.End(0).TryInsert(a, true) || !cable.End(1).TryInsert(b, true))
         {
@@ -465,10 +474,22 @@ public sealed class CableStressMode : MonoBehaviour
             Destroy(cable.gameObject);
             return false;
         }
+        string jointError = cable.StressJointErrors();
+        if (!string.IsNullOrEmpty(jointError))
+        {
+            Write("ROPE JOINTS INVALID lane=" + lane + " cable=" + cable.spawnId +
+                " " + jointError + " span=" + span.ToString("0.000") +
+                "m bend=" + chosenBend);
+            cable.End(0).Unplug();
+            cable.End(1).Unplug();
+            Destroy(cable.gameObject);
+            return false;
+        }
         Write("ROPE READY lane=" + lane + " cable=" + cable.spawnId +
             " A=" + a.owner.name + "/" + a.name + " B=" + b.owner.name + "/" + b.name +
             " span=" + span.ToString("0.000") + "m route=" + routeLength.ToString("0.000") +
-            "m length=" + cable.Length.ToString("0.000") + "m bend=" + chosenBend);
+            "m length=" + cable.Length.ToString("0.000") + "m bend=" + chosenBend +
+            " joints=aligned " + cable.StressEndAngles());
         // Item.Start normally assigns these IDs; be explicit if the fixture
         // was created within the same frame as its first connection.
         if (a.owner.Id == 0) a.owner.Id = Main.Instance.GetNewId(a.owner);
