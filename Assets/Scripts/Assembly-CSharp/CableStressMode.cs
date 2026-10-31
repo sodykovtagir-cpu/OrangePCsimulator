@@ -259,8 +259,10 @@ public sealed class CableStressMode : MonoBehaviour
                     slotOwners[hardware.Id] = host.Id;
                 }
             }
-            // Only after all 48 ends and slot hosts exist: no half-wired save.
+            // The fixture connects ends in one batch, like save restoration.
+            // Recalculate only once after all 48 ends and slot hosts exist.
             if (expected.Count != 48) { Fail("Expected 48 plugged ends, got " + expected.Count); yield break; }
+            CablePower.RefreshAll();
             if (!Observe("baseline, before settling")) yield break;
             for (int step = 0; step < 70; step++)
             {
@@ -357,15 +359,26 @@ public sealed class CableStressMode : MonoBehaviour
             Destroy(cable.gameObject);
             return false;
         }
+        // Fixture setup is not a hand drag: the prefab coil starts midway
+        // between sockets, not inside either authored trigger. The standard
+        // TryInsert path requires an actual trigger overlap even when the
+        // Rigidbody origin is placed exactly at the authored snap pivot.
+        // Use the SAME path as save restoration instead. Verify mains/length
+        // explicitly, so an invalid baseline can never count as a test pass.
+        if (a.kind == PortKind.Outlet && !a.Powered)
+        {
+            Write("INSERT FAILED lane=" + lane + " outlet=" + a.owner.name +
+                " reason=outlet not wall-mounted/powered");
+            if (cable != null) Destroy(cable.gameObject);
+            return false;
+        }
         if (cable != null)
         {
-            // Use the same real proximity check as player insertion; the
-            // just-spawned delivery coil is not located at either socket.
             cable.End(0).GetComponent<Rigidbody>().position = a.Snap.position;
             cable.End(1).GetComponent<Rigidbody>().position = b.Snap.position;
             Physics.SyncTransforms();
         }
-        if (cable == null || !cable.End(0).TryInsert(a) || !cable.End(1).TryInsert(b))
+        if (cable == null || !cable.End(0).TryInsert(a, true) || !cable.End(1).TryInsert(b, true))
         {
             Write("INSERT FAILED lane=" + lane + " cable=" + (cable != null ? cable.name : "null") +
                 " A=" + a.name + " owner=" + a.owner.name + " inserted=" +
@@ -466,6 +479,18 @@ public sealed class CableStressMode : MonoBehaviour
             wall.name = "Cable stress wall " + lane + " (scene-only)";
             wall.transform.position = Origin + new Vector3(Pitch * lane, 1.2f, 3.12f);
             wall.transform.localScale = new Vector3(2.5f, 2.4f, .2f);
+        }
+        // This isolated platform is far from the room's authored lights. Two
+        // shadowless test-only lights make the black cases/cables inspectable.
+        for (int i = 0; i < 2; i++)
+        {
+            var lamp = new GameObject("Cable stress light " + i + " (scene-only)");
+            lamp.transform.position = Origin + new Vector3(6f + i * 16f, 8f, -1f);
+            var light = lamp.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 26f;
+            light.intensity = 2f;
+            light.shadows = LightShadows.None;
         }
         Physics.SyncTransforms();
     }
