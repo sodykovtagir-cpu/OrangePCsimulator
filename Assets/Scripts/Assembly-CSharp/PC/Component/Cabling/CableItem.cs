@@ -622,8 +622,12 @@ namespace PC.Component.Cabling
         public float PrepareStressTestSpan(Vector3 bend)
         {
             if (plugs == null || bodies == null || bodies.Length == 0) return 0f;
-            Vector3 a = plugs[0].transform.position;
-            Vector3 b = plugs[1].transform.position;
+            // TryInsert snaps Rigidbody.position. Its interpolated Transform
+            // can still show the prefab coil in this same frame; an arc built
+            // from that stale pose crosses the fixture wall even though both
+            // physical endpoints are correctly placed at their ports.
+            Vector3 a = plugs[0].GetComponent<Rigidbody>().position;
+            Vector3 b = plugs[1].GetComponent<Rigidbody>().position;
             float span = Vector3.Distance(a, b);
             if (span < .001f) return 0f;
             float targetLength = Mathf.Max(span, length * .82f);
