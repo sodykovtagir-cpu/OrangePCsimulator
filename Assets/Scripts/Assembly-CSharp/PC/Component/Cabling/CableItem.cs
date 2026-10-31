@@ -426,6 +426,64 @@ namespace PC.Component.Cabling
                 poses.Add(new JArray(p.x, p.y, p.z, q.x, q.y, q.z, q.w));
             }
             data["cableBodies"] = poses;
+            // The physics chain is NOT defined by body poses alone. Awake
+            // constructs joints with anchors in an initial delivery coil; if
+            // those anchors survive after restoring a different rope pose,
+            // PhysX projects the whole saved chain towards the old coil in a
+            // single step and breaks GPU/PSU slot joints. Save local anchors
+            // with each section and the final joint on Plug B.
+            var anchors = new JArray();
+            if (bodies != null) foreach (var rb in bodies)
+                anchors.Add(SaveJoint(rb.GetComponent<CharacterJoint>()));
+            if (plugs != null && plugs[1] != null)
+                anchors.Add(SaveJoint(plugs[1].GetComponent<CharacterJoint>()));
+            data["cableJoints"] = anchors;
+        }
+
+        private static JArray SaveJoint(CharacterJoint joint)
+        {
+            var a = joint != null ? joint.anchor : Vector3.zero;
+            var b = joint != null ? joint.connectedAnchor : Vector3.zero;
+            return new JArray(a.x, a.y, a.z, b.x, b.y, b.z);
+        }
+
+        private static bool RestoreJoint(CharacterJoint joint, JToken token)
+        {
+            var values = token as JArray;
+            if (joint == null || values == null || values.Count != 6) return false;
+            joint.anchor = new Vector3(values[0].Value<float>(), values[1].Value<float>(),
+                values[2].Value<float>());
+            joint.connectedAnchor = new Vector3(values[3].Value<float>(),
+                values[4].Value<float>(), values[5].Value<float>());
+            return true;
+        }
+
+        private void ReanchorChainFromLoadedPose()
+        {
+            if (bodies == null || plugs == null) return;
+            Rigidbody previous = plugs[0].GetComponent<Rigidbody>();
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                var current = bodies[i];
+                var joint = current.GetComponent<CharacterJoint>();
+                if (joint == null) { previous = current; continue; }
+                // Adjacent saved segment centres straddle their old boundary.
+                // This approximates older saves which had poses but no anchors;
+                // after the next save the exact local anchors are preserved.
+                Vector3 boundary = i == 0 ? previous.position :
+                    (previous.position + current.position) * .5f;
+                joint.anchor = current.transform.InverseTransformPoint(boundary);
+                joint.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+                previous = current;
+            }
+            var last = plugs[1].GetComponent<CharacterJoint>();
+            if (last != null)
+            {
+                var end = plugs[1].GetComponent<Rigidbody>();
+                Vector3 boundary = end.position;
+                last.anchor = end.transform.InverseTransformPoint(boundary);
+                last.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+            }
         }
 
         public override void FromData(JObject data)
@@ -490,33 +548,100 @@ namespace PC.Component.Cabling
                 }
             }
             Physics.SyncTransforms();
+            var savedJoints = data["cableJoints"] as JArray;
+            bool exact = savedJoints != null && savedJoints.Count == bodies.Length + 1;
+            if (exact)
+            {
+                for (int i = 0; i < bodies.Length; i++)
+                    if (!RestoreJoint(bodies[i].GetComponent<CharacterJoint>(), savedJoints[i]))
+                        exact = false;
+                if (!RestoreJoint(plugs[1].GetComponent<CharacterJoint>(),
+                    savedJoints[bodies.Length])) exact = false;
+            }
+            if (!exact && (poses != null || restorePositions))
+                ReanchorChainFromLoadedPose();
             UpdateJacket();
         }
 
 #if UNITY_EDITOR
-        // F8-only setup: the prefab's delivery coil is centred at its root,
-        // whereas both ends are immediately plugged into devices elsewhere.
-        // Relayout the initial chain and its joint anchors BEFORE the first
-        // physics step; otherwise setup itself manufactures an overstretch.
-        public void PrepareStressTestSpan()
+        private static Vector3 StressArcPoint(Vector3 a, Vector3 b, float height, float t)
         {
-            if (plugs == null || bodies == null || bodies.Length == 0) return;
+            return Vector3.Lerp(a, b, t) + Vector3.up *
+                (height * Mathf.Sin(Mathf.PI * t));
+        }
+
+        private static float StressArcLength(Vector3 a, Vector3 b, float height)
+        {
+            Vector3 previous = a;
+            float total = 0f;
+            for (int i = 1; i <= 64; i++)
+            {
+                Vector3 point = StressArcPoint(a, b, height, i / 64f);
+                total += Vector3.Distance(previous, point);
+                previous = point;
+            }
+            return total;
+        }
+
+        private static Vector3 StressArcSample(Vector3[] points, float[] distances, float distance)
+        {
+            int lo = 0, hi = distances.Length - 1;
+            distance = Mathf.Clamp(distance, 0f, distances[hi]);
+            while (lo + 1 < hi)
+            {
+                int middle = (lo + hi) / 2;
+                if (distances[middle] < distance) lo = middle;
+                else hi = middle;
+            }
+            float width = distances[hi] - distances[lo];
+            return Vector3.Lerp(points[lo], points[hi],
+                width > .00001f ? (distance - distances[lo]) / width : 0f);
+        }
+
+        // Editor F8 ONLY: a prefab delivery coil starts at the invisible root.
+        // Collapsing its 22 capsules into a one-metre line (the old fixture)
+        // made ten overlapping capsules hit the PSU/case in one physics step.
+        // Space centres along ~82% of the REAL cable length, arching into free
+        // space; preserve normal radius, segment masses and pin break force.
+        // Nothing about gameplay cable placement or collision rules changes.
+        public float PrepareStressTestSpan()
+        {
+            if (plugs == null || bodies == null || bodies.Length == 0) return 0f;
             Vector3 a = plugs[0].transform.position;
             Vector3 b = plugs[1].transform.position;
-            Vector3 axis = b - a;
-            if (axis.sqrMagnitude < .0001f) return;
+            float span = Vector3.Distance(a, b);
+            if (span < .001f) return 0f;
+            float targetLength = Mathf.Max(span, length * .82f);
+            float low = 0f, high = length * .52f;
+            for (int i = 0; i < 16; i++)
+            {
+                float middle = (low + high) * .5f;
+                if (StressArcLength(a, b, middle) < targetLength) low = middle;
+                else high = middle;
+            }
+            var points = new Vector3[129];
+            var distances = new float[129];
+            points[0] = a;
+            for (int i = 1; i < points.Length; i++)
+            {
+                points[i] = StressArcPoint(a, b, high, i / 128f);
+                distances[i] = distances[i - 1] + Vector3.Distance(points[i - 1], points[i]);
+            }
+            float total = distances[128];
             Rigidbody previous = plugs[0].GetComponent<Rigidbody>();
             for (int i = 0; i < bodies.Length; i++)
             {
                 var rb = bodies[i];
-                rb.position = Vector3.Lerp(a, b, (i + .5f) / bodies.Length) +
-                    Vector3.up * (.25f * Mathf.Sin(Mathf.PI * (i + .5f) / bodies.Length));
-                rb.rotation = Quaternion.LookRotation(axis);
+                float centre = total * (i + .5f) / bodies.Length;
+                rb.position = StressArcSample(points, distances, centre);
+                var before = StressArcSample(points, distances, Mathf.Max(0f, centre - .07f));
+                var after = StressArcSample(points, distances, Mathf.Min(total, centre + .07f));
+                rb.rotation = Quaternion.LookRotation(after - before);
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 var link = rb.GetComponent<CharacterJoint>();
-                Vector3 boundary = Vector3.Lerp(a, b, i / (float)bodies.Length) +
-                    Vector3.up * (.25f * Mathf.Sin(Mathf.PI * i / bodies.Length));
+                Vector3 boundary = StressArcSample(points, distances,
+                    total * i / bodies.Length);
                 link.anchor = rb.transform.InverseTransformPoint(boundary);
                 link.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
                 previous = rb;
@@ -525,6 +650,43 @@ namespace PC.Component.Cabling
             last.anchor = Vector3.zero;
             last.connectedAnchor = previous.transform.InverseTransformPoint(b);
             Physics.SyncTransforms();
+            UpdateJacket();
+            return total;
+        }
+
+        // Diagnostic is TEST-ONLY and called once before enabling a new rope.
+        // Exclude this rope and the exact plug/capsule collision exemptions;
+        // never silently start a fixture with a capsule inside case/floor.
+        public string StressInitialOverlaps()
+        {
+            if (bodies == null) return "no cable sections";
+            int count = 0;
+            var details = new System.Text.StringBuilder();
+            foreach (var body in bodies)
+            {
+                var own = body.GetComponent<Collider>();
+                if (own == null) continue;
+                foreach (var other in Physics.OverlapBox(own.bounds.center,
+                    own.bounds.extents, Quaternion.identity, ~0,
+                    QueryTriggerInteraction.Ignore))
+                {
+                    if (other == null || other == own || other.isTrigger ||
+                        other.GetComponentInParent<CableItem>() == this ||
+                        Physics.GetIgnoreCollision(own, other)) continue;
+                    Vector3 direction;
+                    float depth;
+                    if (!Physics.ComputePenetration(own, own.transform.position,
+                        own.transform.rotation, other, other.transform.position,
+                        other.transform.rotation, out direction, out depth) ||
+                        depth < .02f) continue;
+                    count++;
+                    if (count <= 5)
+                        details.Append(" [").Append(body.name).Append(" vs ")
+                            .Append(other.name).Append(" depth=")
+                            .Append(depth.ToString("0.000")).Append("m]");
+                }
+            }
+            return count == 0 ? string.Empty : count + " overlaps:" + details;
         }
 #endif
 

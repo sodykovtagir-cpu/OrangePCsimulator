@@ -26,6 +26,13 @@ assert 'finally' in s and 'all five reloads completed' in s
 assert 'ReadyBuildSpawner' in s and 'OwnPorts' in s and 'CablePower.BoardHasPower' in s
 assert 'outlet.IsMounted' in s and 'CablePower.Energized' in s
 assert 'PrepareStressTestSpan();' in s and '#if UNITY_EDITOR' in rope
+assert 'StressArcLength(a, b, middle)' in rope and 'length * .82f' in rope
+assert 'StressArcSample(points, distances, centre)' in rope
+assert 'Physics.ComputePenetration(' in rope and 'Physics.GetIgnoreCollision(own, other)' in rope
+assert 'data["cableJoints"] = anchors;' in rope and 'var savedJoints = data["cableJoints"] as JArray;' in rope
+assert 'RestoreJoint(bodies[i].GetComponent<CharacterJoint>(), savedJoints[i])' in rope
+assert 'ReanchorChainFromLoadedPose();' in rope
+assert 'StressInitialOverlaps();' in s and 'ROPE GEOMETRY INVALID' in s
 assert 'port.owner != item' in rope and 'owner not found' in rope and 'port missing on owner' in rope
 assert 'body.detectCollisions = false;' in restore and 'if (pair.Item2 == null || pair.Item2 is PC.Component.Cabling.CableItem) continue;' in restore
 assert 'yield return new WaitForFixedUpdate();' in restore

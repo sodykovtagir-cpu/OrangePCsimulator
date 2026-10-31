@@ -429,7 +429,22 @@ public sealed class CableStressMode : MonoBehaviour
                 (cable != null ? cable.Length.ToString("0.000") : "missing") + "m");
             return false;
         }
-        cable.PrepareStressTestSpan();
+        float routeLength = cable.PrepareStressTestSpan();
+        string overlaps = cable.StressInitialOverlaps();
+        if (!string.IsNullOrEmpty(overlaps))
+        {
+            Write("ROPE GEOMETRY INVALID lane=" + lane + " cable=" + cable.spawnId +
+                " span=" + span.ToString("0.000") + "m route=" +
+                routeLength.ToString("0.000") + "m " + overlaps);
+            cable.End(0).Unplug();
+            cable.End(1).Unplug();
+            Destroy(cable.gameObject);
+            return false;
+        }
+        Write("ROPE READY lane=" + lane + " cable=" + cable.spawnId +
+            " A=" + a.owner.name + "/" + a.name + " B=" + b.owner.name + "/" + b.name +
+            " span=" + span.ToString("0.000") + "m route=" + routeLength.ToString("0.000") +
+            "m length=" + cable.Length.ToString("0.000") + "m");
         // Item.Start normally assigns these IDs; be explicit if the fixture
         // was created within the same frame as its first connection.
         if (a.owner.Id == 0) a.owner.Id = Main.Instance.GetNewId(a.owner);
