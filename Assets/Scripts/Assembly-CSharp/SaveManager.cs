@@ -82,6 +82,8 @@ public class SaveManager : MonoBehaviour
             game.ac = ac.Power;
         }
 
+        if (ElectricityGrid.Instance != null) ElectricityGrid.Instance.SaveState(game);
+
         game.icon = CaptureScreenshot();
 
         var content = new ContentData();
@@ -182,6 +184,9 @@ public class SaveManager : MonoBehaviour
             acTrigger.SetActive(false);
             acSwitch.enabled = false;
         }
+
+        if (ElectricityGrid.Instance != null)
+            ElectricityGrid.Instance.Initialize(Loader.GameData, lamp);
 
 
         int failCount = 0;

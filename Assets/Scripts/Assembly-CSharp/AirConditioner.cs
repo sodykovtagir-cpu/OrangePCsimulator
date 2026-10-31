@@ -49,6 +49,8 @@ public class AirConditioner : MonoBehaviour
         get => isOn;
         set
         {
+            var grid = ElectricityGrid.Instance;
+            if (grid != null) value = grid.FilterACRequest(value);
             isOn = value;
             var m = mat;
             var s = smoke;
@@ -83,8 +85,12 @@ public class AirConditioner : MonoBehaviour
 
     public void Switch()
     {
-        Power = !Power;
-        if (source != null) source.PlayOneShot(Power ? turnOn : turnOff);
+        var grid = ElectricityGrid.Instance;
+        if (grid != null && !grid.IsPowered)
+            grid.SetACRequested(!grid.DesiredAC);
+        else
+            Power = !Power;
+        if (source != null) source.PlayOneShot((grid != null ? grid.DesiredAC : Power) ? turnOn : turnOff);
     }
 
     private void UpdateSnow()

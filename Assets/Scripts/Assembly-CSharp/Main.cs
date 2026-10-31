@@ -37,6 +37,11 @@ public class Main : MonoBehaviour
 	private bool showOthers;
 
 	private bool paused;
+	public bool IsPaused => paused;
+
+	[Header("Electricity meter (watts)")]
+	[SerializeField, Min(0f)] private float roomLightWatts = 100f;
+	[SerializeField, Min(0f)] private float airConditionerWatts = 1000f;
 
 	[SerializeField]
 	[Header("Money")]
@@ -98,6 +103,9 @@ public class Main : MonoBehaviour
 	private void Awake()
 	{
 		Instance = this;
+		var grid = GetComponent<ElectricityGrid>();
+		if (grid == null) grid = gameObject.AddComponent<ElectricityGrid>();
+		grid.ConfigureLoads(roomLightWatts, airConditionerWatts);
 	}
 
 	private void Start()

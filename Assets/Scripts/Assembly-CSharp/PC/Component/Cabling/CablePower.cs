@@ -6,14 +6,14 @@ namespace PC.Component.Cabling
     {
         public static bool Energized(CablePlug input)
         {
-            if (input == null || input.Cable == null || input.Cable.Kind != CableKind.Power) return false;
+            if (!ElectricityGrid.PowerAvailable || input == null || input.Cable == null || input.Cable.Kind != CableKind.Power) return false;
             var source = input.Cable.End(1 - input.End);
             return source != null && source.Connected != null && source.Connected.Powered;
         }
 
         public static bool BoardHasPower(Motherboard board)
         {
-            if (board == null) return false;
+            if (board == null || !ElectricityGrid.PowerAvailable) return false;
             // Legacy branch uses the original PC assembly/power rules, without
             // wall outlets or separate power cords.
             if (!CableMode.Enabled) return true;

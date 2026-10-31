@@ -97,7 +97,7 @@ assert 'other.Connected == null' in rope
 assert 'a.Connected == null || b.Connected == null ||' in rope
 assert 'a.IsHeld || b.IsHeld || heldSegment != null' in rope
 assert 'if (sectionHeld && distance > restLength + .08f' not in rope
-assert 'overstretchSteps = 0;\n                return false;' in rope
+assert 'overstretchSteps = 0;\n                loadedEnd = null;\n                return false;' in rope
 assert 'float spread = Mathf.Min(.5f, length * .15f);' in rope
 assert 'count >= 24 && length > 12f ? 3' in rope
 assert 'path > length + Mathf.Max(.06f, length * .02f)' in rope

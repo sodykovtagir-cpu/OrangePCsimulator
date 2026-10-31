@@ -77,8 +77,8 @@ namespace PC.Component.Cabling
             game.coin = state.coin;
             game.playtime = state.playtime;
             game.temperature = state.temperature;
-            game.ac = state.ac;
-            game.light = state.light;
+            game.light = game.electricityVersion == 0 ? state.light : game.electricityLightRequested;
+            game.ac = game.electricityVersion == 0 ? state.ac : game.electricityACRequested;
             game.icon = state.icon;
         }
 

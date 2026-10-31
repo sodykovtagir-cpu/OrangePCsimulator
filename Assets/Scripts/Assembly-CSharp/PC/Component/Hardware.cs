@@ -76,6 +76,15 @@ namespace PC.Component
 
 		public event Action OnDamaged;
 
+		// Recompute actual power without changing switch intention or slot counts.
+		public void RefreshGridPower()
+		{
+			bool next = (mainPower || powerCount != 0) && !Damaged && ElectricityGrid.PowerAvailable;
+			if (power == next) return;
+			PowerChanged?.Invoke(next);
+			Power = next;
+		}
+
 		public void Switch(bool on, bool counting = false)
 		{
 			if (counting)
@@ -90,12 +99,13 @@ namespace PC.Component
 				mainPower = on;
 			}
 
-			bool flag = (!mainPower && powerCount == 0) ? false : !Damaged;
+			bool flag = (!mainPower && powerCount == 0) ? false : (!Damaged && ElectricityGrid.PowerAvailable);
 
 			if (power != flag)
 			{
 				PowerChanged?.Invoke(flag);
 				power = flag;
+				ElectricityGrid.Instance?.NotifyLoadChanged();
 			}
 		}
 

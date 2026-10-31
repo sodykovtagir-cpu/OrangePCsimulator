@@ -8,6 +8,13 @@ public class GameData
 	public string roomName;
 
 	public int coin;
+    // Version zero is a pre-meter save: default switch ON and restore light/AC intent.
+    public int electricityVersion;
+    public bool electricitySwitchOn;
+    public bool electricityLightRequested;
+    public bool electricityACRequested;
+    public double electricityUnpaid;
+    public double electricityKWh;
 
 	public int room;
 
