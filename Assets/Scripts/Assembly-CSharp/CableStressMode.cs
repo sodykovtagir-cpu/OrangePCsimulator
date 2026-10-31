@@ -197,11 +197,16 @@ public sealed class CableStressMode : MonoBehaviour
                 // towards the rear; keep both hardware and monitor above the
                 // floor, apart from the wall and from each other.
                 builds[lane] = Instantiate(buildPrefab, basePos + new Vector3(0f, 2.1f, 0f), Quaternion.identity);
+                // Turn the monitor's *rear* AC/HDMI ports toward the case;
+                // otherwise both cables have to pass through its solid screen.
                 monitors[lane] = Instantiate(monitorPrefab, basePos + new Vector3(0f, 1.7f, -4.4f),
-                    Quaternion.identity).GetComponent<PC.Component.Display>();
-                // -Y of the authored outlet faces the test wall (+Z).
-                outlets[lane] = Instantiate(outletPrefab, basePos + new Vector3(0f, 1.2f, 2.8f),
-                    Quaternion.FromToRotation(Vector3.down, Vector3.forward)).GetComponent<OutletStrip>();
+                    Quaternion.Euler(0f, 180f, 0f)).GetComponent<PC.Component.Display>();
+                // Put the wall beside the *front* of the case, not behind it:
+                // cables no longer run straight through the case's solid rear
+                // panel on their way to the PSU and monitor. The authored -Y
+                // side of the outlet still faces the wall (here: +X).
+                outlets[lane] = Instantiate(outletPrefab, basePos + new Vector3(1.2f, 1.2f, -2.7f),
+                    Quaternion.FromToRotation(Vector3.down, Vector3.right)).GetComponent<OutletStrip>();
                 if (monitors[lane] == null || outlets[lane] == null)
                 { Fail("Prefab has no Display/OutletStrip at lane " + lane); yield break; }
                 outlets[lane].GetComponent<Hook>().Hooked = true;
@@ -217,7 +222,10 @@ public sealed class CableStressMode : MonoBehaviour
             }
             foreach (var build in builds) if (build != null)
             { Fail("ReadyBuildSpawner did not finish within 90 seconds"); yield break; }
-            yield return null;
+            // The case/monitor are initially above the platform. Let their
+            // joints and contacts settle WITHOUT cable forces, then reject
+            // any damaged/disassembled assembly before wiring the fixture.
+            for (int step = 0; step < 100; step++) yield return new WaitForFixedUpdate();
             Physics.SyncTransforms();
 
             var gpus = FindObjectsOfType<GPU>();
@@ -232,8 +240,16 @@ public sealed class CableStressMode : MonoBehaviour
                 Motherboard board = Nearest(boards, lane);
                 if (gpu == null || psu == null || board == null ||
                     !Slotted(gpu) || !Slotted(psu) || !Slotted(board) ||
+                    gpu.Damaged || psu.Damaged || monitors[lane].Damaged ||
                     !outlets[lane].IsMounted)
-                { Fail("Baseline assembly/mount invalid at lane " + lane); yield break; }
+                {
+                    Fail("Uncabled assembly failed to settle at lane " + lane +
+                        " gpuSlot=" + Slotted(gpu) + " psuSlot=" + Slotted(psu) +
+                        " boardSlot=" + Slotted(board) + " gpuDamaged=" + gpu?.Damaged +
+                        " psuDamaged=" + psu?.Damaged + " monitorDamaged=" +
+                        monitors[lane].Damaged + " outletMounted=" + outlets[lane].IsMounted);
+                    yield break;
+                }
                 var outletPorts = OwnPorts(outlets[lane].GetComponent<Item>(), PortKind.Outlet);
                 var gpuPort = Port(gpu, PortKind.GpuVideo);
                 var psuPort = Port(psu, PortKind.PcPower);
@@ -242,10 +258,25 @@ public sealed class CableStressMode : MonoBehaviour
                 if (outletPorts.Count < 2 || gpuPort == null || psuPort == null ||
                     monitorPower == null || monitorVideo == null)
                 { Fail("Missing authored ports at lane " + lane); yield break; }
-                if (!Attach(powerPrefab, outletPorts[0], psuPort, lane) ||
-                    !Attach(powerPrefab, outletPorts[1], monitorPower, lane) ||
-                    !Attach(hdmiPrefab, gpuPort, monitorVideo, lane))
-                { Fail("Initial cable insertion failed at lane " + lane); yield break; }
+                // Never activate 24 fresh rope chains in one solver step.
+                // Settle one real cable at a time; if even a single strand
+                // tears the slotted hardware away, report the route before
+                // building a misleading save or another seven PCs.
+                if (!Attach(powerPrefab, outletPorts[0], psuPort, lane))
+                { Fail("PSU cable insertion failed at lane " + lane); yield break; }
+                yield return SettleFixtureCable(lane, "PSU");
+                if (failed || !Slotted(gpu) || !Slotted(psu) || !Slotted(board))
+                { Fail("PSU cable broke a slot at lane " + lane); yield break; }
+                if (!Attach(powerPrefab, outletPorts[1], monitorPower, lane))
+                { Fail("Monitor power insertion failed at lane " + lane); yield break; }
+                yield return SettleFixtureCable(lane, "monitor power");
+                if (failed || !Slotted(gpu) || !Slotted(psu) || !Slotted(board))
+                { Fail("Monitor cable broke a slot at lane " + lane); yield break; }
+                if (!Attach(hdmiPrefab, gpuPort, monitorVideo, lane))
+                { Fail("GPU video insertion failed at lane " + lane); yield break; }
+                yield return SettleFixtureCable(lane, "GPU video");
+                if (failed || !Slotted(gpu) || !Slotted(psu) || !Slotted(board))
+                { Fail("GPU cable broke a slot at lane " + lane); yield break; }
                 healthIds.Add(gpu.Id);
                 healthIds.Add(psu.Id);
                 healthIds.Add(monitors[lane].Id);
@@ -344,6 +375,15 @@ public sealed class CableStressMode : MonoBehaviour
     {
         var ports = OwnPorts(owner, kind);
         return ports.Count > 0 ? ports[0] : null;
+    }
+
+    private IEnumerator SettleFixtureCable(int lane, string route)
+    {
+        for (int step = 0; step < 35; step++)
+        {
+            yield return new WaitForFixedUpdate();
+            if (!Observe("fixture lane " + lane + " " + route + " step " + step)) yield break;
+        }
     }
 
     private bool Attach(GameObject prefab, CablePort a, CablePort b, int lane)
@@ -477,8 +517,10 @@ public sealed class CableStressMode : MonoBehaviour
         {
             var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wall.name = "Cable stress wall " + lane + " (scene-only)";
-            wall.transform.position = Origin + new Vector3(Pitch * lane, 1.2f, 3.12f);
-            wall.transform.localScale = new Vector3(2.5f, 2.4f, .2f);
+            // Wall normal points toward -X. The outlet's -Y back points +X;
+            // its ray starts .12 m toward the wall and hits this face in .10 m.
+            wall.transform.position = Origin + new Vector3(Pitch * lane + 1.52f, 1.2f, -2.7f);
+            wall.transform.localScale = new Vector3(.2f, 2.4f, 1.8f);
         }
         // This isolated platform is far from the room's authored lights. Two
         // shadowless test-only lights make the black cases/cables inspectable.

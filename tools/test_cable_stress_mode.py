@@ -41,6 +41,13 @@ assert 'a.kind == PortKind.Outlet && !a.Powered' in s
 assert 'TryInsert(a, true)' in s and 'TryInsert(b, true)' in s
 assert s.index('CablePower.RefreshAll();') < s.index('if (!Observe("baseline, before settling"))')
 assert 'Cable stress light ' in s and 'light.shadows = LightShadows.None' in s
+assert 'Vector3.right)).GetComponent<OutletStrip>()' in s
+assert 'Quaternion.Euler(0f, 180f, 0f)).GetComponent<PC.Component.Display>()' in s
+assert 'new Vector3(Pitch * lane + 1.52f, 1.2f, -2.7f)' in s
+assert 'for (int step = 0; step < 100; step++) yield return new WaitForFixedUpdate();' in s
+assert 'yield return SettleFixtureCable(lane, "PSU")' in s
+assert 'yield return SettleFixtureCable(lane, "monitor power")' in s
+assert 'yield return SettleFixtureCable(lane, "GPU video")' in s
 build = (root/'Assets/Resources/components/ready/ReadyPC_Home_Black.prefab').read_text()
 names = {}
 for meta in (root/'Assets/Resources/components').rglob('*.prefab.meta'):
