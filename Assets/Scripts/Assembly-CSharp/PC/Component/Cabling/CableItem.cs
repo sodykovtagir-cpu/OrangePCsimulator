@@ -313,6 +313,13 @@ namespace PC.Component.Cabling
                  (plugs[1].Connected != null && CanPull(plugs[1].Connected.GetComponentInParent<Rigidbody>(), 0))))
                 return false;
 
+#if UNITY_EDITOR
+            if (CableStressMode.Recording)
+                Debug.LogWarning($"Cable stress: OVERSTRETCH cable={spawnId} id={Id} end={release.End} " +
+                    $"port={release.Connected?.name} owner={release.Connected?.owner?.Id} " +
+                    $"span={span:0.000} path={path:0.000} length={length:0.000} " +
+                    $"hardLimit={hardLimit} movingApart={movingApart}");
+#endif
             release.Unplug(); // break the device connection before the chain can stretch
             overstretchSteps = 0;
             strainCooldownUntil = Time.time + .35f; // let the loose cable settle
@@ -486,6 +493,41 @@ namespace PC.Component.Cabling
             UpdateJacket();
         }
 
+#if UNITY_EDITOR
+        // F8-only setup: the prefab's delivery coil is centred at its root,
+        // whereas both ends are immediately plugged into devices elsewhere.
+        // Relayout the initial chain and its joint anchors BEFORE the first
+        // physics step; otherwise setup itself manufactures an overstretch.
+        public void PrepareStressTestSpan()
+        {
+            if (plugs == null || bodies == null || bodies.Length == 0) return;
+            Vector3 a = plugs[0].transform.position;
+            Vector3 b = plugs[1].transform.position;
+            Vector3 axis = b - a;
+            if (axis.sqrMagnitude < .0001f) return;
+            Rigidbody previous = plugs[0].GetComponent<Rigidbody>();
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                var rb = bodies[i];
+                rb.position = Vector3.Lerp(a, b, (i + .5f) / bodies.Length) +
+                    Vector3.up * (.25f * Mathf.Sin(Mathf.PI * (i + .5f) / bodies.Length));
+                rb.rotation = Quaternion.LookRotation(axis);
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                var link = rb.GetComponent<CharacterJoint>();
+                Vector3 boundary = Vector3.Lerp(a, b, i / (float)bodies.Length) +
+                    Vector3.up * (.25f * Mathf.Sin(Mathf.PI * i / bodies.Length));
+                link.anchor = rb.transform.InverseTransformPoint(boundary);
+                link.connectedAnchor = previous.transform.InverseTransformPoint(boundary);
+                previous = rb;
+            }
+            var last = plugs[1].GetComponent<CharacterJoint>();
+            last.anchor = Vector3.zero;
+            last.connectedAnchor = previous.transform.InverseTransformPoint(b);
+            Physics.SyncTransforms();
+        }
+#endif
+
         public void FinishRestore()
         {
             if (!restoringPhysics) return;
@@ -547,10 +589,34 @@ namespace PC.Component.Cabling
             {
                 if (restoredOwners[i] == 0 || string.IsNullOrEmpty(restoredPorts[i])) continue;
                 var item = main.GetItemById(restoredOwners[i]);
-                if (item == null) continue;
-                var ports = item.GetComponentsInChildren<CablePort>(true);
-                foreach (var port in ports)
-                    if (port.name == restoredPorts[i] && plugs[i].TryInsert(port, true)) break;
+                if (item == null)
+                {
+                    Debug.LogWarning($"Cable restore: {name} end={i} ownerId={restoredOwners[i]} " +
+                        $"port={restoredPorts[i]}: owner not found");
+                    continue;
+                }
+                bool found = false, connected = false;
+                foreach (var port in item.GetComponentsInChildren<CablePort>(true))
+                {
+                    // Installed GPU and PSU ports may live below a case/board.
+                    // Never attach to a same-named socket belonging to a
+                    // different nested Item.
+                    if (port.owner != item || port.name != restoredPorts[i]) continue;
+                    found = true;
+                    if (plugs[i].TryInsert(port, true)) { connected = true; break; }
+                    var other = plugs[1 - i].Connected;
+                    float span = other == null ? 0f :
+                        Vector3.Distance(other.Snap.position, port.Snap.position);
+                    Debug.LogWarning($"Cable restore: {name} id={Id} end={i} " +
+                        $"owner={item.name}({item.Id}) port={port.name} kind={port.kind} " +
+                        $"occupied={(port.plug != null ? port.plug.Cable?.Id.ToString() : "no")} " +
+                        $"span={span:0.000}m length={Length:0.000}m " +
+                        $"reason={(span > Length ? "too far" : "incompatible/busy/disabled")}");
+                }
+                if (!found || !connected)
+                    Debug.LogWarning($"Cable restore: {name} id={Id} end={i} " +
+                        $"ownerId={restoredOwners[i]} port={restoredPorts[i]} " +
+                        $"result={(found ? "insertion failed" : "port missing on owner")}");
             }
         }
     }

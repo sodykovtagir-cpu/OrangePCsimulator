@@ -1,0 +1,427 @@
+#if UNITY_EDITOR
+// Editor-only, bounded integration test. Nothing is polled or allocated in a player build.
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using Newtonsoft.Json;
+using PC;
+using PC.Component;
+using PC.Component.Cabling;
+using SaveManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public sealed class CableStressMode : MonoBehaviour
+{
+    private const int Lanes = 8;
+    private const int Reloads = 5;
+    private const float Pitch = 4f;
+    private static readonly Vector3 Origin = new Vector3(1000f, 15f, 1000f);
+    private readonly List<Expectation> expected = new List<Expectation>();
+    private readonly Dictionary<int, int> slotOwners = new Dictionary<int, int>();
+    private readonly List<int> healthIds = new List<int>();
+    private readonly Dictionary<int, int> monitorPowerOwners = new Dictionary<int, int>();
+    private readonly List<int> boardIds = new List<int>();
+    public static bool Recording { get; private set; }
+    private bool busy;
+    private bool geometryOnLoad;
+    private bool failed;
+    private bool completed;
+    private int cycle;
+    private int roomScene;
+    private string logPath;
+    private string savePath;
+
+    private sealed class Expectation
+    {
+        public int cableId, end, ownerId, lane;
+        public string cableName, portName;
+        public PortKind kind;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Install()
+    {
+        if (FindObjectOfType<CableStressMode>() == null)
+        {
+            var obj = new GameObject("Cable stress test (Editor only, F8)");
+            DontDestroyOnLoad(obj);
+            obj.AddComponent<CableStressMode>();
+        }
+    }
+
+    private void OnEnable() { SceneManager.sceneLoaded += SceneLoaded; }
+    private void OnDisable() { SceneManager.sceneLoaded -= SceneLoaded; }
+
+    private void Update()
+    {
+        if (busy || !Input.GetKeyDown(KeyCode.F8)) return;
+        if (SaveManager.Instance == null || SaveManager.Loader == null ||
+            Player.Instance == null || Main.Instance == null || SaveManager.RestoringSave)
+        {
+            Debug.LogWarning("[CableStress] Press F8 only after entering a room and finishing load.");
+            return;
+        }
+        if (!CableMode.Enabled)
+        {
+            Debug.LogWarning("[CableStress] Enable 'Physical cables' in the main menu before loading the room.");
+            return;
+        }
+        StartCoroutine(Run());
+    }
+
+    private void SceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // sceneLoaded precedes SaveManager.Start/Hook.FromData: the test wall
+        // must already exist when the saved outlets re-check their mount.
+        if (geometryOnLoad && scene.buildIndex == roomScene) CreateGeometry();
+    }
+
+    private void Write(string text)
+    {
+        string line = DateTime.Now.ToString("HH:mm:ss.fff") + " cycle=" + cycle + " " + text;
+        if (!string.IsNullOrEmpty(logPath))
+        {
+            try { File.AppendAllText(logPath, line + Environment.NewLine); }
+            catch (Exception ex) { Debug.LogError("[CableStress] Log write failed: " + ex); }
+        }
+        Debug.Log("[CableStress] " + line);
+    }
+
+    private void UnityLog(string message, string stack, LogType type)
+    {
+        if (message.StartsWith("[CableStress]", StringComparison.Ordinal)) return;
+        if (type == LogType.Error || type == LogType.Exception ||
+            message.Contains("Cable restore:") || message.Contains("Cable stress:") ||
+            message.Contains("Save: could not reconnect") || message.Contains("сборка неполная"))
+        {
+            try { File.AppendAllText(logPath, DateTime.Now.ToString("HH:mm:ss.fff") +
+                " cycle=" + cycle + " UNITY " + type + " " + message + "\n" + stack + "\n"); }
+            catch { /* the main test reports any file errors via Write */ }
+        }
+    }
+
+    private IEnumerator Run()
+    {
+        busy = true;
+        Recording = true;
+        failed = false;
+        completed = false;
+        cycle = 0;
+        roomScene = SceneManager.GetActiveScene().buildIndex;
+        string suffix = DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+        string folder = Path.Combine(Application.persistentDataPath, "CableStress");
+        Directory.CreateDirectory(folder);
+        savePath = Path.Combine(folder, "CableStress-" + suffix + ".opc");
+        logPath = Path.Combine(folder, "CableStress-" + suffix + ".log");
+        Application.logMessageReceived += UnityLog;
+        Write("START F8: 8 PCs (GTX1060 + PSU500W), 8 monitors, 8 three-socket wall outlets, 24 cables, 5 reloads. Save=" + savePath);
+        try
+        {
+            // Clone metadata; never pass the original GameData reference to a
+            // writable DataLoader, and NEVER save back into the user's .opc.
+            var original = SaveManager.Loader;
+            var data = JsonUtility.FromJson<GameData>(JsonUtility.ToJson(original.GameData));
+            Physics.gravity = new Vector3(0f, -9.81f, 0f);
+            data.roomName = "Cable stress (temporary)";
+            data.gravity = true;
+            data.cableModeVersion = 1;
+            data.cablesEnabled = true;
+            data.otherCableMode = null;
+            var seed = new ContentData { playerData = Player.Instance.SavePlayer(), itemData = new ItemData[0] };
+            SaveManager.Loader = new DataLoader(savePath, data) { Content = JsonConvert.SerializeObject(seed) };
+            geometryOnLoad = true;
+            // Enter a fresh copy of the room so its existing live items cannot
+            // accidentally be included in our test file. The original file is untouched.
+            yield return SceneManager.LoadSceneAsync(roomScene);
+            yield return null;
+            if (!Ready()) { Fail("Room failed to initialize"); yield break; }
+            foreach (var item in FindObjectsOfType<Item>())
+                if (item != null) Destroy(item.gameObject);
+            yield return null;
+            Player.Instance.LoadPlayer(new PlayerData { x = Origin.x - 4f, y = Origin.y + 1.5f,
+                z = Origin.z - 4f, ry = 30f, rx = 0f });
+
+            var buildPrefab = Resources.Load<GameObject>("components/ready/ReadyPC_Home_Black");
+            var monitorPrefab = Resources.Load<GameObject>("components/Monitor(Black)");
+            var outletPrefab = Resources.Load<GameObject>("components/Wall Outlet 3");
+            var powerPrefab = Resources.Load<GameObject>("components/Power Cable (5m)");
+            // Historical asset filename: Power Cable 5m is actually the 10 m SKU.
+            var monitorPowerPrefab = Resources.Load<GameObject>("components/Power Cable 5m");
+            var hdmiPrefab = Resources.Load<GameObject>("components/HDMI Cable (6m)");
+            if (buildPrefab == null || monitorPrefab == null || outletPrefab == null ||
+                powerPrefab == null || monitorPowerPrefab == null || hdmiPrefab == null)
+            { Fail("One of the test Resources prefabs is missing"); yield break; }
+
+            var builds = new GameObject[Lanes];
+            var monitors = new Display[Lanes];
+            var outlets = new OutletStrip[Lanes];
+            for (int lane = 0; lane < Lanes; lane++)
+            {
+                Vector3 basePos = Origin + Vector3.right * (Pitch * lane);
+                // Case_ATX has a bottom at local Y=-2 and extends 2.25 m
+                // towards the rear; keep both hardware and monitor above the
+                // floor, apart from the wall and from each other.
+                builds[lane] = Instantiate(buildPrefab, basePos + new Vector3(0f, 2.1f, 0f), Quaternion.identity);
+                monitors[lane] = Instantiate(monitorPrefab, basePos + new Vector3(0f, 1.7f, -4.4f),
+                    Quaternion.identity).GetComponent<Display>();
+                // -Y of the authored outlet faces the test wall (+Z).
+                outlets[lane] = Instantiate(outletPrefab, basePos + new Vector3(0f, 1.2f, 2.8f),
+                    Quaternion.FromToRotation(Vector3.down, Vector3.forward)).GetComponent<OutletStrip>();
+                if (monitors[lane] == null || outlets[lane] == null)
+                { Fail("Prefab has no Display/OutletStrip at lane " + lane); yield break; }
+                outlets[lane].GetComponent<Hook>().Hooked = true;
+            }
+            // ReadyBuildSpawner uses normal Slot.TryAttach asynchronously.
+            float deadline = Time.realtimeSinceStartup + 90f;
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                bool complete = true;
+                foreach (var build in builds) if (build != null) complete = false;
+                if (complete) break;
+                yield return null;
+            }
+            foreach (var build in builds) if (build != null)
+            { Fail("ReadyBuildSpawner did not finish within 90 seconds"); yield break; }
+            yield return null;
+            Physics.SyncTransforms();
+
+            var gpus = FindObjectsOfType<GPU>();
+            var supplies = FindObjectsOfType<Supply>();
+            var boards = FindObjectsOfType<Motherboard>();
+            if (gpus.Length != Lanes || supplies.Length != Lanes || boards.Length != Lanes)
+            { Fail("Incomplete assemblies: GPU=" + gpus.Length + " PSU=" + supplies.Length + " board=" + boards.Length); yield break; }
+            for (int lane = 0; lane < Lanes; lane++)
+            {
+                GPU gpu = Nearest(gpus, lane);
+                Supply psu = Nearest(supplies, lane);
+                Motherboard board = Nearest(boards, lane);
+                if (gpu == null || psu == null || board == null ||
+                    !Slotted(gpu) || !Slotted(psu) || !Slotted(board) ||
+                    !outlets[lane].IsMounted)
+                { Fail("Baseline assembly/mount invalid at lane " + lane); yield break; }
+                var outletPorts = OwnPorts(outlets[lane].GetComponent<Item>(), PortKind.Outlet);
+                var gpuPort = Port(gpu, PortKind.GpuVideo);
+                var psuPort = Port(psu, PortKind.PcPower);
+                var monitorPower = Port(monitors[lane], PortKind.MonitorPower);
+                var monitorVideo = Port(monitors[lane], PortKind.HdmiInput);
+                if (outletPorts.Count < 2 || gpuPort == null || psuPort == null ||
+                    monitorPower == null || monitorVideo == null)
+                { Fail("Missing authored ports at lane " + lane); yield break; }
+                if (!Attach(powerPrefab, outletPorts[0], psuPort, lane) ||
+                    !Attach(monitorPowerPrefab, outletPorts[1], monitorPower, lane) ||
+                    !Attach(hdmiPrefab, gpuPort, monitorVideo, lane))
+                { Fail("Initial cable insertion failed at lane " + lane); yield break; }
+                healthIds.Add(gpu.Id);
+                healthIds.Add(psu.Id);
+                healthIds.Add(monitors[lane].Id);
+                boardIds.Add(board.Id);
+                monitorPowerOwners[monitors[lane].Id] = outlets[lane].GetComponent<Item>().Id;
+                foreach (var hardware in new Item[] { gpu, psu, board })
+                {
+                    var host = hardware.GetComponent<Connector>().slot.GetComponentInParent<Item>();
+                    if (host == null || host.Id == 0 || hardware.Id == 0)
+                    { Fail("Missing slot host ID at lane " + lane); yield break; }
+                    slotOwners[hardware.Id] = host.Id;
+                }
+            }
+            // Only after all 48 ends and slot hosts exist: no half-wired save.
+            if (expected.Count != 48) { Fail("Expected 48 plugged ends, got " + expected.Count); yield break; }
+            if (!Observe("baseline, before settling")) yield break;
+            for (int step = 0; step < 70; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                if (!Observe("baseline settle step " + step)) yield break;
+            }
+            if (!SaveManager.Instance.SaveData() || !File.Exists(savePath))
+            { Fail("Test save could not be written"); yield break; }
+            Write("BASELINE SAVED 8 PSU + 8 GPU + 8 monitors + 8 outlets; 48 ends verified. Bytes=" + new FileInfo(savePath).Length);
+            for (cycle = 1; cycle <= Reloads; cycle++)
+            {
+                var loader = new DataLoader(savePath);
+                loader.LoadFromPath();
+                SaveManager.Loader = loader;
+                Write("RELOAD starting");
+                yield return SceneManager.LoadSceneAsync(roomScene);
+                // SaveManager.Start starts LoadData after sceneLoaded/Awake;
+                // do not mistake its pre-Start RestoringSave=false for done.
+                yield return null;
+                yield return null;
+                deadline = Time.realtimeSinceStartup + 90f;
+                while (Time.realtimeSinceStartup < deadline &&
+                    (!Ready() || SaveManager.RestoringSave)) yield return null;
+                if (!Ready() || SaveManager.RestoringSave)
+                { Fail("Restore did not finish within 90 seconds"); yield break; }
+                // Check each fixed step, not just the final state: catch a pin
+                // or slot that temporarily detaches after the first collision.
+                bool cyclePassed = true;
+                for (int step = 0; step < 100; step++)
+                {
+                    yield return new WaitForFixedUpdate();
+                    if (!Observe("reload step " + step)) { cyclePassed = false; break; }
+                }
+                Write((cyclePassed ? "RELOAD PASS " : "RELOAD FAIL ") + cycle + "/" + Reloads);
+            }
+            if (!failed) Write("PASS: no cable ends, slots, or wall mounts detached in five reloads");
+            else Write("FAIL: at least one reload lost a connection; all five reloads completed");
+            completed = true;
+        }
+        finally
+        {
+            if (!completed) failed = true;
+            geometryOnLoad = false;
+            Recording = false;
+            Application.logMessageReceived -= UnityLog;
+            busy = false;
+            // Keep SaveManager.Loader pointing to the UNIQUE test file. Switching
+            // it back here would allow Save to overwrite the user's original.
+            Write((failed ? "FAIL" : "DONE") + " — log=" + logPath + " save=" + savePath +
+                ". Exit Play Mode or load your ordinary save from the menu to return.");
+        }
+    }
+
+    private static bool Ready() => SaveManager.Instance != null && Main.Instance != null && Player.Instance != null;
+    private void Fail(string reason) { failed = true; Write("FAIL: " + reason); }
+    private static bool Slotted(Item item) => item != null && item.GetComponent<Connector>() != null &&
+        item.GetComponent<Connector>().slot != null;
+
+    private static T Nearest<T>(T[] items, int lane) where T : Item
+    {
+        T best = null;
+        float dist = 2f;
+        float x = Origin.x + Pitch * lane;
+        foreach (var item in items)
+            if (item != null && Mathf.Abs(item.transform.position.x - x) < dist)
+            { best = item; dist = Mathf.Abs(item.transform.position.x - x); }
+        return best;
+    }
+
+    private static List<CablePort> OwnPorts(Item owner, PortKind kind)
+    {
+        var result = new List<CablePort>();
+        foreach (var port in owner.GetComponentsInChildren<CablePort>(true))
+            if (port.owner == owner && port.kind == kind) result.Add(port);
+        result.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        return result;
+    }
+    private static CablePort Port(Item owner, PortKind kind)
+    {
+        var ports = OwnPorts(owner, kind);
+        return ports.Count > 0 ? ports[0] : null;
+    }
+
+    private bool Attach(GameObject prefab, CablePort a, CablePort b, int lane)
+    {
+        var cable = Instantiate(prefab, (a.Snap.position + b.Snap.position) * .5f, Quaternion.identity)
+            .GetComponent<CableItem>();
+        if (cable != null)
+        {
+            // Use the same real proximity check as player insertion; the
+            // just-spawned delivery coil is not located at either socket.
+            cable.End(0).GetComponent<Rigidbody>().position = a.Snap.position;
+            cable.End(1).GetComponent<Rigidbody>().position = b.Snap.position;
+            Physics.SyncTransforms();
+        }
+        if (cable == null || !cable.End(0).TryInsert(a) || !cable.End(1).TryInsert(b))
+        {
+            Write("INSERT FAILED lane=" + lane + " cable=" + (cable != null ? cable.name : "null") +
+                " A=" + a.name + " owner=" + a.owner.name + " B=" + b.name + " owner=" + b.owner.name +
+                " span=" + Vector3.Distance(a.Snap.position, b.Snap.position).ToString("0.000"));
+            return false;
+        }
+        cable.PrepareStressTestSpan();
+        // Item.Start normally assigns these IDs; be explicit if the fixture
+        // was created within the same frame as its first connection.
+        if (a.owner.Id == 0) a.owner.Id = Main.Instance.GetNewId(a.owner);
+        if (b.owner.Id == 0) b.owner.Id = Main.Instance.GetNewId(b.owner);
+        if (cable.Id == 0) cable.Id = Main.Instance.GetNewId(cable);
+        for (int i = 0; i < 2; i++)
+        {
+            var port = cable.End(i).Connected;
+            expected.Add(new Expectation { cableId = cable.Id, cableName = cable.spawnId,
+                end = i, ownerId = port.owner.Id, portName = port.name, kind = port.kind, lane = lane });
+        }
+        return true;
+    }
+
+    private bool Observe(string stage)
+    {
+        if (!Ready()) { Fail(stage + ": scene dependencies missing"); return false; }
+        bool ok = true;
+        foreach (var e in expected)
+        {
+            var cable = Main.Instance.GetItemById(e.cableId) as CableItem;
+            var plug = cable != null ? cable.End(e.end) : null;
+            var actual = plug != null ? plug.Connected : null;
+            var owner = Main.Instance.GetItemById(e.ownerId);
+            if (actual == null || actual.owner == null || actual.owner.Id != e.ownerId ||
+                actual.name != e.portName || actual.kind != e.kind ||
+                owner == null || !OwnPorts(owner, e.kind).Contains(actual))
+            {
+                string current = actual == null ? "UNPLUGGED" : actual.owner?.name + "(" + actual.owner?.Id +
+                    ")/" + actual.name + "/" + actual.kind;
+                float span = cable != null && cable.End(1 - e.end)?.Connected != null && owner != null
+                    ? Vector3.Distance(cable.End(1 - e.end).Connected.Snap.position,
+                        Port(owner, e.kind)?.Snap.position ?? owner.transform.position) : -1f;
+                Fail(stage + " lane=" + e.lane + " cable=" + e.cableName + "(" + e.cableId +
+                    ") end=" + e.end + " expected=" + owner?.name + "(" + e.ownerId +
+                    ")/" + e.portName + "/" + e.kind + " actual=" + current +
+                    " span=" + span.ToString("0.000") + " length=" + (cable?.Length.ToString("0.000") ?? "missing"));
+                ok = false;
+            }
+        }
+        foreach (var pair in slotOwners)
+        {
+            var part = Main.Instance.GetItemById(pair.Key);
+            var connector = part != null ? part.GetComponent<Connector>() : null;
+            var host = connector != null && connector.slot != null
+                ? connector.slot.GetComponentInParent<Item>() : null;
+            if (host == null || host.Id != pair.Value)
+            { Fail(stage + " SLOT DETACHED part=" + part?.name + " id=" + pair.Key +
+                " expectedHost=" + pair.Value + " actualHost=" + host?.Id); ok = false; }
+        }
+        foreach (var id in healthIds)
+        {
+            var hardware = Main.Instance.GetItemById(id) as Hardware;
+            if (hardware == null || hardware.Damaged)
+            { Fail(stage + " HARDWARE MISSING/DAMAGED id=" + id + " name=" + hardware?.name); ok = false; }
+        }
+        foreach (var id in boardIds)
+        {
+            var board = Main.Instance.GetItemById(id) as Motherboard;
+            if (board == null || !CablePower.BoardHasPower(board))
+            { Fail(stage + " PSU ROUTE NOT POWERED board=" + id); ok = false; }
+        }
+        foreach (var pair in monitorPowerOwners)
+        {
+            var monitor = Main.Instance.GetItemById(pair.Key) as Display;
+            var inlet = monitor != null ? Port(monitor, PortKind.MonitorPower) : null;
+            var plug = inlet != null ? inlet.plug : null;
+            var source = plug != null ? plug.Cable.End(1 - plug.End).Connected : null;
+            if (!CablePower.Energized(plug) || source?.owner?.Id != pair.Value)
+            { Fail(stage + " MONITOR POWER LOST monitor=" + pair.Key + " outlet=" + pair.Value); ok = false; }
+        }
+        foreach (var outlet in FindObjectsOfType<OutletStrip>())
+            if (!outlet.IsMounted)
+            { Fail(stage + " OUTLET UNMOUNTED " + outlet.name + " id=" + outlet.GetComponent<Item>()?.Id); ok = false; }
+        return ok;
+    }
+
+    private static void CreateGeometry()
+    {
+        var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        floor.name = "Cable stress floor (scene-only)";
+        floor.transform.position = Origin + new Vector3(13f, -.2f, -.5f);
+        floor.transform.localScale = new Vector3(42f, .4f, 11f);
+        for (int lane = 0; lane < Lanes; lane++)
+        {
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = "Cable stress wall " + lane + " (scene-only)";
+            wall.transform.position = Origin + new Vector3(Pitch * lane, 1.2f, 3.12f);
+            wall.transform.localScale = new Vector3(2.5f, 2.4f, .2f);
+        }
+        Physics.SyncTransforms();
+    }
+}
+#endif

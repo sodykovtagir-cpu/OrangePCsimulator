@@ -344,14 +344,14 @@ public class SaveManager : MonoBehaviour
             }
             else TryRestoreLegacySlot(pair.Item2, restored);
         }
-        // Saved cable chains are frozen for two frames while the slotted
-        // hardware/ports start. Keep displays in the same pose during this
-        // window: otherwise an unfrozen monitor moves into its saved plug.
+        // Hold the entire slotted assembly still until saved cable joints and
+        // collision exclusions are in place. Freezing only displays left the
+        // GPU/PSU and their slot joints exposed to the first rope impulse.
         var frozenDisplays = new List<Tuple<Rigidbody, bool, bool>>();
         foreach (var pair in restored)
         {
-            if (!(pair.Item2 is PC.Component.Display display)) continue;
-            var body = display.GetComponent<Rigidbody>();
+            if (pair.Item2 == null || pair.Item2 is PC.Component.Cabling.CableItem) continue;
+            var body = pair.Item2.GetComponent<Rigidbody>();
             if (body == null) continue;
             frozenDisplays.Add(Tuple.Create(body, body.isKinematic, body.detectCollisions));
             body.detectCollisions = false;
@@ -379,6 +379,9 @@ public class SaveManager : MonoBehaviour
                     catch (Exception ex) { Debug.LogWarning($"Save: failed to release cable: {ex}"); }
                 }
             }
+            // Let the cable solver settle against stationary hardware first.
+            yield return new WaitForFixedUpdate();
+            yield return new WaitForFixedUpdate();
         }
         finally
         {

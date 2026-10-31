@@ -120,8 +120,18 @@ namespace PC.Component.Cabling
                 ? pin.connectedBody.transform.InverseTransformPoint(port.Snap.position)
                 : port.Snap.position;
             pin.enableCollision = false;
-            pin.breakForce = PullOutForce; // same default force as Slot.cs
+            // A loaded rope can apply an artificial impulse before its saved
+            // rigidbodies have settled. Keep the pin during reconstruction,
+            // then restore the SAME gameplay break threshold (not a permanent
+            // strength buff) after the hosts are unfrozen.
+            pin.breakForce = PullOutForce;
             pin.breakTorque = PullOutForce;
+            if (restoring)
+            {
+                pin.breakForce = Mathf.Infinity;
+                pin.breakTorque = Mathf.Infinity;
+                StartCoroutine(ArmRestoredPin(pin));
+            }
             Connected = port;
             ConnectedAt = Time.time;
             port.plug = this;
@@ -129,6 +139,18 @@ namespace PC.Component.Cabling
             // after each end would see a half-wired PC and turn it off.
             if (!restoring) CablePower.RefreshAll();
             return true;
+        }
+
+        private IEnumerator ArmRestoredPin(FixedJoint restoredPin)
+        {
+            while (SaveManager.RestoringSave) yield return null;
+            // One physics step with the restored hardware free to move.
+            yield return new WaitForFixedUpdate();
+            if (restoredPin != null && pin == restoredPin && Connected != null)
+            {
+                restoredPin.breakForce = PullOutForce;
+                restoredPin.breakTorque = PullOutForce;
+            }
         }
 
         private void WatchPort(CablePort port)
@@ -367,6 +389,12 @@ namespace PC.Component.Cabling
         {
             // The rope's end CharacterJoint has no break limit; the pin is the
             // breakable connection. Clear both ends of the logical link too.
+#if UNITY_EDITOR
+            if (CableStressMode.Recording && Connected != null)
+                Debug.LogWarning($"Cable stress: PIN BREAK cable={Cable?.spawnId} id={Cable?.Id} " +
+                    $"end={End} owner={Connected.owner?.name} id={Connected.owner?.Id} " +
+                    $"port={Connected.name} force={force:0.00}");
+#endif
             if (Connected != null) Unplug();
         }
 
