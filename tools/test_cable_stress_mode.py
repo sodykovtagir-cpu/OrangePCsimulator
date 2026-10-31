@@ -51,6 +51,17 @@ assert 'yield return new WaitForFixedUpdate();' in restore
 assert 'Cable restore: id=' in restore and 'cable.StressInitialOverlaps()' in restore
 assert 'Cable restore: solid-host settle=' in restore and 'message.Contains("Cable restore:")' in s
 assert 'Cable restore: pre-finish id=' in restore and 'cable.StressRestoreOffsets()' in restore
+# The first cable is first in the save. Flush all newly positioned roots
+# before any rope FromData; if a child pose still drifts, reapply exactly the
+# saved chain before inserting pins and KEEP original collision-state flags.
+load = restore[restore.index('public int LoadData()'):restore.index('private static bool HasSavedHost(')]
+assert load.index('Physics.SyncTransforms();\n        foreach (var (savers, data) in scObj)') < load.index('saver.FromData(data);')
+assert 'public float SavedPoseDrift(JObject data)' in rope
+assert 'public void ReapplySavedPose(JObject data)' in rope
+assert 'var plugContacts = (bool[])restorePlugContacts.Clone();' in rope
+assert 'restoreBodyContacts = bodyContacts;' in rope
+assert load.index('cable.ReapplySavedPose(pair.Item2);') < load.index('cable.RestorePorts();')
+assert 'Cable restore: pose resync id=' in load and 'saved rope pose still displaced' in load
 assert 'if (Cable != null && Cable.RestoringPhysics)' in plug
 assert 'Cable restore: id=' in rope and 'snap offsets=' in rope
 assert 'pin.breakForce = Mathf.Infinity;' in plug and 'restoredPin.breakForce = PullOutForce;' in plug

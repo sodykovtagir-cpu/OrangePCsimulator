@@ -167,6 +167,9 @@ assert 'if (!restoring && Cable != null && Cable.RestoringPhysics) return false;
 assert 'if (!restoring) CablePower.RefreshAll();' in plug
 assert 'PC.Component.Cabling.CablePower.RefreshAll();' in save
 assert 'body.detectCollisions = false;' in save and 'body.isKinematic = true;' in save
+assert save.index('Physics.SyncTransforms();\n        foreach (var (savers, data) in scObj)') < save.index('saver.FromData(data);')
+assert 'restorePlugContacts[i] = plugContacts[i];' in rope
+assert 'restoreBodyContacts = bodyContacts;' in rope
 # Kinematic owners must be SOLID while the loaded rope gets its first
 # physics steps; otherwise it falls into the case and the ensuing re-enabled
 # contacts can tear slot joints and cable pins apart.

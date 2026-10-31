@@ -283,6 +283,12 @@ public class SaveManager : MonoBehaviour
         if (duplicates > 0)
             Debug.Log($"Сохранение: отброшено дубликатов предметов: {duplicates}");
 
+        // Instantiate/position every prefab before touching the saved child
+        // Rigidbody poses. The first cable in an .opc otherwise performed the
+        // scene's first Physics.SyncTransforms inside CableItem.FromData,
+        // allowing its pending root move to overwrite the saved rope with
+        // the original prefab coil (observed on all five stress reloads).
+        Physics.SyncTransforms();
         foreach (var (savers, data) in scObj)
         {
             if (savers == null) continue;
@@ -357,11 +363,16 @@ public class SaveManager : MonoBehaviour
             body.detectCollisions = false;
             body.isKinematic = true;
         }
-        StartCoroutine(RestoreCableConnections(frozenDisplays));
+        var savedCables = new List<Tuple<PC.Component.Cabling.CableItem, JObject>>();
+        foreach (var pair in restored)
+            if (pair.Item2 is PC.Component.Cabling.CableItem cable && pair.Item1.data != null)
+                savedCables.Add(Tuple.Create(cable, pair.Item1.data));
+        StartCoroutine(RestoreCableConnections(frozenDisplays, savedCables));
         return failCount;
     }
 
-    private IEnumerator RestoreCableConnections(List<Tuple<Rigidbody, bool, bool>> frozenDisplays)
+    private IEnumerator RestoreCableConnections(List<Tuple<Rigidbody, bool, bool>> frozenDisplays,
+        List<Tuple<PC.Component.Cabling.CableItem, JObject>> savedCables)
     {
         // Port owners and slot-attached hardware need their Start/slot pass
         // before restoring joints, otherwise saved endpoints attach to air.
@@ -369,6 +380,26 @@ public class SaveManager : MonoBehaviour
         yield return null;
         try
         {
+            // A root transform or an Awake/Start action may still have moved
+            // the FIRST cable back to its prefab coil after its FromData pass.
+            // Repair only measured drift using the exact saved poses/joints,
+            // before any plugs are pinned or collisions become active.
+            Physics.SyncTransforms();
+            foreach (var pair in savedCables)
+            {
+                var cable = pair.Item1;
+                if (cable == null) continue;
+                float drift = cable.SavedPoseDrift(pair.Item2);
+                if (drift < .025f) continue;
+                cable.ReapplySavedPose(pair.Item2);
+                float remaining = cable.SavedPoseDrift(pair.Item2);
+                Debug.Log("Cable restore: pose resync id=" + cable.Id +
+                    " drift=" + drift.ToString("0.000") +
+                    "m remaining=" + remaining.ToString("0.000") + "m");
+                if (remaining > .025f)
+                    Debug.LogError("Cable restore: saved rope pose still displaced id=" +
+                        cable.Id + " drift=" + remaining.ToString("0.000") + "m");
+            }
             var cables = FindObjectsOfType<PC.Component.Cabling.CableItem>();
             foreach (var cable in cables)
             {

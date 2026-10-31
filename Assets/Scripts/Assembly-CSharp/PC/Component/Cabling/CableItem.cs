@@ -576,6 +576,54 @@ namespace PC.Component.Cabling
             UpdateJacket();
         }
 
+        // Check both ends AND the physical sections, not just the visual
+        // jacket. The first instantiated cable can retain its prefab coil if
+        // the pending root Transform is flushed after the saved Rigidbody poses.
+        public float SavedPoseDrift(JObject data)
+        {
+            if (!restoringPhysics || data == null || plugs == null || bodies == null)
+                return 0f;
+            float max = 0f;
+            for (int i = 0; i < 2; i++)
+            {
+                var pos = data["cablePos" + i] as JObject;
+                if (pos == null) continue;
+                var saved = new Vector3(pos.Value<float>("x"), pos.Value<float>("y"),
+                    pos.Value<float>("z"));
+                max = Mathf.Max(max, Vector3.Distance(saved,
+                    plugs[i].GetComponent<Rigidbody>().position));
+            }
+            var poses = data["cableBodies"] as JArray;
+            if (poses != null && poses.Count == bodies.Length)
+                for (int i = 0; i < bodies.Length; i++)
+                {
+                    var pose = poses[i] as JArray;
+                    if (pose == null || pose.Count < 3) continue;
+                    var saved = new Vector3(pose[0].Value<float>(), pose[1].Value<float>(),
+                        pose[2].Value<float>());
+                    max = Mathf.Max(max, Vector3.Distance(saved, bodies[i].position));
+                }
+            return max;
+        }
+
+        // FromData also records original collision flags. Replaying it without
+        // preserving those flags would leave the repaired cable permanently
+        // collisionless. This runs only if a saved pose actually drifted, and
+        // strictly before restored ports or the first cable physics step.
+        public void ReapplySavedPose(JObject data)
+        {
+            if (!restoringPhysics || data == null || restoreBodyContacts == null) return;
+            var plugContacts = (bool[])restorePlugContacts.Clone();
+            var bodyContacts = restoreBodyContacts;
+            try { FromData(data); }
+            finally
+            {
+                for (int i = 0; i < restorePlugContacts.Length; i++)
+                    restorePlugContacts[i] = plugContacts[i];
+                restoreBodyContacts = bodyContacts;
+            }
+        }
+
 #if UNITY_EDITOR
         private static Vector3 StressArcPoint(Vector3 a, Vector3 b, float height, Vector3 bend, float t)
         {
