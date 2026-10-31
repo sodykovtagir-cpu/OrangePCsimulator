@@ -45,6 +45,8 @@ assert 'cpu.CurrentWatts' in grid and 'gpu.CurrentWatts' in grid
 assert 'lightSwitch != null && lightSwitch.IsOn' in grid
 assert 'class ElectricityMeterBinding : MonoBehaviour, IReceiverDown' in binding
 assert 'grid.SetSwitch(!grid.SwitchOn)' in binding and 'led.text = grid.LedText' in binding
+assert 'canvasText.text = grid.LedText' in binding and 'displayCanvas.worldCamera = Camera.main;' in binding
+assert 'tmpTextProperty.SetValue(textMeshProText, grid.LedText, null)' in binding
 # Independent arithmetic smoke examples for rate/whole dollar and save residual.
 def charge(watts, seconds, initial=0):
     accrued = initial + watts / 1000 * seconds / 60
