@@ -779,8 +779,19 @@ public class PlacementGrid : MonoBehaviour
     /// (мать держится только FixedJoint, не иерархией), плюс дети по
     /// иерархии каждого тела. Кинематические тела (драггер) не входят.
     /// </summary>
+    private static bool IsCableBody(Rigidbody body)
+    {
+        return body != null &&
+            body.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;
+    }
+
     private static Rigidbody[] CollectAssembly(Rigidbody start)
     {
+        // A cable is a tether, never an installed part of a PC. Following its
+        // CharacterJoints/plug pin would annex the whole rope and even the
+        // monitor into the case assembly, then make their pins unbreakable on
+        // drag. Holding a cable body itself must not annex its endpoints.
+        if (IsCableBody(start)) return new[] { start };
         var lookup = new HashSet<Rigidbody>();
         var queue = new Queue<Rigidbody>();
         var order = new List<Rigidbody>();
@@ -797,7 +808,8 @@ public class PlacementGrid : MonoBehaviour
 
             var a = j.GetComponent<Rigidbody>();
             var b = j.connectedBody;
-            if (a == null || b == null || a.isKinematic || b.isKinematic) continue;
+            if (a == null || b == null || a.isKinematic || b.isKinematic ||
+                IsCableBody(a) || IsCableBody(b)) continue;
 
             List<Rigidbody> la;
             if (!adj.TryGetValue(a, out la)) { la = new List<Rigidbody>(); adj[a] = la; }
@@ -815,7 +827,8 @@ public class PlacementGrid : MonoBehaviour
             var children = rb.GetComponentsInChildren<Rigidbody>(true);
             for (int i = 0; i < children.Length; i++)
             {
-                if (children[i] != null && lookup.Add(children[i]))
+                if (children[i] != null && !IsCableBody(children[i]) &&
+                    lookup.Add(children[i]))
                     queue.Enqueue(children[i]);
             }
 
@@ -877,7 +890,9 @@ public class PlacementGrid : MonoBehaviour
             var js = rb.GetComponentsInChildren<Joint>(true);
             for (int j = 0; j < js.Length; j++)
             {
-                if (js[j] != null && !seen.Contains(js[j])) seen.Add(js[j]);
+                if (js[j] != null &&
+                    js[j].GetComponentInParent<PC.Component.Cabling.CableItem>() == null &&
+                    !seen.Contains(js[j])) seen.Add(js[j]);
             }
         }
 

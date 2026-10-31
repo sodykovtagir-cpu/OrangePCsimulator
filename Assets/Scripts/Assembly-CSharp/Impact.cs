@@ -15,6 +15,7 @@ public class Impact : MonoBehaviour
 	private ParticleSystem particle;
 
 	private AudioSource source;
+    private float nextSoundTime;
 
 	private void Start()
 	{
@@ -32,11 +33,15 @@ public class Impact : MonoBehaviour
 		if (velocityMagnitude < impactThreshold)
 			return;
 
-		if (source != null)
-		{
-			source.PlayOneShot(impactSound);
-			source.volume = velocityMagnitude * volumeMultiplier;
-		}
+        // Do not stack dozens of collision clips when a heavy case rattles
+        // against cable joints/furniture. The collision and its physical
+        // response are untouched; only the one-shot audio is rate-limited.
+        if (source != null && impactSound != null && Time.time >= nextSoundTime)
+        {
+            nextSoundTime = Time.time + .12f;
+            source.PlayOneShot(impactSound,
+                Mathf.Clamp01(velocityMagnitude * volumeMultiplier));
+        }
 
 		if (particle != null)
 		{

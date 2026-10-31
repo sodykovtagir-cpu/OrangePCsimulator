@@ -26,6 +26,8 @@ public class Raycast : MonoBehaviour
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
         public PC.Component.Cabling.CableItem grabbedCable;
+        // Populated once when grabbing a connected case, not every frame.
+        public List<PC.Component.Cabling.CableItem> wiredCables;
 
     }
 
@@ -255,6 +257,16 @@ public class Raycast : MonoBehaviour
         // Выбранный предмет уничтожили (удаление/смена сцены): снимаем выбор,
         // иначе замок кинематики останется висеть вплоть до следующего клика.
         if (selectedBody == null && shellStackIds != null) ClearSelection();
+    }
+
+    private void FixedUpdate()
+    {
+        var drag = currentDrag;
+        if (drag == null || drag.wiredCables == null || spring == null ||
+            spring.connectedBody == null) return;
+        var root = spring.connectedBody.transform;
+        foreach (var cable in drag.wiredCables)
+            if (cable != null) cable.ReleaseWhenDraggedTaut(root);
     }
 
     private void LateUpdate()
@@ -550,6 +562,18 @@ public class Raycast : MonoBehaviour
                     grabbedCable = plug == null ? grabbedCable : null
                 };
                 currentDrag = drag;
+                if (hitRb.GetComponent<Case>() != null)
+                {
+                    // Only during a case drag: track its actually connected
+                    // cables. Never scan the room each physics frame.
+                    foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
+                        if (cable != null && cable.HasPortOnDraggedAssembly(hitRb.transform))
+                        {
+                            if (drag.wiredCables == null)
+                                drag.wiredCables = new List<PC.Component.Cabling.CableItem>();
+                            drag.wiredCables.Add(cable);
+                        }
+                }
 
                 var sTr = spring.transform;
                 // Start a cable drag exactly at the contact point. Camera-
@@ -2315,6 +2339,10 @@ public class Raycast : MonoBehaviour
         // Auto-facing a dragged plug/section turns a still-inserted connector
         // against its socket and can break the joint on the very first click.
         if (rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null) return;
+        // Auto-facing rotates a cabled case without moving its sockets along
+        // the rope. While it is wired, let its Rigidbody respond to the drag
+        // and joints instead of forcing a new orientation every render frame.
+        if (currentDrag != null && currentDrag.wiredCables != null) return;
 
         var t = transform;
         var target = currentDrag?.target;

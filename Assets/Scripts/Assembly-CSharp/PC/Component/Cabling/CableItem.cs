@@ -251,6 +251,73 @@ namespace PC.Component.Cabling
             }
         }
 
+        // Invoked only while the player actually drags a wired case. Do not
+        // run a global cable scan (or change unplug thresholds) in ordinary
+        // play. When the remaining slack is nearly exhausted, release the
+        // hardware-side pin before a stiff drag spring can fling the assembly
+        // and make PhysX project dozens of rope joints through one another.
+        public bool HasPortOnDraggedAssembly(Transform root)
+        {
+            if (root == null || plugs == null) return false;
+            return BelongsToAssembly(plugs[0].Connected, root) ||
+                   BelongsToAssembly(plugs[1].Connected, root);
+        }
+
+        private static bool BelongsToAssembly(CablePort port, Transform root)
+        {
+            if (port == null || port.owner == null || root == null) return false;
+            Item owner = port.owner;
+            for (int depth = 0; owner != null && depth < 5; depth++)
+            {
+                if (owner.transform == root || owner.transform.IsChildOf(root)) return true;
+                var connector = owner.GetComponent<Connector>();
+                var host = connector != null && connector.slot != null
+                    ? connector.slot.GetComponentInParent<Item>() : null;
+                if (host == owner) break;
+                owner = host;
+            }
+            return false;
+        }
+
+        public bool ReleaseWhenDraggedTaut(Transform root)
+        {
+            if (root == null || restoringPhysics || SaveManager.RestoringSave ||
+                plugs == null || bodies == null || bodies.Length == 0) return false;
+            var a = plugs[0];
+            var b = plugs[1];
+            if (a == null || b == null || a.Connected == null || b.Connected == null ||
+                a.IsHeld || b.IsHeld || heldSegment != null) return false;
+            // Only the case-side connection is released. The other end remains
+            // in its outlet or monitor; we never detach a neighbour merely
+            // because an unrelated assembly is being moved.
+            var release = BelongsToAssembly(a.Connected, root) ? a :
+                BelongsToAssembly(b.Connected, root) ? b : null;
+            if (release == null || Time.time - release.ConnectedAt < .25f) return false;
+            Vector3 first = a.GetComponent<Rigidbody>().position;
+            Vector3 last = b.GetComponent<Rigidbody>().position;
+            float span = Vector3.Distance(first, last);
+            float path = 0f;
+            Vector3 previous = first;
+            foreach (var body in bodies)
+            {
+                path += Vector3.Distance(previous, body.position);
+                previous = body.position;
+            }
+            path += Vector3.Distance(previous, last);
+            // Spare length is real slack, not an artificial force buff. The
+            // guard only fires close to the cable's physical limit and during
+            // an active player drag; ordinary Joint breakForce is unchanged.
+            if (span < length * .95f && path < length * .98f) return false;
+#if UNITY_EDITOR
+            Debug.Log("[CableDrag] taut cable=" + Id + " end=" + release.End +
+                " span=" + span.ToString("0.00") + "m path=" +
+                path.ToString("0.00") + "m length=" + length.ToString("0.00") + "m");
+#endif
+            release.Unplug();
+            strainCooldownUntil = Time.time + .35f;
+            return true;
+        }
+
         private bool ReleaseOverstretchedEnd()
         {
             if ((plugs[0].Connected == null && plugs[1].Connected == null) ||
