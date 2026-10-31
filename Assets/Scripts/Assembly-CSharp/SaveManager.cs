@@ -36,15 +36,23 @@ public class SaveManager : MonoBehaviour
 	public static DataLoader Loader { get; set; }
 
 	public static SaveManager Instance { get; private set; }
+    // Collision impulses during the one-off save reconstruction are not
+    // gameplay impacts; a saved monitor must not acquire Damaged on load.
+    public static bool RestoringSave { get; private set; }
+    public static float IgnoreLoadImpactsUntil { get; private set; }
 
 	private void Awake()
 	{
 		Instance = this;
+        RestoringSave = false;
+        IgnoreLoadImpactsUntil = 0f;
 	}
 
 	private void Start()
 	{
-		int ld = LoadData();
+        int ld;
+        try { ld = LoadData(); }
+        catch { RestoringSave = false; throw; }
 		string er = "";
 		if (ld != 0)
 		{
@@ -57,6 +65,9 @@ public class SaveManager : MonoBehaviour
 
     public bool SaveData()
     {
+        // Never write a half-restored cable whose saved port owners are still
+        // frozen/unattached (for example when Save is clicked during loading).
+        if (RestoringSave) return false;
         var loader = Loader;
         var game = loader.GameData;
         game.version = Application.version;
@@ -200,6 +211,7 @@ public class SaveManager : MonoBehaviour
 
         if (cdat.itemData != null && cdat.itemData.Length > 0)
         {
+            RestoringSave = true;
             // Коробки в сохранении лежат как обычные предметы, и их содержимое
             // тоже записано отдельно. Пока восстанавливаем, запрещаем коробкам
             // выкладывать копию: иначе появится дубликат, который вклинится в
@@ -249,11 +261,10 @@ public class SaveManager : MonoBehaviour
                         restored.Add(Tuple.Create(it, item));
                         if (it.id != 0) restoredById[it.id] = item;
                     }
-                    JObject savePayload = null;
-                    if (it.data != null)
-                        savePayload = JObject.FromObject(it.data);
-
-                    scObj.Add(Tuple.Create(saves, savePayload));
+                    // JsonConvert already created the JObject in ItemData.
+                    // Re-serializing every PC disk/cable pose a second time
+                    // here is expensive on large saves and serves no purpose.
+                    scObj.Add(Tuple.Create(saves, it.data));
                 }
                 else
                 {
@@ -333,21 +344,57 @@ public class SaveManager : MonoBehaviour
             }
             else TryRestoreLegacySlot(pair.Item2, restored);
         }
-        StartCoroutine(RestoreCableConnections());
+        // Saved cable chains are frozen for two frames while the slotted
+        // hardware/ports start. Keep displays in the same pose during this
+        // window: otherwise an unfrozen monitor moves into its saved plug.
+        var frozenDisplays = new List<Tuple<Rigidbody, bool, bool>>();
+        foreach (var pair in restored)
+        {
+            if (!(pair.Item2 is PC.Component.Display display)) continue;
+            var body = display.GetComponent<Rigidbody>();
+            if (body == null) continue;
+            frozenDisplays.Add(Tuple.Create(body, body.isKinematic, body.detectCollisions));
+            body.detectCollisions = false;
+            body.isKinematic = true;
+        }
+        StartCoroutine(RestoreCableConnections(frozenDisplays));
         return failCount;
     }
 
-    private IEnumerator RestoreCableConnections()
+    private IEnumerator RestoreCableConnections(List<Tuple<Rigidbody, bool, bool>> frozenDisplays)
     {
         // Port owners and slot-attached hardware need their Start/slot pass
         // before restoring joints, otherwise saved endpoints attach to air.
         yield return null;
         yield return null;
-        foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
+        try
         {
-            try { cable.RestorePorts(); }
-            catch (Exception ex) { Debug.LogWarning($"Save: failed to restore cable ports: {ex}"); }
-            finally { cable.FinishRestore(); } // never leave a saved cable frozen
+            foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
+            {
+                try { cable.RestorePorts(); }
+                catch (Exception ex) { Debug.LogWarning($"Save: failed to restore cable ports: {ex}"); }
+                finally
+                {
+                    try { cable.FinishRestore(); }
+                    catch (Exception ex) { Debug.LogWarning($"Save: failed to release cable: {ex}"); }
+                }
+            }
+        }
+        finally
+        {
+            foreach (var frozen in frozenDisplays)
+            {
+                if (frozen.Item1 == null) continue;
+                frozen.Item1.isKinematic = frozen.Item2;
+                frozen.Item1.detectCollisions = frozen.Item3;
+            }
+            Physics.SyncTransforms();
+            IgnoreLoadImpactsUntil = Time.time + .75f;
+            RestoringSave = false;
+            // Every endpoint now exists: evaluate power and video only once,
+            // never against a partially restored set of saved cables.
+            try { PC.Component.Cabling.CablePower.RefreshAll(); }
+            catch (Exception ex) { Debug.LogWarning("Save: cable power refresh: " + ex); }
         }
     }
 

@@ -34,7 +34,7 @@ namespace PC.Component.Cabling
         public bool Powered => kind == PortKind.Outlet &&
             owner != null && owner.GetComponent<OutletStrip>() is OutletStrip strip && strip.IsMounted;
 
-        public bool Accepts(CablePlug candidate)
+        public bool Accepts(CablePlug candidate, bool restoring = false)
         {
             if (candidate == null || plug != null || candidate.Connected != null) return false;
             var cable = candidate.Cable;
@@ -47,7 +47,7 @@ namespace PC.Component.Cabling
                 // device connector. An unplugged opposite end must not make
                 // these different physical connectors interchangeable.
                 if (kind == PortKind.Outlet)
-                    return candidate.End == 0 && Powered && (opposite == null ||
+                    return candidate.End == 0 && (restoring || Powered) && (opposite == null ||
                         opposite.kind == PortKind.PcPower || opposite.kind == PortKind.MonitorPower);
                 if (kind == PortKind.PcPower || kind == PortKind.MonitorPower)
                     return candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet);

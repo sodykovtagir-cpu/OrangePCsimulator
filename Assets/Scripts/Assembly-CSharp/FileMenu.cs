@@ -84,7 +84,7 @@ public class FileMenu : MonoBehaviour
 		{
 			// read
 			DataLoader l = new DataLoader(path);
-			l.LoadFromPath();
+            l.LoadHeaderFromPath(); // authenticate, but inflate only GameData for the list
 			// load
 			var parent = slotParent;
 			var pref = slotPrefab;
@@ -100,7 +100,15 @@ public class FileMenu : MonoBehaviour
 			loads.Add(v);
 			// buttons
 			x.Find("Edit").GetComponent<Button>().onClick.AddListener(() => { ShowFileInformation(v); });
-			x.Find("Name").GetComponent<Button>().onClick.AddListener(() => { MainMenu.Instance.LoadFile(l); });
+            x.Find("Name").GetComponent<Button>().onClick.AddListener(() =>
+            {
+                try
+                {
+                    var world = l.Content; // full verification/decompression only on open
+                    MainMenu.Instance.LoadFile(l);
+                }
+                catch (Exception e) { Debug.LogWarning("Cannot open save: " + e.Message); }
+            });
 			empty.SetActive(loads.Count == 0);
 			return true;
 		}
