@@ -179,12 +179,12 @@ public sealed class CableStressMode : MonoBehaviour
             var buildPrefab = Resources.Load<GameObject>("components/ready/ReadyPC_Home_Black");
             var monitorPrefab = Resources.Load<GameObject>("components/Monitor(Black)");
             var outletPrefab = Resources.Load<GameObject>("components/Wall Outlet 3");
-            var powerPrefab = Resources.Load<GameObject>("components/Power Cable (5m)");
-            // Historical asset filename: Power Cable 5m is actually the 10 m SKU.
-            var monitorPowerPrefab = Resources.Load<GameObject>("components/Power Cable 5m");
+            // Both routes need more than 5 m at the authored PSU/monitor pivots.
+            // Historical asset filename: Power Cable 5m is the 10 m SKU.
+            var powerPrefab = Resources.Load<GameObject>("components/Power Cable 5m");
             var hdmiPrefab = Resources.Load<GameObject>("components/HDMI Cable (6m)");
             if (buildPrefab == null || monitorPrefab == null || outletPrefab == null ||
-                powerPrefab == null || monitorPowerPrefab == null || hdmiPrefab == null)
+                powerPrefab == null || hdmiPrefab == null)
             { Fail("One of the test Resources prefabs is missing"); yield break; }
 
             var builds = new GameObject[Lanes];
@@ -243,7 +243,7 @@ public sealed class CableStressMode : MonoBehaviour
                     monitorPower == null || monitorVideo == null)
                 { Fail("Missing authored ports at lane " + lane); yield break; }
                 if (!Attach(powerPrefab, outletPorts[0], psuPort, lane) ||
-                    !Attach(monitorPowerPrefab, outletPorts[1], monitorPower, lane) ||
+                    !Attach(powerPrefab, outletPorts[1], monitorPower, lane) ||
                     !Attach(hdmiPrefab, gpuPort, monitorVideo, lane))
                 { Fail("Initial cable insertion failed at lane " + lane); yield break; }
                 healthIds.Add(gpu.Id);
@@ -346,8 +346,17 @@ public sealed class CableStressMode : MonoBehaviour
 
     private bool Attach(GameObject prefab, CablePort a, CablePort b, int lane)
     {
+        float span = Vector3.Distance(a.Snap.position, b.Snap.position);
         var cable = Instantiate(prefab, (a.Snap.position + b.Snap.position) * .5f, Quaternion.identity)
             .GetComponent<CableItem>();
+        if (cable != null && span > cable.Length * .95f)
+        {
+            Write("INSERT FAILED lane=" + lane + " cable=" + cable.spawnId +
+                " reason=span exceeds 95% insertion limit span=" + span.ToString("0.000") +
+                "m length=" + cable.Length.ToString("0.000") + "m");
+            Destroy(cable.gameObject);
+            return false;
+        }
         if (cable != null)
         {
             // Use the same real proximity check as player insertion; the
@@ -359,8 +368,12 @@ public sealed class CableStressMode : MonoBehaviour
         if (cable == null || !cable.End(0).TryInsert(a) || !cable.End(1).TryInsert(b))
         {
             Write("INSERT FAILED lane=" + lane + " cable=" + (cable != null ? cable.name : "null") +
-                " A=" + a.name + " owner=" + a.owner.name + " B=" + b.name + " owner=" + b.owner.name +
-                " span=" + Vector3.Distance(a.Snap.position, b.Snap.position).ToString("0.000"));
+                " A=" + a.name + " owner=" + a.owner.name + " inserted=" +
+                (cable != null && cable.End(0).Connected != null) +
+                " B=" + b.name + " owner=" + b.owner.name + " inserted=" +
+                (cable != null && cable.End(1).Connected != null) +
+                " span=" + span.ToString("0.000") + "m length=" +
+                (cable != null ? cable.Length.ToString("0.000") : "missing") + "m");
             return false;
         }
         cable.PrepareStressTestSpan();

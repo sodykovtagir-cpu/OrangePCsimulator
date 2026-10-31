@@ -32,8 +32,11 @@ assert 'yield return new WaitForFixedUpdate();' in restore
 assert 'pin.breakForce = Mathf.Infinity;' in plug and 'restoredPin.breakForce = PullOutForce;' in plug
 assert 'CableStressMode.Recording' in (scripts/'Connector.cs').read_text()
 for prefab in ('ready/ReadyPC_Home_Black', 'Monitor(Black)', 'Wall Outlet 3',
-               'Power Cable (5m)', 'Power Cable 5m', 'HDMI Cable (6m)'):
+               'Power Cable 5m', 'HDMI Cable (6m)'):
     assert (root/'Assets/Resources/components'/f'{prefab}.prefab').is_file(), prefab
+assert 'length: 10' in (root/'Assets/Resources/components/Power Cable 5m.prefab').read_text()
+assert 'Resources.Load<GameObject>("components/Power Cable 5m")' in s
+assert 'span > cable.Length * .95f' in s
 build = (root/'Assets/Resources/components/ready/ReadyPC_Home_Black.prefab').read_text()
 names = {}
 for meta in (root/'Assets/Resources/components').rglob('*.prefab.meta'):

@@ -139,6 +139,9 @@ public class Player : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // LoadPlayer temporarily disables the CharacterController while it
+        // teleports. A FixedUpdate during that frame must not call Move on it.
+        if (controller == null || !controller.enabled) return;
         bool run = InputManager.GetButton("Run");
         if (sit) return;
         if (pauseControls) return;
