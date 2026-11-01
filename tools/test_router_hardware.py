@@ -28,7 +28,8 @@ assert 'CablePort.AddAuthored(item, PortKind.RouterPower' in router
 assert 'CablePort.AddAuthored(item, PortKind.RouterLan' in router
 assert 'string[] names = { "LAN (3)", "LAN (2)", "LAN (1)", "LAN" };' in router
 assert '(!CableMode.Enabled || HasMainsCable)' in router
-assert 'CablePower.Energized(powerPort.plug)' in router
+assert 'CablePower.Energized((powerPort ?? BindAuthoredPowerPort())?.plug)' in router
+assert 'candidate.kind != PortKind.RouterPower' in router and 'candidate.GetComponentInParent<Item>() != item' in router
 assert 'port.owner != board || port.kind != PortKind.PcLan' in net
 assert 'port.plug.Cable.Kind != CableKind.LAN' in net
 assert 'PhysicalLanTo(parent, out _, out _)' in router
@@ -39,13 +40,14 @@ assert 'public static CablePort AddAuthored' in port
 assert 'materials = new Material[4]' in rope
 assert 'lanPlugModel' in rope and 'Instantiate(lanPlugModel, go.transform)' in rope
 assert '  kind: 3\n  length: 48' in c
-# Power's authored BoxCollider must be a trigger; otherwise it blocks the
-# connector before the existing collision-exclusion/latching code can work.
+# The player's latest prefab removes the old solid Power/Trigger box entirely;
+# a script-driven fallback still works when the imported FBX hierarchy moves.
 import re
-power_box=re.search(r'--- !u!65 &1804551114551547151\nBoxCollider:.*?(?=--- !u!|\Z)',r,re.S)
-assert power_box and '  m_IsTrigger: 1\n' in power_box.group(0)
-assert 'foreach (var box in go.GetComponents<BoxCollider>())' in port
-assert 'box.isTrigger = true;' in port
+power_port=re.search(r'--- !u!1 &8334559102428477866\nGameObject:.*?(?=--- !u!|\Z)',r,re.S)
+assert power_port and '  - component: {fileID: 1804551114551547151}' not in power_port.group(0)
+assert 'm_GameObject: {fileID: 8334559102428477866}' in r
+assert '  kind: 7\n  owner: {fileID: 6213257954193014605}' in r
+assert 'BindAuthoredPowerPort();' in router
 # Each SKU is physical, has its own length/coil, and contains two
 # serialized imported RJ45 instances; no HDMI visual remains in Prefab Mode.
 import re
@@ -103,6 +105,10 @@ assert 'network?.SignalTraffic(system.Board)' in remote
 assert 'network?.SignalTraffic(session.board)' in remote
 assert 'service.Plan != 0' in ind and 'router.UpstreamQuality' in ind
 assert 'Router/Indicators' in ind and 'PulseWifi' in ind and 'PulseLan' in ind
+assert 'child.name == "Indicators"' in ind
 assert 'new Material(all[i].sharedMaterial)' in ind
 assert 'router.IsPowered' in read('ElectricityGrid.cs')
+probe=(root/'Assets/Editor/RouterPowerDiagnostic.cs').read_text()
+assert 'Tools/Typo-Link/Diagnose router power' in probe
+assert 'port.owner == item' in probe and 'CablePower.Energized(plug)' in probe
 print('PASS: authored power/LAN sockets, physical LAN prefab, save modes, traffic LEDs')

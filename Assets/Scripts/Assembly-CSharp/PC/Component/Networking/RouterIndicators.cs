@@ -19,6 +19,11 @@ namespace PC.Component.Networking
         {
             router = GetComponent<RouterDevice>();
             var indicators = transform.Find("Router/Indicators");
+            if (indicators == null)
+                foreach (var child in GetComponentsInChildren<Transform>(true))
+                    if (child.name == "Indicators" &&
+                        child.GetComponentInParent<Item>() == GetComponent<Item>())
+                    { indicators = child; break; }
             if (indicators == null) { Debug.LogWarning("Typo-Link: Indicators not found", this); return; }
             powerLed = Find(indicators, "Power");
             wanLed = Find(indicators, "WAN");

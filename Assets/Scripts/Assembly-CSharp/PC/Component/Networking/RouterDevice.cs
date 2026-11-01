@@ -34,6 +34,11 @@ namespace PC.Component.Networking
             var socket = transform.Find("Router/ports/Power");
             if (socket != null) powerPort = CablePort.AddAuthored(item, PortKind.RouterPower,
                 "Router AC input", socket.Find("Trigger"), socket.Find("Pivot"));
+            // The authored Power port can survive a prefab hierarchy/FBX
+            // reimport even when Transform.Find's old path does not. Bind the
+            // serialized CablePort by its role rather than treating a missing
+            // path as "no power" for the entire lifetime of this router.
+            if (powerPort == null) BindAuthoredPowerPort();
             // Front LEDs run +Z to -Z; rear sockets run in the opposite
             // direction, independently of Unity's duplicate-name suffixes.
             string[] names = { "LAN (3)", "LAN (2)", "LAN (1)", "LAN" };
@@ -45,8 +50,27 @@ namespace PC.Component.Networking
             }
         }
 
+        private CablePort BindAuthoredPowerPort()
+        {
+            if (powerPort != null) return powerPort;
+            if (item == null) item = GetComponent<Item>();
+            foreach (var candidate in GetComponentsInChildren<CablePort>(true))
+            {
+                if (candidate.kind != PortKind.RouterPower ||
+                    candidate.GetComponentInParent<Item>() != item) continue;
+                var socket = candidate.transform.parent;
+                var pivot = socket != null ? socket.Find("Pivot") : null;
+                powerPort = CablePort.AddAuthored(item, PortKind.RouterPower,
+                    "Router AC input", candidate.transform, pivot);
+                break;
+            }
+            return powerPort;
+        }
+
         public CablePort LanSocket(int index) => index >= 1 && index <= 4 ? lanSockets[index - 1] : null;
-        public bool HasMainsCable => powerPort != null && CablePower.Energized(powerPort.plug);
+        // A prefab update can reorder Awake and serialized socket setup; do
+        // not cache a permanent "unpowered" result from an early null port.
+        public bool HasMainsCable => CablePower.Energized((powerPort ?? BindAuthoredPowerPort())?.plug);
         public int PortNumber(CablePort port)
         {
             for (int i = 0; i < lanSockets.Length; i++)
