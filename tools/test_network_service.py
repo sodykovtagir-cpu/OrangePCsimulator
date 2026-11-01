@@ -37,6 +37,10 @@ assert 'child.ConnectUpstream(router.Id, false)' in web
 assert 'RouterWebPages.IsLocalAddress(url)' in browser
 assert 'LoadOnline(site.url, Mathf.Max(.1f, site.trafficMB)' in browser
 assert 'WaitForSecondsRealtime(delay)' in browser
+# With `service == null || ...`, short-circuit skips the out parameters.
+# CS0165: error must still be definitely assigned on the null-service path.
+assert 'float delay = 0f;' in browser and 'string error = null;' in browser
+assert 'out delay, out error' in browser and 'out var error' not in browser
 assert 'if (site != null && site.page != null && NormalizeUrl(site.url) == url)' in browser
 assert 'WifiSignal(board.transform, board.WifiRange)' in net
 assert 'service.Router(board.LanRouterId)' not in net # actual local Router() resolution
