@@ -39,6 +39,13 @@ assert 'public static CablePort AddAuthored' in port
 assert 'materials = new Material[4]' in rope
 assert 'lanPlugModel' in rope and 'Instantiate(lanPlugModel, go.transform)' in rope
 assert '  kind: 3\n  length: 48' in c
+# Power's authored BoxCollider must be a trigger; otherwise it blocks the
+# connector before the existing collision-exclusion/latching code can work.
+import re
+power_box=re.search(r'--- !u!65 &1804551114551547151\nBoxCollider:.*?(?=--- !u!|\Z)',r,re.S)
+assert power_box and '  m_IsTrigger: 1\n' in power_box.group(0)
+assert 'foreach (var box in go.GetComponents<BoxCollider>())' in port
+assert 'box.isTrigger = true;' in port
 # Each SKU is physical, has its own length/coil, and contains two
 # serialized imported RJ45 instances; no HDMI visual remains in Prefab Mode.
 import re
@@ -54,6 +61,8 @@ for length,segments in ((5,11),(15,26),(48,26),(100,52)):
     assert check_prefab(str(prefab)) == 0
     text=prefab.read_text(); item=product.read_text()
     assert f'  kind: 3\n  length: {length}\n  segments: {segments}\n' in text
+    assert '  lanPlugVisualScale: 1\n' in text
+    assert len(re.findall(r'propertyPath: m_LocalScale\.[xyz]\n      value: 1\n',text)) == 6
     assert text.count(f'm_SourcePrefab: {{fileID: 100100000, guid: {fbx}, type: 3}}') == 2
     assert f'lanPlugModel: {{fileID: 919132149155446097, guid: {fbx}, type: 3}}' in text
     assert 'MeshRenderer:' not in text and 'MeshFilter:' not in text
@@ -62,6 +71,15 @@ for length,segments in ((5,11),(15,26),(48,26),(100,52)):
     guid=re.search(r'^guid: ([a-f0-9]{32})$',product.with_suffix('.asset.meta').read_text(),re.M).group(1)
     assert shop.count(f'guid: {guid}, type: 2') == 1
 assert 'Mathf.Clamp(segments, 7, 64)' in rope
+# Cable and plug GameObject roots already have identity scale; only the FBX
+# visual overrides (and the runtime fallback) needed normalization.
+for cable_path in (root/'Assets/Resources/components').glob('*Cable*.prefab'):
+    if not cable_path.name.startswith(('Power Cable','VGA Cable','HDMI Cable','LAN Cable')):
+        continue
+    yaml=cable_path.read_text()
+    for suffix in ('000','010','020'):
+        transform=re.search(r'--- !u!4 &400'+suffix+r'\nTransform:.*?(?=--- !u!|\Z)',yaml,re.S)
+        assert transform and '  m_LocalScale: {x: 1, y: 1, z: 1}\n' in transform.group(0),cable_path
 assert 'go.transform.Find("RJ45 model")' in rope
 # The two artist-authored board sockets and seven duplicated variants have
 # the BoxCollider, real pivot, sphere trigger and PcLan serialized in YAML.

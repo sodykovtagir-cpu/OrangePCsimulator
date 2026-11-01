@@ -83,6 +83,13 @@ namespace PC.Component.Cabling
             var go = trigger.gameObject;
             go.name = label; // stable port name in CableItem save data
             go.layer = 2;
+            // The router's authored Power/Trigger used to contain a SOLID
+            // BoxCollider. It blocked the plug before the insertion sphere
+            // could catch it, and could push the connected lead back out.
+            // Only the dedicated Trigger object becomes a trigger; the
+            // router's actual housing colliders remain physical.
+            foreach (var box in go.GetComponents<BoxCollider>())
+                box.isTrigger = true;
             var sphere = go.GetComponent<SphereCollider>();
             if (sphere == null) sphere = go.AddComponent<SphereCollider>();
             sphere.isTrigger = true;
