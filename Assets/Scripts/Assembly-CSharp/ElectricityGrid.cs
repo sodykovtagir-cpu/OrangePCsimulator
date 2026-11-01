@@ -213,6 +213,9 @@ public sealed class ElectricityGrid : MonoBehaviour
             else if (hardware is GPU gpu) watts += Mathf.Max(0f, gpu.CurrentWatts);
             else watts += Mathf.Max(0f, hardware.Wattage);
         }
+        foreach (var router in FindObjectsOfType<PC.Component.Networking.RouterDevice>())
+            if (router != null && router.IsPowered)
+                watts += Mathf.Max(0f, router.PowerWatts);
         CurrentWatts = watts;
     }
 }

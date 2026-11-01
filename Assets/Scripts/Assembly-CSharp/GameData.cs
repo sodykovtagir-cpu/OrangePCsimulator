@@ -16,6 +16,12 @@ public class GameData
     public double electricityUnpaid;
     public double electricityKWh;
 
+    // Shared provider account across both cable-mode save branches.
+    public int internetPlan;
+    public int internetGatewayId;
+    public double internetPendingDollars;
+    public double internetTotalMegabytes;
+
 	public int room;
 
 	public bool gravity;

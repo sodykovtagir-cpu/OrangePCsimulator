@@ -134,6 +134,25 @@ namespace PC.Component
 		[Header("Devices")]
 		private float wirelessRange;
 
+        [Header("Internet / Wi-Fi")]
+        [SerializeField, Min(0f)] private float wifiRange = 30f;
+        private string wifiSsid = "";
+        private string wifiPassword = "";
+        private int lanRouterId;
+        public float WifiRange => wifiRange > 0f ? wifiRange : 30f; // old prefab with missing field
+        public string WifiSsid => wifiSsid;
+        public string WifiPassword => wifiPassword;
+        public int LanRouterId => lanRouterId;
+        public void ConfigureWifi(string ssid, string password)
+        {
+            wifiSsid = ssid ?? ""; wifiPassword = password ?? "";
+            lanRouterId = 0;
+        }
+        public void ConfigureLan(int routerId)
+        {
+            lanRouterId = routerId; wifiSsid = ""; wifiPassword = "";
+        }
+
 		public AudioSource Source { get; private set; }
 
 		public bool Running => running;
@@ -924,6 +943,9 @@ namespace PC.Component
 				monitorId = monitor.Id;
 			}
 			jObject["monitorId"] = monitorId;
+            jObject["wifiSsid"] = wifiSsid;
+            jObject["wifiPassword"] = wifiPassword;
+            jObject["lanRouterId"] = lanRouterId;
 			jObject["bios"] = JToken.FromObject(BiosSettings);
 
 			// Распаянные накопители: на них живёт система, и файлы игрока
@@ -938,6 +960,9 @@ namespace PC.Component
 			if (jObject == null) return;
 
 			int id = jObject.Value<int>("monitorId");
+            wifiSsid = jObject.Value<string>("wifiSsid") ?? "";
+            wifiPassword = jObject.Value<string>("wifiPassword") ?? "";
+            lanRouterId = jObject.Value<int?>("lanRouterId") ?? 0;
 
 			if (jObject.TryGetValue("bios", out var biosTok) && biosTok != null)
 			{

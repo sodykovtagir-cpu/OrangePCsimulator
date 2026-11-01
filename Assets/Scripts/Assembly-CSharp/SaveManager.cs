@@ -83,6 +83,8 @@ public class SaveManager : MonoBehaviour
         }
 
         if (ElectricityGrid.Instance != null) ElectricityGrid.Instance.SaveState(game);
+        if (PC.Component.Networking.InternetService.Instance != null)
+            PC.Component.Networking.InternetService.Instance.Save(game);
 
         game.icon = CaptureScreenshot();
 
@@ -187,6 +189,8 @@ public class SaveManager : MonoBehaviour
 
         if (ElectricityGrid.Instance != null)
             ElectricityGrid.Instance.Initialize(Loader.GameData, lamp);
+        if (PC.Component.Networking.InternetService.Instance != null)
+            PC.Component.Networking.InternetService.Instance.Load(Loader.GameData);
 
 
         int failCount = 0;

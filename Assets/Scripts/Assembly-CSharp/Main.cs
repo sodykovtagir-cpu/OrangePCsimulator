@@ -106,6 +106,8 @@ public class Main : MonoBehaviour
 		var grid = GetComponent<ElectricityGrid>();
 		if (grid == null) grid = gameObject.AddComponent<ElectricityGrid>();
 		grid.ConfigureLoads(roomLightWatts, airConditionerWatts);
+		if (GetComponent<PC.Component.Networking.InternetService>() == null)
+			gameObject.AddComponent<PC.Component.Networking.InternetService>();
 	}
 
 	private void Start()
