@@ -136,6 +136,14 @@ namespace PC.Component
 
         [Header("Internet / Wi-Fi")]
         [SerializeField, Min(0f)] private float wifiRange = 30f;
+        private bool wifiEnabled = true;
+        public bool WifiEnabled => wifiEnabled;
+        public void SetWifiEnabled(bool enabled)
+        {
+            if (wifiEnabled == enabled) return;
+            wifiEnabled = enabled;
+            ElectricityGrid.Instance?.NotifyLoadChanged();
+        }
         private string wifiSsid = "";
         private string wifiPassword = "";
         private int lanRouterId;
@@ -964,6 +972,7 @@ namespace PC.Component
 				monitorId = monitor.Id;
 			}
 			jObject["monitorId"] = monitorId;
+            jObject["wifiEnabled"] = wifiEnabled;
             jObject["wifiSsid"] = wifiSsid;
             jObject["wifiPassword"] = wifiPassword;
             jObject["lanRouterId"] = lanRouterId;
@@ -982,6 +991,7 @@ namespace PC.Component
 			if (jObject == null) return;
 
 			int id = jObject.Value<int>("monitorId");
+            wifiEnabled = jObject.Value<bool?>("wifiEnabled") ?? true; // existing saves
             wifiSsid = jObject.Value<string>("wifiSsid") ?? "";
             wifiPassword = jObject.Value<string>("wifiPassword") ?? "";
             lanRouterId = jObject.Value<int?>("lanRouterId") ?? 0;

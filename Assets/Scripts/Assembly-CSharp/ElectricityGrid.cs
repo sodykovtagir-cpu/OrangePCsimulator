@@ -212,6 +212,8 @@ public sealed class ElectricityGrid : MonoBehaviour
             if (hardware is CPU cpu) watts += Mathf.Max(0f, cpu.CurrentWatts);
             else if (hardware is GPU gpu) watts += Mathf.Max(0f, gpu.CurrentWatts);
             else watts += Mathf.Max(0f, hardware.Wattage);
+            if (hardware is PC.Component.Motherboard board && board.Running && board.WifiEnabled)
+                watts += 2f; // active PC Wi-Fi radio; never billed when the PC is off
         }
         foreach (var router in FindObjectsOfType<PC.Component.Networking.RouterDevice>())
             if (router != null && router.IsPowered)

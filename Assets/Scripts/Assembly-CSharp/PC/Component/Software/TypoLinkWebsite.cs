@@ -14,6 +14,8 @@ namespace PC.Component.Software
         [SerializeField] private InputField routerIdInput;
         [SerializeField] private Text statusText;
 
+        public void SetRepeaterInput(InputField input) { routerIdInput = input; }
+        public RouterDevice CurrentRouter => LocalRouter;
         private InternetService Service => InternetService.Instance;
         private PC.Component.Motherboard Board => os != null ? os.Board : null;
         private RouterDevice LocalRouter
@@ -47,6 +49,23 @@ namespace PC.Component.Software
         {
             if (Service == null || LocalRouter == null || !Service.SetPlan(id))
             { Say("Сначала подключись к роутеру"); return; }
+            Refresh();
+        }
+        // RouterPanel's Apply button: empty field means "leave unchanged".
+        // Validate both edits first to avoid partially applying invalid settings.
+        public void ApplyWifiSettings()
+        {
+            var router = LocalRouter;
+            if (router == null) { Say("Роутер недоступен"); return; }
+            string name = ssidInput != null ? ssidInput.text : "";
+            string key = passwordInput != null ? passwordInput.text : "";
+            if (!string.IsNullOrEmpty(name) &&
+                (string.IsNullOrWhiteSpace(name) || name.Length > 32))
+            { Say("Имя Wi-Fi должно быть длиной 1–32 символа"); return; }
+            if (!string.IsNullOrEmpty(key) && (key.Length < 8 || key.Length > 63))
+            { Say("Пароль Wi-Fi должен быть длиной 8–63 символа"); return; }
+            if (!string.IsNullOrEmpty(name)) router.SetSsid(name);
+            if (!string.IsNullOrEmpty(key)) router.SetPassword(key);
             Refresh();
         }
         public void SaveWifiName()

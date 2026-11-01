@@ -914,6 +914,7 @@ GameObject:
   - component: {fileID: 4410429360662499407}
   - component: {fileID: 7449284432648735008}
   - component: {fileID: 3224335649334830656}
+  - component: {fileID: 1231231231231231231}
   m_Layer: 5
   m_Name: WifiPanelPrefab
   m_TagString: Untagged
@@ -1099,3 +1100,23 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &1231231231231231231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8731971552345706499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 476e1d52a5b14f0c885f3d903742484e, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: ''
+  ssid: {fileID: 3384195642754583707}
+  description: {fileID: 7493461994340775950}
+  icon: {fileID: 8742002525396167673}
+  passwordPanel: {fileID: 3962394917064023543}
+  password: {fileID: 3916867384816631872}
+  passwordMessage: {fileID: 9086296149697812192}
+  connect: {fileID: 5098720319254387431}
+  connectLabel: {fileID: 4052557318255343642}

@@ -4108,6 +4108,8 @@ MonoBehaviour:
   menuBarItem: {fileID: 114784574240790320, guid: b08d1983bcbd7e641adb4d70f04ad98f, type: 3}
   menuBar: {fileID: 224545578307387141}
   taskbar: {fileID: 7584082345297844500}
+  wifiNetworkPrefab: {fileID: 1231231231231231231, guid: 0995d0db164924d46baa0f4f4978ec98, type: 3}
+  wifiTrayIconSprite: {fileID: 21300000, guid: 930d110f415958f4294f4fb44c6d1777, type: 3}
   startButton: {fileID: 7245741922289534464}
   clockText: {fileID: 7461808215645289506}
   runningAppsContainer: {fileID: 580249143399002748}

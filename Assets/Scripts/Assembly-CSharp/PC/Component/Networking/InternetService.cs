@@ -117,7 +117,7 @@ namespace PC.Component.Networking
                 { result.Router = router; result.Wired = true; result.Signal = 1f;
                   result.LanPort = board.LanPortIndex; }
             }
-            if (result.Router == null && !string.IsNullOrEmpty(board.WifiSsid))
+            if (result.Router == null && board.WifiEnabled && !string.IsNullOrEmpty(board.WifiSsid))
             {
                 foreach (var router in FindObjectsOfType<RouterDevice>())
                 {
@@ -136,7 +136,8 @@ namespace PC.Component.Networking
 
         public bool JoinWifi(Motherboard board, string ssid, string password)
         {
-            if (board == null || string.IsNullOrWhiteSpace(ssid) || !ElectricityGrid.PowerAvailable) return false;
+            if (board == null || !board.Running || !board.WifiEnabled ||
+                string.IsNullOrWhiteSpace(ssid) || !ElectricityGrid.PowerAvailable) return false;
             foreach (var router in FindObjectsOfType<RouterDevice>())
                 if (router != null && router.IsPowered && router.CredentialsMatch(ssid, password) &&
                     router.WifiSignal(board.transform, board.WifiRange) > 0f)

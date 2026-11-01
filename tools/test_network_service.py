@@ -31,7 +31,15 @@ assert 'mb * RatePerGB / 1024d' in net and 'Math.Floor(cost' in net
 assert 'main.SetMoney(main.Money - due, true)' in net
 assert 'class TypoLinkWebsite : Website' in bind and 'public void ChooseOgryzok()' in bind
 assert 'public void AttachRepeaterWifi()' in bind and 'public void JoinWifi()' in bind
-assert 'service.JoinWifi' in web and 'service.JoinLan' in web
+assert 'service.JoinWifi' not in web and 'service.JoinLan' not in web
+assert 'url == "wifi-settings"' not in web
+tray=src('PC/Component/Software/OS/WifiTaskbarController.cs')
+entry=src('PC/Component/Software/OS/WifiNetworkEntry.cs')
+assert 'service.JoinWifi' in entry and 'service.JoinLan' in tray
+assert 'router.CredentialsMatch' in entry and 'passwordMessage.text = "Неверный пароль"' in entry
+assert 'board.SetWifiEnabled' in tray and 'WifiNetworkEntry' in tray
+assert 'board.WifiEnabled' in net and 'jObject["wifiEnabled"]' in board
+assert 'board.WifiEnabled' in grid and 'watts += 2f;' in grid
 assert 'service.SetPlan(id)' in web and 'child.ConnectUpstream(router.Id, true' in web
 assert 'child.ConnectUpstream(router.Id, false)' in web
 assert 'RouterWebPages.IsLocalAddress(url)' in browser

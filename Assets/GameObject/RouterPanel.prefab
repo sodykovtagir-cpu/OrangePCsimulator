@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 222642988549198181}
   - component: {fileID: 114946936116752871}
   - component: {fileID: 7320829179106057043}
+  - component: {fileID: 1231231231231231232}
   m_Layer: 5
   m_Name: RouterPanel
   m_TagString: Untagged
@@ -3042,19 +3043,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 7320829179106057043}
         m_TargetAssemblyTypeName: PC.Component.Software.TypoLinkWebsite, Assembly-CSharp
-        m_MethodName: SaveWifiName
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 7320829179106057043}
-        m_TargetAssemblyTypeName: PC.Component.Software.TypoLinkWebsite, Assembly-CSharp
-        m_MethodName: SaveWifiPassword
+        m_MethodName: ApplyWifiSettings
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -3143,3 +3132,23 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: Apply
+--- !u!114 &1231231231231231232
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1709254077376921}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8c07fbb9ac7449c8e7405b54cf0f69d, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: ''
+  website: {fileID: 7320829179106057043}
+  repeaterList: {fileID: 8740585769454299683}
+  scanButton: {fileID: 1256099431393546018}
+  repeaterResetButton: {fileID: 7986647611194252079}
+  apnResetButton: {fileID: 3631965686912188400}
+  ssidInput: {fileID: 6479793300015015979}
+  passwordInput: {fileID: 6534182772579408902}
+  status: {fileID: 1685704104478584397}

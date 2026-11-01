@@ -16,6 +16,8 @@ namespace PC.Component.Software.OS
 
         void Start()
         {
+            if (taskbar != null && wifiNetworkPrefab != null)
+                gameObject.AddComponent<WifiTaskbarController>().Initialize(this, taskbar.transform, wifiNetworkPrefab, wifiTrayIconSprite);
             Localization.LanguageChanged += OnDocumentationLanguageChanged;
             if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
             // Disable ReorderableList layout on iconParent for free icon positioning
@@ -442,6 +444,8 @@ namespace PC.Component.Software.OS
                 if (parts == null) continue;
                 foreach (var part in parts) if (part != null && part.Power) CurrentDrawWatts += part.Wattage;
             }
+            if (Board != null && Board.Running && Board.Power && !Board.Damaged && Board.WifiEnabled)
+                CurrentDrawWatts += 2f;
         }
 
         public string UserPicturePath
@@ -3282,6 +3286,8 @@ namespace PC.Component.Software.OS
 
         [Header("TASKBAR")]
         [SerializeField] private GameObject taskbar;
+        [SerializeField] private WifiNetworkEntry wifiNetworkPrefab;
+        [SerializeField] private Sprite wifiTrayIconSprite;
         [SerializeField] private Button startButton;
         [SerializeField] private Text clockText;
         [SerializeField] private Transform runningAppsContainer;

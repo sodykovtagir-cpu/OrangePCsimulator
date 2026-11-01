@@ -15,8 +15,7 @@ namespace PC.Component.Software
         private static readonly Color fg = new Color(.9f, .94f, 1f);
         private static readonly Color button = new Color(.17f, .32f, .57f);
         public static bool IsLocalAddress(string url) =>
-            url == "192.168.1.1/panel" || url == "typolink.com/tariffs" ||
-            url == "wifi-settings" || url == "wifi";
+            url == "192.168.1.1/panel" || url == "typolink.com/tariffs";
 
         private static GameObject Make(string name, Transform parent, bool image = false)
         {
@@ -122,50 +121,15 @@ namespace PC.Component.Software
             var service = InternetService.Instance;
             if (service == null) { Label(body, "Сетевая служба не найдена"); return root; }
             Label(body, "TYPO-LINK  /  " + url, 23);
-            if (url == "wifi-settings" || url == "wifi") Wifi(browser, body, board, service);
-            else if (url == "typolink.com/tariffs") Tariffs(browser, body, board, service);
+            if (url == "typolink.com/tariffs") Tariffs(browser, body, board, service);
             else Panel(browser, body, board, service);
             return root;
         }
 
         private static void Links(Browser browser, Transform body)
         {
-            AddButton(body, "Wi-Fi / LAN", () => browser.ShowNetworkPage("wifi-settings"));
             AddButton(body, "Тарифы", () => browser.ShowNetworkPage("typolink.com/tariffs"));
             AddButton(body, "Панель роутера", () => browser.ShowNetworkPage("192.168.1.1/panel"));
-        }
-
-        private static void Wifi(Browser browser, Transform body, Motherboard board, InternetService service)
-        {
-            var link = service.Status(board);
-            Label(body, link.Router == null ? "Не подключено" :
-                "Соединение: " + link.Router.Ssid + (link.Wired ? " [LAN]" : " [Wi-Fi]") +
-                " / качество " + Mathf.RoundToInt(link.Quality * 100f) + "%");
-            if (board == null) { Label(body, "Сначала включи ПК"); return; }
-            AddButton(body, "Отключиться", () => { board.ConfigureLan(0); browser.ShowNetworkPage("wifi-settings"); });
-            var password = Entry(body, "Пароль Wi-Fi (минимум 8 символов)");
-            foreach (var router in UnityEngine.Object.FindObjectsOfType<RouterDevice>())
-            {
-                if (router == null || router.Id == 0 || !router.IsPowered) continue;
-                float signal = router.WifiSignal(board.transform, board.WifiRange);
-                if (signal > 0f)
-                {
-                    var target = router;
-                    AddButton(body, target.Ssid + " / " + Mathf.RoundToInt(signal * 100f) + "% — подключить",
-                        () => { if (service.JoinWifi(board, target.Ssid, password.text))
-                            browser.ShowNetworkPage("wifi-settings");
-                            else Label(body, "Неверный пароль или сеть пропала"); });
-                }
-                if (router.WithinLanRange(board.transform))
-                {
-                    var target = router;
-                    AddButton(body, target.Ssid + " / LAN (логический провод до " +
-                        target.MaxLanLength.ToString("0") + " м)",
-                        () => { if (service.JoinLan(board, target.Id)) browser.ShowNetworkPage("wifi-settings");
-                            else Label(body, "Нет свободного LAN-порта или превышена длина"); });
-                }
-            }
-            Links(browser, body);
         }
 
         private static void Tariffs(Browser browser, Transform body, Motherboard board, InternetService service)

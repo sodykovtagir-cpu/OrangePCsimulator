@@ -203,14 +203,12 @@ namespace PC.Component.Software
             {
                 ClearPage();
                 oggleHome.SetActive(false);
-                string address = NormalizeUrl(site.url);
-                if (address != "wifi-settings" && address != "wifi" &&
-                    (InternetService.Instance == null ||
+                if (InternetService.Instance == null ||
                      !InternetService.Instance.CanOpenLocalPanel(
-                         system != null ? system.Board : null, out var localRouter)))
+                         system != null ? system.Board : null, out var localRouter))
                 {
                     networkPage = RouterWebPages.Message(pageContainer,
-                        "Сначала подключись к роутеру через wifi-settings");
+                        "Сначала подключись к роутеру через Wi-Fi в панели задач PCOS");
                     return;
                 }
                 currentPage = Instantiate(site.page, pageContainer);
