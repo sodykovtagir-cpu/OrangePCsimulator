@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using PC.Component;
+using PC.Component.Cabling;
 using UnityEngine;
 
 namespace PC.Component.Networking
@@ -92,11 +93,29 @@ namespace PC.Component.Networking
             if (board == null || !board.Running || !ElectricityGrid.PowerAvailable)
             { result.Message = "ПК или электросеть выключены"; return result; }
 
-            if (board.LanRouterId != 0)
+            if (CableMode.Enabled)
+            {
+                // A wired PC can only use a genuinely connected LAN cable.
+                foreach (var port in board.GetComponentsInChildren<CablePort>(true))
+                {
+                    if (port.owner != board || port.kind != PortKind.PcLan || port.plug == null ||
+                        port.plug.Cable == null || port.plug.Cable.Kind != CableKind.LAN) continue;
+                    var other = port.plug.Cable.End(1 - port.plug.End);
+                    var remote = other != null ? other.Connected : null;
+                    if (remote == null || remote.kind != PortKind.RouterLan) continue;
+                    var router = remote.owner != null ? remote.owner.GetComponent<RouterDevice>() : null;
+                    if (router == null || !router.IsPowered) continue;
+                    result.Router = router; result.Wired = true; result.Signal = 1f;
+                    result.LanPort = router.PortNumber(remote);
+                    break;
+                }
+            }
+            else if (board.LanRouterId != 0)
             {
                 var router = Router(board.LanRouterId);
                 if (router != null && router.IsPowered && router.WithinLanRange(board.transform))
-                { result.Router = router; result.Wired = true; result.Signal = 1f; }
+                { result.Router = router; result.Wired = true; result.Signal = 1f;
+                  result.LanPort = board.LanPortIndex; }
             }
             if (result.Router == null && !string.IsNullOrEmpty(board.WifiSsid))
             {
@@ -130,9 +149,13 @@ namespace PC.Component.Networking
         public bool JoinLan(Motherboard board, int routerId)
         {
             var router = Router(routerId);
+            if (CableMode.Enabled) return board != null && Status(board).Router == router &&
+                Status(board).Wired; // inserting the physical LAN plug is what connects it
             if (board == null || router == null || !router.WithinLanRange(board.transform) ||
                 (board.LanRouterId != routerId && router.LanClients(this) >= router.LanPorts)) return false;
-            board.ConfigureLan(routerId);
+            int port = router.FirstFreeVirtualPort(this, board);
+            if (port == 0) return false;
+            board.ConfigureLan(routerId, port);
             return true;
         }
 
@@ -171,6 +194,7 @@ namespace PC.Component.Networking
             // the computer off halfway through the page load.
             if (due >= main.Money)
             { error = "Нужны деньги на трафик и хотя бы $1 на питание ПК"; return false; }
+            SignalTraffic(board);
             pendingDollars = Math.Max(0d, cost - due);
             totalMegabytes += mb;
             if (due > 0) main.SetMoney(main.Money - due, true);
@@ -180,6 +204,39 @@ namespace PC.Component.Networking
             delay = Mathf.Clamp(overhead + (float)mb / (mbPerSecond * Mathf.Max(.10f, status.Quality)),
                 .05f, 60f);
             return true;
+        }
+
+        // Blink only on actual requests, never just because a PC is powered.
+        public void SignalTraffic(Motherboard board)
+        {
+            var link = Status(board);
+            if (link.Router == null || link.Quality <= 0f) return;
+            var router = link.Router;
+            if (link.Wired) router.Indicators?.PulseLan(link.LanPort);
+            else router.Indicators?.PulseWifi();
+            var visited = new HashSet<int>();
+            while (router != null && router.UpstreamId != 0 && visited.Add(router.Id))
+            {
+                var parent = Router(router.UpstreamId);
+                if (parent == null) break;
+                if (router.UpstreamWireless)
+                {
+                    router.Indicators?.PulseWifi();
+                    parent.Indicators?.PulseWifi();
+                }
+                else
+                {
+                    int localPort = router.LocalUpstreamLanPort(parent);
+                    int parentPort = router.UpstreamLanPortIndex;
+                    // A replugged cable can use a different socket than the
+                    // last saved/configured one; blink the live physical port.
+                    if (CableMode.Enabled &&
+                        !router.PhysicalLanTo(parent, out localPort, out parentPort)) break;
+                    router.Indicators?.PulseLan(localPort);
+                    parent.Indicators?.PulseLan(parentPort);
+                }
+                router = parent;
+            }
         }
 
         private static uint StableHash(string text)
@@ -194,6 +251,7 @@ namespace PC.Component.Networking
     {
         public RouterDevice Router;
         public bool Wired;
+        public int LanPort;
         public float Signal;
         public float Quality;
         public string Message;

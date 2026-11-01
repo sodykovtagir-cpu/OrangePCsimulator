@@ -587,9 +587,17 @@ namespace PC.Component.Software
             }
         }
 
+        private float nextNetworkPulse;
         private void CaptureDue(Session session, float now, float interval)
         {
             session.nextFrame = now + interval;
+            if (now >= nextNetworkPulse && system != null)
+            {
+                nextNetworkPulse = now + .25f;
+                var network = PC.Component.Networking.InternetService.Instance;
+                network?.SignalTraffic(system.Board);
+                network?.SignalTraffic(session.board);
+            }
             Capture(session);
         }
 

@@ -36,7 +36,7 @@ assert 'service.SetPlan(id)' in web and 'child.ConnectUpstream(router.Id, true' 
 assert 'child.ConnectUpstream(router.Id, false)' in web
 assert 'RouterWebPages.IsLocalAddress(url)' in browser
 assert 'LoadOnline(site.url, Mathf.Max(.1f, site.trafficMB)' in browser
-assert 'WaitForSecondsRealtime(delay)' in browser
+assert 'WaitForSecondsRealtime(step)' in browser and 'SignalTraffic(system' in browser
 # With `service == null || ...`, short-circuit skips the out parameters.
 # CS0165: error must still be definitely assigned on the null-service path.
 assert 'float delay = 0f;' in browser and 'string error = null;' in browser

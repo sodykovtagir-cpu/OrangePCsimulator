@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace PC.Component.Cabling
 {
-    public enum PortKind { Outlet, PcPower, MonitorPower, VgaInput, HdmiInput, BoardVideo, GpuVideo }
-    public enum CableKind { Power, VGA, HDMI }
+    public enum PortKind { Outlet, PcPower, MonitorPower, VgaInput, HdmiInput, BoardVideo, GpuVideo, RouterPower, RouterLan, PcLan }
+    public enum CableKind { Power, VGA, HDMI, LAN }
 
     // Put a CablePort with a SphereCollider (Is Trigger) on the device prefab.
     // Move this trigger to the inlet and its Snap Pivot child to the desired
@@ -16,7 +16,7 @@ namespace PC.Component.Cabling
         public Item owner;
         [SerializeField] private Transform snapPivot;
         public CablePlug plug;
-        private static readonly Material[] portMaterials = new Material[7];
+        private static readonly Material[] portMaterials = new Material[10];
         public Transform Snap => snapPivot != null ? snapPivot :
             transform.Find("Snap Pivot") != null ? transform.Find("Snap Pivot") : transform;
         public Vector3 TriggerCenter => GetComponent<SphereCollider>() is SphereCollider sphere
@@ -48,9 +48,19 @@ namespace PC.Component.Cabling
                 // these different physical connectors interchangeable.
                 if (kind == PortKind.Outlet)
                     return candidate.End == 0 && (restoring || Powered) && (opposite == null ||
-                        opposite.kind == PortKind.PcPower || opposite.kind == PortKind.MonitorPower);
-                if (kind == PortKind.PcPower || kind == PortKind.MonitorPower)
+                        opposite.kind == PortKind.PcPower || opposite.kind == PortKind.MonitorPower ||
+                        opposite.kind == PortKind.RouterPower);
+                if (kind == PortKind.PcPower || kind == PortKind.MonitorPower || kind == PortKind.RouterPower)
                     return candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet);
+                return false;
+            }
+            if (cable.Kind == CableKind.LAN)
+            {
+                if (kind == PortKind.RouterLan)
+                    return opposite == null || opposite.kind == PortKind.PcLan ||
+                        opposite.kind == PortKind.RouterLan;
+                if (kind == PortKind.PcLan)
+                    return opposite == null || opposite.kind == PortKind.RouterLan;
                 return false;
             }
             bool input = kind == PortKind.VgaInput && cable.Kind == CableKind.VGA ||
@@ -62,6 +72,28 @@ namespace PC.Component.Cabling
                 (opposite.kind == PortKind.VgaInput && cable.Kind == CableKind.VGA) ||
                 (opposite.kind == PortKind.HdmiInput && cable.Kind == CableKind.HDMI);
             return false;
+        }
+
+        // Authored socket geometry: use the user's existing Trigger/Pivot, NOT
+        // a generated placeholder mesh. Called before cable save restoration.
+        public static CablePort AddAuthored(Item owner, PortKind kind, string label,
+            Transform trigger, Transform pivot, float radius = .16f)
+        {
+            if (owner == null || trigger == null) return null;
+            var go = trigger.gameObject;
+            go.name = label; // stable port name in CableItem save data
+            go.layer = 2;
+            var sphere = go.GetComponent<SphereCollider>();
+            if (sphere == null) sphere = go.AddComponent<SphereCollider>();
+            sphere.isTrigger = true;
+            sphere.radius = radius / Mathf.Max(.001f, trigger.lossyScale.x,
+                trigger.lossyScale.y, trigger.lossyScale.z);
+            var port = go.GetComponent<CablePort>();
+            if (port == null) port = go.AddComponent<CablePort>();
+            port.owner = owner;
+            port.kind = kind;
+            port.SetPivot(pivot != null ? pivot : trigger);
+            return port;
         }
 
         public static CablePort Add(Item owner, PortKind kind, string label, Vector3 localPosition, float radius = .42f)

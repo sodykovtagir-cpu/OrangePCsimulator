@@ -124,7 +124,14 @@ namespace PC.Component.Software
 
         private IEnumerator FinishLoad(float delay, Action completed)
         {
-            yield return new WaitForSecondsRealtime(delay);
+            float elapsed = 0f;
+            while (elapsed < delay)
+            {
+                InternetService.Instance?.SignalTraffic(system != null ? system.Board : null);
+                float step = Mathf.Min(.25f, delay - elapsed);
+                yield return new WaitForSecondsRealtime(step);
+                elapsed += step;
+            }
             pendingLoad = null;
             // A router/power outage mid-transfer must cancel the page.
             var board = system != null ? system.Board : null;

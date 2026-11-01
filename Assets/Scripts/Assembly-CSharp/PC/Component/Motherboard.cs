@@ -139,6 +139,8 @@ namespace PC.Component
         private string wifiSsid = "";
         private string wifiPassword = "";
         private int lanRouterId;
+        private int lanPortIndex;
+        public int LanPortIndex => lanPortIndex;
         public float WifiRange => wifiRange > 0f ? wifiRange : 30f; // old prefab with missing field
         public string WifiSsid => wifiSsid;
         public string WifiPassword => wifiPassword;
@@ -146,11 +148,12 @@ namespace PC.Component
         public void ConfigureWifi(string ssid, string password)
         {
             wifiSsid = ssid ?? ""; wifiPassword = password ?? "";
-            lanRouterId = 0;
+            lanRouterId = 0; lanPortIndex = 0;
         }
-        public void ConfigureLan(int routerId)
+        public void ConfigureLan(int routerId, int port = 0)
         {
-            lanRouterId = routerId; wifiSsid = ""; wifiPassword = "";
+            lanRouterId = routerId; lanPortIndex = port;
+            wifiSsid = ""; wifiPassword = "";
         }
 
 		public AudioSource Source { get; private set; }
@@ -166,6 +169,9 @@ namespace PC.Component
 			Source = GetComponent<AudioSource>();
 			AddExternal(external);
             PC.Component.Cabling.CablePorts.Install(this);
+            if (PC.Component.Cabling.CableMode.Enabled)
+                PC.Component.Cabling.CablePort.Add(this, PC.Component.Cabling.PortKind.PcLan,
+                    "Board LAN", new Vector3(.25f, 0f, -.18f), .24f);
         }
 
 		public void Switch()
@@ -946,6 +952,7 @@ namespace PC.Component
             jObject["wifiSsid"] = wifiSsid;
             jObject["wifiPassword"] = wifiPassword;
             jObject["lanRouterId"] = lanRouterId;
+            jObject["lanPortIndex"] = lanPortIndex;
 			jObject["bios"] = JToken.FromObject(BiosSettings);
 
 			// Распаянные накопители: на них живёт система, и файлы игрока
@@ -963,6 +970,9 @@ namespace PC.Component
             wifiSsid = jObject.Value<string>("wifiSsid") ?? "";
             wifiPassword = jObject.Value<string>("wifiPassword") ?? "";
             lanRouterId = jObject.Value<int?>("lanRouterId") ?? 0;
+            // Old cable-free saves already had a logical LAN connection but
+            // did not track an individual LED number.
+            lanPortIndex = jObject.Value<int?>("lanPortIndex") ?? (lanRouterId != 0 ? 1 : 0);
 
 			if (jObject.TryGetValue("bios", out var biosTok) && biosTok != null)
 			{

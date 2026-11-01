@@ -627,7 +627,8 @@ public class SaveManager : MonoBehaviour
         // cables can share it while their plugs have different saved positions.
         if (it.spawnId.StartsWith("Power Cable ", StringComparison.Ordinal) ||
             it.spawnId.StartsWith("VGA Cable ", StringComparison.Ordinal) ||
-            it.spawnId.StartsWith("HDMI Cable ", StringComparison.Ordinal)) return false;
+            it.spawnId.StartsWith("HDMI Cable ", StringComparison.Ordinal) ||
+            it.spawnId.StartsWith("LAN Cable ", StringComparison.Ordinal)) return false;
 
         Vector3 pos = it.pos;
 

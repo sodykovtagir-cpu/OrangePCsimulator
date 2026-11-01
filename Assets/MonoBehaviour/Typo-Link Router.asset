@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: Typo-Link Router
+  m_EditorClassIdentifier:
+  itemName: Typo-Link Router
+  price: 260
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 0459630660624a359911b35883e32e27, type: 3}
+  spawn: {fileID: 5917580531249688215, guid: d93137006de1b294fb21eb4678013b50, type: 3}
+  large: 1
+  translateDescription: 0
+  description: Wi-Fi router with four LAN ports. Power cable required in wired mode.

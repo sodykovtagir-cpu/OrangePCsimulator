@@ -93,7 +93,8 @@ namespace PC.Component.Cabling
             string id = item.Value<string>("spawnId");
             return id != null && (id.StartsWith("Power Cable ", StringComparison.Ordinal) ||
                 id.StartsWith("VGA Cable ", StringComparison.Ordinal) ||
-                id.StartsWith("HDMI Cable ", StringComparison.Ordinal));
+                id.StartsWith("HDMI Cable ", StringComparison.Ordinal) ||
+                id.StartsWith("LAN Cable ", StringComparison.Ordinal));
         }
 
         private static string MergeWorld(string current, string previous, bool wired)

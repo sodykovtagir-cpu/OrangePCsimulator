@@ -12,6 +12,8 @@ namespace PC.Component.Cabling
         [SerializeField, Min(.5f)] private float length = 2f;
         [SerializeField] private int segments = 10;
         [SerializeField, Range(.08f, .25f)] private float cableDiameter = .14f;
+        [SerializeField] private GameObject lanPlugModel;
+        [SerializeField] private float lanPlugVisualScale = .12f;
         [SerializeField] private CablePlug plugA;
         [SerializeField] private CablePlug plugB;
         [SerializeField] private LineRenderer jacket;
@@ -181,6 +183,20 @@ namespace PC.Component.Cabling
             var plug = go.GetComponent<CablePlug>();
             if (plug == null) plug = go.AddComponent<CablePlug>();
             plug.Init(this, end);
+            if (kind == CableKind.LAN && lanPlugModel != null)
+            {
+                // Keep the proven plug Rigidbody/Collider, replace only its
+                // visible HDMI mesh with the player's RJ45 FBX model.
+                var oldVisual = go.GetComponent<MeshRenderer>();
+                if (oldVisual != null) oldVisual.enabled = false;
+                var visual = Instantiate(lanPlugModel, go.transform);
+                visual.name = "RJ45 model";
+                visual.transform.localPosition = Vector3.zero;
+                visual.transform.localRotation = Quaternion.identity;
+                visual.transform.localScale = Vector3.one * Mathf.Max(.001f, lanPlugVisualScale);
+                foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
+                    Destroy(collider);
+            }
             if (go.GetComponentInChildren<Renderer>() == null)
             {
                 var model = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -546,7 +562,7 @@ namespace PC.Component.Cabling
             return outletPlugMaterial;
         }
 
-        private static readonly Material[] materials = new Material[3];
+        private static readonly Material[] materials = new Material[4];
         private static Material CableMaterial(CableKind kind)
         {
             int index = (int)kind;
