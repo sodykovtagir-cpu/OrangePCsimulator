@@ -23,6 +23,9 @@ MonoBehaviour:
   - pageName: Cables & Power
     item:
     - {fileID: 11400000, guid: b4dc56fd03e844c6b45356bb835c81ba, type: 2}
+    - {fileID: 11400000, guid: 36e1dd4d8a02416e93d70055d75007c8, type: 2}
+    - {fileID: 11400000, guid: a2ada0572c8a4a8eaa702b9a9800a21f, type: 2}
+    - {fileID: 11400000, guid: 56ac4855e24b4bbdb5e98fecb451f860, type: 2}
     - {fileID: 11400000, guid: 962de0bd86cd5fa9b62ed7fd8a52244e, type: 2}
     - {fileID: 11400000, guid: 14169cf57ea9482685dbe7c767d3a0f7, type: 2}
     - {fileID: 11400000, guid: 07ab8d7127cf4092aaf72a86e30840ae, type: 2}

@@ -3067,6 +3067,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2498294314213791411}
   - component: {fileID: 3656905153186702717}
+  - component: {fileID: 5158988542253093571}
+  - component: {fileID: 5117932331906877747}
   m_Layer: 2
   m_Name: LAN
   m_TagString: Untagged
@@ -3142,3 +3144,32 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4072832992281030392}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &5158988542253093571
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7961636399773033538}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.16
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5117932331906877747
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7961636399773033538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f65810bece34620913cb00d28b91845, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  kind: 9
+  owner: {fileID: 114433391809772074}
+  snapPivot: {fileID: 2864804114140158817}
+  plug: {fileID: 0}

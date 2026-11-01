@@ -170,8 +170,23 @@ namespace PC.Component
 			AddExternal(external);
             PC.Component.Cabling.CablePorts.Install(this);
             if (PC.Component.Cabling.CableMode.Enabled)
-                PC.Component.Cabling.CablePort.Add(this, PC.Component.Cabling.PortKind.PcLan,
-                    "Board LAN", new Vector3(.25f, 0f, -.18f), .24f);
+            {
+                // Honour the artist's RJ45/Trigger and Pivot rather than
+                // generating a cube elsewhere on the board. This also works
+                // on deeply nested Ports groups and on the x32box board.
+                Transform authoredLan = null;
+                foreach (var candidate in GetComponentsInChildren<Transform>(true))
+                    if (candidate.name == "LAN" && candidate.GetComponent<BoxCollider>() != null &&
+                        candidate.GetComponentInParent<Item>() == this)
+                    { authoredLan = candidate; break; }
+                if (authoredLan != null)
+                    PC.Component.Cabling.CablePort.AddAuthored(this,
+                        PC.Component.Cabling.PortKind.PcLan, "Board LAN",
+                        authoredLan, authoredLan.Find("Pivot"));
+                else // retain compatibility with external/legacy board prefabs
+                    PC.Component.Cabling.CablePort.Add(this, PC.Component.Cabling.PortKind.PcLan,
+                        "Board LAN", new Vector3(.25f, 0f, -.18f), .24f);
+            }
         }
 
 		public void Switch()

@@ -67,11 +67,14 @@ namespace PC.Component.Cabling
 
         private void Awake()
         {
-            int count = Mathf.Clamp(segments, 7, 26);
+            // 100 m LAN needs more segments than a short power/video cable;
+            // 52 joints exist only when a player actually spawns that SKU.
+            int count = Mathf.Clamp(segments, 7, 64);
             float step = length / count;
-            // Spawn a loose coil instead of a 12 m straight rod through the
-            // furniture. Chord length is approximately the segment length.
-            int turns = count >= 24 && length > 12f ? 3 : count >= 11 ? 2 : 1;
+            // Coil long lines with extra turns, rather than spawning a giant
+            // five-metre-radius ring through furniture at purchase time.
+            int turns = length >= 80f ? 9 : length >= 30f ? 6 :
+                count >= 24 && length > 12f ? 3 : count >= 11 ? 2 : 1;
             float radius = step / (2f * Mathf.Sin(Mathf.PI * turns / count));
             // A fixed half-metre lateral spread can make a 1 m cable longer
             // than its nominal length before it is even touched.
@@ -183,19 +186,30 @@ namespace PC.Component.Cabling
             var plug = go.GetComponent<CablePlug>();
             if (plug == null) plug = go.AddComponent<CablePlug>();
             plug.Init(this, end);
-            if (kind == CableKind.LAN && lanPlugModel != null)
+            if (kind == CableKind.LAN)
             {
-                // Keep the proven plug Rigidbody/Collider, replace only its
-                // visible HDMI mesh with the player's RJ45 FBX model.
+                // The RJ45 FBX is nested into both prefab plugs so it is
+                // visible in Prefab Mode as well as Play Mode. Old saved
+                // instances without the nested visual get it here once.
                 var oldVisual = go.GetComponent<MeshRenderer>();
                 if (oldVisual != null) oldVisual.enabled = false;
-                var visual = Instantiate(lanPlugModel, go.transform);
-                visual.name = "RJ45 model";
-                visual.transform.localPosition = Vector3.zero;
-                visual.transform.localRotation = Quaternion.identity;
-                visual.transform.localScale = Vector3.one * Mathf.Max(.001f, lanPlugVisualScale);
-                foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
-                    Destroy(collider);
+                var visual = go.transform.Find("RJ45 model");
+                // A Unity FBX reimport may restore its original root name;
+                // there is only one authored child on an RJ45 plug.
+                if (visual == null && go.transform.childCount > 0)
+                    visual = go.transform.GetChild(0);
+                if (visual == null && lanPlugModel != null)
+                {
+                    var created = Instantiate(lanPlugModel, go.transform);
+                    created.name = "RJ45 model";
+                    created.transform.localPosition = Vector3.zero;
+                    created.transform.localRotation = Quaternion.identity;
+                    created.transform.localScale = Vector3.one * Mathf.Max(.001f, lanPlugVisualScale);
+                    visual = created.transform;
+                }
+                if (visual != null)
+                    foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
+                        Destroy(collider);
             }
             if (go.GetComponentInChildren<Renderer>() == null)
             {
@@ -570,7 +584,9 @@ namespace PC.Component.Cabling
             var shader = Shader.Find("Standard") ?? Shader.Find("Diffuse");
             var material = new Material(shader);
             material.color = kind == CableKind.VGA ? new Color(.18f, .22f, .52f) :
-                kind == CableKind.HDMI ? new Color(.1f, .1f, .1f) : new Color(.32f, .32f, .32f);
+                kind == CableKind.HDMI ? new Color(.1f, .1f, .1f) :
+                kind == CableKind.LAN ? new Color(.11f, .20f, .21f) :
+                new Color(.32f, .32f, .32f);
             materials[index] = material;
             return material;
         }

@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: LAN Cable 48m
   price: 420
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: e220c30a6e6b78b4abfc5318867ee532, type: 3}
+  sprite: {fileID: 21300000, guid: 88e190b14ef84e0685a4482e712c1dcd, type: 3}
   spawn: {fileID: 100000, guid: 7d395e1421414fdbaa5a4912ccfda288, type: 3}
   large: 1
   translateDescription: 0

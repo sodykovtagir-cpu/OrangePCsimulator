@@ -39,6 +39,43 @@ assert 'public static CablePort AddAuthored' in port
 assert 'materials = new Material[4]' in rope
 assert 'lanPlugModel' in rope and 'Instantiate(lanPlugModel, go.transform)' in rope
 assert '  kind: 3\n  length: 48' in c
+# Each SKU is physical, has its own length/coil, and contains two
+# serialized imported RJ45 instances; no HDMI visual remains in Prefab Mode.
+import re
+fbx='25abe6272ecacd641a52d6b37b16b6f9'
+icon=re.search(r'^guid: ([a-f0-9]{32})$',
+    (root/'Assets/Texture2D/icon_cable_lan.png.meta').read_text(), re.M).group(1)
+mat=re.search(r'^guid: ([a-f0-9]{32})$',
+    (root/'Assets/Material/Cable LAN.mat.meta').read_text(), re.M).group(1)
+shop=(root/'Assets/MonoBehaviour/Shop.asset').read_text()
+for length,segments in ((5,11),(15,26),(48,26),(100,52)):
+    prefab=root/f'Assets/Resources/components/LAN Cable ({length}m).prefab'
+    product=root/f'Assets/MonoBehaviour/LAN Cable ({length}m).asset'
+    assert check_prefab(str(prefab)) == 0
+    text=prefab.read_text(); item=product.read_text()
+    assert f'  kind: 3\n  length: {length}\n  segments: {segments}\n' in text
+    assert text.count(f'm_SourcePrefab: {{fileID: 100100000, guid: {fbx}, type: 3}}') == 2
+    assert f'lanPlugModel: {{fileID: 919132149155446097, guid: {fbx}, type: 3}}' in text
+    assert 'MeshRenderer:' not in text and 'MeshFilter:' not in text
+    assert f'guid: {mat}, type: 2' in text
+    assert f'guid: {icon}, type: 3' in item
+    guid=re.search(r'^guid: ([a-f0-9]{32})$',product.with_suffix('.asset.meta').read_text(),re.M).group(1)
+    assert shop.count(f'guid: {guid}, type: 2') == 1
+assert 'Mathf.Clamp(segments, 7, 64)' in rope
+assert 'go.transform.Find("RJ45 model")' in rope
+# The two artist-authored board sockets and seven duplicated variants have
+# the BoxCollider, real pivot, sphere trigger and PcLan serialized in YAML.
+port_guid=re.search(r'^guid: ([a-f0-9]{32})$',
+    (cs/'PC/Component/Cabling/CablePort.cs.meta').read_text(),re.M).group(1)
+for board_name in ('ATX','Mini_ITX','ATX 2','Micro_ATX','EATX',
+                   'EXATX','MSG_ATX_Black','MSG_ATX_White','x32box'):
+    path=root/f'Assets/Resources/components/{board_name}.prefab'
+    assert check_prefab(str(path)) == 0
+    text=path.read_text()
+    assert text.count('  m_Name: LAN\n') == 1 and '  m_Name: Pivot\n' in text
+    assert f'guid: {port_guid}, type: 3' in text and '  kind: 9\n' in text
+    assert 'SphereCollider:' in text and '  m_IsTrigger: 1' in text
+assert 'candidate.name == "LAN"' in board and 'authoredLan.Find("Pivot")' in board
 assert 'guid: 25abe6272ecacd641a52d6b37b16b6f9' in c
 assert 'LAN Cable ' in mode and 'LAN Cable ' in saver
 assert 'router.Indicators?.PulseLan(link.LanPort)' in net

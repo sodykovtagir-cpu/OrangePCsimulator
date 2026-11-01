@@ -331,12 +331,14 @@ for key in ('Cables & Power','Power Cable','VGA Cable','HDMI Cable','Wall Outlet
 shop_page=shop.split('  - pageName: Cables & Power\n')[1].split('  - pageName:',1)[0]
 page_guids=re.findall(r'^    - \{fileID: 11400000, guid: ([a-f0-9]{32}), type: 2\}$',
                       shop_page,re.M)
-# Existing 17 cable/outlet products plus the authored RJ45 cable.
-lan_asset=root/'Assets/MonoBehaviour/LAN Cable (48m).asset'
-lan_guid=re.search(r'^guid: ([a-f0-9]{32})$',
-    lan_asset.with_suffix('.asset.meta').read_text(), re.M).group(1)
-assert len(page_guids)==18 and len(set(page_guids))==18
-assert sorted(page_guids)==sorted(shop_ids+[lan_guid])
+# Existing 17 cable/outlet products plus four real RJ45 lengths.
+lan_guids=[]
+for length in (5,15,48,100):
+    asset=root/f'Assets/MonoBehaviour/LAN Cable ({length}m).asset'
+    lan_guids.append(re.search(r'^guid: ([a-f0-9]{32})$',
+        asset.with_suffix('.asset.meta').read_text(), re.M).group(1))
+assert len(page_guids)==21 and len(set(page_guids))==21
+assert sorted(page_guids)==sorted(shop_ids+lan_guids)
 for kind in ('power','vga','hdmi','outlet'):
     image=root/f'Assets/Texture2D/icon_cable_{kind}.png'
     assert image.exists() and image.with_suffix('.png.meta').exists()
@@ -363,4 +365,4 @@ for kind in ('power','vga','hdmi','outlet'):
         match=re.search(r'^  sprite: \{fileID: \d+, guid: ([a-f0-9]{32})',
                         asset.read_text(), re.M)
         assert match and match.group(1) in valid, asset
-print('Physical cables, power/video routes, persistence, 18 shop items: OK')
+print('Physical cables, power/video routes, persistence, 21 shop items: OK')
