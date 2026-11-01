@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -110,7 +110,9 @@ namespace PC.Component.Software
             oggleHome.SetActive(false);
             var service = InternetService.Instance;
             var board = system != null ? system.Board : null;
-            if (service == null || !service.TryTransfer(board, url, mb, out var delay, out var error))
+            float delay = 0f;
+            string error = null;
+            if (service == null || !service.TryTransfer(board, url, mb, out delay, out error))
             {
                 networkPage = RouterWebPages.Message(pageContainer,
                     error ?? "Нет подключения к интернету");
