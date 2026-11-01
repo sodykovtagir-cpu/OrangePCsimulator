@@ -1041,6 +1041,7 @@ MonoBehaviour:
   - url: www.printexpert.com
     page: {fileID: 114021143164813130, guid: b41483cdbf0833f468e796bc5174fab1, type: 3}
     visible: 1
+    trafficMB: 5
     description: Make your own custom banners at a low price
     keywords:
     - printexpert
@@ -1056,6 +1057,7 @@ MonoBehaviour:
   - url: www.darknet.com
     page: {fileID: 114663928911710202, guid: fb7d89ac53fb4de498c13cee661bc0d0, type: 3}
     visible: 1
+    trafficMB: 5
     description: There is no description
     keywords:
     - darknet
@@ -1073,6 +1075,7 @@ MonoBehaviour:
   - url: www.giveaway.com
     page: {fileID: 114740135012415122, guid: b59a22166faecf244af19a0e89927495, type: 3}
     visible: 1
+    trafficMB: 5
     description: Enter code
     keywords:
     - give away
@@ -1091,6 +1094,7 @@ MonoBehaviour:
   - url: www.freecoins.com
     page: {fileID: 114382274882578217, guid: 8d38dfba4d1fe074d91e00c9b6a13cd0, type: 3}
     visible: 1
+    trafficMB: 5
     description: FREEEEE COINZZZ111!!111!1 TAKE IT NOW!1111!!!
     keywords:
     - freecoins
@@ -1111,6 +1115,7 @@ MonoBehaviour:
   - url: www.modforge.com
     page: {fileID: 114711914853252429, guid: 46030b2eeda0b4340a0bf4b2be291d46, type: 3}
     visible: 1
+    trafficMB: 5
     description: Print your .pic onto a custom case side panel
     keywords:
     - modforge
@@ -1125,6 +1130,35 @@ MonoBehaviour:
     - panel
     - paint
     - pic
+  - url: typolink.com/tariffs
+    page: {fileID: 7320829179106057043, guid: 38a93d210b245c947868b491c4c6cb47, type: 3}
+    visible: 1
+    trafficMB: 0
+    description: Subscibe to TypoLink
+    keywords:
+    - typolink
+    - typo
+    - link
+    - tariff
+    - tarriff
+    - "\u0442\u0430\u0440\u0438\u0444"
+    - wifi
+    - internet
+    - internet
+    - internet
+  - url: 192.168.1.1/panel
+    page: {fileID: 7320829179106057043, guid: edb70598ee2bfb24cb962c29ce8cd2ad, type: 3}
+    visible: 0
+    trafficMB: 0
+    description: TypoLink Router settings
+    keywords:
+    - typolink
+    - typo
+    - link
+    - wifi
+    - internet
+    - internet
+    - internet
   addressBar: {fileID: 114686765713806498}
   oggleHome: {fileID: 4538018306292929125}
   resultsContainer: {fileID: 7372137659372211972}
