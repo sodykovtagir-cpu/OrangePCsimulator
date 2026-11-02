@@ -215,7 +215,15 @@ namespace PC.Component.Cabling
                     foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
                         Destroy(collider);
             }
-            if (kind == CableKind.LAN) plug.EnsureCableExitPivot();
+            // These local positions follow the authored FBX back/strain-relief
+            // directions: RJ45/VGA/HDMI along -X, wall plug A along +Y,
+            // device power plug B along -Z. Never move the socket snap Pivot.
+            Vector3 exit = kind == CableKind.LAN ? new Vector3(-.15f, 0f, 0f) :
+                kind == CableKind.VGA || kind == CableKind.HDMI ?
+                    new Vector3(-.115f, 0f, 0f) :
+                end == 0 ? new Vector3(0f, .084f, 0f) :
+                    new Vector3(0f, 0f, -.112f);
+            plug.EnsureCableExitPivot(exit);
             if (go.GetComponentInChildren<Renderer>() == null)
             {
                 var model = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -698,12 +706,12 @@ namespace PC.Component.Cabling
             }
         }
 
-        // Earlier saves stored rope anchors at the ORIGIN of the RJ45 plug.
+        // Earlier saves stored rope anchors at the ORIGIN of each plug.
         // Retain every interior saved joint and move only the two end joints
         // to the new pivot, in the physics poses restored before port insertion.
-        private void AnchorLanPlugEnds()
+        private void AnchorPlugEnds()
         {
-            if (kind != CableKind.LAN || plugs == null || bodies == null || bodies.Length == 0) return;
+            if (plugs == null || bodies == null || bodies.Length == 0) return;
             var first = bodies[0].GetComponent<CharacterJoint>();
             if (first != null)
             {
@@ -794,7 +802,7 @@ namespace PC.Component.Cabling
             }
             if (!exact && (poses != null || restorePositions))
                 ReanchorChainFromLoadedPose();
-            AnchorLanPlugEnds();
+            AnchorPlugEnds();
             UpdateJacket();
         }
 
@@ -1108,11 +1116,11 @@ namespace PC.Component.Cabling
                 for (int i = 0; i < bodies.Length; i++)
                     bodies[i].position = Vector3.Lerp(plugs[0].CableExitPhysicsPosition,
                         plugs[1].CableExitPhysicsPosition, (i + .5f) / bodies.Length) + Vector3.up * .16f;
-                if (kind == CableKind.LAN) ReanchorChainFromLoadedPose();
+                ReanchorChainFromLoadedPose();
             }
             // Pins may have snapped restored plug poses after FromData, or a
             // legacy save may have lacked joint poses entirely.
-            AnchorLanPlugEnds();
+            AnchorPlugEnds();
             foreach (var plug in plugs)
             {
                 if (plug == null) continue;

@@ -17,8 +17,8 @@ namespace PC.Component.Cabling
         private CablePort yankedPort;
         private Action<CablePlug> releaseDrag;
         [SerializeField, Min(10f)] private float pullOutForce = 200f;
-        // On LAN plugs, this authored child marks the BACK of the RJ45 shell,
-        // where the jacket leaves the connector. It is not the port snap point.
+        // Authored child at the back of the plug, where the jacket exits.
+        // Socket snapping still uses the original plug root and port Pivot.
         [SerializeField] private Transform cableExitPivot;
         public Vector3 CableExitLocalPosition => cableExitPivot != null ?
             cableExitPivot.localPosition : Vector3.zero;
@@ -35,15 +35,15 @@ namespace PC.Component.Cabling
             }
         }
 
-        public void EnsureCableExitPivot()
+        public void EnsureCableExitPivot(Vector3 fallbackPosition)
         {
             if (cableExitPivot == null) cableExitPivot = transform.Find("Cable Pivot");
             if (cableExitPivot != null) return;
-            // Old LAN instances without an authored child get the same point.
+            // Older cable instances without an authored child get the same point.
             var marker = new GameObject("Cable Pivot");
             cableExitPivot = marker.transform;
             cableExitPivot.SetParent(transform, false);
-            cableExitPivot.localPosition = new Vector3(-.15f, 0f, 0f);
+            cableExitPivot.localPosition = fallbackPosition;
         }
         public float PullOutForce => pullOutForce >= 10f ? pullOutForce : 200f;
         // Current solver load is read only when a two-ended rope is nearly
@@ -113,13 +113,13 @@ namespace PC.Component.Cabling
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null)
             {
-                // LAN length is measured between the two jacket EXIT pivots,
-                // not between front-of-plug socket pivots. Keep other cable
-                // types' original snap-to-snap reach unchanged.
-                float span = Cable.Kind == CableKind.LAN ?
+                // All cables now measure the distance between their jacket
+                // exits. Legacy plugs without pivots retain snap-to-snap reach.
+                float span = CableExitLocalPosition == Vector3.zero &&
+                    other.CableExitLocalPosition == Vector3.zero ?
+                    Vector3.Distance(other.Connected.Snap.position, port.Snap.position) :
                     Vector3.Distance(other.CableExitPhysicsPosition,
-                        port.Snap.position + port.Snap.rotation * CableExitLocalPosition) :
-                    Vector3.Distance(other.Connected.Snap.position, port.Snap.position);
+                        port.Snap.position + port.Snap.rotation * CableExitLocalPosition);
                 if (span > Cable.Length * (restoring ? 1f : .95f)) return false;
             }
             // The model's BoxCollider is offset from its Rigidbody origin.

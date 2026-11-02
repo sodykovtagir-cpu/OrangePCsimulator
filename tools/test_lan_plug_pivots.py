@@ -11,12 +11,12 @@ plug = (code / 'CablePlug.cs').read_text()
 rope = (code / 'CableItem.cs').read_text()
 assert '[SerializeField] private Transform cableExitPivot;' in plug
 assert 'transform.Find("Cable Pivot")' in plug
-assert 'new Vector3(-.15f, 0f, 0f)' in plug
+assert 'new Vector3(-.15f, 0f, 0f)' in rope
 assert 'body.position + body.rotation * CableExitLocalPosition' in plug
 assert 'Vector3.Distance(other.CableExitPhysicsPosition,' in plug
 assert 'port.Snap.position + port.Snap.rotation * CableExitLocalPosition' in plug
-assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position);' in plug
-assert 'if (kind == CableKind.LAN) plug.EnsureCableExitPivot();' in rope
+assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) :' in plug
+assert 'plug.EnsureCableExitPivot(exit);' in rope
 assert 'points[0] = plugA.CableExitPosition;' in rope
 assert 'points[count] = plugB.CableExitPosition;' in rope
 assert 'last.anchor = plugB.CableExitLocalPosition;' in rope
@@ -24,12 +24,12 @@ assert 'jacket.SetPosition(0, plugA.CableExitPosition);' in rope
 assert 'jacket.SetPosition(bodies.Length + 1, plugB.CableExitPosition);' in rope
 assert 'Vector3 start = plugs[0].CableExitPhysicsPosition;' in rope
 assert 'Vector3 end = plugs[1].CableExitPhysicsPosition;' in rope
-assert 'private void AnchorLanPlugEnds()' in rope
+assert 'private void AnchorPlugEnds()' in rope
 assert 'first.connectedAnchor = plugs[0].CableExitLocalPosition;' in rope
 assert 'last.anchor = plugs[1].CableExitLocalPosition;' in rope
-assert rope.count('AnchorLanPlugEnds();') >= 2 # after FromData and after port restoration
+assert rope.count('AnchorPlugEnds();') >= 2 # after FromData and after port restoration
 assert 'data["cableJoints"] = anchors;' in rope and 'RestoreJoint(' in rope
-assert 'if (kind == CableKind.LAN) ReanchorChainFromLoadedPose();' in rope
+assert 'ReanchorChainFromLoadedPose();' in rope
 for length in (5, 15, 48, 100):
     path = parts / f'LAN Cable ({length}m).prefab'
     content = path.read_text()
