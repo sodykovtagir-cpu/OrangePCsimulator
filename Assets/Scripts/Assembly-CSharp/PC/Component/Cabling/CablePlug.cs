@@ -17,6 +17,34 @@ namespace PC.Component.Cabling
         private CablePort yankedPort;
         private Action<CablePlug> releaseDrag;
         [SerializeField, Min(10f)] private float pullOutForce = 200f;
+        // On LAN plugs, this authored child marks the BACK of the RJ45 shell,
+        // where the jacket leaves the connector. It is not the port snap point.
+        [SerializeField] private Transform cableExitPivot;
+        public Vector3 CableExitLocalPosition => cableExitPivot != null ?
+            cableExitPivot.localPosition : Vector3.zero;
+        public Vector3 CableExitPosition => cableExitPivot != null ?
+            cableExitPivot.position : transform.position;
+        // Restored/interpolated Transforms can lag the saved Rigidbody pose.
+        public Vector3 CableExitPhysicsPosition
+        {
+            get
+            {
+                var body = GetComponent<Rigidbody>();
+                return body != null ? body.position + body.rotation * CableExitLocalPosition :
+                    CableExitPosition;
+            }
+        }
+
+        public void EnsureCableExitPivot()
+        {
+            if (cableExitPivot == null) cableExitPivot = transform.Find("Cable Pivot");
+            if (cableExitPivot != null) return;
+            // Old LAN instances without an authored child get the same point.
+            var marker = new GameObject("Cable Pivot");
+            cableExitPivot = marker.transform;
+            cableExitPivot.SetParent(transform, false);
+            cableExitPivot.localPosition = new Vector3(-.15f, 0f, 0f);
+        }
         public float PullOutForce => pullOutForce >= 10f ? pullOutForce : 200f;
         // Current solver load is read only when a two-ended rope is nearly
         // taut. A 1 kg monitor supplies ~10 N: too little to break the normal
@@ -83,10 +111,17 @@ namespace PC.Component.Cabling
             RefreshYankedPort();
             if (!restoring && port == yankedPort) return false;
             var other = Cable.End(1 - End);
-            if (other != null && other.Connected != null &&
-                Vector3.Distance(other.Connected.Snap.position, port.Snap.position) >
-                    Cable.Length * (restoring ? 1f : .95f))
-                return false;
+            if (other != null && other.Connected != null)
+            {
+                // LAN length is measured between the two jacket EXIT pivots,
+                // not between front-of-plug socket pivots. Keep other cable
+                // types' original snap-to-snap reach unchanged.
+                float span = Cable.Kind == CableKind.LAN ?
+                    Vector3.Distance(other.CableExitPhysicsPosition,
+                        port.Snap.position + port.Snap.rotation * CableExitLocalPosition) :
+                    Vector3.Distance(other.Connected.Snap.position, port.Snap.position);
+                if (span > Cable.Length * (restoring ? 1f : .95f)) return false;
+            }
             // The model's BoxCollider is offset from its Rigidbody origin.
             // A real overlap must not be rejected because the origin is outside
             // the sphere while the visible plug is already touching the socket.
