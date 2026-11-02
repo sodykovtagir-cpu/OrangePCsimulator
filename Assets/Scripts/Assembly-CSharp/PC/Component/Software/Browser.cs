@@ -32,6 +32,8 @@ namespace PC.Component.Software
         [SerializeField] private Transform pageContainer;
         [SerializeField] private GameObject loadingPage;
         [SerializeField] private Text loadingText;
+        [SerializeField] private GameObject errorPage;
+        [SerializeField] private Text errorText;
         [SerializeField] private GameObject oggleResultPrefab;
 
         [SerializeField] private InputField homeSearchInput;
@@ -100,10 +102,28 @@ namespace PC.Component.Software
         public void ShowNetworkPage(string url)
         {
             url = NormalizeUrl(url);
+            var board = system != null ? system.Board : null;
+            if (InternetService.Instance == null ||
+                !InternetService.Instance.CanOpenLocalPanel(board, out var router))
+            {
+                ShowError("Сначала подключись к роутеру через Wi-Fi в панели задач PCOS или LAN");
+                return;
+            }
             ClearPage();
             oggleHome.SetActive(false);
-            networkPage = RouterWebPages.Create(this, pageContainer,
-                system != null ? system.Board : null, url);
+            networkPage = RouterWebPages.Create(this, pageContainer, board, url);
+        }
+
+        private void ShowError(string message)
+        {
+            ClearPage();
+            oggleHome.SetActive(false);
+            if (errorPage != null)
+            {
+                if (errorText != null) errorText.text = message;
+                errorPage.SetActive(true);
+            }
+            else networkPage = RouterWebPages.Message(pageContainer, message);
         }
 
         private void LoadOnline(string url, float mb, Action completed)
@@ -116,8 +136,7 @@ namespace PC.Component.Software
             string error = null;
             if (service == null || !service.TryTransfer(board, url, mb, out delay, out error))
             {
-                networkPage = RouterWebPages.Message(pageContainer,
-                    error ?? "Нет подключения к интернету");
+                ShowError(error ?? "Нет подключения к интернету");
                 return;
             }
             // Authored white loading page in Browser.prefab; the rotating image
@@ -147,8 +166,7 @@ namespace PC.Component.Software
             var status = InternetService.Instance != null ? InternetService.Instance.Status(board) : null;
             if (status == null || status.Quality <= 0f)
             {
-                ClearPage();
-                networkPage = RouterWebPages.Message(pageContainer, "Соединение прервано");
+                ShowError("Соединение прервано");
                 yield break;
             }
             completed();
@@ -216,8 +234,7 @@ namespace PC.Component.Software
                      !InternetService.Instance.CanOpenLocalPanel(
                          system != null ? system.Board : null, out var localRouter))
                 {
-                    networkPage = RouterWebPages.Message(pageContainer,
-                        "Сначала подключись к роутеру через Wi-Fi в панели задач PCOS");
+                    ShowError("Сначала подключись к роутеру через Wi-Fi в панели задач PCOS или LAN");
                     return;
                 }
                 currentPage = Instantiate(site.page, pageContainer);
@@ -238,6 +255,7 @@ namespace PC.Component.Software
         private void ClearPage()
         {
             if (loadingPage != null) loadingPage.SetActive(false);
+            if (errorPage != null) errorPage.SetActive(false);
             if (pendingLoad != null) { StopCoroutine(pendingLoad); pendingLoad = null; }
             if (networkPage != null) { Destroy(networkPage); networkPage = null; }
             resultsPage.SetActive(false);
