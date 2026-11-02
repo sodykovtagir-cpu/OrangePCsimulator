@@ -8538,7 +8538,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'Wi-Fi: ON (2 W)'
+  m_Text: 'Wi-Fi: ON'
 --- !u!1 &6812345678000000028
 GameObject:
   m_ObjectHideFlags: 0

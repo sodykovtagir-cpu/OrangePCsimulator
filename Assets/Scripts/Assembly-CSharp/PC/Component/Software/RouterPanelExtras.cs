@@ -114,7 +114,7 @@ namespace PC.Component.Software
             if (child == null || child.UpstreamId != parent.Id)
             { if (status != null) status.text = "Этот роутер не подключён к текущему"; return; }
             if (!child.UpstreamWireless)
-            { if (status != null) status.text = "Для отключения LAN вынь кабель"; return; }
+            { if (status != null) status.text = "Подключён по LAN"; return; }
             child.DisconnectUpstream();
             if (selectedEntry != null) selectedEntry.CancelPasswordEntry();
             if (status != null) status.text = "Повторитель #" + selectedId + " отключён";
