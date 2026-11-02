@@ -216,14 +216,14 @@ namespace PC.Component.Cabling
                         Destroy(collider);
             }
             // These local positions follow the authored FBX back/strain-relief
-            // directions: RJ45/VGA/HDMI along -X, the wall plug A inside its
-            // black shell along -Y, device plug B along -Z. A tip placement on
-            // the wall plug can make the jacket appear to grow from its white
-            // contacts; NEVER move the socket snap Pivot to compensate.
-            Vector3 exit = kind == CableKind.LAN ? new Vector3(-.15f, 0f, 0f) :
+            // directions: RJ45/VGA/HDMI along -X, wall plug A along +Y,
+            // device power plug B along -Z. The RJ45 rear is only 0.02 m
+            // behind its root: -0.15 m leaves a visible gap in Play Mode.
+            // Never move the socket snap Pivot to compensate.
+            Vector3 exit = kind == CableKind.LAN ? new Vector3(-.02f, 0f, 0f) :
                 kind == CableKind.VGA || kind == CableKind.HDMI ?
                     new Vector3(-.115f, 0f, 0f) :
-                end == 0 ? new Vector3(0f, -.06f, 0f) :
+                end == 0 ? new Vector3(0f, .084f, 0f) :
                     new Vector3(0f, 0f, -.112f);
             plug.EnsureCableExitPivot(exit);
             if (go.GetComponentInChildren<Renderer>() == null)

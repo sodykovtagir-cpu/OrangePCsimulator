@@ -11,7 +11,7 @@ plug = (code / 'CablePlug.cs').read_text()
 rope = (code / 'CableItem.cs').read_text()
 assert '[SerializeField] private Transform cableExitPivot;' in plug
 assert 'transform.Find("Cable Pivot")' in plug
-assert 'new Vector3(-.15f, 0f, 0f)' in rope
+assert 'new Vector3(-.02f, 0f, 0f)' in rope
 assert 'body.position + body.rotation * CableExitLocalPosition' in plug
 assert 'Vector3.Distance(other.CableExitPhysicsPosition,' in plug
 assert 'port.Snap.position + port.Snap.rotation * CableExitLocalPosition' in plug
@@ -52,6 +52,14 @@ for length in (5, 15, 48, 100):
         pivot_body = content.split(f'--- !u!4 &{pivot_transform}\n', 1)[1].split('--- !u!', 1)[0]
         assert f'  m_GameObject: {{fileID: {pivot_go}}}' in pivot_body
         assert f'  m_Father: {{fileID: {root_id}}}' in pivot_body
-        assert '  m_LocalPosition: {x: -0.15, y: 0, z: 0}' in pivot_body
+        assert '  m_LocalPosition: {x: -0.02, y: 0, z: 0}' in pivot_body
+        # Pivot must sit just inside the back face of the authored plug
+        # collider, not 12 cm outside it as the old -0.15 marker did.
+        collider = content.split(f'--- !u!65 &{650010 if root_id == 400010 else 650020}\n', 1)[1].split('--- !u!', 1)[0]
+        center = re.search(r'm_Center: \{x: ([^,]+),', collider)
+        size = re.search(r'm_Size: \{x: ([^,]+),', collider)
+        assert center and size
+        back = float(center.group(1)) - float(size.group(1)) / 2
+        assert back < -0.02 < back + 0.02, (path, root_id, back)
         assert '  m_LocalScale: {x: 1, y: 1, z: 1}' in pivot_body
 print('PASS: four LAN prefab pairs, rear exit pivots, jacket/joints and old-save anchors')

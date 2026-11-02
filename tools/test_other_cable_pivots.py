@@ -10,7 +10,7 @@ plug = (root/'Assets/Scripts/Assembly-CSharp/PC/Component/Cabling/CablePlug.cs')
 rope = (root/'Assets/Scripts/Assembly-CSharp/PC/Component/Cabling/CableItem.cs').read_text()
 assert 'plug.EnsureCableExitPivot(exit);' in rope
 assert 'new Vector3(-.115f, 0f, 0f)' in rope
-assert 'new Vector3(0f, -.06f, 0f)' in rope
+assert 'new Vector3(0f, .084f, 0f)' in rope
 assert 'new Vector3(0f, 0f, -.112f)' in rope
 assert 'if (kind == CableKind.VGA || kind == CableKind.HDMI)' not in rope # no runtime opt-out
 assert 'CableExitLocalPosition == Vector3.zero' in plug
@@ -24,7 +24,7 @@ assert 'var savedJoints = data["cableJoints"] as JArray;' in rope
 assert 'first.connectedAnchor = plugs[0].CableExitLocalPosition;' in rope
 assert 'last.anchor = plugs[1].CableExitLocalPosition;' in rope
 expected = {
-    'Power Cable': (0, ('{x: 0, y: -0.06, z: 0}', '{x: 0, y: 0, z: -0.112}')),
+    'Power Cable': (0, ('{x: 0, y: 0.084, z: 0}', '{x: 0, y: 0, z: -0.112}')),
     'VGA Cable': (1, ('{x: -0.115, y: 0, z: 0}',) * 2),
     'HDMI Cable': (2, ('{x: -0.115, y: 0, z: 0}',) * 2),
 }
