@@ -72,7 +72,7 @@ namespace PC.Component.Software.OS
         {
             var board = os != null ? os.Board : null;
             bool enabled = board != null && board.WifiEnabled;
-            if (powerLabel != null) powerLabel.text = enabled ? "Wi-Fi: ON (2 W)" : "Wi-Fi: OFF (0 W)";
+            if (powerLabel != null) powerLabel.text = enabled ? "Wi-Fi: ON" : "Wi-Fi: OFF";
             // Preserve the icon sprite and its authored colors; only reduce opacity.
             if (trayIcon != null)
             {
@@ -119,7 +119,7 @@ namespace PC.Component.Software.OS
             var connection = service.Status(board);
             status.text = board.WifiEnabled ?
                 (found == 0 ? "Wi-Fi сети не найдены" : "Wi-Fi сетей: " + found) :
-                "Wi-Fi выключен (экономия 2 Вт)";
+                "Wi-Fi выключен";
             if (connection.Wired) status.text += "  |  LAN подключён";
         }
 
@@ -133,7 +133,7 @@ namespace PC.Component.Software.OS
         private void AddRow(Motherboard board, RouterDevice router, InternetService service, bool lan)
         {
             var row = Instantiate(rowPrefab, list);
-            row.SetPcosPlainTextWhite();
+            row.SetPcosCardColors();
             var rect = (RectTransform)row.transform;
             rect.localScale = Vector3.one;
             rect.sizeDelta = new Vector2(415, 54);

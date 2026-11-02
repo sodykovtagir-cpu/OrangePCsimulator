@@ -87,11 +87,14 @@ namespace PC.Component.Software.OS
         // PCOS creates its own instances of the shared prefab. Do not recolor
         // the asset: the router website still uses its authored text palette.
         // Button captions and input/placeholder text keep their contrast.
-        public void SetPcosPlainTextWhite()
+        public void SetPcosCardColors()
         {
             if (ssid != null) ssid.color = Color.white;
             if (description != null) description.color = Color.white;
             if (passwordMessage != null) passwordMessage.color = Color.white;
+            // The author's icon sprite stays intact; tint only this PCOS row.
+            if (icon != null && icon.TryGetComponent<Image>(out var wifiIcon))
+                wifiIcon.color = Color.white;
         }
 
         public void CancelPasswordEntry()
@@ -125,8 +128,8 @@ namespace PC.Component.Software.OS
                 if (icon != null) icon.SetActive(!enteringPassword);
                 if (description != null)
                 {
-                    description.text = wired ? "Подключён по LAN — отсоедини кабель" :
-                        repeaterConnected ? "Повторитель по Wi-Fi" : "Подключить к основной Wi-Fi сети";
+                    description.text = wired ? "Подключён по LAN" :
+                        repeaterConnected ? "Повторитель по Wi-Fi" : "Не подключён";
                     description.gameObject.SetActive(!enteringPassword);
                 }
                 if (connectLabel != null)

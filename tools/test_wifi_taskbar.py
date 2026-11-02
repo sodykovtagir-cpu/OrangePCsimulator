@@ -32,11 +32,19 @@ assert 'ssid.gameObject.SetActive(!enteringPassword)' in entry
 refresh = entry.split('public void Refresh()', 1)[1].split('private void ConnectRepeaterClicked()', 1)[0]
 assert 'bool repeaterConnected =' in refresh and 'bool connected = Connected();' in refresh
 assert 'bool connected = repeaterParent' not in refresh
-colors = entry.split('public void SetPcosPlainTextWhite()', 1)[1].split('public void CancelPasswordEntry()', 1)[0]
+colors = entry.split('public void SetPcosCardColors()', 1)[1].split('public void CancelPasswordEntry()', 1)[0]
 assert all(f'{name}.color = Color.white' in colors for name in ('ssid', 'description', 'passwordMessage'))
 assert 'connectLabel.color' not in colors and 'password.textComponent.color' not in colors
-assert 'row.SetPcosPlainTextWhite();' in tray and 'SetPcosPlainTextWhite' not in routerpanel
+assert 'icon.TryGetComponent<Image>(out var wifiIcon)' in colors
+assert 'wifiIcon.color = Color.white;' in colors
+assert 'row.SetPcosCardColors();' in tray and 'SetPcosCardColors' not in routerpanel
 assert 'icon.SetActive(!enteringPassword && !isLan)' in entry
+assert 'powerLabel.text = enabled ? "Wi-Fi: ON" : "Wi-Fi: OFF";' in tray
+assert '"Wi-Fi выключен"' in tray and 'экономия' not in tray
+assert 'Wi-Fi: ON (2 W)' not in read('Assets/GameObject/PCOS.prefab')
+assert 'Подключён по LAN — отсоедини кабель' not in entry
+assert 'Для отключения LAN вынь кабель' not in routerpanel
+assert 'description.text = wired ? "Подключён по LAN"' in entry
 assert 'description.gameObject.SetActive(!enteringPassword)' in entry
 assert 'url == "wifi-settings"' not in web and 'url == "wifi"' not in web
 assert 'scanButton.onClick.AddListener(Scan)' in routerpanel
