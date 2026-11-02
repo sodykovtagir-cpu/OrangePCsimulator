@@ -218,6 +218,83 @@ namespace PC.Component.Networking
             upstreamLanPortIndex = 0;
         }
 
+        // Called only after a cable/power change or completed save restore.
+        // A physical router-router LAN link configures the downstream router
+        // automatically, but never guesses which unconfigured router is main.
+        public static void RefreshAutoLanLinks()
+        {
+            if (!CableMode.Enabled || SaveManager.RestoringSave) return;
+            var service = InternetService.Instance;
+            if (service == null) return;
+            var routers = FindObjectsOfType<RouterDevice>();
+            // A disconnected physical LAN must not leave a stale saved route.
+            foreach (var child in routers)
+            {
+                if (child == null || child.upstreamId == 0 || child.upstreamWireless) continue;
+                var parent = service.Router(child.upstreamId);
+                if (parent == null || !child.PhysicalLanTo(parent, out _, out _))
+                    child.DisconnectUpstream();
+            }
+            // No configured gateway means direction is ambiguous. Do not call
+            // service.Gateway() here: that fallback could pick an arbitrary AP.
+            var gateway = service.Router(service.GatewayId);
+            if (gateway == null) return;
+            // A restored chain may be enumerated leaf-first. Iterate at most
+            // one pass per router so each newly reachable parent can attach its
+            // children even if no further cable/power event occurs.
+            for (int pass = 0; pass < routers.Length; pass++)
+            {
+                bool changed = false;
+                foreach (var a in routers)
+                {
+                    if (a == null || a.Id == 0 || !a.IsPowered) continue;
+                    for (int i = 1; i <= 4; i++)
+                    {
+                        var socket = a.LanSocket(i);
+                        var plug = socket != null ? socket.plug : null;
+                        if (plug == null || plug.Cable == null || plug.Cable.Kind != CableKind.LAN) continue;
+                        var end = plug.Cable.End(1 - plug.End);
+                        var remote = end != null ? end.Connected : null;
+                        if (remote == null || remote.kind != PortKind.RouterLan) continue;
+                        var b = remote.owner != null ? remote.owner.GetComponent<RouterDevice>() : null;
+                        if (b == null || b.Id == 0 || a.Id >= b.Id || !b.IsPowered) continue;
+                        RouterDevice parent = null, child = null;
+                        if (a == gateway) { parent = a; child = b; }
+                        else if (b == gateway) { parent = b; child = a; }
+                        else if (IsAncestor(a, b, service)) { parent = a; child = b; }
+                        else if (IsAncestor(b, a, service)) { parent = b; child = a; }
+                        else
+                        {
+                            bool aReachable = a.UpstreamQuality(service, new HashSet<int>()) > 0f;
+                            bool bReachable = b.UpstreamQuality(service, new HashSet<int>()) > 0f;
+                            if (aReachable && !bReachable) { parent = a; child = b; }
+                            else if (bReachable && !aReachable) { parent = b; child = a; }
+                        }
+                        if (parent == null || child == null ||
+                            (parent != gateway && parent.UpstreamQuality(service, new HashSet<int>()) <= 0f) ||
+                            !child.PhysicalLanTo(parent, out _, out var parentPort)) continue;
+                        if (child.upstreamId == parent.Id && !child.upstreamWireless &&
+                            child.upstreamLanPortIndex == parentPort) continue;
+                        // ConnectUpstream checks power, actual cable and cycles.
+                        if (child.ConnectUpstream(parent.Id, false)) changed = true;
+                    }
+                }
+                if (!changed) break;
+            }
+        }
+
+        private static bool IsAncestor(RouterDevice ancestor, RouterDevice descendant, InternetService service)
+        {
+            var seen = new HashSet<int>();
+            var current = service.Router(descendant.upstreamId);
+            while (current != null && seen.Add(current.Id))
+            {
+                if (current == ancestor) return true;
+                current = service.Router(current.upstreamId);
+            }
+            return false;
+        }
+
         public float UpstreamQuality(InternetService service, HashSet<int> seen)
         {
             if (!IsPowered || Id == 0 || !seen.Add(Id)) return 0f;

@@ -111,6 +111,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   website: {fileID: 7320829179106057043}
   repeaterList: {fileID: 8740585769454299683}
+  repeaterRowPrefab: {fileID: 1231231231231231231, guid: 0995d0db164924d46baa0f4f4978ec98, type: 3}
   scanButton: {fileID: 1256099431393546018}
   repeaterResetButton: {fileID: 7986647611194252079}
   apnResetButton: {fileID: 3631965686912188400}

@@ -23,8 +23,13 @@ namespace PC.Component.Software.OS
         private bool enteringPassword;
         private bool isLan;
         private Action onLanChanged;
+        private Action<WifiNetworkEntry> onSelected;
+        private Action onRepeaterChanged;
+        private RouterDevice repeaterParent;
+        private RouterDevice repeaterTarget;
 
-        public void Initialize(Motherboard currentBoard, RouterDevice target, InternetService currentService)
+        public void Initialize(Motherboard currentBoard, RouterDevice target, InternetService currentService,
+            Action<WifiNetworkEntry> selected = null)
         {
             board = currentBoard;
             router = target;
@@ -32,6 +37,8 @@ namespace PC.Component.Software.OS
             enteringPassword = false;
             isLan = false;
             onLanChanged = null;
+            onSelected = selected;
+            repeaterParent = repeaterTarget = null;
             if (password != null) { password.contentType = InputField.ContentType.Password; password.text = ""; }
             if (connect != null) connect.onClick.AddListener(ConnectClicked);
             Refresh();
@@ -50,6 +57,41 @@ namespace PC.Component.Software.OS
             Refresh();
         }
 
+        // Used on the main router's web panel: each card is a candidate
+        // repeater, and the typed key belongs to the MAIN Wi-Fi network.
+        public void InitializeRepeater(RouterDevice parent, RouterDevice target,
+            InternetService network, Action<WifiNetworkEntry> selected, Action changed)
+        {
+            board = null;
+            router = null;
+            service = network;
+            repeaterParent = parent;
+            repeaterTarget = target;
+            onSelected = selected;
+            onRepeaterChanged = changed;
+            enteringPassword = false;
+            isLan = false;
+            if (password != null)
+            {
+                password.contentType = InputField.ContentType.Password;
+                password.text = "";
+            }
+            if (connect != null)
+            {
+                connect.onClick.RemoveAllListeners();
+                connect.onClick.AddListener(ConnectClicked);
+            }
+            Refresh();
+        }
+
+        public void CancelPasswordEntry()
+        {
+            enteringPassword = false;
+            if (password != null) password.text = "";
+            if (passwordPanel != null) passwordPanel.SetActive(false);
+            Refresh();
+        }
+
         private bool Connected()
         {
             if (board == null || router == null || service == null) return false;
@@ -60,7 +102,31 @@ namespace PC.Component.Software.OS
 
         public void Refresh()
         {
+            if (repeaterTarget != null)
+            {
+                bool connected = repeaterParent != null &&
+                    repeaterTarget.UpstreamId == repeaterParent.Id;
+                bool wired = connected && !repeaterTarget.UpstreamWireless;
+                if (ssid != null)
+                {
+                    ssid.text = "#" + repeaterTarget.Id + " " + repeaterTarget.Ssid;
+                    ssid.gameObject.SetActive(!enteringPassword);
+                }
+                if (icon != null) icon.SetActive(!enteringPassword);
+                if (description != null)
+                {
+                    description.text = wired ? "Подключён по LAN — отсоедини кабель" :
+                        connected ? "Повторитель по Wi-Fi" : "Подключить к основной Wi-Fi сети";
+                    description.gameObject.SetActive(!enteringPassword);
+                }
+                if (connectLabel != null)
+                    connectLabel.text = wired ? "LAN" : connected ? "Disconnect" : "Connect";
+                if (connect != null) connect.interactable = !wired;
+                if (passwordPanel != null) passwordPanel.SetActive(enteringPassword && !connected);
+                return;
+            }
             if (router == null || board == null) return;
+            if (connect != null) connect.interactable = true;
             bool connected = Connected();
             if (connected && enteringPassword) enteringPassword = false;
             if (ssid != null) { ssid.text = isLan ? "LAN: " + router.Ssid : router.Ssid;
@@ -76,8 +142,48 @@ namespace PC.Component.Software.OS
             if (connectLabel != null) connectLabel.text = connected ? "Disconnect" : "Connect";
         }
 
+        private void ConnectRepeaterClicked()
+        {
+            if (service == null || repeaterParent == null || repeaterTarget == null) return;
+            if (repeaterTarget.UpstreamId == repeaterParent.Id)
+            {
+                if (!repeaterTarget.UpstreamWireless) return; // unplug physical LAN
+                repeaterTarget.DisconnectUpstream();
+                CancelPasswordEntry();
+                onRepeaterChanged?.Invoke();
+                return;
+            }
+            if (!enteringPassword)
+            {
+                onSelected?.Invoke(this);
+                enteringPassword = true;
+                if (password != null) password.text = "";
+                if (passwordMessage != null) passwordMessage.text = "Пароль основной сети:";
+                Refresh();
+                if (password != null) password.ActivateInputField();
+                return;
+            }
+            string key = password != null ? password.text : "";
+            // An empty or wrong key is not replaced with parent.Password.
+            if (string.IsNullOrEmpty(key) ||
+                !repeaterParent.CredentialsMatch(repeaterParent.Ssid, key))
+            {
+                if (passwordMessage != null) passwordMessage.text = "Неверный пароль основной сети";
+                return;
+            }
+            if (!repeaterTarget.ConnectUpstream(repeaterParent.Id, true, key))
+            {
+                if (passwordMessage != null)
+                    passwordMessage.text = "Нет сигнала, питания или возник цикл";
+                return;
+            }
+            CancelPasswordEntry();
+            onRepeaterChanged?.Invoke();
+        }
+
         private void ConnectClicked()
         {
+            if (repeaterTarget != null) { ConnectRepeaterClicked(); return; }
             if (board == null || router == null || service == null) return;
             if (isLan)
             {
@@ -101,6 +207,7 @@ namespace PC.Component.Software.OS
             if (!board.WifiEnabled) { if (passwordMessage != null) passwordMessage.text = "Wi-Fi выключен"; return; }
             if (!enteringPassword)
             {
+                onSelected?.Invoke(this);
                 enteringPassword = true;
                 if (password != null) password.text = "";
                 if (passwordMessage != null) passwordMessage.text = "Enter Password:";

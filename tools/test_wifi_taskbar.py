@@ -31,7 +31,10 @@ assert 'icon.SetActive(!enteringPassword && !isLan)' in entry
 assert 'description.gameObject.SetActive(!enteringPassword)' in entry
 assert 'url == "wifi-settings"' not in web and 'url == "wifi"' not in web
 assert 'scanButton.onClick.AddListener(Scan)' in routerpanel
-assert 'website.AttachRepeaterWifi()' in routerpanel and 'website.AttachRepeaterLan()' in routerpanel
+assert 'InitializeRepeater(current, router, network' in routerpanel
+assert 'entry => SelectEntry(entry, router.Id)' in routerpanel
+assert 'SelectEntry)' in tray and 'selectedEntry.CancelPasswordEntry()' in tray
+assert 'repeaterRowPrefab: {fileID: 1231231231231231231, guid: 0995d0db164924d46baa0f4f4978ec98' in read('Assets/GameObject/RouterPanel.prefab')
 # YAML fileIDs and references must point at each other (no scene object refs).
 wifipref=read('Assets/Scripts/Assembly-CSharp/PC/Component/WifiPanelPrefab.prefab')
 pcpref=read('Assets/GameObject/PCOS.prefab')
