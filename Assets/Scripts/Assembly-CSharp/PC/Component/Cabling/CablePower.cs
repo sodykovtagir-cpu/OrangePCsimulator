@@ -108,6 +108,8 @@ namespace PC.Component.Cabling
                 display.Switch(powered, false);
                 display.ShowNoSignal(powered && videoBoard == null);
             }
+            // Event-driven: only on cable/power changes and save completion.
+            PC.Component.Networking.RouterDevice.RefreshAutoLanLinks();
         }
     }
 }

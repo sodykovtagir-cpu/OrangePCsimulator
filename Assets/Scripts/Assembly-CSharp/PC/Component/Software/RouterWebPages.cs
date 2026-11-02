@@ -177,12 +177,20 @@ namespace PC.Component.Software
                 var child = other;
                 Label(body, "#" + child.Id + ": " + child.Ssid +
                     " / " + (child.UpstreamId == 0 ? "нет родителя" : "родитель #" + child.UpstreamId));
-                AddButton(body, "Подключить #" + child.Id + " через LAN", () =>
-                { if (child.ConnectUpstream(router.Id, false)) browser.ShowNetworkPage("192.168.1.1/panel");
-                  else Label(body, "LAN: слишком далеко, нет порта или получился цикл"); });
+                // The code-built fallback is used only without RouterPanel.prefab.
+                // In cable mode LAN is automatic; never offer a fake LAN button.
+                if (!PC.Component.Cabling.CableMode.Enabled)
+                    AddButton(body, "Подключить #" + child.Id + " через LAN", () =>
+                    { if (child.ConnectUpstream(router.Id, false)) browser.ShowNetworkPage("192.168.1.1/panel");
+                      else Label(body, "LAN: слишком далеко, нет порта или получился цикл"); });
+                Label(body, "Пароль основной Wi-Fi сети для #" + child.Id);
+                var parentKey = Entry(body, "Введи пароль");
+                parentKey.contentType = InputField.ContentType.Password;
                 AddButton(body, "Подключить #" + child.Id + " как Wi-Fi повторитель", () =>
-                { if (child.ConnectUpstream(router.Id, true, router.Password)) browser.ShowNetworkPage("192.168.1.1/panel");
-                  else Label(body, "Wi-Fi: слишком далеко или получился цикл"); });
+                { if (!string.IsNullOrEmpty(parentKey.text) &&
+                      child.ConnectUpstream(router.Id, true, parentKey.text))
+                      browser.ShowNetworkPage("192.168.1.1/panel");
+                  else Label(body, "Wi-Fi: неверный пароль, нет сигнала или возник цикл"); });
             }
             if (router.UpstreamId != 0)
                 AddButton(body, "Отключить этот роутер от родителя", () =>

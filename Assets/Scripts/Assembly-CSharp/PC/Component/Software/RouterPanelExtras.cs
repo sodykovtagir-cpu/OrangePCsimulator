@@ -1,173 +1,123 @@
 using PC.Component.Networking;
+using PC.Component.Software.OS;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace PC.Component.Software
 {
-    // Uses the authored RouterPanel: its Scan/Reset buttons and empty repeater scroll list.
+    // Binds the player's RouterPanel and reuses the player's WifiPanelPrefab.
+    // LAN is driven by physical cable events, never by a virtual web button.
     public sealed class RouterPanelExtras : MonoBehaviour
     {
         [SerializeField] private TypoLinkWebsite website;
         [SerializeField] private RectTransform repeaterList;
+        [SerializeField] private WifiNetworkEntry repeaterRowPrefab;
         [SerializeField] private Button scanButton;
         [SerializeField] private Button repeaterResetButton;
         [SerializeField] private Button apnResetButton;
         [SerializeField] private InputField ssidInput;
         [SerializeField] private InputField passwordInput;
         [SerializeField] private Text status;
-        private InputField targetId;
-        private Transform rows;
-        private static Font font;
-        private static Font Font => font != null ? font : font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        private WifiNetworkEntry selectedEntry;
+        private int selectedId;
 
         private void Start()
         {
-            if (website == null || repeaterList == null) return;
-            targetId = Field(repeaterList, "ID повторителя");
-            website.SetRepeaterInput(targetId);
-            rows = new GameObject("Доступные роутеры", typeof(RectTransform)).transform;
-            rows.SetParent(repeaterList, false);
-            // Items live inside the existing Scroll View, never a second independent page.
-            var layout = rows.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.childControlWidth = true;
-            layout.childForceExpandWidth = true;
-            layout.childControlHeight = false;
-            layout.spacing = 3;
-            rows.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var element = rows.gameObject.AddComponent<LayoutElement>();
-            element.flexibleWidth = 1;
+            if (website == null || repeaterList == null || repeaterRowPrefab == null) return;
             if (scanButton != null) scanButton.onClick.AddListener(Scan);
             if (repeaterResetButton != null) repeaterResetButton.onClick.AddListener(DisconnectSelected);
             if (apnResetButton != null) apnResetButton.onClick.AddListener(ResetForm);
             Scan();
         }
 
-        private static RectTransform Make(Transform parent, string name, float height, bool image)
+        private void OnDestroy()
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            rect.sizeDelta = new Vector2(0, height);
-            if (image) go.AddComponent<Image>().color = new Color(1f, 1f, 1f, .392f);
-            var size = go.AddComponent<LayoutElement>();
-            size.preferredHeight = height;
-            size.flexibleWidth = 1;
-            return rect;
-        }
-
-        private static Text Label(Transform parent, string value, float width)
-        {
-            var go = new GameObject(value, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            var element = go.AddComponent<LayoutElement>();
-            element.preferredWidth = width;
-            element.flexibleWidth = width < 0 ? 1 : 0;
-            var text = go.GetComponent<Text>();
-            text.font = Font;
-            text.color = new Color(.19607843f, .19607843f, .19607843f, 1f);
-            text.fontSize = 14;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.text = value;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        private static InputField Field(Transform parent, string hint)
-        {
-            var row = Make(parent, hint, 32, true);
-            var input = row.gameObject.AddComponent<InputField>();
-            input.contentType = InputField.ContentType.IntegerNumber;
-            var text = Label(row, "", -1);
-            var textRect = (RectTransform)text.transform;
-            textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(6, 0); textRect.offsetMax = new Vector2(-6, 0);
-            input.textComponent = text;
-            var placeholder = Label(row, hint, -1);
-            var placeholderRect = (RectTransform)placeholder.transform;
-            placeholderRect.anchorMin = Vector2.zero; placeholderRect.anchorMax = Vector2.one;
-            placeholderRect.offsetMin = new Vector2(6, 0); placeholderRect.offsetMax = new Vector2(-6, 0);
-            placeholder.color = new Color(.7f, .7f, .7f);
-            input.placeholder = placeholder;
-            return input;
-        }
-
-        private static Button Action(Transform row, string title, float width, UnityEngine.Events.UnityAction callback)
-        {
-            var go = new GameObject(title, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            go.transform.SetParent(row, false);
-            go.GetComponent<Image>().color = Color.white;
-            var el = go.AddComponent<LayoutElement>(); el.preferredWidth = width; el.preferredHeight = 34;
-            var button = go.GetComponent<Button>(); button.onClick.AddListener(callback);
-            var text = Label(go.transform, title, width);
-            var rect = (RectTransform)text.transform;
-            rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero; rect.offsetMax = Vector2.zero;
-            text.alignment = TextAnchor.MiddleCenter;
-            return button;
+            if (scanButton != null) scanButton.onClick.RemoveListener(Scan);
+            if (repeaterResetButton != null) repeaterResetButton.onClick.RemoveListener(DisconnectSelected);
+            if (apnResetButton != null) apnResetButton.onClick.RemoveListener(ResetForm);
         }
 
         private void Scan()
         {
-            if (rows == null) return;
-            for (int i = rows.childCount - 1; i >= 0; --i) Destroy(rows.GetChild(i).gameObject);
+            if (repeaterList == null || website == null) return;
+            selectedEntry = null;
+            selectedId = 0;
+            for (int i = repeaterList.childCount - 1; i >= 0; i--)
+                Destroy(repeaterList.GetChild(i).gameObject);
             var current = website.CurrentRouter;
-            if (current == null) { if (status != null) status.text = "Сначала подключи ПК к роутеру"; return; }
+            var network = InternetService.Instance;
+            if (current == null || network == null)
+            { if (status != null) status.text = "Сначала подключи ПК к роутеру"; return; }
+            // The PC is administering the MAIN router. This explicit context
+            // resolves an otherwise ambiguous two-router provider direction.
+            if (network.GatewayId == 0 && current.UpstreamId == 0)
+                network.SetGateway(current.Id);
             int count = 0;
             foreach (var router in FindObjectsOfType<RouterDevice>())
             {
                 if (router == null || router.Id == 0 || router == current || !router.IsPowered) continue;
-                var target = router;
-                var line = Make(rows, router.Ssid, 38, false);
-                var layout = line.gameObject.AddComponent<HorizontalLayoutGroup>();
-                layout.spacing = 3;
-                layout.childForceExpandWidth = false;
-                layout.childControlWidth = true;
-                layout.childControlHeight = true;
-                string state = router.UpstreamId == current.Id ? " (повторитель)" : "";
-                Label(line, "#" + router.Id + " " + router.Ssid + state, -1);
-                Action(line, "Wi-Fi", 60, () => Connect(target, true));
-                Action(line, "LAN", 54, () => Connect(target, false));
+                var row = Instantiate(repeaterRowPrefab, repeaterList);
+                var rect = (RectTransform)row.transform;
+                rect.localScale = Vector3.one;
+                rect.sizeDelta = new Vector2(415f, 54f);
+                var element = row.GetComponent<LayoutElement>();
+                if (element == null) element = row.gameObject.AddComponent<LayoutElement>();
+                element.preferredHeight = 54f;
+                element.preferredWidth = 415f;
+                row.InitializeRepeater(current, router, network,
+                    entry => SelectEntry(entry, router.Id), () =>
+                    {
+                        row.Refresh();
+                        if (status != null) status.text = "Повторитель #" + router.Id +
+                            (router.UpstreamId == current.Id ? " подключён" : " отключён");
+                    });
                 count++;
             }
             if (count == 0)
             {
-                var empty = Make(rows, "Пусто", 32, true);
-                // The exact turquoise from RouterPanel/Banner, white text as requested.
-                empty.GetComponent<Image>().color = new Color(.3372549f, .76470596f, .8235295f, 1f);
-                var text = Label(empty, "Нет включённых роутеров для подключения", -1);
-                text.color = Color.white;
-                var rect = (RectTransform)text.transform;
+                // Preserve the existing turquoise empty state and white text.
+                var empty = new GameObject("Нет роутеров", typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+                empty.transform.SetParent(repeaterList, false);
+                empty.GetComponent<Image>().color = new Color(.3372549f, .76470596f, .8235295f);
+                empty.GetComponent<LayoutElement>().preferredHeight = 32f;
+                var label = new GameObject("Сообщение", typeof(RectTransform),
+                    typeof(CanvasRenderer), typeof(Text));
+                label.transform.SetParent(empty.transform, false);
+                var rect = (RectTransform)label.transform;
                 rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
                 rect.offsetMin = rect.offsetMax = Vector2.zero;
+                var text = label.GetComponent<Text>();
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.fontSize = 14;
+                text.color = Color.white;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.text = "Нет включённых роутеров для подключения";
             }
             if (status != null) status.text = "Роутер #" + current.Id + ". Найдено: " + count;
         }
 
-        private void Connect(RouterDevice target, bool wifi)
+        private void SelectEntry(WifiNetworkEntry entry, int id)
         {
-            if (target == null || website == null || targetId == null) return;
-            targetId.text = target.Id.ToString();
-            if (wifi) website.AttachRepeaterWifi(); else website.AttachRepeaterLan();
-            if (target.UpstreamId == website.CurrentRouter?.Id && target.UpstreamWireless == wifi)
-            {
-                Scan();
-                if (status != null) status.text = "#" + target.Id + " подключён по " + (wifi ? "Wi-Fi" : "LAN");
-            }
-            // On failure the existing TypoLinkWebsite shows a detailed error.
+            if (selectedEntry != null && selectedEntry != entry)
+                selectedEntry.CancelPasswordEntry();
+            selectedEntry = entry;
+            selectedId = id;
         }
 
         private void DisconnectSelected()
         {
             var parent = website != null ? website.CurrentRouter : null;
-            if (parent == null || targetId == null || !int.TryParse(targetId.text, out var id))
-            { if (status != null) status.text = "Укажи ID повторителя"; return; }
-            var child = InternetService.Instance?.Router(id);
+            if (parent == null || selectedId == 0)
+            { if (status != null) status.text = "Выбери повторитель в списке"; return; }
+            var child = InternetService.Instance?.Router(selectedId);
             if (child == null || child.UpstreamId != parent.Id)
             { if (status != null) status.text = "Этот роутер не подключён к текущему"; return; }
+            if (!child.UpstreamWireless)
+            { if (status != null) status.text = "Для отключения LAN вынь кабель"; return; }
             child.DisconnectUpstream();
-            Scan();
-            if (status != null) status.text = "Повторитель #" + id + " отключён";
+            if (selectedEntry != null) selectedEntry.CancelPasswordEntry();
+            if (status != null) status.text = "Повторитель #" + selectedId + " отключён";
         }
 
         private void ResetForm()

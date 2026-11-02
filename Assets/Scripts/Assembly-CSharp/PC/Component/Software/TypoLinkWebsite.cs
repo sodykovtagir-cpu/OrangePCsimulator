@@ -99,12 +99,14 @@ namespace PC.Component.Software
             Refresh();
         }
         public void AttachRepeaterLan() { AttachRepeater(false); }
-        public void AttachRepeaterWifi() { AttachRepeater(true); }
+        // The web list has a dedicated password field per WifiPanelPrefab.
+        // The legacy no-argument button must never silently reuse parent.Password.
+        public void AttachRepeaterWifi() { Say("Выбери роутер в списке и введи пароль основной Wi-Fi сети"); }
         private void AttachRepeater(bool wifi)
         {
             var parent = LocalRouter;
             var child = Service != null ? Service.Router(TargetId()) : null;
-            if (parent == null || child == null || !child.ConnectUpstream(parent.Id, wifi, parent.Password))
+            if (parent == null || child == null || !child.ConnectUpstream(parent.Id, wifi))
             { Say("Повторитель: слишком далеко, нет порта или возник цикл"); return; }
             Refresh();
         }

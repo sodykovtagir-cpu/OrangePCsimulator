@@ -20,6 +20,7 @@ namespace PC.Component.Software.OS
         private Text status;
         private Text powerLabel;
         private Image trayIcon;
+        private WifiNetworkEntry selectedEntry;
 
         public void Initialize(OperatingSystem system, WifiNetworkEntry prefab, Button tray,
             RectTransform menu, Button scan, Button power, RectTransform rows,
@@ -84,6 +85,7 @@ namespace PC.Component.Software.OS
         private void Scan()
         {
             if (list == null || status == null) return;
+            selectedEntry = null;
             for (int i = list.childCount - 1; i >= 0; i--)
                 Destroy(list.GetChild(i).gameObject);
             UpdateRadio();
@@ -121,6 +123,13 @@ namespace PC.Component.Software.OS
             if (connection.Wired) status.text += "  |  LAN подключён";
         }
 
+        private void SelectEntry(WifiNetworkEntry entry)
+        {
+            if (selectedEntry != null && selectedEntry != entry)
+                selectedEntry.CancelPasswordEntry();
+            selectedEntry = entry;
+        }
+
         private void AddRow(Motherboard board, RouterDevice router, InternetService service, bool lan)
         {
             var row = Instantiate(rowPrefab, list);
@@ -132,7 +141,7 @@ namespace PC.Component.Software.OS
             element.preferredHeight = 54;
             element.preferredWidth = 415;
             if (lan) row.InitializeLan(board, router, service, Scan);
-            else row.Initialize(board, router, service);
+            else row.Initialize(board, router, service, SelectEntry);
         }
     }
 }

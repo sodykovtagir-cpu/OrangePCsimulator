@@ -18,6 +18,7 @@ namespace PC.Component.Networking
         private int gatewayId;
         private double pendingDollars;
         private double totalMegabytes;
+        private float nextGatewayScan;
 
         public int Plan => plan;
         public int GatewayId => gatewayId;
@@ -70,13 +71,25 @@ namespace PC.Component.Networking
             // A newly placed first router is the provider gateway. Lock its ID
             // once selected so a later extender cannot silently become gateway.
             if (gatewayId != 0) return null;
+            // When several routers exist without a nominated provider, LEDs
+            // poll Status regularly. Rate-limit this otherwise repeated scan.
+            if (Time.unscaledTime < nextGatewayScan) return null;
+            nextGatewayScan = Time.unscaledTime + 1f;
+            RouterDevice onlyCandidate = null;
             foreach (var router in FindObjectsOfType<RouterDevice>())
-                if (router != null && router.Id != 0 && router.UpstreamId == 0)
-                {
-                    gatewayId = router.Id;
-                    return router;
-                }
-            return null;
+            {
+                if (router == null || router.Id == 0 || router.UpstreamId != 0) continue;
+                // With two independent routers, the provider's side is not
+                // identifiable. A PC connected to the main router can select
+                // it from the local panel; never pick one by iteration order.
+                if (onlyCandidate != null) return null;
+                onlyCandidate = router;
+            }
+            if (onlyCandidate == null) return null;
+            gatewayId = onlyCandidate.Id;
+            // A cable may already be plugged in when the gateway becomes known.
+            RouterDevice.RefreshAutoLanLinks();
+            return onlyCandidate;
         }
 
         public bool SetGateway(int routerId)
@@ -84,6 +97,7 @@ namespace PC.Component.Networking
             var router = Router(routerId);
             if (router == null || router.UpstreamId != 0) return false;
             gatewayId = routerId;
+            RouterDevice.RefreshAutoLanLinks();
             return true;
         }
 
