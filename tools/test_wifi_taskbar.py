@@ -27,6 +27,15 @@ assert 'passwordMessage.text = "Неверный пароль"' in entry
 assert 'description.text = connected ? "Connected"' in entry
 assert 'connectLabel.text = connected ? "Disconnect" : "Connect"' in entry
 assert 'ssid.gameObject.SetActive(!enteringPassword)' in entry
+# The shared card is recolored only on PCOS instances, not on the router site
+# or button/input captions. Repeater's local must not shadow the PC local (CS0136).
+refresh = entry.split('public void Refresh()', 1)[1].split('private void ConnectRepeaterClicked()', 1)[0]
+assert 'bool repeaterConnected =' in refresh and 'bool connected = Connected();' in refresh
+assert 'bool connected = repeaterParent' not in refresh
+colors = entry.split('public void SetPcosPlainTextWhite()', 1)[1].split('public void CancelPasswordEntry()', 1)[0]
+assert all(f'{name}.color = Color.white' in colors for name in ('ssid', 'description', 'passwordMessage'))
+assert 'connectLabel.color' not in colors and 'password.textComponent.color' not in colors
+assert 'row.SetPcosPlainTextWhite();' in tray and 'SetPcosPlainTextWhite' not in routerpanel
 assert 'icon.SetActive(!enteringPassword && !isLan)' in entry
 assert 'description.gameObject.SetActive(!enteringPassword)' in entry
 assert 'url == "wifi-settings"' not in web and 'url == "wifi"' not in web

@@ -133,6 +133,7 @@ namespace PC.Component.Software.OS
         private void AddRow(Motherboard board, RouterDevice router, InternetService service, bool lan)
         {
             var row = Instantiate(rowPrefab, list);
+            row.SetPcosPlainTextWhite();
             var rect = (RectTransform)row.transform;
             rect.localScale = Vector3.one;
             rect.sizeDelta = new Vector2(415, 54);

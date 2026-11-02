@@ -84,6 +84,16 @@ namespace PC.Component.Software.OS
             Refresh();
         }
 
+        // PCOS creates its own instances of the shared prefab. Do not recolor
+        // the asset: the router website still uses its authored text palette.
+        // Button captions and input/placeholder text keep their contrast.
+        public void SetPcosPlainTextWhite()
+        {
+            if (ssid != null) ssid.color = Color.white;
+            if (description != null) description.color = Color.white;
+            if (passwordMessage != null) passwordMessage.color = Color.white;
+        }
+
         public void CancelPasswordEntry()
         {
             enteringPassword = false;
@@ -104,9 +114,9 @@ namespace PC.Component.Software.OS
         {
             if (repeaterTarget != null)
             {
-                bool connected = repeaterParent != null &&
+                bool repeaterConnected = repeaterParent != null &&
                     repeaterTarget.UpstreamId == repeaterParent.Id;
-                bool wired = connected && !repeaterTarget.UpstreamWireless;
+                bool wired = repeaterConnected && !repeaterTarget.UpstreamWireless;
                 if (ssid != null)
                 {
                     ssid.text = "#" + repeaterTarget.Id + " " + repeaterTarget.Ssid;
@@ -116,13 +126,13 @@ namespace PC.Component.Software.OS
                 if (description != null)
                 {
                     description.text = wired ? "Подключён по LAN — отсоедини кабель" :
-                        connected ? "Повторитель по Wi-Fi" : "Подключить к основной Wi-Fi сети";
+                        repeaterConnected ? "Повторитель по Wi-Fi" : "Подключить к основной Wi-Fi сети";
                     description.gameObject.SetActive(!enteringPassword);
                 }
                 if (connectLabel != null)
-                    connectLabel.text = wired ? "LAN" : connected ? "Disconnect" : "Connect";
+                    connectLabel.text = wired ? "LAN" : repeaterConnected ? "Disconnect" : "Connect";
                 if (connect != null) connect.interactable = !wired;
-                if (passwordPanel != null) passwordPanel.SetActive(enteringPassword && !connected);
+                if (passwordPanel != null) passwordPanel.SetActive(enteringPassword && !repeaterConnected);
                 return;
             }
             if (router == null || board == null) return;
