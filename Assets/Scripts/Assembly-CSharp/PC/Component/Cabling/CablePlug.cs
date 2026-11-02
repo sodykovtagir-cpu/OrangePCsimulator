@@ -17,11 +17,14 @@ namespace PC.Component.Cabling
         private CablePort yankedPort;
         private Action<CablePlug> releaseDrag;
         [SerializeField, Min(10f)] private float pullOutForce = 200f;
-        // Authored child at the back of the plug, where the jacket exits.
-        // Socket snapping still uses the original plug root and port Pivot.
+        // Authored marker on the connector model where the jacket and first
+        // physical joint meet. Socket snapping still uses the plug root/port.
         [SerializeField] private Transform cableExitPivot;
+        // The pivot can be nested under the visual FBX (and that visual can be
+        // scaled/rotated). Joint anchors are in the Rigidbody/plug ROOT space,
+        // never in the pivot's immediate parent's local space.
         public Vector3 CableExitLocalPosition => cableExitPivot != null ?
-            cableExitPivot.localPosition : Vector3.zero;
+            transform.InverseTransformPoint(cableExitPivot.position) : Vector3.zero;
         public Vector3 CableExitPosition => cableExitPivot != null ?
             cableExitPivot.position : transform.position;
         // Restored/interpolated Transforms can lag the saved Rigidbody pose.
@@ -35,15 +38,21 @@ namespace PC.Component.Cabling
             }
         }
 
-        public void EnsureCableExitPivot(Vector3 fallbackPosition)
+        public void EnsureCableExitPivot(Vector3 fallbackPosition, Transform connectorModel = null)
         {
+            if (cableExitPivot == null && connectorModel != null)
+                cableExitPivot = connectorModel.Find("Cable Pivot");
+            // Old saved prefabs can still have a marker directly under Plug A/B.
             if (cableExitPivot == null) cableExitPivot = transform.Find("Cable Pivot");
             if (cableExitPivot != null) return;
-            // Older cable instances without an authored child get the same point.
+            // On older cable instances, add the marker on the actual connector
+            // model when it exists; preserve its plug-root-space position.
             var marker = new GameObject("Cable Pivot");
             cableExitPivot = marker.transform;
-            cableExitPivot.SetParent(transform, false);
-            cableExitPivot.localPosition = fallbackPosition;
+            var parent = connectorModel != null && connectorModel.IsChildOf(transform)
+                ? connectorModel : transform;
+            cableExitPivot.SetParent(parent, false);
+            cableExitPivot.position = transform.TransformPoint(fallbackPosition);
         }
         public float PullOutForce => pullOutForce >= 10f ? pullOutForce : 200f;
         // Current solver load is read only when a two-ended rope is nearly
