@@ -48,7 +48,7 @@ namespace PC.Component.Software
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.sizeDelta = new Vector2(0, height);
-            if (image) go.AddComponent<Image>().color = new Color(.2f, .3f, .42f, 1f);
+            if (image) go.AddComponent<Image>().color = new Color(1f, 1f, 1f, .392f);
             var size = go.AddComponent<LayoutElement>();
             size.preferredHeight = height;
             size.flexibleWidth = 1;
@@ -65,7 +65,7 @@ namespace PC.Component.Software
             element.flexibleWidth = width < 0 ? 1 : 0;
             var text = go.GetComponent<Text>();
             text.font = Font;
-            text.color = Color.white;
+            text.color = new Color(.19607843f, .19607843f, .19607843f, 1f);
             text.fontSize = 14;
             text.alignment = TextAnchor.MiddleLeft;
             text.text = value;
@@ -96,7 +96,7 @@ namespace PC.Component.Software
         {
             var go = new GameObject(title, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
             go.transform.SetParent(row, false);
-            go.GetComponent<Image>().color = new Color(.22f, .44f, .62f);
+            go.GetComponent<Image>().color = Color.white;
             var el = go.AddComponent<LayoutElement>(); el.preferredWidth = width; el.preferredHeight = 34;
             var button = go.GetComponent<Button>(); button.onClick.AddListener(callback);
             var text = Label(go.transform, title, width);
@@ -132,8 +132,11 @@ namespace PC.Component.Software
             }
             if (count == 0)
             {
-                var empty = Make(rows, "Пусто", 32, false);
+                var empty = Make(rows, "Пусто", 32, true);
+                // The exact turquoise from RouterPanel/Banner, white text as requested.
+                empty.GetComponent<Image>().color = new Color(.3372549f, .76470596f, .8235295f, 1f);
                 var text = Label(empty, "Нет включённых роутеров для подключения", -1);
+                text.color = Color.white;
                 var rect = (RectTransform)text.transform;
                 rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
                 rect.offsetMin = rect.offsetMax = Vector2.zero;

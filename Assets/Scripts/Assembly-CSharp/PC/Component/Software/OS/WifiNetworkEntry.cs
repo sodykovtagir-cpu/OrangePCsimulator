@@ -1,3 +1,4 @@
+using System;
 using PC.Component.Networking;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,6 +21,8 @@ namespace PC.Component.Software.OS
         private RouterDevice router;
         private InternetService service;
         private bool enteringPassword;
+        private bool isLan;
+        private Action onLanChanged;
 
         public void Initialize(Motherboard currentBoard, RouterDevice target, InternetService currentService)
         {
@@ -27,16 +30,32 @@ namespace PC.Component.Software.OS
             router = target;
             service = currentService;
             enteringPassword = false;
+            isLan = false;
+            onLanChanged = null;
             if (password != null) { password.contentType = InputField.ContentType.Password; password.text = ""; }
+            if (connect != null) connect.onClick.AddListener(ConnectClicked);
+            Refresh();
+        }
+
+        public void InitializeLan(Motherboard currentBoard, RouterDevice target,
+            InternetService currentService, Action changed)
+        {
+            board = currentBoard;
+            router = target;
+            service = currentService;
+            enteringPassword = false;
+            isLan = true;
+            onLanChanged = changed;
             if (connect != null) connect.onClick.AddListener(ConnectClicked);
             Refresh();
         }
 
         private bool Connected()
         {
-            if (board == null || router == null || service == null || !board.WifiEnabled) return false;
+            if (board == null || router == null || service == null) return false;
             var status = service.Status(board);
-            return !status.Wired && status.Router == router;
+            return isLan ? board.LanRouterId == router.Id && status.Wired && status.Router == router :
+                board.WifiEnabled && !status.Wired && status.Router == router;
         }
 
         public void Refresh()
@@ -44,11 +63,12 @@ namespace PC.Component.Software.OS
             if (router == null || board == null) return;
             bool connected = Connected();
             if (connected && enteringPassword) enteringPassword = false;
-            if (ssid != null) { ssid.text = router.Ssid; ssid.gameObject.SetActive(!enteringPassword); }
-            if (icon != null) icon.SetActive(!enteringPassword);
+            if (ssid != null) { ssid.text = isLan ? "LAN: " + router.Ssid : router.Ssid;
+                ssid.gameObject.SetActive(!enteringPassword); }
+            if (icon != null) icon.SetActive(!enteringPassword && !isLan);
             if (description != null)
             {
-                description.text = connected ? "Connected" :
+                description.text = connected ? "Connected" : isLan ? "LAN" :
                     "Signal: " + Mathf.RoundToInt(router.WifiSignal(board.transform, board.WifiRange) * 100f) + "%";
                 description.gameObject.SetActive(!enteringPassword);
             }
@@ -59,6 +79,18 @@ namespace PC.Component.Software.OS
         private void ConnectClicked()
         {
             if (board == null || router == null || service == null) return;
+            if (isLan)
+            {
+                if (board.LanRouterId == router.Id) board.ConfigureLan(0);
+                else if (!service.JoinLan(board, router.Id))
+                {
+                    if (description != null) description.text = "LAN: порт занят или роутер недоступен";
+                    return;
+                }
+                Refresh();
+                onLanChanged?.Invoke();
+                return;
+            }
             if (Connected())
             {
                 board.ConfigureLan(0); // does not unplug an actual LAN cable

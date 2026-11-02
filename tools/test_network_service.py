@@ -35,7 +35,7 @@ assert 'service.JoinWifi' not in web and 'service.JoinLan' not in web
 assert 'url == "wifi-settings"' not in web
 tray=src('PC/Component/Software/OS/WifiTaskbarController.cs')
 entry=src('PC/Component/Software/OS/WifiNetworkEntry.cs')
-assert 'service.JoinWifi' in entry and 'service.JoinLan' in tray
+assert 'service.JoinWifi' in entry and 'service.JoinLan' in entry
 assert 'router.CredentialsMatch' in entry and 'passwordMessage.text = "Неверный пароль"' in entry
 assert 'board.SetWifiEnabled' in tray and 'WifiNetworkEntry' in tray
 assert 'board.WifiEnabled' in net and 'jObject["wifiEnabled"]' in board
