@@ -36,8 +36,8 @@ assert 'StressJointErrors();' in s and 'ROPE JOINTS INVALID' in s
 assert s.index('cable.PrepareStressTestSpan(Vector3.zero);') < s.index('cable.End(0).TryInsert(a, true)')
 assert 'Quaternion.Inverse(body.rotation) * (world - body.position)' in rope
 arc = rope[rope.index('public float PrepareStressTestSpan('):rope.index('public string StressJointErrors()')]
-assert 'Vector3 a = plugs[0].transform.position;' in arc
-assert 'Vector3 b = plugs[1].transform.position;' in arc
+assert 'Vector3 a = plugs[0].CableExitPhysicsPosition;' in arc
+assert 'Vector3 b = plugs[1].CableExitPhysicsPosition;' in arc
 assert 'PASS 1: lay down EVERY physical body' in rope and 'PASS 2: anchor every CharacterJoint' in rope
 assert 'data["cableJoints"] = anchors;' in rope and 'var savedJoints = data["cableJoints"] as JArray;' in rope
 assert 'RestoreJoint(bodies[i].GetComponent<CharacterJoint>(), savedJoints[i])' in rope

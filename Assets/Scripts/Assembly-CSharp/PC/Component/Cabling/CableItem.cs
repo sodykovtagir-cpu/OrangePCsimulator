@@ -90,6 +90,10 @@ namespace PC.Component.Cabling
             plugA = SetupPlug(plugA, "Plug A", 0, points[0]);
             plugB = SetupPlug(plugB, "Plug B", 1, points[count]);
             plugs = new[] { plugA, plugB };
+            // The first/last rope boundary is the cable's exit from its plug,
+            // not the plug origin snapped into a socket. Interior coil stays.
+            points[0] = plugA.CableExitPosition;
+            points[count] = plugB.CableExitPosition;
             var physicalColliders = new Collider[count + 2];
             physicalColliders[0] = plugA.GetComponent<Collider>();
             physicalColliders[count + 1] = plugB.GetComponent<Collider>();
@@ -125,7 +129,7 @@ namespace PC.Component.Cabling
             last.autoConfigureConnectedAnchor = false;
             last.enableCollision = false;
             last.enablePreprocessing = false;
-            last.anchor = Vector3.zero;
+            last.anchor = plugB.CableExitLocalPosition;
             last.connectedAnchor = previous.transform.InverseTransformPoint(points[count]);
             Limit(last);
             // All parts of one cable must ignore one another. Self-collision in
@@ -211,6 +215,15 @@ namespace PC.Component.Cabling
                     foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
                         Destroy(collider);
             }
+            // These local positions follow the authored FBX back/strain-relief
+            // directions: RJ45/VGA/HDMI along -X, wall plug A along +Y,
+            // device power plug B along -Z. Never move the socket snap Pivot.
+            Vector3 exit = kind == CableKind.LAN ? new Vector3(-.15f, 0f, 0f) :
+                kind == CableKind.VGA || kind == CableKind.HDMI ?
+                    new Vector3(-.115f, 0f, 0f) :
+                end == 0 ? new Vector3(0f, .084f, 0f) :
+                    new Vector3(0f, 0f, -.112f);
+            plug.EnsureCableExitPivot(exit);
             if (go.GetComponentInChildren<Renderer>() == null)
             {
                 var model = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -255,18 +268,18 @@ namespace PC.Component.Cabling
                 var other = plugs[1 - end];
                 bool sectionHeld = heldSegment != null && heldSegmentIndex >= 0;
                 if (!sectionHeld && (other == null || (!other.IsHeld && other.Connected == null))) continue;
-                Vector3 target = sectionHeld ? heldSegment.position : other.GetComponent<Rigidbody>().position;
+                Vector3 target = sectionHeld ? heldSegment.position : other.CableExitPhysicsPosition;
                 float restLength = sectionHeld
                     ? length * (end == 0 ? heldSegmentIndex + .5f : bodies.Length - heldSegmentIndex - .5f)
                         / bodies.Length : length;
-                float distance = Vector3.Distance(attached.Connected.Snap.position, target);
+                float distance = Vector3.Distance(attached.CableExitPhysicsPosition, target);
                 float tension = Mathf.Max(0f, distance - restLength * .85f) *
                     (tensionStiffness >= 10f ? tensionStiffness : 1000f);
                 if (tension <= 0f) continue;
                 var rb = attached.Connected.GetComponentInParent<Rigidbody>();
                 if (CanPull(rb, 0))
                 {
-                    Vector3 direction = (target - attached.Connected.Snap.position).normalized;
+                    Vector3 direction = (target - attached.CableExitPhysicsPosition).normalized;
                     Vector3 targetVelocity = sectionHeld ? heldSegment.velocity :
                         other.GetComponent<Rigidbody>().velocity;
                     float closingSpeed = Vector3.Dot(
@@ -386,8 +399,8 @@ namespace PC.Component.Cabling
 
             // Use physics poses consistently; interpolated Transform poses are
             // meant for rendering and can falsely appear to stretch the path.
-            Vector3 start = plugs[0].GetComponent<Rigidbody>().position;
-            Vector3 end = plugs[1].GetComponent<Rigidbody>().position;
+            Vector3 start = plugs[0].CableExitPhysicsPosition;
+            Vector3 end = plugs[1].CableExitPhysicsPosition;
             float span = Vector3.Distance(start, end);
             float path = 0f;
             Vector3 previous = start;
@@ -559,10 +572,10 @@ namespace PC.Component.Cabling
 
         private void UpdateJacket()
         {
-            jacket.SetPosition(0, plugA.transform.position);
+            jacket.SetPosition(0, plugA.CableExitPosition);
             for (int i = 0; i < bodies.Length; i++)
                 jacket.SetPosition(i + 1, bodies[i].transform.position);
-            jacket.SetPosition(bodies.Length + 1, plugB.transform.position);
+            jacket.SetPosition(bodies.Length + 1, plugB.CableExitPosition);
         }
 
         private static Material outletPlugMaterial;
@@ -677,7 +690,7 @@ namespace PC.Component.Cabling
                 // Adjacent saved segment centres straddle their old boundary.
                 // This approximates older saves which had poses but no anchors;
                 // after the next save the exact local anchors are preserved.
-                Vector3 boundary = i == 0 ? previous.position :
+                Vector3 boundary = i == 0 ? plugs[0].CableExitPhysicsPosition :
                     (previous.position + current.position) * .5f;
                 joint.anchor = BodyLocalPoint(current, boundary);
                 joint.connectedAnchor = BodyLocalPoint(previous, boundary);
@@ -687,9 +700,31 @@ namespace PC.Component.Cabling
             if (last != null)
             {
                 var end = plugs[1].GetComponent<Rigidbody>();
-                Vector3 boundary = end.position;
+                Vector3 boundary = plugs[1].CableExitPhysicsPosition;
                 last.anchor = BodyLocalPoint(end, boundary);
                 last.connectedAnchor = BodyLocalPoint(previous, boundary);
+            }
+        }
+
+        // Earlier saves stored rope anchors at the ORIGIN of each plug.
+        // Retain every interior saved joint and move only the two end joints
+        // to the new pivot, in the physics poses restored before port insertion.
+        private void AnchorPlugEnds()
+        {
+            if (plugs == null || bodies == null || bodies.Length == 0) return;
+            var first = bodies[0].GetComponent<CharacterJoint>();
+            if (first != null)
+            {
+                Vector3 boundary = plugs[0].CableExitPhysicsPosition;
+                first.anchor = BodyLocalPoint(bodies[0], boundary);
+                first.connectedAnchor = plugs[0].CableExitLocalPosition;
+            }
+            var last = plugs[1].GetComponent<CharacterJoint>();
+            if (last != null)
+            {
+                Vector3 boundary = plugs[1].CableExitPhysicsPosition;
+                last.anchor = plugs[1].CableExitLocalPosition;
+                last.connectedAnchor = BodyLocalPoint(bodies[bodies.Length - 1], boundary);
             }
         }
 
@@ -767,6 +802,7 @@ namespace PC.Component.Cabling
             }
             if (!exact && (poses != null || restorePositions))
                 ReanchorChainFromLoadedPose();
+            AnchorPlugEnds();
             UpdateJacket();
         }
 
@@ -867,8 +903,8 @@ namespace PC.Component.Cabling
             // The fixture uses normal (non-loading) port insertion; lay out
             // the arc at its visible snap positions, then compute joint local
             // anchors from the placed Rigidbody poses below.
-            Vector3 a = plugs[0].transform.position;
-            Vector3 b = plugs[1].transform.position;
+            Vector3 a = plugs[0].CableExitPhysicsPosition;
+            Vector3 b = plugs[1].CableExitPhysicsPosition;
             float span = Vector3.Distance(a, b);
             if (span < .001f) return 0f;
             float targetLength = Mathf.Max(span, length * .82f);
@@ -1078,9 +1114,13 @@ namespace PC.Component.Cabling
                 // the portal, not at the connected devices. Lay it between
                 // its actual plugs before releasing physical contacts.
                 for (int i = 0; i < bodies.Length; i++)
-                    bodies[i].position = Vector3.Lerp(plugs[0].transform.position,
-                        plugs[1].transform.position, (i + .5f) / bodies.Length) + Vector3.up * .16f;
+                    bodies[i].position = Vector3.Lerp(plugs[0].CableExitPhysicsPosition,
+                        plugs[1].CableExitPhysicsPosition, (i + .5f) / bodies.Length) + Vector3.up * .16f;
+                ReanchorChainFromLoadedPose();
             }
+            // Pins may have snapped restored plug poses after FromData, or a
+            // legacy save may have lacked joint poses entirely.
+            AnchorPlugEnds();
             foreach (var plug in plugs)
             {
                 if (plug == null) continue;
