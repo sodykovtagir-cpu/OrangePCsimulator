@@ -30,6 +30,8 @@ namespace PC.Component.Software
         [SerializeField] private GameObject oggleHome;
         [SerializeField] private Transform resultsContainer;
         [SerializeField] private Transform pageContainer;
+        [SerializeField] private GameObject loadingPage;
+        [SerializeField] private Text loadingText;
         [SerializeField] private GameObject oggleResultPrefab;
 
         [SerializeField] private InputField homeSearchInput;
@@ -118,7 +120,14 @@ namespace PC.Component.Software
                     error ?? "Нет подключения к интернету");
                 return;
             }
-            networkPage = RouterWebPages.Message(pageContainer, "Загрузка... " + url);
+            // Authored white loading page in Browser.prefab; the rotating image
+            // reuses PCOS's exact Loading sprite and the browser's animation.
+            if (loadingPage != null)
+            {
+                if (loadingText != null) loadingText.text = "Загрузка... " + url;
+                loadingPage.SetActive(true);
+            }
+            else networkPage = RouterWebPages.Message(pageContainer, "Загрузка... " + url);
             pendingLoad = StartCoroutine(FinishLoad(delay, completed));
         }
 
@@ -228,6 +237,7 @@ namespace PC.Component.Software
 
         private void ClearPage()
         {
+            if (loadingPage != null) loadingPage.SetActive(false);
             if (pendingLoad != null) { StopCoroutine(pendingLoad); pendingLoad = null; }
             if (networkPage != null) { Destroy(networkPage); networkPage = null; }
             resultsPage.SetActive(false);
