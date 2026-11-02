@@ -16,8 +16,10 @@ namespace PC.Component.Software.OS
 
         void Start()
         {
-            if (taskbar != null && wifiNetworkPrefab != null)
-                gameObject.AddComponent<WifiTaskbarController>().Initialize(this, taskbar.transform, wifiNetworkPrefab, wifiTrayIconSprite);
+            if (wifiNetworkPrefab != null && wifiTrayButton != null && wifiPanel != null)
+                gameObject.AddComponent<WifiTaskbarController>().Initialize(this, wifiNetworkPrefab,
+                    wifiTrayButton, wifiPanel, wifiScanButton, wifiPowerButton, wifiList,
+                    wifiStatus, wifiPowerLabel, wifiTrayIcon);
             Localization.LanguageChanged += OnDocumentationLanguageChanged;
             if (IsAppInstalled("Lua Editor")) EnsureLuaDocs();
             // Disable ReorderableList layout on iconParent for free icon positioning
@@ -3287,7 +3289,14 @@ namespace PC.Component.Software.OS
         [Header("TASKBAR")]
         [SerializeField] private GameObject taskbar;
         [SerializeField] private WifiNetworkEntry wifiNetworkPrefab;
-        [SerializeField] private Sprite wifiTrayIconSprite;
+        [SerializeField] private Button wifiTrayButton;
+        [SerializeField] private RectTransform wifiPanel;
+        [SerializeField] private Button wifiScanButton;
+        [SerializeField] private Button wifiPowerButton;
+        [SerializeField] private RectTransform wifiList;
+        [SerializeField] private Text wifiStatus;
+        [SerializeField] private Text wifiPowerLabel;
+        [SerializeField] private Image wifiTrayIcon;
         [SerializeField] private Button startButton;
         [SerializeField] private Text clockText;
         [SerializeField] private Transform runningAppsContainer;

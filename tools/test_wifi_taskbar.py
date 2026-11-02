@@ -18,14 +18,16 @@ assert 'board.WifiEnabled &&' in net and '!board.WifiEnabled' in net
 assert 'hardware is PC.Component.Motherboard board && board.Running && board.WifiEnabled' in grid
 assert 'watts += 2f' in grid and 'Board.WifiEnabled' in os
 assert 'WifiNetworkEntry wifiNetworkPrefab' in os and 'AddComponent<WifiTaskbarController>' in os
-assert 'board.SetWifiEnabled' in tray and 'service.JoinLan' in tray
+assert 'board.SetWifiEnabled' in tray and 'service.JoinLan' in entry
+assert 'new GameObject' not in tray and 'ActionButton(' not in tray
+assert 'InitializeLan' in entry and 'Instantiate(rowPrefab, list)' in tray
 assert 'CableMode.Enabled' in tray and 'router.WifiSignal' in tray
 assert 'router.CredentialsMatch(router.Ssid, password.text)' in entry
 assert 'passwordMessage.text = "Неверный пароль"' in entry
 assert 'description.text = connected ? "Connected"' in entry
 assert 'connectLabel.text = connected ? "Disconnect" : "Connect"' in entry
 assert 'ssid.gameObject.SetActive(!enteringPassword)' in entry
-assert 'icon.SetActive(!enteringPassword)' in entry
+assert 'icon.SetActive(!enteringPassword && !isLan)' in entry
 assert 'description.gameObject.SetActive(!enteringPassword)' in entry
 assert 'url == "wifi-settings"' not in web and 'url == "wifi"' not in web
 assert 'scanButton.onClick.AddListener(Scan)' in routerpanel
@@ -38,6 +40,15 @@ for prefab in (wifipref,pcpref,routerpref):
     ids=re.findall(r'^--- !u!\d+ &(\d+)',prefab,re.M)
     assert len(ids)==len(set(ids))
 assert 'wifiNetworkPrefab: {fileID: 1231231231231231231, guid: 0995d0db164924d46baa0f4f4978ec98' in pcpref
+for name in ('Wi-Fi Button','Wi-Fi Menu','Networks Scroll View','Wi-Fi Module','Scan'):
+    assert '  m_Name: '+name+'\n' in pcpref
+assert '  m_Name: Wi-Fi Menu\n' in pcpref and '  m_IsActive: 0' in pcpref
+assert 'wifiTrayIconSprite:' not in pcpref
+for ref in ('wifiTrayButton','wifiPanel','wifiScanButton','wifiPowerButton',
+            'wifiList','wifiStatus','wifiPowerLabel','wifiTrayIcon'):
+    assert re.search(r'^  '+ref+r': \{fileID: (?!0\})\d+\}',pcpref,re.M),ref
+assert 'Нет включённых роутеров для подключения' in routerpanel
+assert 'text.color = Color.white' in routerpanel and '.3372549f' in routerpanel
 assert '1231231231231231231' in wifipref
 assert '1231231231231231232' in routerpref
 assert 'm_MethodName: ApplyWifiSettings' in routerpref
