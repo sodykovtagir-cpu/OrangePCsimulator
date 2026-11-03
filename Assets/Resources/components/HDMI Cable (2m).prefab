@@ -45,8 +45,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ef5e8237ba5145dd808c1a6988cbc188, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   spawnId: HDMI Cable (2m)
   info: HDMI Cable 2m
   match: 0
@@ -56,9 +56,13 @@ MonoBehaviour:
   length: 2
   segments: 7
   cableDiameter: 0.13
+  lanPlugModel: {fileID: 0}
+  lanPlugVisualScale: 0.12
   plugA: {fileID: 1140010}
   plugB: {fileID: 1140020}
   jacket: {fileID: 1200000}
+  maxPullMass: 5
+  tensionStiffness: 1000
 --- !u!120 &1200000
 LineRenderer:
   serializedVersion: 2
@@ -102,14 +106,14 @@ LineRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Positions:
-  - {x: 0.1792521, y: 0.45, z: 0.0000000}
+  - {x: 0.1792521, y: 0.45, z: 0}
   - {x: 0.0981425, y: 0.45, z: 0.2574197}
   - {x: -0.1375512, y: 0.45, z: 0.3209971}
   - {x: -0.3180745, y: 0.45, z: 0.1428571}
   - {x: -0.2752173, y: 0.45, z: -0.1428571}
   - {x: -0.0089798, y: 0.45, z: -0.3209971}
   - {x: 0.3124282, y: 0.45, z: -0.2574197}
-  - {x: 0.4792521, y: 0.45, z: -0.0000000}
+  - {x: 0.4792521, y: 0.45, z: -0}
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 0.14
@@ -276,8 +280,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.22371289, y: 0.10526404, z: 0.22987226}
-  m_Center: {x: 0.06006238, y: 0.0003671795, z: 0.00009969622}
+  m_Size: {x: 0.34326354, y: 0.11204334, z: 0.24511787}
+  m_Center: {x: 0.011631737, y: 0, z: 0}
 --- !u!54 &540010
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -315,9 +319,41 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 995c5007ea7b424191ae7aeb07149f34, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pullOutForce: 200
   cableExitPivot: {fileID: 400011}
+--- !u!1 &100011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 400011}
+  m_Layer: 0
+  m_Name: Cable Pivot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &400011
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100011}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.175, y: 0, z: -0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 400010}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &100020
 GameObject:
   m_ObjectHideFlags: 0
@@ -374,8 +410,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.22371289, y: 0.10526404, z: 0.22987226}
-  m_Center: {x: 0.06006238, y: 0.0003671795, z: 0.00009969622}
+  m_Size: {x: 0.34326342, y: 0.11204334, z: 0.24511778}
+  m_Center: {x: 0.011631734, y: 0, z: 0}
 --- !u!54 &540020
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -413,8 +449,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 995c5007ea7b424191ae7aeb07149f34, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pullOutForce: 200
   cableExitPivot: {fileID: 400021}
 --- !u!33 &3233250504935710089
 MeshFilter:
@@ -467,37 +504,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &100011
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 400011}
-  m_Layer: 0
-  m_Name: Cable Pivot
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &400011
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 100011}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.115, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 400010}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &100021
 GameObject:
   m_ObjectHideFlags: 0
@@ -523,7 +529,7 @@ Transform:
   m_GameObject: {fileID: 100021}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.115, y: 0, z: 0}
+  m_LocalPosition: {x: 0.173, y: 0, z: -0.006}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
