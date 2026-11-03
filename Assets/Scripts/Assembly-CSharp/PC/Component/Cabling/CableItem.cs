@@ -190,6 +190,7 @@ namespace PC.Component.Cabling
             var plug = go.GetComponent<CablePlug>();
             if (plug == null) plug = go.AddComponent<CablePlug>();
             plug.Init(this, end);
+            Transform connectorModel = null;
             if (kind == CableKind.LAN)
             {
                 // The RJ45 FBX is nested into both prefab plugs so it is
@@ -211,21 +212,21 @@ namespace PC.Component.Cabling
                     created.transform.localScale = Vector3.one * Mathf.Max(.001f, lanPlugVisualScale);
                     visual = created.transform;
                 }
+                connectorModel = visual;
                 if (visual != null)
                     foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
                         Destroy(collider);
             }
-            // These local positions follow the authored FBX back/strain-relief
-            // directions: RJ45/VGA/HDMI along -X, wall plug A along +Y,
-            // device power plug B along -Z. The RJ45 rear is only 0.02 m
-            // behind its root: -0.15 m leaves a visible gap in Play Mode.
-            // Never move the socket snap Pivot to compensate.
+            // Legacy fallback ONLY when the connector has no authored pivot.
+            // Prefab markers are under the visual model: users place them in
+            // Unity, and neither this vector nor socket snapping overwrites it.
+            // Do not move the socket snap Pivot to adjust cable attachment.
             Vector3 exit = kind == CableKind.LAN ? new Vector3(-.02f, 0f, 0f) :
                 kind == CableKind.VGA || kind == CableKind.HDMI ?
                     new Vector3(-.115f, 0f, 0f) :
                 end == 0 ? new Vector3(0f, .084f, 0f) :
                     new Vector3(0f, 0f, -.112f);
-            plug.EnsureCableExitPivot(exit);
+            plug.EnsureCableExitPivot(exit, connectorModel);
             if (go.GetComponentInChildren<Renderer>() == null)
             {
                 var model = GameObject.CreatePrimitive(PrimitiveType.Cube);

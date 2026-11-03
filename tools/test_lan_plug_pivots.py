@@ -10,13 +10,16 @@ code = root / 'Assets/Scripts/Assembly-CSharp/PC/Component/Cabling'
 plug = (code / 'CablePlug.cs').read_text()
 rope = (code / 'CableItem.cs').read_text()
 assert '[SerializeField] private Transform cableExitPivot;' in plug
-assert 'transform.Find("Cable Pivot")' in plug
+assert 'connectorModel.Find("Cable Pivot")' in plug
+assert 'transform.InverseTransformPoint(cableExitPivot.position)' in plug
+assert 'cableExitPivot.position = transform.TransformPoint(fallbackPosition)' in plug
 assert 'new Vector3(-.02f, 0f, 0f)' in rope
 assert 'body.position + body.rotation * CableExitLocalPosition' in plug
 assert 'Vector3.Distance(other.CableExitPhysicsPosition,' in plug
 assert 'port.Snap.position + port.Snap.rotation * CableExitLocalPosition' in plug
 assert 'Vector3.Distance(other.Connected.Snap.position, port.Snap.position) :' in plug
-assert 'plug.EnsureCableExitPivot(exit);' in rope
+assert 'plug.EnsureCableExitPivot(exit, connectorModel);' in rope
+assert 'connectorModel = visual;' in rope
 assert 'points[0] = plugA.CableExitPosition;' in rope
 assert 'points[count] = plugB.CableExitPosition;' in rope
 assert 'last.anchor = plugB.CableExitLocalPosition;' in rope
@@ -48,18 +51,16 @@ for length in (5, 15, 48, 100):
         plug_body = content.split(f'--- !u!114 &{prefab_id}\n', 1)[1].split('--- !u!', 1)[0]
         assert f'  cableExitPivot: {{fileID: {pivot_transform}}}' in plug_body
         root_body = content.split(f'--- !u!4 &{root_id}\n', 1)[1].split('--- !u!', 1)[0]
-        assert f'  - {{fileID: {pivot_transform}}}' in root_body
+        assert f'  - {{fileID: {pivot_transform}}}' not in root_body
+        model_id = re.search(r'^  - \{fileID: (\d+)\}$', root_body, re.M).group(1)
+        model_body = content.split(f'--- !u!4 &{model_id} stripped\n', 1)[1].split('--- !u!', 1)[0]
+        model_instance = re.search(r'm_PrefabInstance: \{fileID: (\d+)\}', model_body).group(1)
+        prefab_instance = content.split(f'--- !u!1001 &{model_instance}\n', 1)[1].split('--- !u!', 1)[0]
+        assert 'targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 25abe6272ecacd641a52d6b37b16b6f9, type: 3}' in prefab_instance
+        assert f'addedObject: {{fileID: {pivot_transform}}}' in prefab_instance
         pivot_body = content.split(f'--- !u!4 &{pivot_transform}\n', 1)[1].split('--- !u!', 1)[0]
         assert f'  m_GameObject: {{fileID: {pivot_go}}}' in pivot_body
-        assert f'  m_Father: {{fileID: {root_id}}}' in pivot_body
+        assert f'  m_Father: {{fileID: {model_id}}}' in pivot_body
         assert '  m_LocalPosition: {x: -0.02, y: 0, z: 0}' in pivot_body
-        # Pivot must sit just inside the back face of the authored plug
-        # collider, not 12 cm outside it as the old -0.15 marker did.
-        collider = content.split(f'--- !u!65 &{650010 if root_id == 400010 else 650020}\n', 1)[1].split('--- !u!', 1)[0]
-        center = re.search(r'm_Center: \{x: ([^,]+),', collider)
-        size = re.search(r'm_Size: \{x: ([^,]+),', collider)
-        assert center and size
-        back = float(center.group(1)) - float(size.group(1)) / 2
-        assert back < -0.02 < back + 0.02, (path, root_id, back)
         assert '  m_LocalScale: {x: 1, y: 1, z: 1}' in pivot_body
-print('PASS: four LAN prefab pairs, rear exit pivots, jacket/joints and old-save anchors')
+print('PASS: four LAN prefab pairs, editable connector pivots, jacket/joints and old-save anchors')
