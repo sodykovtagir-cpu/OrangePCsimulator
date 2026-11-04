@@ -279,11 +279,10 @@ namespace PC.Component.Cabling
             if (jacket == null) jacket = GetComponent<LineRenderer>();
             if (jacket == null) jacket = gameObject.AddComponent<LineRenderer>();
             jacket.useWorldSpace = true;
-            // Keep the continuous jacket at one point per physical section.
-            // Pairs of near/far joint anchors make very short backtracking
-            // segments; LineRenderer corner triangulation then collapses and
-            // the cable appears to flicker between thick and thin sections.
-            jacket.positionCount = count + 2;
+            // One point per PHYSICAL joint, not one per segment centre (which
+            // cuts through solid corners), and not two points per section's
+            // anchors (which backtrack at joints and collapse the line width).
+            jacket.positionCount = count + 1;
             jacket.startWidth = cableDiameter;
             jacket.endWidth = cableDiameter;
             jacket.numCapVertices = 6;
@@ -695,9 +694,23 @@ namespace PC.Component.Cabling
         private void UpdateJacket()
         {
             jacket.SetPosition(0, plugA.CableExitPosition);
-            for (int i = 0; i < bodies.Length; i++)
-                jacket.SetPosition(i + 1, bodies[i].transform.position);
-            jacket.SetPosition(bodies.Length + 1, plugB.CableExitPosition);
+            for (int i = 1; i < bodies.Length; i++)
+            {
+                // Both anchors describe the SAME joint in adjacent capsule
+                // spaces. Averaging them closes small solver gaps without
+                // adding a hairpin or drawing a chord through a case corner.
+                var joint = bodies[i].GetComponent<CharacterJoint>();
+                if (joint == null)
+                {
+                    jacket.SetPosition(i, (bodies[i - 1].transform.position +
+                        bodies[i].transform.position) * .5f);
+                    continue;
+                }
+                Vector3 current = bodies[i].transform.TransformPoint(joint.anchor);
+                Vector3 previous = bodies[i - 1].transform.TransformPoint(joint.connectedAnchor);
+                jacket.SetPosition(i, (current + previous) * .5f);
+            }
+            jacket.SetPosition(bodies.Length, plugB.CableExitPosition);
         }
 
         private static Material outletPlugMaterial;

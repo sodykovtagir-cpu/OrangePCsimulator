@@ -106,8 +106,10 @@ assert 'yankedPort = old' in plug
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
-assert 'jacket.positionCount = count + 2;' in rope
-assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
+assert 'jacket.positionCount = count + 1;' in rope
+assert 'bodies[i].transform.TransformPoint(joint.anchor)' in rope
+assert 'bodies[i - 1].transform.TransformPoint(joint.connectedAnchor)' in rope
+assert 'jacket.SetPosition(i, (current + previous) * .5f);' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope
