@@ -87,6 +87,8 @@ assert 'if (GridMode() && !RemoveMode && cableHit == null &&' in shoot
 assert 'cableHit != null || !hitRb.freezeRotation' in shoot
 assert 'bool cableDrag = t.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;' in raycast
 assert 'if (PlacementGrid.Instance != null && !cableDrag)' in raycast
+assert 'hitRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;' in raycast
+assert 'currentDrag.draggedBody.collisionDetectionMode = currentDrag.oldCollisionMode;' in raycast
 assert 'if (grid != null && grid.SnapEnabled && !cableDrag)' in raycast
 assert 'var grabbedCable = hitRb.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
 assert 'drag.wiredCaseStartPosition = hitRb.position;' in raycast
@@ -110,11 +112,14 @@ assert 'yankedPort = old' in plug
 # item pulls, and release one end at the hard limit even when nothing is held.
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
-assert 'AllowContactsBeforeJointProjection();' in rope
-assert 'joint.projectionDistance = .25f;' in rope
-assert 'RelaxedContactLinks' in rope
-assert 'relaxed-contact-links=' in (root/'Assets/Editor/CableCollisionDiagnostics.cs').read_text()
+assert 'AllowContactsBeforeJointProjection();' not in rope
+assert 'joint.projectionDistance = .25f;' not in rope
+assert 'RelaxedContactLinks' not in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
+assert 'CollisionDetectionMode.ContinuousDynamic' in rope
+assert 'SupportsSweepCcd(rb)' in rope
+assert 'RestoreCableCcd(rb);' in rope
+assert 'length <= 16f && count <= 26' in rope
 assert 'jacket.positionCount = count + 1;' in rope
 assert 'bodies[i].transform.TransformPoint(joint.anchor)' in rope
 assert 'bodies[i - 1].transform.TransformPoint(joint.connectedAnchor)' in rope
@@ -232,6 +237,7 @@ assert 'Physics.GetIgnoreCollision(capsule, other)' in diagnose
 assert 'RecoverSolidPenetrations();' not in rope
 assert 'below-example=' in diagnose
 assert 'stretched-joints=' in diagnose
+assert 'jacket-crossings=' in diagnose and 'Physics.RaycastNonAlloc(a, delta.normalized,' in diagnose
 assert 'above.collider.GetComponentInParent<CableItem>() == null' in diagnose
 assert 'collider=' in diagnose and 'host=' in diagnose
 assert 'body.detectCollisions' in diagnose

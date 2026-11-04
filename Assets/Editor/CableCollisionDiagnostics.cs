@@ -89,14 +89,44 @@ public static class CableCollisionDiagnostics
                                 .ToString("0.000") + "m";
                 }
             }
+            // Capsule overlap alone cannot catch a taut jacket bridging a
+            // narrow rod between two joint anchors. Query each rendered span
+            // separately for the player's "spiral around a pole" check.
+            int jacketCrossings = 0;
+            string jacketExample = "none";
+            var jacket = cable.GetComponent<LineRenderer>();
+            if (jacket != null && jacket.enabled && jacket.positionCount > 1)
+            {
+                var rayHits = new RaycastHit[64];
+                for (int i = 1; i < jacket.positionCount; i++)
+                {
+                    Vector3 a = jacket.GetPosition(i - 1);
+                    Vector3 b = jacket.GetPosition(i);
+                    Vector3 delta = b - a;
+                    if (delta.sqrMagnitude < .0001f) continue;
+                    int rayCount = Physics.RaycastNonAlloc(a, delta.normalized,
+                        rayHits, delta.magnitude, ~0, QueryTriggerInteraction.Ignore);
+                    if (rayCount == rayHits.Length) continue; // crowded query
+                    for (int h = 0; h < rayCount; h++)
+                    {
+                        var solid = rayHits[h].collider;
+                        if (solid == null || solid.GetComponentInParent<CableItem>() != null)
+                            continue;
+                        jacketCrossings++;
+                        if (jacketExample == "none")
+                            jacketExample = "span " + (i - 1) + "-" + i +
+                                " / " + solid.name;
+                    }
+                }
+            }
             Debug.Log("Cable collision check: " + cable.name + " id=" + cable.Id +
                 " sections=" + sections + " disabled=" + disabled +
                 " penetrations=" + overlaps + " ignored=" + ignored +
                 " below-solid-suspects=" + below +
                 " stretched-joints=" + stretchedJoints +
                 " max-joint-error=" + largestJointError.ToString("0.000") + "m" +
-                " relaxed-contact-links=" + cable.RelaxedContactLinks +
-                " example=" + example +
+                " jacket-crossings=" + jacketCrossings +
+                " example=" + example + " jacket-example=" + jacketExample +
                 " below-example=" + belowExample);
         }
         Debug.Log("Cable collision check: finished " + cables.Length + " cables. " +

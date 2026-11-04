@@ -22,11 +22,6 @@ namespace PC.Component.Cabling
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
         private CharacterJoint[] links;
-        private CharacterJoint tailLink;
-        private readonly Collider[] blockingHits = new Collider[32];
-        private bool[] blockedSections;
-        private float nextContactCheck;
-        public int RelaxedContactLinks { get; private set; }
         private Rigidbody heldSegment;
         private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
@@ -145,7 +140,6 @@ namespace PC.Component.Cabling
                     physicalColliders.Add(col);
             bodies = new Rigidbody[count];
             links = new CharacterJoint[count];
-            blockedSections = new bool[count];
             Rigidbody previous = plugA.GetComponent<Rigidbody>();
             for (int i = 0; i < count; i++)
             {
@@ -160,7 +154,7 @@ namespace PC.Component.Cabling
                 col.height = Vector3.Distance(points[i], points[i + 1]) + .04f;
                 physicalColliders.Add(col);
                 var rb = body.AddComponent<Rigidbody>();
-                ConfigureBody(rb, .025f);
+                ConfigureBody(rb, .025f, length <= 16f && count <= 26);
                 bodies[i] = rb;
                 var joint = body.AddComponent<CharacterJoint>();
                 links[i] = joint;
@@ -174,7 +168,6 @@ namespace PC.Component.Cabling
                 previous = rb;
             }
             var last = plugB.gameObject.AddComponent<CharacterJoint>();
-            tailLink = last;
             last.connectedBody = previous;
             last.autoConfigureConnectedAnchor = false;
             last.enableCollision = false;
@@ -191,17 +184,47 @@ namespace PC.Component.Cabling
             SetupJacket(count);
         }
 
-        private static void ConfigureBody(Rigidbody rb, float mass)
+        private static void ConfigureBody(Rigidbody rb, float mass, bool sweepCcd)
         {
             rb.mass = mass;
             rb.drag = 1.25f;
             rb.angularDrag = 1.5f;
-            rb.solverIterations = 12;
-            rb.solverVelocityIterations = 8;
+            rb.solverIterations = sweepCcd ? 16 : 12;
+            rb.solverVelocityIterations = sweepCcd ? 10 : 8;
             rb.sleepThreshold = .03f;
             rb.maxDepenetrationVelocity = 1.5f;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            // Speculative CCD predicts an AABB before the joint solver and
+            // can miss a thin pole if a connected chain is pulled through it.
+            // Sweep-based CCD protects the affordable short cables; keep long
+            // 48/100m coils speculative to avoid hundreds of costly CCD bodies.
+            rb.collisionDetectionMode = sweepCcd && SupportsSweepCcd(rb)
+                ? CollisionDetectionMode.ContinuousDynamic
+                : CollisionDetectionMode.ContinuousSpeculative;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
+        }
+
+        private void RestoreCableCcd(Rigidbody rb)
+        {
+            // ContinuousDynamic is not for frozen save-load rigidbodies.
+            // They use speculative mode until FinishRestore makes them dynamic.
+            rb.collisionDetectionMode = length <= 16f && bodies.Length <= 26 &&
+                SupportsSweepCcd(rb) ? CollisionDetectionMode.ContinuousDynamic :
+                CollisionDetectionMode.ContinuousSpeculative;
+        }
+
+        private static bool SupportsSweepCcd(Rigidbody rb)
+        {
+            bool any = false;
+            foreach (var solid in rb.GetComponentsInChildren<Collider>(true))
+            {
+                if (solid == null || !solid.enabled || solid.isTrigger ||
+                    !solid.gameObject.activeInHierarchy || solid.attachedRigidbody != rb)
+                    continue;
+                if (solid is BoxCollider || solid is SphereCollider || solid is CapsuleCollider)
+                    any = true;
+                else return false; // authored mesh collider: retain speculative CCD
+            }
+            return any;
         }
 
         private static void Limit(CharacterJoint joint)
@@ -233,7 +256,7 @@ namespace PC.Component.Cabling
             // parts of the RJ45 mesh. Never add a default square BoxCollider.
             var rb = go.GetComponent<Rigidbody>();
             if (rb == null) rb = go.AddComponent<Rigidbody>();
-            ConfigureBody(rb, .11f);
+            ConfigureBody(rb, .11f, length <= 16f && segments <= 26);
             var plug = go.GetComponent<CablePlug>();
             if (plug == null) plug = go.AddComponent<CablePlug>();
             plug.Init(this, end);
@@ -297,15 +320,6 @@ namespace PC.Component.Cabling
         private void FixedUpdate()
         {
             if (plugs == null || bodies == null || restoringPhysics) return;
-            // Saved rope poses may already cross a solid. Recheck during the
-            // load settling steps too, once FinishRestore has re-enabled the
-            // physical cable, rather than letting strict projection pin it
-            // inside the case for the entire restore window.
-            if (Time.time >= nextContactCheck)
-            {
-                nextContactCheck = Time.time + .1f;
-                AllowContactsBeforeJointProjection();
-            }
             // A falling PSU/monitor can stretch the chain with neither plug
             // held by the player. Release a connection before it can oscillate.
             if (ReleaseOverstretchedEnd()) return;
@@ -345,77 +359,6 @@ namespace PC.Component.Cabling
                 // Holding any section must never call Unplug. Pulling hard
                 // enough breaks the plug's own FixedJoint (pullOutForce), not
                 // a geometry threshold that can already be met on pickup.
-            }
-        }
-
-        private void AllowContactsBeforeJointProjection()
-        {
-            // Projection snaps a stretched CharacterJoint back into alignment
-            // AFTER the solver has handled contacts. On the logged cases this
-            // left up to .13m of real capsule inside a solid despite collisions
-            // being enabled. Never teleport a capsule or disable its collider:
-            // relax only the links touching a deeply penetrating section so
-            // the contact solver can push it out, then restore the usual
-            // tight rope limit once the section and both anchors are clear.
-            for (int i = 0; i < bodies.Length; i++)
-            {
-                blockedSections[i] = false;
-                var rb = bodies[i];
-                if (rb == null || rb.isKinematic || !rb.detectCollisions) continue;
-                var own = rb.GetComponent<CapsuleCollider>();
-                if (own == null || !own.enabled) continue;
-                int count = Physics.OverlapSphereNonAlloc(rb.position,
-                    Mathf.Max(.4f, own.height * .5f + .25f), blockingHits,
-                    ~0, QueryTriggerInteraction.Ignore);
-                if (count == blockingHits.Length)
-                {
-                    // An incomplete broad-phase must not reset a previously
-                    // softened joint against an unobserved case wall.
-                    blockedSections[i] = true;
-                    continue;
-                }
-                for (int j = 0; j < count; j++)
-                {
-                    var other = blockingHits[j];
-                    if (other == null || other == own ||
-                        other.GetComponentInParent<CableItem>() == this ||
-                        (other.attachedRigidbody != null &&
-                            !other.attachedRigidbody.detectCollisions) ||
-                        Physics.GetIgnoreCollision(own, other) ||
-                        Physics.GetIgnoreLayerCollision(own.gameObject.layer,
-                            other.gameObject.layer)) continue;
-                    Vector3 direction;
-                    float depth;
-                    if (Physics.ComputePenetration(own, rb.position, rb.rotation,
-                        other, other.transform.position, other.transform.rotation,
-                        out direction, out depth) && depth > .025f)
-                    {
-                        blockedSections[i] = true;
-                        break;
-                    }
-                }
-            }
-            RelaxedContactLinks = 0;
-            for (int i = 0; i <= bodies.Length; i++)
-            {
-                var joint = i == bodies.Length ? tailLink : links[i];
-                if (joint == null || joint.connectedBody == null) continue;
-                bool blocked = (i < bodies.Length && blockedSections[i]) ||
-                    (i > 0 && blockedSections[i - 1]);
-                if (blocked)
-                {
-                    joint.projectionDistance = .25f;
-                }
-                else if (joint.projectionDistance > .02f)
-                {
-                    var ownRb = joint.GetComponent<Rigidbody>();
-                    if (ownRb == null) continue;
-                    Vector3 a = BodyWorldPoint(ownRb, joint.anchor);
-                    Vector3 b = BodyWorldPoint(joint.connectedBody, joint.connectedAnchor);
-                    if (Vector3.Distance(a, b) < .012f)
-                        joint.projectionDistance = .02f;
-                }
-                if (joint.projectionDistance > .02f) RelaxedContactLinks++;
             }
         }
 
@@ -896,6 +839,7 @@ namespace PC.Component.Cabling
                 var rb = plugs[i].GetComponent<Rigidbody>();
                 restorePlugContacts[i] = rb.detectCollisions;
                 rb.detectCollisions = false;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rb.isKinematic = true;
                 if (havePosition[i]) rb.position = restoredPositions[i];
                 var rot = data["cableRot" + i] as JArray;
@@ -909,6 +853,7 @@ namespace PC.Component.Cabling
                 var rb = bodies[i];
                 restoreBodyContacts[i] = rb.detectCollisions;
                 rb.detectCollisions = false;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rb.isKinematic = true;
                 if (poses != null && poses.Count == bodies.Length)
                 {
@@ -1266,12 +1211,14 @@ namespace PC.Component.Cabling
                 if (plug == null) continue;
                 var rb = plug.GetComponent<Rigidbody>();
                 rb.isKinematic = false;
+                RestoreCableCcd(rb);
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
             foreach (var rb in bodies)
             {
                 rb.isKinematic = false;
+                RestoreCableCcd(rb);
                 rb.velocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }

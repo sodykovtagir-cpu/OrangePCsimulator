@@ -16,6 +16,9 @@ public class Raycast : MonoBehaviour
         public Transform target;
         public float oldDrag;
         public float oldAngularDrag;
+        public CollisionDetectionMode oldCollisionMode;
+        public bool sweptWhileDragging;
+        public Rigidbody draggedBody;
         public float distance;
         public RigidbodyConstraints oldConstrains;
 
@@ -549,10 +552,23 @@ public class Raycast : MonoBehaviour
                     target = hit.transform,
                     oldDrag = hitRb.drag,
                     oldAngularDrag = hitRb.angularDrag,
+                    oldCollisionMode = hitRb.collisionDetectionMode,
+                    draggedBody = hitRb,
                     oldConstrains = hitRb.constraints,
                     grabbedCable = plug == null ? grabbedCable : null
                 };
                 currentDrag = drag;
+                // A dragged chair/case/router can sweep across an otherwise
+                // stationary cable. CCD on the rope alone cannot see movement
+                // of a dynamic Discrete body through a thin lead or pole.
+                // Enable sweep CCD only for this ONE dragged rigidbody when
+                // all its active solids support it, and restore its old mode
+                // on release (authored prefab settings stay untouched).
+                if (!hitRb.isKinematic && HasSweepColliders(hitRb))
+                {
+                    hitRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                    drag.sweptWhileDragging = true;
+                }
                 if (hitRb.GetComponent<Case>() != null)
                 {
                     drag.wiredCaseStartPosition = hitRb.position;
@@ -2374,6 +2390,21 @@ public class Raycast : MonoBehaviour
         drag.distance = (maxDistance - 2f) * v + 2f;
     }
 
+    private static bool HasSweepColliders(Rigidbody rb)
+    {
+        bool any = false;
+        foreach (var solid in rb.GetComponentsInChildren<Collider>(true))
+        {
+            if (solid == null || !solid.enabled || solid.isTrigger ||
+                !solid.gameObject.activeInHierarchy || solid.attachedRigidbody != rb)
+                continue;
+            if (solid is BoxCollider || solid is SphereCollider || solid is CapsuleCollider)
+                any = true;
+            else return false; // sweep CCD needs primitive physical colliders
+        }
+        return any;
+    }
+
     private void ReleaseHeldPlug(PC.Component.Cabling.CablePlug plug)
     {
         if (plug == null || currentDrag == null || spring == null ||
@@ -2429,6 +2460,8 @@ public class Raycast : MonoBehaviour
             // OnTriggerStay can snap the plug on the next physics step.
             if (releasedPlug != null) releasedPlug.SetHeld(false);
             if (currentDrag.grabbedCable != null) currentDrag.grabbedCable.HoldSection(null);
+            if (currentDrag.sweptWhileDragging && currentDrag.draggedBody != null)
+                currentDrag.draggedBody.collisionDetectionMode = currentDrag.oldCollisionMode;
 
             if (distanceObj) distanceObj.SetActive(false);
             currentDrag = null;
