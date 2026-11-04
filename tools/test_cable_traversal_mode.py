@@ -28,6 +28,14 @@ assert 'pcBounds.Encapsulate(obstacles[i].bounds)' in code
 assert 'pcBounds.min.x - 1.1f' in code and 'lane == 2 ? pcCableSpawn' in code
 assert 'FIXTURE PC bounds=' in code
 assert 'hand.AddComponent<SpringJoint>()' in code
+assert 'hand.transform.position = target.position;' in code
+assert 'joint.autoConfigureConnectedAnchor = false;' in code
+assert 'joint.connectedAnchor = Vector3.zero;' in code
+assert 'stationary grasp before movement' in code
+assert 'yield return RunStage("thick wall / opposing ends"' in code
+assert 'yield return RunStage("assembled PC housing"' in code
+assert 'monitoringPins && message.StartsWith("Cable HDMI: PIN BREAK"' in code
+assert 'reload watch step=' in code
 assert 'moving.GetComponent<Rigidbody>().MovePosition(target);' in code
 assert 'movingPlug.SetHeld(true);' in code and 'movingPlug.SetHeld(false);' in code
 assert 'Mathf.SmoothStep(0f, 1f, t)' in code and 'Mathf.PerlinNoise' in code

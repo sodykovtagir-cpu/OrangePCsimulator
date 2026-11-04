@@ -21,6 +21,8 @@ public sealed class CableTraversalMode : MonoBehaviour
     private bool busy;
     private bool geometryOnLoad;
     private bool failed;
+    private bool monitoringPins;
+    private bool pcRouteNegative;
     private int roomScene;
     private string logPath;
     private string savePath;
@@ -78,6 +80,11 @@ public sealed class CableTraversalMode : MonoBehaviour
         if (firstViolations.Count < 12) firstViolations.Add(message);
         Write("FAIL " + message);
     }
+    private void UnityLog(string message, string stack, LogType type)
+    {
+        if (monitoringPins && message.StartsWith("Cable HDMI: PIN BREAK", StringComparison.Ordinal))
+            Fail("PIN BREAK while isolated traversal fixture is active: " + message);
+    }
 
     private IEnumerator Run()
     {
@@ -118,6 +125,10 @@ public sealed class CableTraversalMode : MonoBehaviour
             foreach (var item in FindObjectsOfType<Item>())
                 if (item != null) Destroy(item.gameObject);
             yield return null;
+            // Only monitor the disposable room, never the user's own objects
+            // removed during the scene switch or later normal gameplay.
+            Application.logMessageReceived += UnityLog;
+            monitoringPins = true;
             Player.Instance.LoadPlayer(new PlayerData { x = Origin.x - 5f,
                 y = Origin.y + 1.5f, z = Origin.z - 5f, ry = 30f, rx = 0f });
             var lan = Resources.Load<GameObject>("components/LAN Cable (5m)");
@@ -152,9 +163,25 @@ public sealed class CableTraversalMode : MonoBehaviour
             // hard-coded 1.6 m offset. Spawn the *new* coil wholly outside
             // its real colliders; do not alter the case or rescue a collision
             // after the cable has already been created inside the metal.
+            // Route the HDMI probe around the side OPPOSITE the assembled
+            // PC's video sockets. Real port triggers can otherwise auto-insert
+            // the dragged plug, turning a collision test into a pin-break test.
+            int negativePorts = 0, positivePorts = 0;
+            foreach (var port in FindObjectsOfType<CablePort>())
+            {
+                if (port == null ||
+                    (port.kind != PortKind.GpuVideo && port.kind != PortKind.BoardVideo &&
+                     port.kind != PortKind.HdmiInput) ||
+                    (port.TriggerCenter - pcBounds.center).sqrMagnitude > 36f) continue;
+                if (port.TriggerCenter.z < pcBounds.center.z) negativePorts++;
+                else positivePorts++;
+            }
+            pcRouteNegative = negativePorts <= positivePorts;
             Vector3 pcCableSpawn = new Vector3(pcBounds.min.x - 1.1f,
-                Origin.y + 1.4f, pcBounds.center.z - .7f);
-            Write("FIXTURE PC bounds=" + pcBounds + " cable-spawn=" + pcCableSpawn);
+                Origin.y + 1.4f, pcRouteNegative ? pcBounds.min.z + .4f : pcBounds.max.z - .4f);
+            Write("FIXTURE PC bounds=" + pcBounds + " cable-spawn=" + pcCableSpawn +
+                " video-ports-z(-/+): " + negativePorts + "/" + positivePorts +
+                " detour=" + (pcRouteNegative ? "negative Z" : "positive Z"));
 
             var pole = GameObject.Find("Cable traversal thin pole (scene-only)");
             var wall = GameObject.Find("Cable traversal thick wall (scene-only)");
@@ -176,18 +203,23 @@ public sealed class CableTraversalMode : MonoBehaviour
             }
             for (int step = 0; step < SettleSteps; step++) yield return new WaitForFixedUpdate();
             Physics.SyncTransforms();
-            // Never count a bad initial coil as a traversal success.
-            if (!Observe("preflight pole", cables[0], new[] { thin }) ||
-                !Observe("preflight wall", cables[1], new[] { thick }) ||
-                !Observe("preflight PC", cables[2], obstacles))
-            { Fail("Fixture cable started intersecting a solid; motion not tested"); yield break; }
-
-            yield return Exercise("spiral thin pole", cables[0], new[] { thin },
-                Origin + new Vector3(0f, 1.35f, 0f), .42f, false);
-            yield return Exercise("thick wall / opposing ends", cables[1], new[] { thick },
-                Origin + new Vector3(Pitch, 1.35f, 0f), 1.05f, true);
-            yield return Exercise("assembled PC housing", cables[2], obstacles,
-                pcCentre, 1.7f, true);
+            // Check all three baselines independently: one bad lane must not
+            // hide the other two or prevent their full save/reload check.
+            bool poleReady = Observe("preflight pole", cables[0], new[] { thin });
+            bool wallReady = Observe("preflight wall", cables[1], new[] { thick });
+            bool pcReady = Observe("preflight PC", cables[2], obstacles);
+            if (poleReady)
+                yield return RunStage("spiral thin pole", cables[0], new[] { thin },
+                    Origin + new Vector3(0f, 1.35f, 0f), .42f, false);
+            else Write("SKIP spiral: invalid initial coil");
+            if (wallReady)
+                yield return RunStage("thick wall / opposing ends", cables[1], new[] { thick },
+                    Origin + new Vector3(Pitch, 1.35f, 0f), 1.05f, true);
+            else Write("SKIP wall: invalid initial coil");
+            if (pcReady)
+                yield return RunStage("assembled PC housing", cables[2], obstacles,
+                    pcCentre, 1.7f, true);
+            else Write("SKIP PC: invalid initial coil");
             // Save and reload even after a geometry FAIL: the second phase
             // checks whether the already-wrong rope gets worse on restore.
             // Full SaveManager save + room reload, not a synthetic cable-only
@@ -226,17 +258,35 @@ public sealed class CableTraversalMode : MonoBehaviour
                 new List<Collider> { restoredPole }, new List<Collider> { restoredWall },
                 restoredCaseSolids
             };
+            var restoredCables = new CableItem[ids.Length];
+            var reloadValid = new bool[ids.Length];
             for (int i = 0; i < ids.Length; i++)
             {
-                var restored = Main.Instance.GetItemById(ids[i]) as CableItem;
-                if (restored == null) { Fail("Missing cable after reload id=" + ids[i]); continue; }
-                Observe("after save/reload lane=" + i, restored, savedObstacles[i]);
+                restoredCables[i] = Main.Instance.GetItemById(ids[i]) as CableItem;
+                if (restoredCables[i] == null)
+                { Fail("Missing cable after reload id=" + ids[i]); continue; }
+                reloadValid[i] = Observe("after save/reload lane=" + i,
+                    restoredCables[i], savedObstacles[i]);
+            }
+            // A reloaded plug can snap or its pin can break several physics
+            // ticks after the initial check. Watch for two more seconds instead
+            // of reporting PASS immediately before a delayed PIN BREAK.
+            for (int step = 0; step < 100; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                if (step % 10 != 0) continue;
+                for (int i = 0; i < ids.Length; i++)
+                    if (reloadValid[i])
+                        reloadValid[i] = Observe("reload watch step=" + step + " lane=" + i,
+                            restoredCables[i], savedObstacles[i]);
             }
             Write(failed ? "FAIL: see first violation and isolated log" :
                 "PASS: spiral, thick wall, assembled PC and one full save/reload");
         }
         finally
         {
+            monitoringPins = false;
+            Application.logMessageReceived -= UnityLog;
             for (int i = 0; i < hands.Count; i++) if (hands[i] != null) Destroy(hands[i]);
             hands.Clear();
             geometryOnLoad = false;
@@ -261,15 +311,32 @@ public sealed class CableTraversalMode : MonoBehaviour
     private GameObject Hand(Rigidbody target, float spring, float damper)
     {
         var hand = new GameObject("Cable traversal hand (scene-only)");
+        // Place the Transform BEFORE adding the joint. In a fresh GameObject
+        // its default world origin is (0,0,0); at this test's distant room an
+        // auto-configured connectedAnchor can generate a huge first impulse.
+        hand.transform.position = target.position;
         var rb = hand.AddComponent<Rigidbody>();
         rb.isKinematic = true;
-        rb.position = target.position;
         var joint = hand.AddComponent<SpringJoint>();
+        joint.autoConfigureConnectedAnchor = false;
+        joint.anchor = Vector3.zero;
+        joint.connectedAnchor = Vector3.zero;
         joint.spring = spring;
         joint.damper = damper;
         joint.connectedBody = target;
         hands.Add(hand);
         return hand;
+    }
+
+    private IEnumerator RunStage(string stage, CableItem cable,
+        IList<Collider> solids, Vector3 centre, float radius, bool cross)
+    {
+        bool priorFailure = failed;
+        failed = false;
+        yield return Exercise(stage, cable, solids, centre, radius, cross);
+        bool stageFailed = failed;
+        failed |= priorFailure;
+        if (stageFailed) Write("STAGE FAIL " + stage + "; proceeding to the other independent lanes");
     }
 
     private IEnumerator Exercise(string stage, CableItem cable,
@@ -290,6 +357,13 @@ public sealed class CableTraversalMode : MonoBehaviour
         movingEnd.drag = 10f;
         movingEnd.angularDrag = 5f;
         movingPlug.SetHeld(true); // same held state as the player's plug drag
+        // Isolate a physics jump caused by merely attaching the springs from
+        // a real traversal failure. Measure it before issuing ANY hand move.
+        Write(stage + " GRASP anchors fixed=" +
+            Vector3.Distance(stationary.transform.position, fixedEnd.position).ToString("0.000") +
+            "m moving=" + Vector3.Distance(moving.transform.position, movingEnd.position).ToString("0.000") + "m");
+        yield return new WaitForFixedUpdate();
+        Observe(stage + " stationary grasp before movement", cable, solids);
         // Ease in/out at every waypoint; deterministic little overcorrections
         // emulate a hand moving the mouse rather than robotic linear steps.
         var waypoints = new List<Vector3> { movingEnd.position };
@@ -311,7 +385,11 @@ public sealed class CableTraversalMode : MonoBehaviour
             for (int solid = 1; solid < solids.Count; solid++)
                 if (solids[solid] != null) bounds.Encapsulate(solids[solid].bounds);
             float left = bounds.min.x - .22f, right = bounds.max.x + .22f;
-            float around = bounds.max.z + .22f;
+            // Keep the case route away from whichever Z side has the actual
+            // video sockets; no assumption about the prefab's orientation.
+            float around = stage == "assembled PC housing" ?
+                (pcRouteNegative ? bounds.min.z - .30f : bounds.max.z + .30f) :
+                bounds.max.z + .22f;
             waypoints.Add(new Vector3(left, centre.y, around));
             waypoints.Add(new Vector3(right, centre.y, around));
             waypoints.Add(new Vector3(right, centre.y, centre.z));
