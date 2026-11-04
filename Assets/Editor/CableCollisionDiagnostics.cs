@@ -95,6 +95,7 @@ public static class CableCollisionDiagnostics
                 " below-solid-suspects=" + below +
                 " stretched-joints=" + stretchedJoints +
                 " max-joint-error=" + largestJointError.ToString("0.000") + "m" +
+                " relaxed-contact-links=" + cable.RelaxedContactLinks +
                 " example=" + example +
                 " below-example=" + belowExample);
         }

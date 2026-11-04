@@ -77,6 +77,7 @@ namespace PC.Component.Cabling
         private Item watchedOwner;
         private Case currentCase;
         private CablePort approachPort;
+        private CablePort watchedPort;
         // Unity can miss a trigger callback when a small socket and a dragged
         // rigidbody move past one another between physics steps.
         private readonly Collider[] nearbyPortColliders = new Collider[24];
@@ -233,6 +234,7 @@ namespace PC.Component.Cabling
         private void WatchPort(CablePort port)
         {
             if (port == null || port.owner == null) return;
+            watchedPort = port;
             if (watchedOwner != port.owner)
             {
                 DeferRestore(devicePairs);
@@ -259,6 +261,7 @@ namespace PC.Component.Cabling
         {
             if (approachPort != port || Connected != null) return;
             approachPort = null;
+            watchedPort = null;
             watchedOwner = null;
             currentCase = null;
             DeferRestore(devicePairs);
@@ -423,9 +426,34 @@ namespace PC.Component.Cabling
                 if (target == null || target.isTrigger || !target.enabled ||
                     !target.gameObject.activeInHierarchy || target.GetComponentInParent<Item>() != owner)
                     continue;
+                // Only solids at this socket may be bypassed by its inserted
+                // connector. A different wall of the same case must remain
+                // solid even while a player holds the plug near the port.
+                if (watchedPort != null &&
+                    Vector3.Distance(target.ClosestPoint(watchedPort.Snap.position),
+                        watchedPort.Snap.position) > watchedPort.CaptureRadius + .25f)
+                    continue;
                 foreach (var ours in ourColliders)
                     AddPair(list, ours, target);
-                AddPair(list, adjacent, target);
+                // The plug can stay inside its socket, but a free capsule
+                // must collide with every case/board/outlet solid it has not
+                // actually intersected. Previously every such pair was
+                // disabled, allowing the first section to enter an entire
+                // housing and pull the following sections through its wall.
+                // A pre-existing overlap (e.g. a saved inset socket) is kept
+                // exempt until RestoreClearAdjacent observes real clearance.
+                if (adjacent != null && adjacent.enabled && watchedPort != null &&
+                    adjacent.gameObject.activeInHierarchy &&
+                    Vector3.Distance(adjacent.bounds.center, watchedPort.Snap.position) <=
+                        watchedPort.CaptureRadius + adjacent.bounds.extents.magnitude + .08f)
+                {
+                    Vector3 direction;
+                    float depth;
+                    if (Physics.ComputePenetration(adjacent, adjacent.transform.position,
+                        adjacent.transform.rotation, target, target.transform.position,
+                        target.transform.rotation, out direction, out depth) && depth > .002f)
+                        AddPair(list, adjacent, target);
+                }
             }
         }
 
@@ -477,7 +505,25 @@ namespace PC.Component.Cabling
                         pendingRestore.RemoveAt(i);
                         continue;
                     }
-                    if (pair.plug.bounds.Intersects(pair.target.bounds)) continue;
+                    // Broad-phase AABBs of a long thin case wall overlap a
+                    // plug even after its real colliders separate. Waiting for
+                    // non-intersecting bounds kept IgnoreCollision alive and
+                    // let a loose cable travel through the whole housing.
+                    if (pair.plug.bounds.Intersects(pair.target.bounds))
+                    {
+                        bool primitive = pair.plug is BoxCollider ||
+                            pair.plug is SphereCollider || pair.plug is CapsuleCollider ||
+                            pair.target is BoxCollider || pair.target is SphereCollider ||
+                            pair.target is CapsuleCollider;
+                        if (!primitive) continue; // cannot query a non-convex pair
+                        Vector3 direction;
+                        float depth;
+                        if (Physics.ComputePenetration(pair.plug,
+                            pair.plug.transform.position, pair.plug.transform.rotation,
+                            pair.target, pair.target.transform.position,
+                            pair.target.transform.rotation, out direction, out depth) &&
+                            depth > .003f) continue;
+                    }
                     Physics.IgnoreCollision(pair.plug, pair.target, false);
                     pendingRestore.RemoveAt(i);
                 }
@@ -495,6 +541,7 @@ namespace PC.Component.Cabling
             if (pin != null) Destroy(pin);
             pin = null;
             watchedOwner = null;
+            watchedPort = null;
             currentCase = null;
             DeferRestore(devicePairs);
             DeferRestore(casePairs);

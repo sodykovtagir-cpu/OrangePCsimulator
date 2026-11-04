@@ -35,9 +35,10 @@ assert 'AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)' in 
 assert 'Physics.IgnoreCollision(ours, target, true)' in plug
 assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
 assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
-# Every CablePort owner (GPU, PSU, motherboard, display and wall outlet)
-# ignores ONLY this plug and its adjacent capsule. The installed GPU/PSU/board
-# additionally exempts their case, never unrelated devices or full cable.
+assert 'Physics.ComputePenetration(pair.plug,' in plug
+# Every CablePort owner exempts the inserted plug. Only an already-overlapping
+# adjacent capsule *near this socket* is temporarily exempt; the rest of the
+# case/board/outlet and the remaining cable keep physical contacts.
 assert 'WatchPort(port);' in plug and 'watchedOwner = port.owner;' in plug
 assert 'AddPairs(devicePairs, watchedOwner.transform, watchedOwner);' in plug
 assert 'if (!IsHeld || Connected != null || port == null || !port.Accepts(this)) return;' in plug
@@ -56,6 +57,10 @@ assert 'Cable.NearEndCollider(End)' in plug
 assert 'target.GetComponentInParent<Item>() != owner' in plug
 assert 'target == null || target.isTrigger || !target.enabled' in plug
 assert 'AddPair(list, adjacent, target);' in plug
+assert 'if (Physics.ComputePenetration(adjacent, adjacent.transform.position,' in plug
+assert 'target.transform.rotation, out direction, out depth) && depth > .002f)' in plug
+assert 'watchedPort.CaptureRadius + adjacent.bounds.extents.magnitude + .08f' in plug
+assert 'target.ClosestPoint(watchedPort.Snap.position)' in plug
 assert 'RestoreClearAdjacent(devicePairs);' in plug
 assert 'RestoreClearAdjacent(casePairs);' in plug
 assert 'Physics.ComputePenetration(adjacent, adjacent.transform.position,' in plug
@@ -105,6 +110,10 @@ assert 'yankedPort = old' in plug
 # item pulls, and release one end at the hard limit even when nothing is held.
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
+assert 'AllowContactsBeforeJointProjection();' in rope
+assert 'joint.projectionDistance = .25f;' in rope
+assert 'RelaxedContactLinks' in rope
+assert 'relaxed-contact-links=' in (root/'Assets/Editor/CableCollisionDiagnostics.cs').read_text()
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
 assert 'jacket.positionCount = count + 1;' in rope
 assert 'bodies[i].transform.TransformPoint(joint.anchor)' in rope
