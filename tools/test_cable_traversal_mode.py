@@ -34,6 +34,8 @@ assert 'rope path stretched to ' in code and 'JACKET through ' in code
 assert 'Physics.RaycastNonAlloc(start, delta.normalized, rayHits,' in code
 assert 'firstViolations.Add(message)' in code
 assert 'after save/reload lane=' in code
+# C# cannot infer one `var` type for two declarators (CS0819).
+assert 'var a = cable.End(0), b = cable.End(1);' not in code
 assert 'Exit Play Mode or load your own save to return.' in code
 print('PASS: human-paced spring/rod/wall/assembled-PC fixture, full isolated save/reload')
 assert 'oppositeSeen = true;' in code and 'INCONCLUSIVE' in code

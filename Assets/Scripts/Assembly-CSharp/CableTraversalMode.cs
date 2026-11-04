@@ -400,7 +400,8 @@ public sealed class CableTraversalMode : MonoBehaviour
         }
         if (maxGap > .02f)
         { Fail(stage + ": STRETCHED " + worst + " gap=" + maxGap.ToString("0.000") + "m"); return false; }
-        var a = cable.End(0), b = cable.End(1);
+        var a = cable.End(0);
+        var b = cable.End(1);
         if (a == null || b == null) { Fail(stage + ": missing cable end"); return false; }
         if (a.Connected != null || b.Connected != null)
         { Fail(stage + ": plug unexpectedly inserted into fixture hardware"); return false; }
