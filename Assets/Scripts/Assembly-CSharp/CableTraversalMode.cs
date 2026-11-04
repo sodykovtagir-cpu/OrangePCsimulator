@@ -159,10 +159,10 @@ public sealed class CableTraversalMode : MonoBehaviour
             Bounds pcBounds = obstacles[0].bounds;
             for (int i = 1; i < obstacles.Count; i++)
                 pcBounds.Encapsulate(obstacles[i].bounds);
-            // The assembled case is wider than a test cable's original
-            // hard-coded 1.6 m offset. Spawn the *new* coil wholly outside
-            // its real colliders; do not alter the case or rescue a collision
-            // after the cable has already been created inside the metal.
+            // The HDMI prefab labelled "6m" actually has length=12 and a
+            // roughly 1m delivery coil. Its Plug B can project more than 1.1m
+            // from the cable ROOT. Reserve space for the entire coil and
+            // authored plug collider, not just the root, outside the case.
             // Route the HDMI probe around the side OPPOSITE the assembled
             // PC's video sockets. Real port triggers can otherwise auto-insert
             // the dragged plug, turning a collision test into a pin-break test.
@@ -177,7 +177,7 @@ public sealed class CableTraversalMode : MonoBehaviour
                 else positivePorts++;
             }
             pcRouteNegative = negativePorts <= positivePorts;
-            Vector3 pcCableSpawn = new Vector3(pcBounds.min.x - 1.1f,
+            Vector3 pcCableSpawn = new Vector3(pcBounds.min.x - 2.1f,
                 Origin.y + 1.4f, pcRouteNegative ? pcBounds.min.z + .4f : pcBounds.max.z - .4f);
             Write("FIXTURE PC bounds=" + pcBounds + " cable-spawn=" + pcCableSpawn +
                 " video-ports-z(-/+): " + negativePorts + "/" + positivePorts +
@@ -395,9 +395,13 @@ public sealed class CableTraversalMode : MonoBehaviour
             float left = bounds.min.x - .22f, right = bounds.max.x + .22f;
             // Keep the case route away from whichever Z side has the actual
             // video sockets; no assumption about the prefab's orientation.
+            // A 15m Power section is ~0.58m long, with ~0.36m reach from
+            // centre to tip. The old 0.22m waypoint clipped a wall corner
+            // even when the hand passed outside it. Give the capsule itself
+            // room to turn, then still check every physical contact.
             float around = stage == "assembled PC housing" ?
-                (pcRouteNegative ? bounds.min.z - .30f : bounds.max.z + .30f) :
-                bounds.max.z + .22f;
+                (pcRouteNegative ? bounds.min.z - .45f : bounds.max.z + .45f) :
+                bounds.max.z + .45f;
             waypoints.Add(new Vector3(left, centre.y, around));
             waypoints.Add(new Vector3(right, centre.y, around));
             waypoints.Add(new Vector3(right, centre.y, centre.z));
@@ -525,6 +529,36 @@ public sealed class CableTraversalMode : MonoBehaviour
                         " depth=" + depth.ToString("0.000") + "m ignored=" +
                         Physics.GetIgnoreCollision(capsule, solid));
                     return false;
+                }
+            }
+        }
+        // A connector may collide even when all cable capsules and the
+        // jacket are clear. This caught the old fixture's oversized HDMI
+        // delivery coil: Plug B was born inside the case before any drag.
+        for (int end = 0; end < 2; end++)
+        {
+            var plug = cable.End(end);
+            if (plug == null) { Fail(stage + ": missing plug " + end); return false; }
+            var plugBody = plug.GetComponent<Rigidbody>();
+            foreach (var plugSolid in plug.GetComponentsInChildren<Collider>())
+            {
+                if (plugSolid == null || !plugSolid.enabled || plugSolid.isTrigger ||
+                    plugSolid.attachedRigidbody != plugBody) continue;
+                for (int k = 0; k < solids.Count; k++)
+                {
+                    var solid = solids[k];
+                    if (solid == null || !solid.enabled || solid.isTrigger) continue;
+                    Vector3 direction;
+                    float depth;
+                    if (Physics.ComputePenetration(plugSolid, plugSolid.transform.position,
+                        plugSolid.transform.rotation, solid, solid.transform.position,
+                        solid.transform.rotation, out direction, out depth) && depth > .025f)
+                    {
+                        Fail(stage + ": PLUG through " + solid.name + " end=" + end +
+                            " depth=" + depth.ToString("0.000") + "m ignored=" +
+                            Physics.GetIgnoreCollision(plugSolid, solid));
+                        return false;
+                    }
                 }
             }
         }

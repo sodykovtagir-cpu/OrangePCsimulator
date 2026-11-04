@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Static guards for the Editor-only traversal fixture; Unity Play Mode must run it."""
 from pathlib import Path
+import math
+import re
 
 root = Path(__file__).resolve().parents[1]
 code = (root / 'Assets/Scripts/Assembly-CSharp/CableTraversalMode.cs').read_text()
@@ -25,8 +27,17 @@ assert 'Cable traversal thick wall' in code and '.38f, 2.7f, 3f' in code
 assert 'FindNearestCase(pcCentre)' in code and 'caseItem.GetComponentsInChildren<Collider>()' in code
 # A coil placed at a fixed offset was already inside the assembled PC in Play Mode.
 assert 'pcBounds.Encapsulate(obstacles[i].bounds)' in code
-assert 'pcBounds.min.x - 1.1f' in code and 'lane == 2 ? pcCableSpawn' in code
+assert 'pcBounds.min.x - 2.1f' in code and 'lane == 2 ? pcCableSpawn' in code
+assert 'bounds.max.z + .45f' in code
+assert 'PLUG through ' in code and 'plugSolid.attachedRigidbody != plugBody' in code
 assert 'FIXTURE PC bounds=' in code
+# Check the actual delivery-coil radius, not the misleading "HDMI 6m" name.
+hdmi = (root / 'Assets/Resources/components/HDMI Cable 6m.prefab').read_text()
+length = float(re.search(r'^  length: ([\d.]+)$', hdmi, re.M).group(1))
+sections = int(re.search(r'^  segments: (\d+)$', hdmi, re.M).group(1))
+turns = 3 if sections >= 24 and length > 12 else 2 if sections >= 11 else 1
+radius = (length / sections) / (2 * math.sin(math.pi * turns / sections))
+assert 2.1 > radius + .25 + .3, 'fixture must clear coil, plug body and shell'
 assert 'hand.AddComponent<SpringJoint>()' in code
 assert 'hand.transform.position = target.position;' in code
 assert 'joint.autoConfigureConnectedAnchor = false;' in code
