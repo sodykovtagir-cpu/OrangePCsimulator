@@ -54,7 +54,7 @@ MonoBehaviour:
   glue: 0
   kind: 3
   length: 5
-  segments: 11
+  segments: 22
   cableDiameter: 0.08
   lanPlugModel: {fileID: 919132149155446097, guid: 25abe6272ecacd641a52d6b37b16b6f9, type: 3}
   lanPlugVisualScale: 1

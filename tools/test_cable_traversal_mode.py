@@ -48,6 +48,7 @@ assert 'Physics.ComputePenetration(capsule, rb.position, rb.rotation,' in code
 assert 'STRETCHED' in code and 'endpoint span exceeds cable length' in code
 assert 'rope path stretched to ' in code and 'JACKET through ' in code
 assert 'Physics.RaycastNonAlloc(start, delta.normalized, rayHits,' in code
+assert 'plug-contact=' in code and 'Physics.GetIgnoreCollision(plugSolid, solid)' in code
 assert 'firstViolations.Add(message)' in code
 assert 'after save/reload lane=' in code
 # C# cannot infer one `var` type for two declarators (CS0819).

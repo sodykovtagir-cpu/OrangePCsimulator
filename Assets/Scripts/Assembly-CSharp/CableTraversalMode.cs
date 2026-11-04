@@ -575,13 +575,35 @@ public sealed class CableTraversalMode : MonoBehaviour
                 for (int k = 0; k < solids.Count; k++)
                     if (solid != null && solid == solids[k])
                     {
+                        // A connector whose authored solid does not cover its
+                        // cable-exit pivot can leave a physical gap at a case
+                        // wall. Record whether this is an ignored contact, a
+                        // real penetration, or a collider that misses the exit.
+                        string plugContact = "none";
+                        var plugBody = b.GetComponent<Rigidbody>();
+                        foreach (var plugSolid in b.GetComponentsInChildren<Collider>())
+                        {
+                            if (plugSolid == null || !plugSolid.enabled || plugSolid.isTrigger ||
+                                plugSolid.attachedRigidbody != plugBody) continue;
+                            Vector3 direction;
+                            float depth;
+                            bool overlaps = Physics.ComputePenetration(plugSolid,
+                                plugSolid.transform.position, plugSolid.transform.rotation,
+                                solid, solid.transform.position, solid.transform.rotation,
+                                out direction, out depth);
+                            plugContact = plugSolid.name + " overlap=" +
+                                (overlaps ? depth.ToString("0.000") : "none") +
+                                " ignored=" + Physics.GetIgnoreCollision(plugSolid, solid);
+                            break;
+                        }
                         Fail(stage + ": JACKET through " + solid.name +
                             " span=" + (i - 1) + "-" + i +
                             " from=" + start.ToString("F3") +
                             " to=" + physicalPath[i].ToString("F3") +
                             " solid-bounds=" + solid.bounds +
-                            " plugB=" + b.GetComponent<Rigidbody>().position.ToString("F3") +
-                            " connected=" + (b.Connected != null ? b.Connected.name : "none"));
+                            " plugB=" + plugBody.position.ToString("F3") +
+                            " connected=" + (b.Connected != null ? b.Connected.name : "none") +
+                            " plug-contact=" + plugContact);
                         return false;
                     }
             }

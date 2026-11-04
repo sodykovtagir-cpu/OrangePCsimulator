@@ -811,6 +811,13 @@ namespace PC.Component.Cabling
             }
         }
 
+        private static Vector3 SavedBodyPosition(JArray pose) =>
+            new Vector3(pose[0].Value<float>(), pose[1].Value<float>(), pose[2].Value<float>());
+
+        private static Quaternion SavedBodyRotation(JArray pose) =>
+            new Quaternion(pose[3].Value<float>(), pose[4].Value<float>(),
+                pose[5].Value<float>(), pose[6].Value<float>());
+
         public override void FromData(JObject data)
         {
             base.FromData(data);
@@ -848,6 +855,16 @@ namespace PC.Component.Cabling
                         rot[2].Value<float>(), rot[3].Value<float>());
             }
             var poses = data["cableBodies"] as JArray;
+            // The 5 m LAN gained finer, shorter collision capsules. Old saves
+            // contain 11 body poses; without resampling, the generic fallback
+            // would lay the 22 new bodies in a straight line THROUGH furniture.
+            // Keep both plug positions and the old curved centreline instead.
+            bool resampleLan = kind == CableKind.LAN && length == 5f &&
+                bodies.Length == 22 && poses != null && poses.Count == 11;
+            if (resampleLan)
+                foreach (var token in poses)
+                    if (!(token is JArray pose) || pose.Count < 7)
+                    { resampleLan = false; break; }
             for (int i = 0; i < bodies.Length; i++)
             {
                 var rb = bodies[i];
@@ -863,6 +880,34 @@ namespace PC.Component.Cabling
                         pose[2].Value<float>());
                     rb.rotation = new Quaternion(pose[3].Value<float>(), pose[4].Value<float>(),
                         pose[5].Value<float>(), pose[6].Value<float>());
+                }
+                else if (resampleLan && restorePositions)
+                {
+                    float source = (i + .5f) * poses.Count / bodies.Length - .5f;
+                    int low = Mathf.FloorToInt(source);
+                    if (low < 0)
+                    {
+                        var first = (JArray)poses[0];
+                        rb.position = Vector3.Lerp(plugs[0].CableExitPhysicsPosition,
+                            SavedBodyPosition(first), Mathf.Clamp01(1f + source * 2f));
+                        rb.rotation = SavedBodyRotation(first);
+                    }
+                    else if (low >= poses.Count - 1)
+                    {
+                        var last = (JArray)poses[poses.Count - 1];
+                        rb.position = Vector3.Lerp(SavedBodyPosition(last),
+                            plugs[1].CableExitPhysicsPosition,
+                            Mathf.Clamp01((source - (poses.Count - 1)) * 2f));
+                        rb.rotation = SavedBodyRotation(last);
+                    }
+                    else
+                    {
+                        var first = (JArray)poses[low];
+                        var next = (JArray)poses[low + 1];
+                        float t = source - low;
+                        rb.position = Vector3.Lerp(SavedBodyPosition(first), SavedBodyPosition(next), t);
+                        rb.rotation = Quaternion.Slerp(SavedBodyRotation(first), SavedBodyRotation(next), t);
+                    }
                 }
                 else if (restorePositions)
                 {
