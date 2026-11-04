@@ -31,7 +31,11 @@ assert 'currentDrag.wiredCables != null) return;' in ray  # no forced auto-rotat
 assert 'public bool ReleaseWhenDraggedTaut(Transform root)' in rope
 release = rope[rope.index('public bool ReleaseWhenDraggedTaut('):
                rope.index('private bool ReleaseOverstretchedEnd()')]
-assert 'if (span < length * .95f && path < length * .98f) return false;' in release
+assert 'if (span < length * .95f || path < length * .98f) return false;' in release
+# Regression: 8.08 m around obstacles is NOT a reason to disconnect HDMI
+# when the plugs are only 6.42 m apart on an 8 m cable.
+span, path, length = 6.42, 8.08, 8.0
+assert span < length * .95 or path < length * .98
 assert 'BelongsToAssembly(a.Connected, root) ? a' in release
 assert 'release.Unplug();' in release
 assert 'pin.breakForce = PullOutForce;' in (scripts / 'PC/Component/Cabling/CablePlug.cs').read_text()

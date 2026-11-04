@@ -74,12 +74,20 @@ shoot = raycast[raycast.index('public void ShootRaycast'):raycast.index('private
 assert 'plug.Unplug();' not in shoot
 assert 'if (RemoveMode && hit.transform != null)' not in shoot
 assert 'if (dragRigidbody)' in shoot
+assert 'if (cableHit != null && selectedBody != null) ClearSelection();' in shoot
+assert 'if (GridMode() && !RemoveMode && cableHit == null &&' in shoot
+assert 'cableHit != null || !hitRb.freezeRotation' in shoot
+assert 'bool cableDrag = t.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;' in raycast
+assert 'if (PlacementGrid.Instance != null && !cableDrag)' in raycast
+assert 'if (grid != null && grid.SnapEnabled && !cableDrag)' in raycast
 assert 'var grabbedCable = hitRb.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
 assert 'drag.wiredCaseStartPosition = hitRb.position;' in raycast
 assert 'Vector3.Distance(root.position, drag.wiredCaseStartPosition) < .08f' in raycast
 assert '!AutoRotation || grabbedCable != null || drag.wiredCables != null' in raycast
 assert 'Cable.SettleEndAtSocket(End, snappedExit - previousExit);' in plug
 assert 'internal void SettleEndAtSocket(int end, Vector3 delta)' in rope
+assert 'Vector3.ClampMagnitude(delta, .15f)' in rope
+assert 'rb.SweepTest(direction, out obstacle, distance,' in rope
 assert 'plug.SetHeld(true, ReleaseHeldPlug)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
 assert 'if (!AutoRotation || grabbedCable != null || drag.wiredCables != null)' in raycast
 assert 'if (rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null) return;' in raycast
@@ -95,7 +103,9 @@ assert 'yankedPort = old' in plug
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
-assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
+assert 'jacket.positionCount = count * 2 + 2;' in rope
+assert 'section.TransformPoint(current.anchor)' in rope
+assert 'section.TransformPoint(next.connectedAnchor)' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope

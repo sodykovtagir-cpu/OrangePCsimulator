@@ -21,6 +21,8 @@ namespace PC.Component.Cabling
         [SerializeField, Min(10f)] private float tensionStiffness = 1000f;
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
+        private CharacterJoint[] links;
+        private CharacterJoint tailLink;
         private Rigidbody heldSegment;
         private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
@@ -60,11 +62,25 @@ namespace PC.Component.Cabling
             if (restoringPhysics || bodies == null || bodies.Length == 0 ||
                 delta.sqrMagnitude < .000001f) return;
             int adjacent = Mathf.Min(3, bodies.Length);
+            // A long teleport here could itself put a capsule through a wall.
+            // Keep insertion corrections local and sweep each solid section
+            // against the world before changing its Rigidbody position.
+            Vector3 correction = Vector3.ClampMagnitude(delta, .15f);
             for (int i = 0; i < adjacent; i++)
             {
                 var rb = bodies[end == 0 ? i : bodies.Length - 1 - i];
                 float weight = (adjacent - i) / (float)adjacent;
-                rb.position += delta * weight;
+                Vector3 shift = correction * weight;
+                float distance = shift.magnitude;
+                if (distance > .0001f)
+                {
+                    Vector3 direction = shift / distance;
+                    RaycastHit obstacle;
+                    if (rb.SweepTest(direction, out obstacle, distance,
+                        QueryTriggerInteraction.Ignore))
+                        distance = Mathf.Max(0f, obstacle.distance - .005f);
+                    rb.position += direction * distance;
+                }
                 // Dampen only the disturbed end; keep the interior moving.
                 rb.velocity *= 1f - weight;
                 rb.angularVelocity *= 1f - weight;
@@ -124,6 +140,7 @@ namespace PC.Component.Cabling
                 if (col.enabled && !col.isTrigger && col.gameObject.activeInHierarchy)
                     physicalColliders.Add(col);
             bodies = new Rigidbody[count];
+            links = new CharacterJoint[count];
             Rigidbody previous = plugA.GetComponent<Rigidbody>();
             for (int i = 0; i < count; i++)
             {
@@ -141,6 +158,7 @@ namespace PC.Component.Cabling
                 ConfigureBody(rb, .025f);
                 bodies[i] = rb;
                 var joint = body.AddComponent<CharacterJoint>();
+                links[i] = joint;
                 joint.connectedBody = previous;
                 joint.autoConfigureConnectedAnchor = false;
                 joint.enableCollision = false;
@@ -151,6 +169,7 @@ namespace PC.Component.Cabling
                 previous = rb;
             }
             var last = plugB.gameObject.AddComponent<CharacterJoint>();
+            tailLink = last;
             last.connectedBody = previous;
             last.autoConfigureConnectedAnchor = false;
             last.enableCollision = false;
@@ -258,7 +277,10 @@ namespace PC.Component.Cabling
             if (jacket == null) jacket = GetComponent<LineRenderer>();
             if (jacket == null) jacket = gameObject.AddComponent<LineRenderer>();
             jacket.useWorldSpace = true;
-            jacket.positionCount = count + 2;
+            // Render the actual rigid capsule centre-lines and joint points.
+            // Connecting only Rigidbody centres cuts across corners/solid
+            // surfaces even while every capsule remains outside them.
+            jacket.positionCount = count * 2 + 2;
             jacket.startWidth = cableDiameter;
             jacket.endWidth = cableDiameter;
             jacket.numCapVertices = 6;
@@ -368,7 +390,11 @@ namespace PC.Component.Cabling
             // Spare length is real slack, not an artificial force buff. The
             // guard only fires close to the cable's physical limit and during
             // an active player drag; ordinary Joint breakForce is unchanged.
-            if (span < length * .95f && path < length * .98f) return false;
+            // A bent cable can have a long centre-line while its plugs remain
+            // metres apart from the hard limit (observed 8.08 m path, 6.42 m
+            // span on an 8 m HDMI). Never unplug on a mere PC click in that
+            // situation: both the direct span AND the path must be nearly taut.
+            if (span < length * .95f || path < length * .98f) return false;
 #if UNITY_EDITOR
             Debug.Log("[CableDrag] taut cable=" + Id + " end=" + release.End +
                 " span=" + span.ToString("0.00") + "m path=" +
@@ -589,8 +615,21 @@ namespace PC.Component.Cabling
         {
             jacket.SetPosition(0, plugA.CableExitPosition);
             for (int i = 0; i < bodies.Length; i++)
-                jacket.SetPosition(i + 1, bodies[i].transform.position);
-            jacket.SetPosition(bodies.Length + 1, plugB.CableExitPosition);
+            {
+                var current = links[i];
+                var next = i + 1 < bodies.Length ? links[i + 1] : tailLink;
+                if (current == null || next == null)
+                {
+                    // A destroyed joint should not leave stale screen points.
+                    jacket.SetPosition(i * 2 + 1, bodies[i].transform.position);
+                    jacket.SetPosition(i * 2 + 2, bodies[i].transform.position);
+                    continue;
+                }
+                var section = bodies[i].transform;
+                jacket.SetPosition(i * 2 + 1, section.TransformPoint(current.anchor));
+                jacket.SetPosition(i * 2 + 2, section.TransformPoint(next.connectedAnchor));
+            }
+            jacket.SetPosition(bodies.Length * 2 + 1, plugB.CableExitPosition);
         }
 
         private static Material outletPlugMaterial;

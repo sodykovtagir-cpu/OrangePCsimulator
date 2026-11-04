@@ -478,6 +478,11 @@ public class Raycast : MonoBehaviour
         // Rigidbody. Never unplug on a click: the RJ45/HDMI collider can sit
         // over a PC wall, and merely touching the case then hits the plug.
         // Pulling the plug still breaks its physical FixedJoint as intended.
+        var cableHit = hit.rigidbody != null ?
+            hit.rigidbody.GetComponentInParent<PC.Component.Cabling.CableItem>() : null;
+        // A previously selected PC is locked kinematic by the placement grid.
+        // Release that selection before starting a flexible cable drag.
+        if (cableHit != null && selectedBody != null) ClearSelection();
 
         if (dragRigidbody)
         {
@@ -503,7 +508,7 @@ public class Raycast : MonoBehaviour
             // — это захват, поэтому считаем его движимым.
             bool movable = hitRb &&
                 (hitRb == selectedBody ||
-                 (!hitRb.isKinematic && !hitRb.freezeRotation));
+                 (!hitRb.isKinematic && (cableHit != null || !hitRb.freezeRotation)));
             if (!movable && GridMode() && currentDrag == null) ClearSelection();
 
             if (movable)
@@ -512,8 +517,8 @@ public class Raycast : MonoBehaviour
                 // нажатие только выбирает предмет (обводка), второе по
                 // выбранному — тащит. Лёгкие предметы не улетают от
                 // случайного касания. Без сетки — хват сразу, как раньше.
-                if (GridMode() && !RemoveMode && currentDrag == null &&
-                    selectedBody != hitRb)
+                if (GridMode() && !RemoveMode && cableHit == null &&
+                    currentDrag == null && selectedBody != hitRb)
                 {
                     SelectBody(hitRb);
                     return;
@@ -2125,8 +2130,10 @@ public class Raycast : MonoBehaviour
 
         int oldLayer = go.layer;
 
-        // Защита ПК — заморозка внутренних констрейнтов
-        if (PlacementGrid.Instance != null)
+        // A cable is flexible, not an assembly to pin to the placement grid.
+        // Freezing its Rigidbody here makes the spring grab appear unresponsive.
+        bool cableDrag = t.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;
+        if (PlacementGrid.Instance != null && !cableDrag)
             PlacementGrid.Instance.OnDragStarted(t);
 
         while (currentDrag != null && currentDrag.target)
@@ -2162,7 +2169,7 @@ public class Raycast : MonoBehaviour
                 // Сетка: снапаем САМ предмет к мировой сетке с учётом стены/лифта/склона
                 var grid = PlacementGrid.Instance;
 
-                if (grid != null && grid.SnapEnabled)
+                if (grid != null && grid.SnapEnabled && !cableDrag)
                 {
                     // Сначала узнаём поверхность под прицелом — по её нормали
                     // снап выбирает оси (пол снапает XZ, стена — YZ/XY).
