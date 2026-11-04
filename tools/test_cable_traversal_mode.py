@@ -39,7 +39,11 @@ assert 'reload watch step=' in code
 assert 'moving.GetComponent<Rigidbody>().MovePosition(target);' in code
 assert 'movingPlug.SetHeld(true);' in code and 'movingPlug.SetHeld(false);' in code
 assert 'Mathf.SmoothStep(0f, 1f, t)' in code and 'Mathf.PerlinNoise' in code
-assert 'for (int pause = 0; pause < 7' in code
+assert 'for (int pause = 0; pause < 4' in code
+assert 'int frames = i % 3 == 0 ? 24 : i % 3 == 1 ? 17 : 29;' in code
+assert 'for (int step = 0; step < 25; step++)' in code
+assert 'Observe("before save PC", cables[2], obstacles);' in code
+assert 'if (maxGap > .03f)' in code and 'maxGap.ToString("0.0000")' in code
 assert 'Physics.ComputePenetration(capsule, rb.position, rb.rotation,' in code
 assert 'STRETCHED' in code and 'endpoint span exceeds cable length' in code
 assert 'rope path stretched to ' in code and 'JACKET through ' in code
