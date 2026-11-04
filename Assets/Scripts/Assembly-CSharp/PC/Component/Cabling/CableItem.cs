@@ -35,6 +35,12 @@ namespace PC.Component.Cabling
         private float loadedSince;
         private readonly Collider[] supportHits = new Collider[24];
         private float strainCooldownUntil;
+        // An articulated joint can place a section inside a solid after CCD
+        // has resolved its contact. Check only at intervals; never move a
+        // connector, an ignored socket/case pair, or any saved frozen pose.
+        private readonly Collider[] recoveryHits = new Collider[48];
+        private float nextPenetrationCheck;
+        public int RecoveredPenetrations { get; private set; }
 
         // The root is an invisible spawn anchor: dragging the physical cable
         // moves its child rigidbodies, not this transform. SaveManager must use
@@ -289,6 +295,12 @@ namespace PC.Component.Cabling
         private void FixedUpdate()
         {
             if (plugs == null || bodies == null || restoringPhysics) return;
+            if (!SaveManager.RestoringSave && Time.time >= SaveManager.IgnoreLoadImpactsUntil &&
+                Time.time >= nextPenetrationCheck)
+            {
+                nextPenetrationCheck = Time.time + .06f;
+                RecoverSolidPenetrations();
+            }
             // A falling PSU/monitor can stretch the chain with neither plug
             // held by the player. Release a connection before it can oscillate.
             if (ReleaseOverstretchedEnd()) return;
@@ -328,6 +340,78 @@ namespace PC.Component.Cabling
                 // Holding any section must never call Unplug. Pulling hard
                 // enough breaks the plug's own FixedJoint (pullOutForce), not
                 // a geometry threshold that can already be met on pickup.
+            }
+        }
+
+        private void RecoverSolidPenetrations()
+        {
+            // CCD predicts movement before the solver. A CharacterJoint can
+            // subsequently project a rope capsule into a case, GPU or floor;
+            // the log has confirmed >5cm of penetration even with contacts
+            // enabled. Correct only the deepest *non-ignored* real overlap.
+            // Short bounded steps let contacts and joints resolve naturally on
+            // the next tick instead of teleporting the rope through a wall.
+            foreach (var body in bodies)
+            {
+                if (body == null || body.isKinematic || !body.detectCollisions) continue;
+                var capsule = body.GetComponent<CapsuleCollider>();
+                if (capsule == null || !capsule.enabled) continue;
+                int count = Physics.OverlapSphereNonAlloc(body.position,
+                    Mathf.Max(.4f, capsule.height * .5f + .25f), recoveryHits,
+                    ~0, QueryTriggerInteraction.Ignore);
+                if (count == recoveryHits.Length) continue; // incomplete query
+                float deepest = .018f;
+                Vector3 outward = Vector3.zero;
+                for (int i = 0; i < count; i++)
+                {
+                    var other = recoveryHits[i];
+                    if (other == null || other == capsule ||
+                        other.GetComponentInParent<CableItem>() == this ||
+                        Physics.GetIgnoreCollision(capsule, other) ||
+                        Physics.GetIgnoreLayerCollision(capsule.gameObject.layer,
+                            other.gameObject.layer)) continue;
+                    Vector3 direction;
+                    float depth;
+                    if (Physics.ComputePenetration(capsule, body.position,
+                        body.rotation, other, other.transform.position,
+                        other.transform.rotation, out direction, out depth) &&
+                        depth > deepest)
+                    {
+                        deepest = depth;
+                        outward = direction;
+                    }
+                }
+                if (outward == Vector3.zero) continue;
+                // Do not push this section further into another nearby solid.
+                Vector3 step = outward * Mathf.Min(deepest + .002f, .018f);
+                bool blocked = false;
+                for (int i = 0; i < count; i++)
+                {
+                    var other = recoveryHits[i];
+                    if (other == null || other == capsule ||
+                        other.GetComponentInParent<CableItem>() == this ||
+                        Physics.GetIgnoreCollision(capsule, other) ||
+                        Physics.GetIgnoreLayerCollision(capsule.gameObject.layer,
+                            other.gameObject.layer)) continue;
+                    Vector3 direction;
+                    float before = 0f, after;
+                    Physics.ComputePenetration(capsule, body.position, body.rotation,
+                        other, other.transform.position, other.transform.rotation,
+                        out direction, out before);
+                    if (Physics.ComputePenetration(capsule, body.position + step,
+                        body.rotation, other, other.transform.position,
+                        other.transform.rotation, out direction, out after) &&
+                        after > Mathf.Max(.018f, before + .004f))
+                    {
+                        blocked = true;
+                        break;
+                    }
+                }
+                if (blocked) continue;
+                body.position += step;
+                float inwardSpeed = Vector3.Dot(body.velocity, outward);
+                if (inwardSpeed < 0f) body.velocity -= outward * inwardSpeed;
+                RecoveredPenetrations++;
             }
         }
 

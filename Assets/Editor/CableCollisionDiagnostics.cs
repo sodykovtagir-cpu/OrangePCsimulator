@@ -22,7 +22,10 @@ public static class CableCollisionDiagnostics
         foreach (var cable in cables)
         {
             int sections = 0, disabled = 0, overlaps = 0, ignored = 0, below = 0;
-            string example = "none";
+            int stretchedJoints = 0;
+            float largestJointError = 0f;
+            string example = "none", belowExample = "none";
+            bool exampleWasIgnored = true;
             foreach (var body in cable.GetComponentsInChildren<Rigidbody>())
             {
                 if (!body.name.StartsWith("Cable segment ")) continue;
@@ -30,6 +33,16 @@ public static class CableCollisionDiagnostics
                 if (capsule == null) continue;
                 sections++;
                 if (!body.detectCollisions || !capsule.enabled || body.isKinematic) disabled++;
+                var joint = body.GetComponent<CharacterJoint>();
+                if (joint != null && joint.connectedBody != null)
+                {
+                    float error = Vector3.Distance(
+                        body.position + body.rotation * joint.anchor,
+                        joint.connectedBody.position +
+                        joint.connectedBody.rotation * joint.connectedAnchor);
+                    if (error > .03f) stretchedJoints++;
+                    largestJointError = Mathf.Max(largestJointError, error);
+                }
                 int count = Physics.OverlapSphereNonAlloc(body.position,
                     Mathf.Max(.4f, capsule.height * .5f + .25f), hits, ~0,
                     QueryTriggerInteraction.Ignore);
@@ -49,9 +62,13 @@ public static class CableCollisionDiagnostics
                         Physics.GetIgnoreLayerCollision(capsule.gameObject.layer,
                             other.gameObject.layer);
                     if (excluded) ignored++;
-                    if (example == "none")
+                    if (example == "none" || (exampleWasIgnored && !excluded))
+                    {
+                        exampleWasIgnored = excluded;
                         example = body.name + " / " + other.name + " depth=" +
-                            depth.ToString("0.000") + "m ignored=" + excluded;
+                            depth.ToString("0.000") + "m ignored=" + excluded +
+                            " speed=" + body.velocity.magnitude.ToString("0.00") + "m/s";
+                    }
                 }
                 // A completely submerged capsule no longer overlaps a thin
                 // floor collider. Report solids above its centre as a clue.
@@ -61,12 +78,22 @@ public static class CableCollisionDiagnostics
                     QueryTriggerInteraction.Ignore) &&
                     above.collider.GetComponentInParent<CableItem>() != cable &&
                     above.point.y - body.position.y > capsule.radius + .02f)
+                {
                     below++;
+                    if (belowExample == "none")
+                        belowExample = body.name + " / " + above.collider.name +
+                            " surfaceAbove=" + (above.point.y - body.position.y)
+                                .ToString("0.000") + "m";
+                }
             }
             Debug.Log("Cable collision check: " + cable.name + " id=" + cable.Id +
                 " sections=" + sections + " disabled=" + disabled +
                 " penetrations=" + overlaps + " ignored=" + ignored +
-                " below-solid-suspects=" + below + " example=" + example);
+                " below-solid-suspects=" + below +
+                " stretched-joints=" + stretchedJoints +
+                " max-joint-error=" + largestJointError.ToString("0.000") + "m" +
+                " recovered=" + cable.RecoveredPenetrations + " example=" + example +
+                " below-example=" + belowExample);
         }
         Debug.Log("Cable collision check: finished " + cables.Length + " cables. " +
             "If sections overlap visible objects but penetrations=0, check " +
