@@ -51,6 +51,26 @@ namespace PC.Component.Cabling
         public Collider NearEndCollider(int end) => bodies != null && bodies.Length > 0
             ? bodies[end == 0 ? 0 : bodies.Length - 1].GetComponent<Collider>() : null;
 
+        // A plug teleports a few centimetres to an authored socket pivot on
+        // insertion. Carry the nearby rope sections with it BEFORE the next
+        // solver step; otherwise the endpoint joint projects the first section
+        // in one violent frame, visibly jerking the cable and sometimes pin.
+        internal void SettleEndAtSocket(int end, Vector3 delta)
+        {
+            if (restoringPhysics || bodies == null || bodies.Length == 0 ||
+                delta.sqrMagnitude < .000001f) return;
+            int adjacent = Mathf.Min(3, bodies.Length);
+            for (int i = 0; i < adjacent; i++)
+            {
+                var rb = bodies[end == 0 ? i : bodies.Length - 1 - i];
+                float weight = (adjacent - i) / (float)adjacent;
+                rb.position += delta * weight;
+                // Dampen only the disturbed end; keep the interior moving.
+                rb.velocity *= 1f - weight;
+                rb.angularVelocity *= 1f - weight;
+            }
+        }
+
         public void HoldSection(Rigidbody section)
         {
             heldSegment = null;

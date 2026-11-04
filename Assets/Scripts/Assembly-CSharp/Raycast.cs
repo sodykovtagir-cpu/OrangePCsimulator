@@ -28,6 +28,7 @@ public class Raycast : MonoBehaviour
         public PC.Component.Cabling.CableItem grabbedCable;
         // Populated once when grabbing a connected case, not every frame.
         public List<PC.Component.Cabling.CableItem> wiredCables;
+        public Vector3 wiredCaseStartPosition;
 
     }
 
@@ -265,6 +266,9 @@ public class Raycast : MonoBehaviour
         if (drag == null || drag.wiredCables == null || spring == null ||
             spring.connectedBody == null) return;
         var root = spring.connectedBody.transform;
+        // A click is not a pull: do not apply the taut-rope release guard
+        // until the player has actually moved the wired case.
+        if (Vector3.Distance(root.position, drag.wiredCaseStartPosition) < .08f) return;
         foreach (var cable in drag.wiredCables)
             if (cable != null) cable.ReleaseWhenDraggedTaut(root);
     }
@@ -470,28 +474,10 @@ public class Raycast : MonoBehaviour
             return;
         }
 
-        // Disassembly is an intentional disconnect, not a drag. On a plug,
-        // remove only that plug; on the jacket, choose the nearest connected
-        // end. Normal clicks below never disconnect any type of cable.
-        if (RemoveMode && hit.transform != null)
-        {
-            var cable = hit.transform.GetComponentInParent<PC.Component.Cabling.CableItem>();
-            if (cable != null)
-            {
-                var plug = hit.transform.GetComponentInParent<PC.Component.Cabling.CablePlug>();
-                if (plug == null)
-                {
-                    var a = cable.End(0);
-                    var b = cable.End(1);
-                    if (a == null || a.Connected == null) plug = b;
-                    else if (b == null || b.Connected == null) plug = a;
-                    else plug = Vector3.SqrMagnitude(hit.point - a.transform.position) <=
-                                     Vector3.SqrMagnitude(hit.point - b.transform.position) ? a : b;
-                }
-                if (plug != null && plug.Connected != null) plug.Unplug();
-                return;
-            }
-        }
+        // Disassembly must grab a plug or cable section like any other
+        // Rigidbody. Never unplug on a click: the RJ45/HDMI collider can sit
+        // over a PC wall, and merely touching the case then hits the plug.
+        // Pulling the plug still breaks its physical FixedJoint as intended.
 
         if (dragRigidbody)
         {
@@ -564,6 +550,7 @@ public class Raycast : MonoBehaviour
                 currentDrag = drag;
                 if (hitRb.GetComponent<Case>() != null)
                 {
+                    drag.wiredCaseStartPosition = hitRb.position;
                     // Only during a case drag: track its actually connected
                     // cables. Never scan the room each physics frame.
                     foreach (var cable in FindObjectsOfType<PC.Component.Cabling.CableItem>())
@@ -576,10 +563,9 @@ public class Raycast : MonoBehaviour
                 }
 
                 var sTr = spring.transform;
-                // Start a cable drag exactly at the contact point. Camera-
-                // facing auto placement can jump the spring on the first frame
-                // and rip out a plug before the player actually pulls it.
-                if (!AutoRotation || grabbedCable != null)
+                // Start cable AND wired-case drags at the contact point. A
+                // camera-facing spring jump can tear out a still-slack HDMI.
+                if (!AutoRotation || grabbedCable != null || drag.wiredCables != null)
                 {
                     sTr.position = hit.point;
                     drag.distance = hit.distance;

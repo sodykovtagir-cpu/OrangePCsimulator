@@ -163,6 +163,9 @@ namespace PC.Component.Cabling
             WatchPort(port);
             approachPort = null;
             var rb = GetComponent<Rigidbody>();
+            Vector3 previousExit = CableExitPhysicsPosition;
+            Vector3 snappedExit = port.Snap.position +
+                port.Snap.rotation * CableExitLocalPosition;
             if (Cable != null && Cable.RestoringPhysics)
             {
                 // Saved joints refer to the physics pose, not the interpolated
@@ -172,7 +175,12 @@ namespace PC.Component.Cabling
                 rb.position = port.Snap.position;
                 rb.rotation = port.Snap.rotation;
             }
-            else transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
+            else
+            {
+                transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);
+                if (!restoring && Cable != null)
+                    Cable.SettleEndAtSocket(End, snappedExit - previousExit);
+            }
             // A saved plug is kinematic until CableItem.FinishRestore.
             // PhysX rejects writes to its velocity in that state. Ordinary
             // inserted (dynamic) plugs must still lose their throw velocity.
@@ -467,10 +475,15 @@ namespace PC.Component.Cabling
             // The rope's end CharacterJoint has no break limit; the pin is the
             // breakable connection. Clear both ends of the logical link too.
 #if UNITY_EDITOR
-            if (CableStressMode.Recording && Connected != null)
+            if (Connected != null && CableStressMode.Recording)
                 Debug.LogWarning($"Cable stress: PIN BREAK cable={Cable?.spawnId} id={Cable?.Id} " +
                     $"end={End} owner={Connected.owner?.name} id={Connected.owner?.Id} " +
                     $"port={Connected.name} force={force:0.00}");
+            else if (Connected != null && Cable != null && Cable.Kind == CableKind.HDMI)
+                Debug.LogWarning($"Cable HDMI: PIN BREAK end={End} " +
+                    $"owner={Connected.owner?.name} port={Connected.name} " +
+                    $"force={force:0.00} held={IsHeld} " +
+                    $"sincePlugged={Time.time - ConnectedAt:0.00}s");
 #endif
             if (Connected != null) Unplug();
         }

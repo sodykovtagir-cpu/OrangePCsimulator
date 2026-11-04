@@ -26,7 +26,7 @@ assert 'candidate.End == 0 && (restoring || Powered)' in ports
 assert 'candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet)' in ports
 assert '!port.Accepts(this, restoring)' in plug
 assert 'if (!restoring) CablePower.RefreshAll();' in plug
-assert 'kind == CableKind.Power && end == 0 ? OutletPlugMaterial()' in rope
+assert 'GameObject.CreatePrimitive(PrimitiveType.Cube)' not in rope
 assert 'Physics' not in rope or 'CapsuleCollider' in rope
 assert all(x in rope for x in ('CapsuleCollider','CharacterJoint','Rigidbody','ContinuousSpeculative','Physics.IgnoreCollision', 'LineRenderer', 'Length', 'JObject', 'RestorePorts()'))
 assert 'Cable.Length * (restoring ? 1f : .95f)' in plug
@@ -68,15 +68,20 @@ raycast=read('Raycast.cs')
 # must never bypass the physical VGA/HDMI route when wires are required.
 assert 'if (PC.Component.Cabling.CableMode.Enabled)\n            Main.Instance?.FadeText(' in raycast
 assert 'else\n            mb.ConnectMonitor(selectedMonitor);' in raycast
-# Disassembly is an explicit click action BEFORE ordinary dragging; normal
-# clicks only grab, with no automatic Unplug on any cable type.
-assert raycast.index('if (RemoveMode && hit.transform != null)') < raycast.index('if (dragRigidbody)', raycast.index('public void ShootRaycast'))
-assert 'if (plug != null && plug.Connected != null) plug.Unplug();' in raycast
-assert raycast.count('plug.Unplug();') == 1
-assert 'var cable = hit.transform.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
-assert 'Vector3.SqrMagnitude(hit.point - a.transform.position)' in raycast
+# Disassembly has no click-to-unplug branch: a jacket or plug still reaches
+# the normal Rigidbody grab, while a hit on a plug over the PC cannot drop HDMI.
+shoot = raycast[raycast.index('public void ShootRaycast'):raycast.index('private void SelectBody(')]
+assert 'plug.Unplug();' not in shoot
+assert 'if (RemoveMode && hit.transform != null)' not in shoot
+assert 'if (dragRigidbody)' in shoot
+assert 'var grabbedCable = hitRb.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
+assert 'drag.wiredCaseStartPosition = hitRb.position;' in raycast
+assert 'Vector3.Distance(root.position, drag.wiredCaseStartPosition) < .08f' in raycast
+assert '!AutoRotation || grabbedCable != null || drag.wiredCables != null' in raycast
+assert 'Cable.SettleEndAtSocket(End, snappedExit - previousExit);' in plug
+assert 'internal void SettleEndAtSocket(int end, Vector3 delta)' in rope
 assert 'plug.SetHeld(true, ReleaseHeldPlug)' in raycast and 'releasedPlug.SetHeld(false)' in raycast
-assert 'if (!AutoRotation || grabbedCable != null)' in raycast
+assert 'if (!AutoRotation || grabbedCable != null || drag.wiredCables != null)' in raycast
 assert 'if (rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null) return;' in raycast
 assert 'releaseDrag?.Invoke(this)' in plug and 'private void ReleaseHeldPlug(' in raycast
 assert 'pin.breakForce = PullOutForce' in plug and 'OnJointBreak(float force)' in plug
@@ -181,7 +186,7 @@ assert 'maxMotion = Mathf.Max(maxMotion, cable.RestoreMotion());' in transition
 assert 'if (!rb.isKinematic)' in plug
 assert 'rb.position = port.Snap.position;' in plug and 'rb.rotation = port.Snap.rotation;' in plug
 assert 'if (Cable != null && Cable.RestoringPhysics)' in plug
-assert 'else transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);' in plug
+assert 'transform.SetPositionAndRotation(port.Snap.position, port.Snap.rotation);' in plug
 assert 'plugs[1].GetComponent<Rigidbody>().position - restoredPositions[1]' in rope
 assert 'plugs[1].transform.position - restoredPositions[1]' not in rope
 assert 'frozen.Item1.isKinematic = frozen.Item2;' in save
