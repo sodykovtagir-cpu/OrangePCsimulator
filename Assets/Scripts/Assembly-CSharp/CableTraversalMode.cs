@@ -406,6 +406,7 @@ public sealed class CableTraversalMode : MonoBehaviour
         }
         int checks = 0;
         bool oppositeSeen = false;
+        float maxPoleTurns = 0f;
         Bounds barrier = solids[0].bounds;
         for (int solid = 1; solid < solids.Count; solid++)
             if (solids[solid] != null) barrier.Encapsulate(solids[solid].bounds);
@@ -431,6 +432,8 @@ public sealed class CableTraversalMode : MonoBehaviour
                     oppositeSeen = true;
                 if (!Observe(stage + " move=" + i + " frame=" + frame,
                     cable, solids)) break;
+                if (!cross)
+                    maxPoleTurns = Mathf.Max(maxPoleTurns, PoleWindings(cable, centre));
             }
             for (int pause = 0; pause < 4 && !failed; pause++)
             {
@@ -451,7 +454,34 @@ public sealed class CableTraversalMode : MonoBehaviour
         }
         if (!failed && cross && !oppositeSeen)
             Fail(stage + ": INCONCLUSIVE — plug never reached the opposite side while the other end stayed behind the obstacle");
-        if (!failed) Write("PASS " + stage + ": " + checks + " human-paced fixed steps; opposite=" + oppositeSeen);
+        // Moving the hand in a circle is NOT proof that the actual rope wound
+        // around the pole: the other end can slide, or coarse links may trace
+        // a short chord. Require substantial winding of the physics chain.
+        if (!failed && !cross && maxPoleTurns < .85f)
+            Fail(stage + ": INCONCLUSIVE — hand circled pole, but physical cable wound only " +
+                maxPoleTurns.ToString("0.00") + " turns (need >=0.85)");
+        if (!failed) Write("PASS " + stage + ": " + checks + " human-paced fixed steps; " +
+            "opposite=" + oppositeSeen + " max-winding=" + maxPoleTurns.ToString("0.00") + " turns");
+    }
+
+    private static float PoleWindings(CableItem cable, Vector3 pole)
+    {
+        var sections = new List<Rigidbody>();
+        foreach (var body in cable.GetComponentsInChildren<Rigidbody>())
+            if (body != null && body.name.StartsWith("Cable segment ")) sections.Add(body);
+        sections.Sort((left, right) => SectionIndex(left).CompareTo(SectionIndex(right)));
+        Vector3 start = cable.End(0).CableExitPhysicsPosition - pole;
+        float previous = Mathf.Atan2(start.z, start.x) * Mathf.Rad2Deg;
+        float total = 0f;
+        for (int i = 0; i <= sections.Count; i++)
+        {
+            Vector3 offset = (i == sections.Count ? cable.End(1).CableExitPhysicsPosition :
+                sections[i].position) - pole;
+            float next = Mathf.Atan2(offset.z, offset.x) * Mathf.Rad2Deg;
+            total += Mathf.DeltaAngle(previous, next);
+            previous = next;
+        }
+        return Mathf.Abs(total) / 360f;
     }
 
     private bool Observe(string stage, CableItem cable, IList<Collider> solids)

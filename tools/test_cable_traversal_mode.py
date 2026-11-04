@@ -55,4 +55,7 @@ assert 'var a = cable.End(0), b = cable.End(1);' not in code
 assert 'Exit Play Mode or load your own save to return.' in code
 print('PASS: human-paced spring/rod/wall/assembled-PC fixture, full isolated save/reload')
 assert 'oppositeSeen = true;' in code and 'INCONCLUSIVE' in code
+assert 'PoleWindings(cable, centre)' in code
+assert 'maxPoleTurns < .85f' in code and 'max-winding=' in code
+assert 'Mathf.DeltaAngle(previous, next)' in code
 assert 'Power Cable (15m)' in code and 'HDMI Cable 6m' in code
