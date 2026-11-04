@@ -41,8 +41,10 @@ for length in (5, 15, 48, 100):
     assert len(ids) == len(set(ids))
     assert '  lanPlugVisualScale: 1\n' in content
     assert '  kind: 3\n' in content
-    assert 'm_Size: {x: 0.15, y: 0.10, z: 0.20}' in content or \
-        'm_Size: {x: 0.15, y: 0.1, z: 0.2}' in content
+    # No synthesized root box; each RJ45 has the two authored child boxes.
+    assert content.count('BoxCollider:') == 4
+    assert '--- !u!65 &650010\n' not in content
+    assert '--- !u!65 &650020\n' not in content
     assert len(re.findall(r'^  m_Name: Cable Pivot$', content, re.M)) == 2
     for prefab_id, root_id, pivot_go, pivot_transform in (
         (1140010, 400010, 100011, 400011),
@@ -57,10 +59,33 @@ for length in (5, 15, 48, 100):
         model_instance = re.search(r'm_PrefabInstance: \{fileID: (\d+)\}', model_body).group(1)
         prefab_instance = content.split(f'--- !u!1001 &{model_instance}\n', 1)[1].split('--- !u!', 1)[0]
         assert 'targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 25abe6272ecacd641a52d6b37b16b6f9, type: 3}' in prefab_instance
+        assert len(re.findall(r'^    - targetCorrespondingSourceObject:', prefab_instance.split('m_AddedComponents:', 1)[1], re.M)) == 2
+        reference = (parts / 'LAN Cable (5m).prefab').read_text()
+        source_instance = reference.split(f'--- !u!1001 &{model_instance}\n', 1)[1].split('--- !u!', 1)[0]
+        component_refs = re.findall(r'addedObject: \{fileID: (\d+)\}',
+                                    prefab_instance.split('m_AddedComponents:', 1)[1])
+        source_refs = re.findall(r'addedObject: \{fileID: (\d+)\}',
+                                 source_instance.split('m_AddedComponents:', 1)[1])
+        assert component_refs == source_refs and len(component_refs) == 2
+        for component_id in component_refs:
+            component = content.split(f'--- !u!65 &{component_id}\n', 1)[1].split('--- !u!', 1)[0]
+            source_component = reference.split(f'--- !u!65 &{component_id}\n', 1)[1].split('--- !u!', 1)[0]
+            assert component.strip() == source_component.strip(), (path, component_id)
         assert f'addedObject: {{fileID: {pivot_transform}}}' in prefab_instance
         pivot_body = content.split(f'--- !u!4 &{pivot_transform}\n', 1)[1].split('--- !u!', 1)[0]
         assert f'  m_GameObject: {{fileID: {pivot_go}}}' in pivot_body
         assert f'  m_Father: {{fileID: {model_id}}}' in pivot_body
-        assert '  m_LocalPosition: {x: -0.02, y: 0, z: 0}' in pivot_body
+        reference = (parts / 'LAN Cable (5m).prefab').read_text()
+        reference_pivot = reference.split(f'--- !u!4 &{pivot_transform}\n', 1)[1].split('--- !u!', 1)[0]
+        position = re.search(r'^  m_LocalPosition: .*$', reference_pivot, re.M).group()
+        assert position in pivot_body
         assert '  m_LocalScale: {x: 1, y: 1, z: 1}' in pivot_body
-print('PASS: four LAN prefab pairs, editable connector pivots, jacket/joints and old-save anchors')
+assert 'AddComponent<BoxCollider>' not in rope
+assert 'Destroy(collider)' not in rope
+assert 'plugA.GetComponentsInChildren<Collider>' in rope
+assert 'plugB.GetComponentsInChildren<Collider>' in rope
+assert 'GetComponentsInChildren<Collider>(true)' in plug
+assert 'var solid = GetComponent<Collider>();' not in plug
+assert 'if (!hasSolid) return;' in plug
+assert 'solid.ClosestPoint(port.TriggerCenter)' in plug
+print('PASS: four LAN prefab pairs use child colliders and user-edited pivots')

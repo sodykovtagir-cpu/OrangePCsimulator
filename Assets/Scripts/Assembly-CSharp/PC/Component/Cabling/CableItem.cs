@@ -94,9 +94,15 @@ namespace PC.Component.Cabling
             // not the plug origin snapped into a socket. Interior coil stays.
             points[0] = plugA.CableExitPosition;
             points[count] = plugB.CableExitPosition;
-            var physicalColliders = new Collider[count + 2];
-            physicalColliders[0] = plugA.GetComponent<Collider>();
-            physicalColliders[count + 1] = plugB.GetComponent<Collider>();
+            // A plug can have several authored colliders on child model parts.
+            // Keep them all in the self-collision exclusions (not only a root box).
+            var physicalColliders = new System.Collections.Generic.List<Collider>(count + 8);
+            foreach (var col in plugA.GetComponentsInChildren<Collider>(true))
+                if (col.enabled && !col.isTrigger && col.gameObject.activeInHierarchy)
+                    physicalColliders.Add(col);
+            foreach (var col in plugB.GetComponentsInChildren<Collider>(true))
+                if (col.enabled && !col.isTrigger && col.gameObject.activeInHierarchy)
+                    physicalColliders.Add(col);
             bodies = new Rigidbody[count];
             Rigidbody previous = plugA.GetComponent<Rigidbody>();
             for (int i = 0; i < count; i++)
@@ -110,7 +116,7 @@ namespace PC.Component.Cabling
                 col.direction = 2;
                 col.radius = cableDiameter * .5f;
                 col.height = Vector3.Distance(points[i], points[i + 1]) + .04f;
-                physicalColliders[i + 1] = col;
+                physicalColliders.Add(col);
                 var rb = body.AddComponent<Rigidbody>();
                 ConfigureBody(rb, .025f);
                 bodies[i] = rb;
@@ -134,8 +140,8 @@ namespace PC.Component.Cabling
             Limit(last);
             // All parts of one cable must ignore one another. Self-collision in
             // the original short chain was the source of the violent scattering.
-            for (int i = 0; i < physicalColliders.Length; i++)
-                for (int j = i + 1; j < physicalColliders.Length; j++)
+            for (int i = 0; i < physicalColliders.Count; i++)
+                for (int j = i + 1; j < physicalColliders.Count; j++)
                     if (physicalColliders[i] != null && physicalColliders[j] != null)
                         Physics.IgnoreCollision(physicalColliders[i], physicalColliders[j]);
             SetupJacket(count);
@@ -179,11 +185,8 @@ namespace PC.Component.Cabling
             }
             else go = tr.gameObject;
             go.transform.position = position;
-            var col = go.GetComponent<BoxCollider>();
-            if (col == null) col = go.AddComponent<BoxCollider>();
-            // The plug collider is on the root of the plug; custom model meshes
-            // should be children, so they can be replaced without touching it.
-            if (tr == null) col.size = new Vector3(.16f, .12f, .20f);
+            // Colliders are authored on the connector prefab, including child
+            // parts of the RJ45 mesh. Never add a default square BoxCollider.
             var rb = go.GetComponent<Rigidbody>();
             if (rb == null) rb = go.AddComponent<Rigidbody>();
             ConfigureBody(rb, .11f);
@@ -213,9 +216,6 @@ namespace PC.Component.Cabling
                     visual = created.transform;
                 }
                 connectorModel = visual;
-                if (visual != null)
-                    foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
-                        Destroy(collider);
             }
             // Legacy fallback ONLY when the connector has no authored pivot.
             // Prefab markers are under the visual model: users place them in
@@ -227,17 +227,9 @@ namespace PC.Component.Cabling
                 end == 0 ? new Vector3(0f, .084f, 0f) :
                     new Vector3(0f, 0f, -.112f);
             plug.EnsureCableExitPivot(exit, connectorModel);
-            if (go.GetComponentInChildren<Renderer>() == null)
-            {
-                var model = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                model.name = "Replace with plug model";
-                model.transform.SetParent(go.transform, false);
-                model.transform.localScale = new Vector3(.16f, .12f, .20f);
-                Destroy(model.GetComponent<Collider>());
-                var renderer = model.GetComponent<Renderer>();
-                if (renderer != null) renderer.sharedMaterial =
-                    kind == CableKind.Power && end == 0 ? OutletPlugMaterial() : CableMaterial(kind);
-            }
+            // No primitive fallback: CreatePrimitive(Cube) also creates an
+            // unwanted BoxCollider before Destroy takes effect in Play Mode.
+            // A plug without an authored visual/collider remains unchanged.
             return plug;
         }
 

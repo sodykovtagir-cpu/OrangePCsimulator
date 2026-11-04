@@ -85,11 +85,14 @@ namespace PC.Component.Cabling
 
         private bool NearPort(CablePort port, float extra = 0f)
         {
-            var solid = GetComponent<Collider>();
-            if (port == null || solid == null || !solid.enabled) return false;
+            if (port == null) return false;
             float reach = port.CaptureRadius + extra;
-            return (solid.ClosestPoint(port.TriggerCenter) - port.TriggerCenter).sqrMagnitude <=
-                reach * reach;
+            foreach (var solid in GetComponentsInChildren<Collider>(true))
+                if (solid.enabled && !solid.isTrigger && solid.gameObject.activeInHierarchy &&
+                    (solid.ClosestPoint(port.TriggerCenter) - port.TriggerCenter).sqrMagnitude <=
+                        reach * reach)
+                    return true;
+            return false;
         }
         // Re-arm an unplugged connector as soon as its collider has actually
         // cleared the old trigger. This must run even when no insertion is being
@@ -131,7 +134,7 @@ namespace PC.Component.Cabling
                         port.Snap.position + port.Snap.rotation * CableExitLocalPosition);
                 if (span > Cable.Length * (restoring ? 1f : .95f)) return false;
             }
-            // The model's BoxCollider is offset from its Rigidbody origin.
+            // Authored colliders can be offset from the Rigidbody origin.
             // A real overlap must not be rejected because the origin is outside
             // the sphere while the visible plug is already touching the socket.
             if (!restoring && !NearPort(port)) return false;
@@ -275,9 +278,17 @@ namespace PC.Component.Cabling
 
         private void TryNearbyPort()
         {
-            var solid = GetComponent<Collider>();
-            if (solid == null || !solid.enabled) return;
-            float radius = Mathf.Max(.7f, solid.bounds.extents.magnitude + .5f);
+            float radius = .7f;
+            bool hasSolid = false;
+            foreach (var solid in GetComponentsInChildren<Collider>(true))
+            {
+                if (!solid.enabled || solid.isTrigger || !solid.gameObject.activeInHierarchy)
+                    continue;
+                hasSolid = true;
+                radius = Mathf.Max(radius, Vector3.Distance(transform.position, solid.bounds.center) +
+                    solid.bounds.extents.magnitude + .5f);
+            }
+            if (!hasSolid) return;
             // CablePort.Add places authored and fallback port triggers on layer 2.
             int count = Physics.OverlapSphereNonAlloc(transform.position, radius,
                 nearbyPortColliders, 1 << 2, QueryTriggerInteraction.Collide);
