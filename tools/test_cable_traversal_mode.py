@@ -23,6 +23,10 @@ for prefab in ('LAN Cable (5m)', 'Power Cable (15m)', 'HDMI Cable 6m',
 assert 'Cable traversal thin pole' in code and '.045f, 2.7f, .045f' in code
 assert 'Cable traversal thick wall' in code and '.38f, 2.7f, 3f' in code
 assert 'FindNearestCase(pcCentre)' in code and 'caseItem.GetComponentsInChildren<Collider>()' in code
+# A coil placed at a fixed offset was already inside the assembled PC in Play Mode.
+assert 'pcBounds.Encapsulate(obstacles[i].bounds)' in code
+assert 'pcBounds.min.x - 1.1f' in code and 'lane == 2 ? pcCableSpawn' in code
+assert 'FIXTURE PC bounds=' in code
 assert 'hand.AddComponent<SpringJoint>()' in code
 assert 'moving.GetComponent<Rigidbody>().MovePosition(target);' in code
 assert 'movingPlug.SetHeld(true);' in code and 'movingPlug.SetHeld(false);' in code

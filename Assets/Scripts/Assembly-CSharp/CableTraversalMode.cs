@@ -144,6 +144,17 @@ public sealed class CableTraversalMode : MonoBehaviour
                         solid.GetComponentInParent<Item>() == caseItem)
                         obstacles.Add(solid);
             if (obstacles.Count == 0) { Fail("PC case has no solid colliders"); yield break; }
+            Physics.SyncTransforms();
+            Bounds pcBounds = obstacles[0].bounds;
+            for (int i = 1; i < obstacles.Count; i++)
+                pcBounds.Encapsulate(obstacles[i].bounds);
+            // The assembled case is wider than a test cable's original
+            // hard-coded 1.6 m offset. Spawn the *new* coil wholly outside
+            // its real colliders; do not alter the case or rescue a collision
+            // after the cable has already been created inside the metal.
+            Vector3 pcCableSpawn = new Vector3(pcBounds.min.x - 1.1f,
+                Origin.y + 1.4f, pcBounds.center.z - .7f);
+            Write("FIXTURE PC bounds=" + pcBounds + " cable-spawn=" + pcCableSpawn);
 
             var pole = GameObject.Find("Cable traversal thin pole (scene-only)");
             var wall = GameObject.Find("Cable traversal thick wall (scene-only)");
@@ -156,7 +167,8 @@ public sealed class CableTraversalMode : MonoBehaviour
             var props = new[] { lan, power, hdmi };
             for (int lane = 0; lane < props.Length; lane++)
             {
-                var position = Origin + new Vector3(Pitch * lane - 1.6f, 1.4f, -.7f);
+                var position = lane == 2 ? pcCableSpawn :
+                    Origin + new Vector3(Pitch * lane - 1.6f, 1.4f, -.7f);
                 var cable = Instantiate(props[lane], position, Quaternion.identity)
                     .GetComponent<CableItem>();
                 if (cable == null) { Fail("Cable prefab has no CableItem lane=" + lane); yield break; }
