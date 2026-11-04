@@ -56,6 +56,9 @@ assert 'Cable.NearEndCollider(End)' in plug
 assert 'target.GetComponentInParent<Item>() != owner' in plug
 assert 'target == null || target.isTrigger || !target.enabled' in plug
 assert 'AddPair(list, adjacent, target);' in plug
+assert 'RestoreClearAdjacent(devicePairs);' in plug
+assert 'RestoreClearAdjacent(casePairs);' in plug
+assert 'Physics.ComputePenetration(adjacent, adjacent.transform.position,' in plug
 assert 'candidate.PrepareApproach(this)' in ports and 'candidate.LeaveApproach(this)' in ports
 assert 'approachPort.CaptureRadius + .25f' in plug
 assert 'Physics.IgnoreLayerCollision' not in plug and 'Physics.IgnoreLayerCollision' not in rope
@@ -103,9 +106,8 @@ assert 'yankedPort = old' in plug
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
-assert 'jacket.positionCount = count * 2 + 2;' in rope
-assert 'section.TransformPoint(current.anchor)' in rope
-assert 'section.TransformPoint(next.connectedAnchor)' in rope
+assert 'jacket.positionCount = count + 2;' in rope
+assert 'jacket.SetPosition(i + 1, bodies[i].transform.position);' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope
@@ -213,6 +215,10 @@ assert 'var pcCase = connector.slot.GetComponentInParent<Case>();' not in read('
 assert 'solidCase.enabled = false' in read('PC/Component/Cabling/CableCaseOpening.cs')
 assert all(side in read('PC/Component/Cabling/CableCaseOpening.cs')
            for side in ('"Left"','"Right"','"Below"','"Above"'))
+diagnose=(root/'Assets/Editor/CableCollisionDiagnostics.cs').read_text()
+assert 'Tools/OrangePC/Diagnose cable collisions now' in diagnose
+assert 'Physics.GetIgnoreCollision(capsule, other)' in diagnose
+assert 'body.detectCollisions' in diagnose
 editor_sockets=(root/'Assets/Editor/PrepareCableSockets.cs').read_text()
 assert 'Prepare sockets in selected prefab' in editor_sockets
 assert 'GetComponentsInChildren<PC.Component.Display>' in editor_sockets  # UnityEngine.Display is ambiguous

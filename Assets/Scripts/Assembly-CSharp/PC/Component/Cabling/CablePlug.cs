@@ -63,8 +63,8 @@ namespace PC.Component.Cabling
 
         // Physics.IgnoreCollision is PER PAIR. Only this plug and its nearest
         // rope capsule may pass through the owner of this particular socket
-        // (and the enclosing case for installed GPU/PSU/board). Other cable
-        // sections, hardware and world contacts remain physical.
+        // (and enclosing case) during insertion. The capsule's exceptions
+        // end on clearance; the inserted plug retains its exemption.
         private struct Pair
         {
             public Collider plug;
@@ -282,6 +282,38 @@ namespace PC.Component.Cabling
             SyncCase();
             Reinstate(devicePairs);
             Reinstate(casePairs);
+            // The adjacent rope capsule needs passage through an inset socket
+            // while snapping, but must not ignore the ENTIRE PC case forever.
+            // As soon as it clears each solid, restore normal collisions; the
+            // connector itself stays exempt so the inserted pin remains stable.
+            if (Connected != null && Time.time - ConnectedAt > .25f)
+            {
+                RestoreClearAdjacent(devicePairs);
+                RestoreClearAdjacent(casePairs);
+            }
+        }
+
+        private void RestoreClearAdjacent(List<Pair> pairs)
+        {
+            var adjacent = Cable != null ? Cable.NearEndCollider(End) : null;
+            if (adjacent == null) return;
+            for (int i = pairs.Count - 1; i >= 0; i--)
+            {
+                var pair = pairs[i];
+                if (pair.plug != adjacent) continue;
+                if (pair.target != null && pair.target.enabled && adjacent.enabled &&
+                    pair.target.gameObject.activeInHierarchy && adjacent.gameObject.activeInHierarchy)
+                {
+                    Vector3 direction;
+                    float depth;
+                    if (Physics.ComputePenetration(adjacent, adjacent.transform.position,
+                        adjacent.transform.rotation, pair.target, pair.target.transform.position,
+                        pair.target.transform.rotation, out direction, out depth) && depth > .003f)
+                        continue;
+                    Physics.IgnoreCollision(adjacent, pair.target, false);
+                }
+                pairs.RemoveAt(i);
+            }
         }
 
         private void TryNearbyPort()

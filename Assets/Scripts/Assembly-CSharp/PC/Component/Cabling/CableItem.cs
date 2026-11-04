@@ -21,8 +21,6 @@ namespace PC.Component.Cabling
         [SerializeField, Min(10f)] private float tensionStiffness = 1000f;
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
-        private CharacterJoint[] links;
-        private CharacterJoint tailLink;
         private Rigidbody heldSegment;
         private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
@@ -49,7 +47,8 @@ namespace PC.Component.Cabling
         public float Length => length;
         public CablePlug End(int i) => plugs != null && i >= 0 && i < 2 ? plugs[i] : null;
         // The first physical capsule meets the panel at an inset socket.
-        // Exempt only this short adjacent section from that panel's colliders.
+        // Temporarily exempt this section during insertion, then restore
+        // its panel collisions as soon as the capsule has cleared the solid.
         public Collider NearEndCollider(int end) => bodies != null && bodies.Length > 0
             ? bodies[end == 0 ? 0 : bodies.Length - 1].GetComponent<Collider>() : null;
 
@@ -140,7 +139,6 @@ namespace PC.Component.Cabling
                 if (col.enabled && !col.isTrigger && col.gameObject.activeInHierarchy)
                     physicalColliders.Add(col);
             bodies = new Rigidbody[count];
-            links = new CharacterJoint[count];
             Rigidbody previous = plugA.GetComponent<Rigidbody>();
             for (int i = 0; i < count; i++)
             {
@@ -158,7 +156,6 @@ namespace PC.Component.Cabling
                 ConfigureBody(rb, .025f);
                 bodies[i] = rb;
                 var joint = body.AddComponent<CharacterJoint>();
-                links[i] = joint;
                 joint.connectedBody = previous;
                 joint.autoConfigureConnectedAnchor = false;
                 joint.enableCollision = false;
@@ -169,7 +166,6 @@ namespace PC.Component.Cabling
                 previous = rb;
             }
             var last = plugB.gameObject.AddComponent<CharacterJoint>();
-            tailLink = last;
             last.connectedBody = previous;
             last.autoConfigureConnectedAnchor = false;
             last.enableCollision = false;
@@ -277,10 +273,11 @@ namespace PC.Component.Cabling
             if (jacket == null) jacket = GetComponent<LineRenderer>();
             if (jacket == null) jacket = gameObject.AddComponent<LineRenderer>();
             jacket.useWorldSpace = true;
-            // Render the actual rigid capsule centre-lines and joint points.
-            // Connecting only Rigidbody centres cuts across corners/solid
-            // surfaces even while every capsule remains outside them.
-            jacket.positionCount = count * 2 + 2;
+            // Keep the continuous jacket at one point per physical section.
+            // Pairs of near/far joint anchors make very short backtracking
+            // segments; LineRenderer corner triangulation then collapses and
+            // the cable appears to flicker between thick and thin sections.
+            jacket.positionCount = count + 2;
             jacket.startWidth = cableDiameter;
             jacket.endWidth = cableDiameter;
             jacket.numCapVertices = 6;
@@ -615,21 +612,8 @@ namespace PC.Component.Cabling
         {
             jacket.SetPosition(0, plugA.CableExitPosition);
             for (int i = 0; i < bodies.Length; i++)
-            {
-                var current = links[i];
-                var next = i + 1 < bodies.Length ? links[i + 1] : tailLink;
-                if (current == null || next == null)
-                {
-                    // A destroyed joint should not leave stale screen points.
-                    jacket.SetPosition(i * 2 + 1, bodies[i].transform.position);
-                    jacket.SetPosition(i * 2 + 2, bodies[i].transform.position);
-                    continue;
-                }
-                var section = bodies[i].transform;
-                jacket.SetPosition(i * 2 + 1, section.TransformPoint(current.anchor));
-                jacket.SetPosition(i * 2 + 2, section.TransformPoint(next.connectedAnchor));
-            }
-            jacket.SetPosition(bodies.Length * 2 + 1, plugB.CableExitPosition);
+                jacket.SetPosition(i + 1, bodies[i].transform.position);
+            jacket.SetPosition(bodies.Length + 1, plugB.CableExitPosition);
         }
 
         private static Material outletPlugMaterial;
