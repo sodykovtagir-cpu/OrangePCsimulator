@@ -67,7 +67,10 @@ public static class CableCollisionDiagnostics
                         exampleWasIgnored = excluded;
                         example = body.name + " / " + other.name + " depth=" +
                             depth.ToString("0.000") + "m ignored=" + excluded +
-                            " speed=" + body.velocity.magnitude.ToString("0.00") + "m/s";
+                            " speed=" + body.velocity.magnitude.ToString("0.00") + "m/s" +
+                            " collider=" + other.GetType().Name +
+                            " host=" + (other.attachedRigidbody != null
+                                ? other.attachedRigidbody.name : "static");
                     }
                 }
                 // A completely submerged capsule no longer overlaps a thin
@@ -76,7 +79,7 @@ public static class CableCollisionDiagnostics
                 if (Physics.Raycast(body.position + Vector3.up * .5f,
                     Vector3.down, out above, .5f, ~0,
                     QueryTriggerInteraction.Ignore) &&
-                    above.collider.GetComponentInParent<CableItem>() != cable &&
+                    above.collider.GetComponentInParent<CableItem>() == null &&
                     above.point.y - body.position.y > capsule.radius + .02f)
                 {
                     below++;
@@ -92,7 +95,7 @@ public static class CableCollisionDiagnostics
                 " below-solid-suspects=" + below +
                 " stretched-joints=" + stretchedJoints +
                 " max-joint-error=" + largestJointError.ToString("0.000") + "m" +
-                " recovered=" + cable.RecoveredPenetrations + " example=" + example +
+                " example=" + example +
                 " below-example=" + belowExample);
         }
         Debug.Log("Cable collision check: finished " + cables.Length + " cables. " +

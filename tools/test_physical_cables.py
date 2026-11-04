@@ -220,13 +220,11 @@ assert all(side in read('PC/Component/Cabling/CableCaseOpening.cs')
 diagnose=(root/'Assets/Editor/CableCollisionDiagnostics.cs').read_text()
 assert 'Tools/OrangePC/Diagnose cable collisions now' in diagnose
 assert 'Physics.GetIgnoreCollision(capsule, other)' in diagnose
-assert 'RecoveredPenetrations' in diagnose
-assert 'stretched-joints=' in diagnose
+assert 'RecoverSolidPenetrations();' not in rope
 assert 'below-example=' in diagnose
-assert 'RecoverSolidPenetrations();' in rope
-assert 'Physics.ComputePenetration(capsule, body.position,' in rope
-assert 'Physics.GetIgnoreCollision(capsule, other)' in rope
-assert 'body.position += step;' in rope
+assert 'stretched-joints=' in diagnose
+assert 'above.collider.GetComponentInParent<CableItem>() == null' in diagnose
+assert 'collider=' in diagnose and 'host=' in diagnose
 assert 'body.detectCollisions' in diagnose
 editor_sockets=(root/'Assets/Editor/PrepareCableSockets.cs').read_text()
 assert 'Prepare sockets in selected prefab' in editor_sockets
