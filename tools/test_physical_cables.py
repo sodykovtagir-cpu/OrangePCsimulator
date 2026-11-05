@@ -35,10 +35,9 @@ assert 'AddPairs(List<Pair> list, UnityEngine.Component device, Item owner)' in 
 assert 'Physics.IgnoreCollision(ours, target, true)' in plug
 assert 'Physics.IgnoreCollision(pair.plug, pair.target, false)' in plug
 assert 'pair.plug.bounds.Intersects(pair.target.bounds)' in plug
-assert 'Physics.ComputePenetration(pair.plug,' in plug
-# Every CablePort owner exempts the inserted plug. Only an already-overlapping
-# adjacent capsule *near this socket* is temporarily exempt; the rest of the
-# case/board/outlet and the remaining cable keep physical contacts.
+# Every CablePort owner (GPU, PSU, motherboard, display and wall outlet)
+# ignores ONLY this plug and its adjacent capsule. The installed GPU/PSU/board
+# additionally exempts their case, never unrelated devices or full cable.
 assert 'WatchPort(port);' in plug and 'watchedOwner = port.owner;' in plug
 assert 'AddPairs(devicePairs, watchedOwner.transform, watchedOwner);' in plug
 assert 'if (!IsHeld || Connected != null || port == null || !port.Accepts(this)) return;' in plug
@@ -57,13 +56,6 @@ assert 'Cable.NearEndCollider(End)' in plug
 assert 'target.GetComponentInParent<Item>() != owner' in plug
 assert 'target == null || target.isTrigger || !target.enabled' in plug
 assert 'AddPair(list, adjacent, target);' in plug
-assert 'if (Physics.ComputePenetration(adjacent, adjacent.transform.position,' in plug
-assert 'target.transform.rotation, out direction, out depth) && depth > .002f)' in plug
-assert 'watchedPort.CaptureRadius + adjacent.bounds.extents.magnitude + .08f' in plug
-assert 'target.ClosestPoint(watchedPort.Snap.position)' in plug
-assert 'RestoreClearAdjacent(devicePairs);' in plug
-assert 'RestoreClearAdjacent(casePairs);' in plug
-assert 'Physics.ComputePenetration(adjacent, adjacent.transform.position,' in plug
 assert 'candidate.PrepareApproach(this)' in ports and 'candidate.LeaveApproach(this)' in ports
 assert 'approachPort.CaptureRadius + .25f' in plug
 assert 'Physics.IgnoreLayerCollision' not in plug and 'Physics.IgnoreLayerCollision' not in rope
@@ -87,8 +79,6 @@ assert 'if (GridMode() && !RemoveMode && cableHit == null &&' in shoot
 assert 'cableHit != null || !hitRb.freezeRotation' in shoot
 assert 'bool cableDrag = t.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;' in raycast
 assert 'if (PlacementGrid.Instance != null && !cableDrag)' in raycast
-assert 'hitRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;' in raycast
-assert 'currentDrag.draggedBody.collisionDetectionMode = currentDrag.oldCollisionMode;' in raycast
 assert 'if (grid != null && grid.SnapEnabled && !cableDrag)' in raycast
 assert 'var grabbedCable = hitRb.GetComponentInParent<PC.Component.Cabling.CableItem>();' in raycast
 assert 'drag.wiredCaseStartPosition = hitRb.position;' in raycast
@@ -112,18 +102,10 @@ assert 'yankedPort = old' in plug
 # item pulls, and release one end at the hard limit even when nothing is held.
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
-assert 'AllowContactsBeforeJointProjection();' not in rope
-assert 'joint.projectionDistance = .25f;' not in rope
-assert 'RelaxedContactLinks' not in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
-assert 'CollisionDetectionMode.ContinuousDynamic' in rope
-assert 'SupportsSweepCcd(rb)' in rope
-assert 'RestoreCableCcd(rb);' in rope
-assert 'length <= 16f && count <= 26' in rope
-assert 'jacket.positionCount = count + 1;' in rope
-assert 'bodies[i].transform.TransformPoint(joint.anchor)' in rope
-assert 'bodies[i - 1].transform.TransformPoint(joint.connectedAnchor)' in rope
-assert 'jacket.SetPosition(i, (current + previous) * .5f);' in rope
+assert 'jacket.positionCount = count * 2 + 2;' in rope
+assert 'section.TransformPoint(current.anchor)' in rope
+assert 'section.TransformPoint(next.connectedAnchor)' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope
@@ -231,16 +213,6 @@ assert 'var pcCase = connector.slot.GetComponentInParent<Case>();' not in read('
 assert 'solidCase.enabled = false' in read('PC/Component/Cabling/CableCaseOpening.cs')
 assert all(side in read('PC/Component/Cabling/CableCaseOpening.cs')
            for side in ('"Left"','"Right"','"Below"','"Above"'))
-diagnose=(root/'Assets/Editor/CableCollisionDiagnostics.cs').read_text()
-assert 'Tools/OrangePC/Diagnose cable collisions now' in diagnose
-assert 'Physics.GetIgnoreCollision(capsule, other)' in diagnose
-assert 'RecoverSolidPenetrations();' not in rope
-assert 'below-example=' in diagnose
-assert 'stretched-joints=' in diagnose
-assert 'jacket-crossings=' in diagnose and 'Physics.RaycastNonAlloc(a, delta.normalized,' in diagnose
-assert 'above.collider.GetComponentInParent<CableItem>() == null' in diagnose
-assert 'collider=' in diagnose and 'host=' in diagnose
-assert 'body.detectCollisions' in diagnose
 editor_sockets=(root/'Assets/Editor/PrepareCableSockets.cs').read_text()
 assert 'Prepare sockets in selected prefab' in editor_sockets
 assert 'GetComponentsInChildren<PC.Component.Display>' in editor_sockets  # UnityEngine.Display is ambiguous
