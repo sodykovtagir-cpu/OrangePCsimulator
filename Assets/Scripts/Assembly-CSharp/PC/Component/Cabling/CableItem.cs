@@ -152,6 +152,11 @@ namespace PC.Component.Cabling
                 col.direction = 2;
                 col.radius = cableDiameter * .5f;
                 col.height = Vector3.Distance(points[i], points[i + 1]) + .04f;
+                // Contacts on thin poles/case skins must be generated BEFORE
+                // a moving joint puts the capsule inside the solid. This is
+                // only the predictive contact envelope of a runtime-created
+                // section, not a resize of any authored plug collider/Pivot.
+                col.contactOffset = Mathf.Min(.025f, col.radius * .5f);
                 physicalColliders.Add(col);
                 var rb = body.AddComponent<Rigidbody>();
                 ConfigureBody(rb, .025f, length <= 16f && count <= 26);
@@ -189,8 +194,12 @@ namespace PC.Component.Cabling
             rb.mass = mass;
             rb.drag = 1.25f;
             rb.angularDrag = 1.5f;
-            rb.solverIterations = sweepCcd ? 16 : 12;
-            rb.solverVelocityIterations = sweepCcd ? 10 : 8;
+            // Short swept cables have many coupled joints and narrow contacts.
+            // More solver passes are cheaper than a post-step teleport that
+            // would push a section through a wall or stretch its neighbour.
+            // Keep the long 48/100 m speculative chains at their old budget.
+            rb.solverIterations = sweepCcd ? 24 : 12;
+            rb.solverVelocityIterations = sweepCcd ? 12 : 8;
             rb.sleepThreshold = .03f;
             rb.maxDepenetrationVelocity = 1.5f;
             // Speculative CCD predicts an AABB before the joint solver and
