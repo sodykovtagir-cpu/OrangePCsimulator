@@ -562,6 +562,7 @@ public sealed class CableTraversalMode : MonoBehaviour
         { Fail(stage + ": physical/visual section count mismatch"); return false; }
         float maxGap = 0f;
         string worst = "none";
+        Rigidbody worstBody = null;
         for (int i = 0; i < rope.Length; i++)
         {
             var rb = rope[i];
@@ -574,7 +575,7 @@ public sealed class CableTraversalMode : MonoBehaviour
             { Fail(stage + ": disabled collisions " + rb.name); return false; }
             float gap = Vector3.Distance(rb.position + rb.rotation * joint.anchor,
                 joint.connectedBody.position + joint.connectedBody.rotation * joint.connectedAnchor);
-            if (gap > maxGap) { maxGap = gap; worst = rb.name; }
+            if (gap > maxGap) { maxGap = gap; worst = rb.name; worstBody = rb; }
             for (int j = 0; j < solids.Count; j++)
             {
                 var solid = solids[j];
@@ -587,7 +588,10 @@ public sealed class CableTraversalMode : MonoBehaviour
                 {
                     Fail(stage + ": CAPSULE through " + solid.name + " " + rb.name +
                         " depth=" + depth.ToString("0.000") + "m ignored=" +
-                        Physics.GetIgnoreCollision(capsule, solid));
+                        Physics.GetIgnoreCollision(capsule, solid) +
+                        " ccd=" + rb.collisionDetectionMode +
+                        " speed=" + rb.velocity.magnitude.ToString("0.00") +
+                        " angular=" + rb.angularVelocity.magnitude.ToString("0.00"));
                     return false;
                 }
             }
@@ -627,7 +631,13 @@ public sealed class CableTraversalMode : MonoBehaviour
         // report actual deviations above a small solver margin. Total rope
         // path and endpoint span are checked separately below.
         if (maxGap > .03f)
-        { Fail(stage + ": STRETCHED " + worst + " gap=" + maxGap.ToString("0.0000") + "m"); return false; }
+        {
+            Fail(stage + ": STRETCHED " + worst + " gap=" + maxGap.ToString("0.0000") +
+                "m ccd=" + (worstBody != null ? worstBody.collisionDetectionMode.ToString() : "none") +
+                " speed=" + (worstBody != null ? worstBody.velocity.magnitude.ToString("0.00") : "none") +
+                " angular=" + (worstBody != null ? worstBody.angularVelocity.magnitude.ToString("0.00") : "none"));
+            return false;
+        }
         var a = cable.End(0);
         var b = cable.End(1);
         if (a == null || b == null) { Fail(stage + ": missing cable end"); return false; }

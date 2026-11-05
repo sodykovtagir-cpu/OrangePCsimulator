@@ -22,6 +22,7 @@ namespace PC.Component.Cabling
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
         private CharacterJoint[] links;
+        private float[] rotationalCcdUntil;
         private Rigidbody heldSegment;
         private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
@@ -140,6 +141,7 @@ namespace PC.Component.Cabling
                     physicalColliders.Add(col);
             bodies = new Rigidbody[count];
             links = new CharacterJoint[count];
+            rotationalCcdUntil = new float[count];
             Rigidbody previous = plugA.GetComponent<Rigidbody>();
             for (int i = 0; i < count; i++)
             {
@@ -201,7 +203,11 @@ namespace PC.Component.Cabling
             rb.solverIterations = sweepCcd ? 24 : 12;
             rb.solverVelocityIterations = sweepCcd ? 12 : 8;
             rb.sleepThreshold = .03f;
-            rb.maxDepenetrationVelocity = 1.5f;
+            // At 50 Hz, the old 1.5 m/s cap can only separate 3 cm per step:
+            // the same depth measured against a 4.5 cm pole while unwinding.
+            // Allow a short cable to clear that contact without projecting its
+            // joints farther into the obstacle; long cables keep the old cap.
+            rb.maxDepenetrationVelocity = sweepCcd ? 2.5f : 1.5f;
             // Speculative CCD predicts an AABB before the joint solver and
             // can miss a thin pole if a connected chain is pulled through it.
             // Sweep-based CCD protects the affordable short cables; keep long
@@ -219,6 +225,30 @@ namespace PC.Component.Cabling
             rb.collisionDetectionMode = length <= 16f && bodies.Length <= 26 &&
                 SupportsSweepCcd(rb) ? CollisionDetectionMode.ContinuousDynamic :
                 CollisionDetectionMode.ContinuousSpeculative;
+        }
+
+        private void UpdateRotationalCcd()
+        {
+            if (length > 16f || bodies == null || bodies.Length > 26 ||
+                rotationalCcdUntil == null) return;
+            // Sweep CCD sees translation but not the rotation of a link around
+            // a narrow pole. Speculative CCD includes angular motion, yet can
+            // produce ghost contacts. Use it only while a short capsule really
+            // rotates, with a brief hold to avoid flickering modes every tick.
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                var rb = bodies[i];
+                if (rb == null || rb.isKinematic) continue;
+                var capsule = rb.GetComponent<CapsuleCollider>();
+                if (capsule == null || !capsule.enabled) continue;
+                float tipSpeed = rb.angularVelocity.magnitude * capsule.height * .5f;
+                if (tipSpeed > .12f && tipSpeed > rb.velocity.magnitude * .18f)
+                    rotationalCcdUntil[i] = Time.time + .12f;
+                var mode = Time.time < rotationalCcdUntil[i]
+                    ? CollisionDetectionMode.ContinuousSpeculative
+                    : CollisionDetectionMode.ContinuousDynamic;
+                if (rb.collisionDetectionMode != mode) rb.collisionDetectionMode = mode;
+            }
         }
 
         private static bool SupportsSweepCcd(Rigidbody rb)
@@ -329,6 +359,7 @@ namespace PC.Component.Cabling
         private void FixedUpdate()
         {
             if (plugs == null || bodies == null || restoringPhysics) return;
+            UpdateRotationalCcd();
             // A falling PSU/monitor can stretch the chain with neither plug
             // held by the player. Release a connection before it can oscillate.
             if (ReleaseOverstretchedEnd()) return;

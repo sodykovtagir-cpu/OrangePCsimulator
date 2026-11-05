@@ -14,6 +14,12 @@ assert 'col.contactOffset = Mathf.Min(.025f, col.radius * .5f);' in creation
 assert 'physicalColliders.Add(col);' in creation
 assert 'rb.solverIterations = sweepCcd ? 24 : 12;' in rope
 assert 'rb.solverVelocityIterations = sweepCcd ? 12 : 8;' in rope
+assert 'rb.maxDepenetrationVelocity = sweepCcd ? 2.5f : 1.5f;' in rope
+assert 'UpdateRotationalCcd();' in rope
+assert 'tipSpeed = rb.angularVelocity.magnitude * capsule.height * .5f' in rope
+assert 'rotationalCcdUntil[i] = Time.time + .12f;' in rope
+assert 'CollisionDetectionMode.ContinuousSpeculative' in rope
+assert 'CollisionDetectionMode.ContinuousDynamic' in rope
 assert 'joint.projectionDistance = .02f;' in rope
 assert 'CollisionDetectionMode.ContinuousDynamic' in rope
 assert 'RestoreCableCcd(rb);' in rope
