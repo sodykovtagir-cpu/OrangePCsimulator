@@ -70,4 +70,14 @@ assert 'oppositeSeen = true;' in code and 'INCONCLUSIVE' in code
 assert 'PoleWindings(cable, centre)' in code
 assert 'maxPoleTurns < .85f' in code and 'max-winding=' in code
 assert 'Mathf.DeltaAngle(previous, next)' in code
+# The spiral only passes after a real winding AND a separate tension pull that
+# unwinds the physical rope without capsules or jacket crossing the pole.
+assert 'pullStart = waypoints.Count;' in code
+assert 'new Vector3(-3.5f, 0f, -.85f)' in code
+assert 'WOUND pole before pull:' in code and 'woundBeforePull < .85f' in code
+assert 'for (int hold = 0; hold < 20 && !failed; hold++)' in code
+assert 'Observe(stage + " unwind hold=" + hold, cable, solids)' in code
+assert 'finalPoleTurns > .25f' in code and 'UNWIND FAIL' in code
+assert 'TOPOLOGY JUMP' in code and 'previous - current > .45f' in code
+assert 'after-pull=' in code
 assert 'Power Cable (15m)' in code and 'HDMI Cable 6m' in code

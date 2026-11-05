@@ -375,6 +375,7 @@ public sealed class CableTraversalMode : MonoBehaviour
         // Ease in/out at every waypoint; deterministic little overcorrections
         // emulate a hand moving the mouse rather than robotic linear steps.
         var waypoints = new List<Vector3> { movingEnd.position };
+        int pullStart = int.MaxValue;
         if (!cross)
         {
             for (int k = 0; k <= 12; k++)
@@ -383,6 +384,14 @@ public sealed class CableTraversalMode : MonoBehaviour
                 waypoints.Add(centre + new Vector3(Mathf.Cos(angle) * radius,
                     .06f * Mathf.Sin(k * .8f), Mathf.Sin(angle) * radius));
             }
+            pullStart = waypoints.Count;
+            // Do not reverse the scripted circle. Pull the grabbed plug
+            // AWAY from the pole, like a person removing a wrap by tension.
+            // A remaining turn would require more than 5 m of cable at the
+            // last target. The chain must unwind, not tunnel through the rod.
+            waypoints.Add(centre + new Vector3(-.9f, 0f, -.55f));
+            waypoints.Add(centre + new Vector3(-2f, 0f, -.75f));
+            waypoints.Add(centre + new Vector3(-3.5f, 0f, -.85f));
         }
         else
         {
@@ -411,6 +420,8 @@ public sealed class CableTraversalMode : MonoBehaviour
         int checks = 0;
         bool oppositeSeen = false;
         float maxPoleTurns = 0f;
+        float lastPoleTurns = 0f;
+        float woundBeforePull = 0f;
         Bounds barrier = solids[0].bounds;
         for (int solid = 1; solid < solids.Count; solid++)
             if (solids[solid] != null) barrier.Encapsulate(solids[solid].bounds);
@@ -436,13 +447,34 @@ public sealed class CableTraversalMode : MonoBehaviour
                     oppositeSeen = true;
                 if (!Observe(stage + " move=" + i + " frame=" + frame,
                     cable, solids)) break;
-                if (!cross)
-                    maxPoleTurns = Mathf.Max(maxPoleTurns, PoleWindings(cable, centre));
+                if (!cross && !CheckPoleWinding(stage, cable, centre,
+                    ref lastPoleTurns, ref maxPoleTurns, i < pullStart)) break;
             }
             for (int pause = 0; pause < 4 && !failed; pause++)
             {
                 yield return new WaitForFixedUpdate();
                 if (pause == 3) Observe(stage + " pause=" + i, cable, solids);
+            }
+            if (!cross && i == pullStart - 1 && !failed)
+            {
+                woundBeforePull = PoleWindings(cable, centre);
+                Write("WOUND pole before pull: " + woundBeforePull.ToString("0.00") +
+                    " turns (peak=" + maxPoleTurns.ToString("0.00") + ")");
+                if (woundBeforePull < .85f)
+                    Fail(stage + ": INCONCLUSIVE — cable did not stay wrapped before pull (" +
+                        woundBeforePull.ToString("0.00") + " turns)");
+            }
+        }
+        if (!cross && !failed)
+        {
+            // Keep tension briefly at the far point. Dropping the hand
+            // immediately could leave a loose turn that simply stays put.
+            for (int hold = 0; hold < 20 && !failed; hold++)
+            {
+                yield return new WaitForFixedUpdate();
+                if (!Observe(stage + " unwind hold=" + hold, cable, solids)) break;
+                if (!CheckPoleWinding(stage, cable, centre, ref lastPoleTurns,
+                    ref maxPoleTurns, false)) break;
             }
         }
         movingPlug.SetHeld(false);
@@ -454,18 +486,46 @@ public sealed class CableTraversalMode : MonoBehaviour
         for (int step = 0; step < 30 && !failed; step++)
         {
             yield return new WaitForFixedUpdate();
-            if (step % 5 == 0) Observe(stage + " settle=" + step, cable, solids);
+            if (!cross || step % 5 == 0)
+            {
+                if (!Observe(stage + " settle=" + step, cable, solids)) break;
+                if (!cross && !CheckPoleWinding(stage, cable, centre,
+                    ref lastPoleTurns, ref maxPoleTurns, false)) break;
+            }
         }
         if (!failed && cross && !oppositeSeen)
             Fail(stage + ": INCONCLUSIVE — plug never reached the opposite side while the other end stayed behind the obstacle");
-        // Moving the hand in a circle is NOT proof that the actual rope wound
-        // around the pole: the other end can slide, or coarse links may trace
-        // a short chord. Require substantial winding of the physics chain.
+        // Both halves of the acceptance test are mandatory: first make an
+        // actual wrap, THEN pull until it is gone without a capsule crossing.
         if (!failed && !cross && maxPoleTurns < .85f)
             Fail(stage + ": INCONCLUSIVE — hand circled pole, but physical cable wound only " +
                 maxPoleTurns.ToString("0.00") + " turns (need >=0.85)");
+        float finalPoleTurns = cross ? 0f : PoleWindings(cable, centre);
+        if (!failed && !cross && finalPoleTurns > .25f)
+            Fail(stage + ": UNWIND FAIL — physical cable remains around pole: " +
+                finalPoleTurns.ToString("0.00") + " turns (must be <=0.25)");
         if (!failed) Write("PASS " + stage + ": " + checks + " human-paced fixed steps; " +
-            "opposite=" + oppositeSeen + " max-winding=" + maxPoleTurns.ToString("0.00") + " turns");
+            "opposite=" + oppositeSeen + " max-winding=" + maxPoleTurns.ToString("0.00") +
+            " turns; after-pull=" + finalPoleTurns.ToString("0.00") + " turns");
+    }
+
+    private bool CheckPoleWinding(string stage, CableItem cable, Vector3 centre,
+        ref float previous, ref float measured, bool winding)
+    {
+        float current = PoleWindings(cable, centre);
+        // The rod may be so thin that an entire section leaps to its other
+        // side between physics samples. No instantaneous disappearance of
+        // half a turn may be counted as successful unwinding.
+        if (previous > .5f && previous - current > .45f)
+        {
+            Fail(stage + ": TOPOLOGY JUMP — winding fell from " +
+                previous.ToString("0.00") + " to " + current.ToString("0.00") +
+                " turns in one fixed step");
+            return false;
+        }
+        previous = current;
+        if (winding) measured = Mathf.Max(measured, current);
+        return true;
     }
 
     private static float PoleWindings(CableItem cable, Vector3 pole)
