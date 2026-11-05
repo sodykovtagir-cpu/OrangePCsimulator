@@ -103,9 +103,11 @@ assert 'yankedPort = old' in plug
 assert 'joint.enableProjection = true;' in rope
 assert 'joint.projectionDistance = .02f;' in rope
 assert 'rb.interpolation = RigidbodyInterpolation.Interpolate;' in rope
-assert 'jacket.positionCount = count * 2 + 2;' in rope
-assert 'section.TransformPoint(current.anchor)' in rope
-assert 'section.TransformPoint(next.connectedAnchor)' in rope
+# Only the visual jacket uses joint midpoints; physics remains 11 sections.
+# Near/far anchors from adjacent capsules can backtrack and produce triangles.
+assert 'jacket.positionCount = count + 1;' in rope
+assert 'bodies[i].transform.TransformPoint(joint.anchor)' in rope
+assert 'bodies[i - 1].transform.TransformPoint(joint.connectedAnchor)' in rope
 assert 'path += Vector3.Distance(previous, body.position);' in rope
 assert 'if (ReleaseOverstretchedEnd()) return;' in rope
 assert 'other.Connected == null' in rope

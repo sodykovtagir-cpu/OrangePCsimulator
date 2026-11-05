@@ -10,9 +10,15 @@ plug = (root / 'Assets/Scripts/Assembly-CSharp/PC/Component/Cabling/CablePlug.cs
 raycast = (root / 'Assets/Scripts/Assembly-CSharp/Raycast.cs').read_text()
 lan = (root / 'Assets/Resources/components/LAN Cable (5m).prefab').read_text()
 
-# The rollback restores the earlier 11-body rope and two points per body.
+# Keep the confirmed 11-body physics, but draw only one point per joint
+# to avoid the LineRenderer's doubled-back anchor triangles.
 assert re.search(r'^  segments: 11$', lan, re.M)
-assert 'jacket.SetPosition(bodies.Length * 2 + 1, plugB.CableExitPosition);' in code
+assert 'jacket.positionCount = count + 1;' in code
+assert 'var joint = links[i];' in code
+assert 'Vector3 previous = bodies[i - 1].transform.TransformPoint(joint.connectedAnchor);' in code
+assert 'jacket.SetPosition(i, (current + previous) * .5f);' in code
+assert 'jacket.SetPosition(bodies.Length, plugB.CableExitPosition);' in code
+assert 'jacket.SetPosition(i * 2 + 2,' not in code
 assert 'UpdateRotationalCcd();' not in code
 assert 'CableTraversalMode' not in code
 assert 'CableTraversalMode' not in raycast

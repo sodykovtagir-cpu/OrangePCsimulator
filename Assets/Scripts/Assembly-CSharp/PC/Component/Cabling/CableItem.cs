@@ -22,7 +22,6 @@ namespace PC.Component.Cabling
         private CablePlug[] plugs;
         private Rigidbody[] bodies;
         private CharacterJoint[] links;
-        private CharacterJoint tailLink;
         private Rigidbody heldSegment;
         private int heldSegmentIndex = -1;
         private readonly int[] restoredOwners = new int[2];
@@ -169,7 +168,6 @@ namespace PC.Component.Cabling
                 previous = rb;
             }
             var last = plugB.gameObject.AddComponent<CharacterJoint>();
-            tailLink = last;
             last.connectedBody = previous;
             last.autoConfigureConnectedAnchor = false;
             last.enableCollision = false;
@@ -277,10 +275,11 @@ namespace PC.Component.Cabling
             if (jacket == null) jacket = GetComponent<LineRenderer>();
             if (jacket == null) jacket = gameObject.AddComponent<LineRenderer>();
             jacket.useWorldSpace = true;
-            // Render the actual rigid capsule centre-lines and joint points.
-            // Connecting only Rigidbody centres cuts across corners/solid
-            // surfaces even while every capsule remains outside them.
-            jacket.positionCount = count * 2 + 2;
+            // One visual point per physical joint. Two anchors for each
+            // capsule can briefly backtrack across a stretched joint, making
+            // the LineRenderer draw the wide triangular folds seen in Play Mode.
+            // This changes the jacket only, not any Rigidbody or joint.
+            jacket.positionCount = count + 1;
             jacket.startWidth = cableDiameter;
             jacket.endWidth = cableDiameter;
             jacket.numCapVertices = 6;
@@ -614,22 +613,23 @@ namespace PC.Component.Cabling
         private void UpdateJacket()
         {
             jacket.SetPosition(0, plugA.CableExitPosition);
-            for (int i = 0; i < bodies.Length; i++)
+            for (int i = 1; i < bodies.Length; i++)
             {
-                var current = links[i];
-                var next = i + 1 < bodies.Length ? links[i + 1] : tailLink;
-                if (current == null || next == null)
+                // Both anchors describe the SAME joint in adjacent capsule
+                // spaces. Averaging closes solver gaps without doubling back
+                // between the two anchors or cutting across section centres.
+                var joint = links[i];
+                if (joint == null)
                 {
-                    // A destroyed joint should not leave stale screen points.
-                    jacket.SetPosition(i * 2 + 1, bodies[i].transform.position);
-                    jacket.SetPosition(i * 2 + 2, bodies[i].transform.position);
+                    jacket.SetPosition(i, (bodies[i - 1].transform.position +
+                        bodies[i].transform.position) * .5f);
                     continue;
                 }
-                var section = bodies[i].transform;
-                jacket.SetPosition(i * 2 + 1, section.TransformPoint(current.anchor));
-                jacket.SetPosition(i * 2 + 2, section.TransformPoint(next.connectedAnchor));
+                Vector3 current = bodies[i].transform.TransformPoint(joint.anchor);
+                Vector3 previous = bodies[i - 1].transform.TransformPoint(joint.connectedAnchor);
+                jacket.SetPosition(i, (current + previous) * .5f);
             }
-            jacket.SetPosition(bodies.Length * 2 + 1, plugB.CableExitPosition);
+            jacket.SetPosition(bodies.Length, plugB.CableExitPosition);
         }
 
         private static Material outletPlugMaterial;
