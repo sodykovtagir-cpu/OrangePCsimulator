@@ -16004,7 +16004,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
   m_AnchoredPosition: {x: -23, y: 14}
-  m_SizeDelta: {x: 490, y: 80}
+  m_SizeDelta: {x: 560, y: 80}
   m_Pivot: {x: 1, y: 0}
 --- !u!224 &578
 RectTransform:
@@ -19367,7 +19367,7 @@ MonoBehaviour:
   visualWiring: {fileID: 742}
   visualWiringOn: {fileID: 21300000, guid: 5ed66d920dc67cc4cb1bdf5024308f85, type: 2}
   visualWiringOff: {fileID: 21300000, guid: a4b2aca6cd893d641bb63325042e08ca, type: 2}
-  gridImage: {fileID: 473320737}
+  gridImage: {fileID: 1024747266}
   gridOnSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   gridOffSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   visualLinePrefab: {fileID: 114454353502528964, guid: 148b8799dc8326a44971ab6a1b2afe16, type: 3}
@@ -22677,7 +22677,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 98843b49250d924469e8c9e2828a4bf1, type: 2}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -23537,7 +23537,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 7
+  m_Text: G
 --- !u!114 &872630765
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23774,7 +23774,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: a4b2aca6cd893d641bb63325042e08ca, type: 2}
+  m_Sprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -25475,7 +25475,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 450, y: -40}
+  m_AnchoredPosition: {x: 520, y: -40}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1796248510
