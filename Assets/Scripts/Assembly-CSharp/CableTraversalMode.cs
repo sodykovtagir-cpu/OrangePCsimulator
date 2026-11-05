@@ -356,14 +356,16 @@ public sealed class CableTraversalMode : MonoBehaviour
         var movingPlug = cable.End(1);
         var movingEnd = movingPlug.GetComponent<Rigidbody>();
         var stationary = Hand(fixedEnd, 120f, 9f);
-        var moving = Hand(movingEnd, 100f, 5f);
+        // Match the actual free-plug drag: the test hand must not apply
+        // stronger forces than a player can apply after the grip fix.
+        var moving = Hand(movingEnd, 45f, 5f);
         float oldDrag = movingEnd.drag, oldAngularDrag = movingEnd.angularDrag;
         var oldCcd = movingEnd.collisionDetectionMode;
         // Raycast does the same temporary CCD switch during a real plug grab;
         // this menu fixture does not run through Raycast's input pipeline.
         movingEnd.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-        movingEnd.drag = 10f;
-        movingEnd.angularDrag = 5f;
+        movingEnd.drag = 4f;
+        movingEnd.angularDrag = 2f;
         movingPlug.SetHeld(true); // same held state as the player's plug drag
         // Isolate a physics jump caused by merely attaching the springs from
         // a real traversal failure. Measure it before issuing ANY hand move.
@@ -439,7 +441,12 @@ public sealed class CableTraversalMode : MonoBehaviour
                 float noise = Mathf.PerlinNoise((checks + frame) * .045f, i * .71f) - .5f;
                 Vector3 target = Vector3.Lerp(a, b, ease) +
                     new Vector3(wobble * noise, wobble * .2f, wobble * Mathf.Sin(t * 13f));
-                moving.GetComponent<Rigidbody>().MovePosition(target);
+                var handBody = moving.GetComponent<Rigidbody>();
+                Vector3 follow = Vector3.MoveTowards(handBody.position,
+                    target, 5f * Time.fixedDeltaTime);
+                Vector3 grip = movingEnd.position + movingEnd.rotation *
+                    moving.GetComponent<SpringJoint>().connectedAnchor;
+                handBody.MovePosition(grip + Vector3.ClampMagnitude(follow - grip, .28f));
                 yield return new WaitForFixedUpdate();
                 checks++;
                 if (cross && fixedEnd.position.x < barrier.min.x - .05f &&
@@ -471,6 +478,11 @@ public sealed class CableTraversalMode : MonoBehaviour
             // immediately could leave a loose turn that simply stays put.
             for (int hold = 0; hold < 20 && !failed; hold++)
             {
+                var handBody = moving.GetComponent<Rigidbody>();
+                Vector3 grip = movingEnd.position + movingEnd.rotation *
+                    moving.GetComponent<SpringJoint>().connectedAnchor;
+                handBody.MovePosition(grip +
+                    Vector3.ClampMagnitude(handBody.position - grip, .28f));
                 yield return new WaitForFixedUpdate();
                 if (!Observe(stage + " unwind hold=" + hold, cable, solids)) break;
                 if (!CheckPoleWinding(stage, cable, centre, ref lastPoleTurns,

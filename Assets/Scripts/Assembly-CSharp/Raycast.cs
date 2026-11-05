@@ -542,10 +542,16 @@ public class Raycast : MonoBehaviour
                     var rb = go.AddComponent<Rigidbody>();
                     rb.isKinematic = true;
                     var sj = go.AddComponent<SpringJoint>();
-                    sj.spring = targetSpring;
-                    sj.damper = targetDamper;
                     spring = sj;
                 }
+                // A 100 N/m hand spring on a 25 g rope link can yank the
+                // whole chain at once and fight a wall instead of bending at
+                // the grabbed point. Keep the full force for an INSERTED plug
+                // so physical pull-out still works; soften free cable grabs.
+                bool freeCableGrip = grabbedCable != null &&
+                    (plug == null || plug.Connected == null);
+                spring.spring = freeCableGrip ? (plug == null ? 22f : 45f) : targetSpring;
+                spring.damper = freeCableGrip ? 5f : targetDamper;
 
                 var drag = new Drag
                 {
@@ -2112,8 +2118,14 @@ public class Raycast : MonoBehaviour
         var rb = j ? j.connectedBody : null;
         if (rb == null) yield break;
 
-        rb.drag = targetDrag;
-        rb.angularDrag = targetAngularDrag;
+        // Drag only the grabbed link. High drag on a tiny 25 g section
+        // resists its own bend while the spring pulls neighbouring links as
+        // one rigid-looking bundle. Restore authored values in End().
+        var heldPlug = rb.GetComponent<PC.Component.Cabling.CablePlug>();
+        bool freeCableBody = rb.GetComponentInParent<PC.Component.Cabling.CableItem>() != null &&
+            (heldPlug == null || heldPlug.Connected == null);
+        rb.drag = freeCableBody ? (heldPlug == null ? 2f : 4f) : targetDrag;
+        rb.angularDrag = freeCableBody ? 2f : targetAngularDrag;
 
         if (distanceObj)
             distanceObj.SetActive(true);
@@ -2309,7 +2321,34 @@ public class Raycast : MonoBehaviour
                     RestoreSpring();
                 }
 
-                spring.transform.position = point;
+                if (cableDrag && (heldPlug == null || heldPlug.Connected == null))
+                {
+                    // The cursor may move through a wall, but the hand may
+                    // not drag a free plug/section metres ahead of its body:
+                    // that would keep increasing spring force while a solid
+                    // blocks the cable, stretching its CharacterJoints and
+                    // shaking the entire chain. Lag the hand physically; do
+                    // not teleport any cable Rigidbody or alter colliders.
+                    spring.spring = heldPlug == null ? 22f : 45f;
+                    spring.damper = 5f;
+                    float reach = heldPlug == null ? .16f : .28f;
+                    Vector3 follow = Vector3.MoveTowards(spring.transform.position,
+                        point, 5f * Time.deltaTime);
+                    Vector3 grip = rb.position + rb.rotation * spring.connectedAnchor;
+                    spring.transform.position = grip +
+                        Vector3.ClampMagnitude(follow - grip, reach);
+                }
+                else
+                {
+                    // An inserted plug still has the original full-strength
+                    // physical pull-out; unrelated objects keep their drag.
+                    if (cableDrag)
+                    {
+                        spring.spring = targetSpring;
+                        spring.damper = targetDamper;
+                    }
+                    spring.transform.position = point;
+                }
 
                 var curGo = currentDrag.target
                     ? currentDrag.target.gameObject

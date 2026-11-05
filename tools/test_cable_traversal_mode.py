@@ -47,7 +47,8 @@ assert 'yield return RunStage("thick wall / opposing ends"' in code
 assert 'yield return RunStage("assembled PC housing"' in code
 assert 'monitoringPins && message.StartsWith("Cable HDMI: PIN BREAK"' in code
 assert 'reload watch step=' in code
-assert 'moving.GetComponent<Rigidbody>().MovePosition(target);' in code
+assert 'handBody.MovePosition(grip + Vector3.ClampMagnitude(follow - grip, .28f));' in code
+assert 'Vector3.MoveTowards(handBody.position,' in code
 assert 'movingPlug.SetHeld(true);' in code and 'movingPlug.SetHeld(false);' in code
 assert 'Mathf.SmoothStep(0f, 1f, t)' in code and 'Mathf.PerlinNoise' in code
 assert 'for (int pause = 0; pause < 4' in code
