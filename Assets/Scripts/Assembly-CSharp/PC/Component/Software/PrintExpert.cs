@@ -161,6 +161,17 @@ namespace PC.Component.Software
 				return;
 			}
 
+			// The new imported model must have bound its renderer in Awake before
+			// taking the player's money. The original banner needs no extra check.
+			var dakimakura = delivered.GetComponent<DakimakuraVisual>();
+			if (dakimakura != null && !dakimakura.Ready)
+			{
+				if (alertText != null) alertText.text = "Модель дакимакуры не готова";
+				Destroy(delivered);
+				Destroy(tex);
+				return;
+			}
+
 			var loader = delivered.GetComponent<TextureLoader>();
 			if (loader == null)
 			{
@@ -219,6 +230,13 @@ namespace PC.Component.Software
 			previewInstance = loader.gameObject;
 			previewInstance.transform.localPosition = Vector3.zero;
 			previewInstance.transform.localRotation = Quaternion.identity;
+			var dakimakura = previewInstance.GetComponent<DakimakuraVisual>();
+			if (dakimakura != null && !dakimakura.Ready)
+			{
+				if (alertText != null) alertText.text = "Модель дакимакуры не готова";
+				StopPreview();
+				return;
+			}
 			MakePreviewOnly();
 
 			// materials создаёт локальные копии: общие материалы товара не изменяем.

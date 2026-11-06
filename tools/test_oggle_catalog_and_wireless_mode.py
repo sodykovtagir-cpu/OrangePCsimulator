@@ -18,10 +18,10 @@ shared_prefab = (assets / "Scripts/Assembly-CSharp/PC/Component/WifiPanelPrefab.
 
 catalog = browser_prefab.split("  websites:\n", 1)[1].split("\n  addressBar:", 1)[0]
 entries = re.findall(r"(?m)^  - url: ([^\n]+)\n(.*?)(?=^  - url: |\Z)", catalog, re.S | re.M)
-assert len(entries) == 7
+assert len(entries) == 8
 urls = {url for url, _ in entries}
 assert len(urls) == len(entries)
-assert {"www.typolink.com/tariffs", "192.168.1.1"} <= urls
+assert {"www.typolink.com/tariffs", "192.168.1.1", "www.dakimakuraexpert.com"} <= urls
 for url, body in entries:
     assert "    visible: 1\n" in body, url
     # Unity YAML can wrap quoted keyword strings across lines.
@@ -55,4 +55,4 @@ for text in (browser_prefab, web, network):
     assert "typolink.com/tarrifs" not in text
     assert "www.www.typolink.com" not in text
 assert 'url == "192.168.1.1" || url == "www.typolink.com/tariffs"' in web
-print("PASS: all seven Oggle sites indexed, addresses/keywords and cable-free LAN removal")
+print("PASS: all eight Oggle sites indexed, addresses/keywords and cable-free LAN removal")

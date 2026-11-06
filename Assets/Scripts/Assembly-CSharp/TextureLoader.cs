@@ -11,6 +11,14 @@ public class TextureLoader : MonoBehaviour, ISave
 
     private byte[] data;
 
+    // Imported models may create their renderer in Awake. Bind that renderer
+    // before a saved texture is restored or a new purchase is painted.
+    public void BindRenderer(Renderer target)
+    {
+        rend = target;
+        matIndex = 0;
+    }
+
     public bool IsEmpty()
     {
         return data == null || data.Length == 0;

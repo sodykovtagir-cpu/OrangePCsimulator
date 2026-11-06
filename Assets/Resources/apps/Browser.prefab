@@ -1083,6 +1083,37 @@ MonoBehaviour:
     - low price
     - "\u043F\u0440\u0438\u043D\u0442 \u044D\u043A\u0441\u043F\u0435\u0440\u0442"
     - "\u043F\u0440\u0438\u043D\u0442 \u0438\u043A\u0441\u043F\u0435\u0440\u0442"
+  - url: www.dakimakuraexpert.com
+    page: {fileID: 114021143164813130, guid: 01b72cb418fd4757944b10939e741f39, type: 3}
+    visible: 1
+    trafficMB: 5
+    description: Print your own dakimakura from a picture, with an optional HD finish.
+    keywords:
+    - dakimakura
+    - dakimakura expert
+    - daki
+    - body pillow
+    - pillow
+    - custom pillow
+    - custom dakimakura
+    - print pillow
+    - pillow printing
+    - photo pillow
+    - anime pillow
+    - hd pillow
+    - hd dakimakura
+    - hd print
+    - image print
+    - picture to pillow
+    - dakimakura shop
+    - daki shop
+    - 32x70
+    - 1024x2240
+    - www.dakimakuraexpert.com
+    - дакимакура
+    - подушка
+    - печать подушек
+    - дакимакура hd
   - url: www.darknet.com
     page: {fileID: 114663928911710202, guid: fb7d89ac53fb4de498c13cee661bc0d0, type: 3}
     visible: 1
