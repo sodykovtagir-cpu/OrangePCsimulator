@@ -22,6 +22,7 @@ public class WorkshopItem
 	public int downloads;
 	public int likes;
 	public bool has_cover;
+	public bool liked_by_me;
 }
 
 [Serializable]
@@ -164,7 +165,8 @@ public class WorkshopClient : MonoBehaviour
 	{
 		string body = null;
 		string err = null;
-		yield return RequestGet("?action=list&i=1", (t, e) => { body = t; err = e; });
+		yield return RequestGet("?action=list&i=1&client=" + UnityWebRequest.EscapeURL(ClientId()),
+			(t, e) => { body = t; err = e; });
 		if (err != null) { done(null, err); yield break; }
 		var json = StripJunk(body);
 		WorkshopListResponse parsed = null;
@@ -400,9 +402,13 @@ public class WorkshopClient : MonoBehaviour
 		}));
 	}
 
-	public void Like(int id, Action<int, string> done)
+	public void Like(int id, Action<int, string> done) { SetLike(id, true, done); }
+	public void Unlike(int id, Action<int, string> done) { SetLike(id, false, done); }
+
+	private void SetLike(int id, bool like, Action<int, string> done)
 	{
-		StartCoroutine(SimplePost("?action=like&i=1", new List<IMultipartFormSection>
+		StartCoroutine(SimplePost(like ? "?action=like&i=1" : "?action=unlike&i=1",
+			new List<IMultipartFormSection>
 		{
 			Field("id", id.ToString()),
 			Field("client", ClientId())
@@ -412,7 +418,7 @@ public class WorkshopClient : MonoBehaviour
 			WorkshopUploadResponse p = null;
 			try { p = JsonUtility.FromJson<WorkshopUploadResponse>(StripJunk(body)); }
 			catch (Exception e) { done(0, e.Message); return; }
-			if (p == null || !p.ok) { done(0, p != null ? p.error : "like fail"); return; }
+			if (p == null || !p.ok) { done(0, p != null ? p.error : "reaction fail"); return; }
 			done(p.likes, null);
 		}));
 	}

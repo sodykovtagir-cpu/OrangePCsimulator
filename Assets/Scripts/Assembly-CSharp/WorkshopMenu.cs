@@ -469,15 +469,26 @@ public class WorkshopMenu : MonoBehaviour
 			var b = like.GetComponent<Button>();
 			if (b != null)
 			{
-				int captured = it.id;
+				var icon = b.targetGraphic;
+				Color offColor = icon != null ? icon.color : Color.white;
+				if (icon != null && it.liked_by_me) icon.color = Color.red;
 				b.onClick.AddListener(() =>
 				{
-					WorkshopClient.Instance.Like(captured, (n, err) =>
+					if (WorkshopClient.Instance == null || !b.interactable) return;
+					bool next = !it.liked_by_me;
+					b.interactable = false; // no double request while one is in flight
+					System.Action<int, string> done = (n, err) =>
 					{
-						if (t == null) return;
+						if (b == null) return;
+						b.interactable = true;
 						if (err != null) { SetStatus(err); return; }
-						SetChildText(t, "Likes", n.ToString());
-					});
+						it.liked_by_me = next;
+						it.likes = n;
+						if (icon != null) icon.color = next ? Color.red : offColor;
+						if (t != null) SetChildText(t, "Likes", n.ToString());
+					};
+					if (next) WorkshopClient.Instance.Like(it.id, done);
+					else WorkshopClient.Instance.Unlike(it.id, done);
 				});
 			}
 		}

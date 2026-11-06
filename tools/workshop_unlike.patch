@@ -1,0 +1,29 @@
+--- a/workshop/api.php
++++ b/workshop/api.php
+@@ -114 +114 @@
+-function pub($it) {
++function pub($it, $viewerHash = null) {
+@@ -116,0 +117,3 @@
++    // Only expose THIS client's reaction. Never send the hash list to players.
++    $it['liked_by_me'] = $viewerHash !== null && !empty($it['liked']) &&
++        is_array($it['liked']) && in_array($viewerHash, $it['liked'], true);
+@@ -175,0 +179,2 @@
++    $client = clean(isset($_GET['client']) ? $_GET['client'] : '', 64);
++    $viewerHash = $client !== '' ? hash('sha256', $client) : null;
+@@ -177 +182 @@
+-    foreach (load_index($INDEX) as $it) $out[] = pub($it);
++    foreach (load_index($INDEX) as $it) $out[] = pub($it, $viewerHash);
+@@ -210 +215 @@
+-if ($action === 'like' && $_SERVER['REQUEST_METHOD'] === 'POST') {
++if (($action === 'like' || $action === 'unlike') && $_SERVER['REQUEST_METHOD'] === 'POST') {
+@@ -219 +224,2 @@
+-    if (!in_array($hash, $items[$i]['liked'], true)) {
++    $liked = in_array($hash, $items[$i]['liked'], true);
++    if ($action === 'like' && !$liked) {
+@@ -220,0 +227,3 @@
++    } elseif ($action === 'unlike' && $liked) {
++        $items[$i]['liked'] = array_values(array_filter($items[$i]['liked'],
++            function ($entry) use ($hash) { return $entry !== $hash; }));
+@@ -224 +233 @@
+-    json_out(['ok' => true, 'likes' => $items[$i]['likes']]);
++    json_out(['ok' => true, 'likes' => $items[$i]['likes'], 'liked' => $action === 'like']);

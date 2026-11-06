@@ -26,6 +26,16 @@ assert 'cached.size == info.Length && cached.modifiedUtc == info.LastWriteTimeUt
 assert 'headerCache.Remove(path);' in menu
 assert 'ScreenshotCover(GameData data)' in workshop
 assert 'CoverForSave(path)' in workshop and 'ScreenshotCover(load.loader.GameData)' in info
+client = read('WorkshopClient.cs')
+assert 'public bool liked_by_me;' in client
+assert 'UnityWebRequest.EscapeURL(ClientId())' in client
+assert 'public void Unlike(int id, Action<int, string> done)' in client
+assert '?action=unlike&i=1' in client
+assert 'if (next) WorkshopClient.Instance.Like(it.id, done);' in workshop
+assert 'else WorkshopClient.Instance.Unlike(it.id, done);' in workshop
+server_patch = (Path(__file__).resolve().parent / 'workshop_unlike.patch').read_text()
+assert "if (($action === 'like' || $action === 'unlike')" in server_patch
+assert "['liked_by_me']" in server_patch and "array_values(array_filter($items[$i]['liked']" in server_patch
 assert 'screenshotPreview != null ? screenshotPreview : CoverPlaceholder()' in info
 marquee = read('PassiveDescriptionMarquee.cs')
 assert 'editor != null && editor.isFocused' in marquee
