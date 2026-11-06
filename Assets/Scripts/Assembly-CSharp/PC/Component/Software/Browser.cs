@@ -50,6 +50,7 @@ namespace PC.Component.Software
         [SerializeField] private Text addFavoritesTitle;
         [SerializeField] private GameObject historyItemPrefab;
         [SerializeField] private GameObject favoritesItemPrefab;
+        [SerializeField] private Sprite fallbackSiteIcon;
 
         public void SearchFromResults()
         {
@@ -65,6 +66,8 @@ namespace PC.Component.Software
         private const string RecentSitesPath = "System/oggle_recent.json";
         private const string FavoritesPath = "System/oggle_favorites.json";
         private const int MaxRecentSites = 5;
+        private const string TariffsUrl = "www.typolink.com/tariffs";
+        private const string RouterUrl = "192.168.1.1";
         [Serializable]
         private sealed class RecentSites
         {
@@ -121,8 +124,17 @@ namespace PC.Component.Software
         {
             if (favoritesLoaded || system == null || system.FileManager == null) return;
             favoritesLoaded = true;
-            if (!system.FileManager.TryGetFile(0, FavoritesPath, out var saved) ||
-                saved == null || string.IsNullOrEmpty(saved.content) || saved.content.Length > 8192) return;
+            if (!system.FileManager.TryGetFile(0, FavoritesPath, out var saved) || saved == null)
+            {
+                // Seed only a new PC. An existing empty file means the player
+                // intentionally deleted both defaults: never re-add them.
+                favoriteUrls.Clear();
+                favoriteUrls.Add(TariffsUrl);
+                favoriteUrls.Add(RouterUrl);
+                if (!SaveUrls(FavoritesPath, favoriteUrls)) favoritesLoaded = false;
+                return;
+            }
+            if (string.IsNullOrEmpty(saved.content) || saved.content.Length > 8192) return;
             try
             {
                 var data = JsonUtility.FromJson<RecentSites>(saved.content);
@@ -188,6 +200,16 @@ namespace PC.Component.Software
                 row.name = "History: " + url;
                 var label = row.GetComponentInChildren<Text>();
                 if (label != null) label.text = url;
+                var icon = row.transform.Find("Image");
+                if (icon != null)
+                {
+                    var image = icon.GetComponent<Image>();
+                    if (image != null)
+                    {
+                        image.sprite = SiteIcon(url);
+                        image.preserveAspect = true;
+                    }
+                }
                 // The author's history row has an Image but no Button.
                 var button = row.GetComponent<Button>() ?? row.AddComponent<Button>();
                 button.targetGraphic = row.GetComponent<Image>();
@@ -195,6 +217,16 @@ namespace PC.Component.Software
                 button.onClick.AddListener(() => OpenRecentSite(capturedUrl));
                 historyItems.Add(row);
             }
+        }
+
+        private Sprite SiteIcon(string url)
+        {
+            if (websites != null)
+                foreach (var site in websites)
+                    if (site != null && site.page != null &&
+                        NormalizeUrl(site.url) == NormalizeUrl(url) && site.page.icon != null)
+                        return site.page.icon;
+            return fallbackSiteIcon;
         }
 
         private void RenderFavorites()
@@ -205,19 +237,26 @@ namespace PC.Component.Software
             {
                 var tile = Instantiate(favoritesItemPrefab, favoritesPanel);
                 tile.name = "Favorite: " + url;
-                var label = tile.GetComponentInChildren<Text>();
-                // The author's compact tile is 67px wide: show the hostname,
-                // but keep the full URL in the click handler and save file.
-                if (label != null)
-                {
-                    var host = url.Split('/')[0];
-                    label.text = host.Length > 12 ? host.Substring(0, 11) + "…" : host;
-                }
-                var button = tile.GetComponent<Button>();
-                var capturedUrl = url;
-                if (button != null) button.onClick.AddListener(() => OpenRecentSite(capturedUrl));
+                var item = tile.GetComponent<FavoriteTile>();
+                if (item != null)
+                    item.Initialize(url, SiteIcon(url), OpenRecentSite, RemoveFavorite);
                 favoriteItems.Add(tile);
             }
+        }
+
+        private void RemoveFavorite(string url)
+        {
+            LoadFavorites();
+            var previous = new List<string>(favoriteUrls);
+            if (!favoriteUrls.Remove(url)) return;
+            if (!SaveUrls(FavoritesPath, favoriteUrls))
+            {
+                favoriteUrls.Clear();
+                favoriteUrls.AddRange(previous);
+                Debug.LogWarning("Oggle: не удалось сохранить удаление избранного на диск ПК");
+                return;
+            }
+            RenderFavorites();
         }
 
         private void OpenRecentSite(string url)

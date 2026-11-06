@@ -1371,6 +1371,7 @@ MonoBehaviour:
   addFavoritesTitle: {fileID: 1413617616655323745}
   historyItemPrefab: {fileID: 1291933620389674571, guid: df583bcea98a2c14f9236f41c733d80c, type: 3}
   favoritesItemPrefab: {fileID: 7439697941606578863, guid: 6288bce4648b83d4792c37f92991c766, type: 3}
+  fallbackSiteIcon: {fileID: 21300000, guid: ccea911e70e5ff549b5d44da8f8688aa, type: 2}
 --- !u!1 &150600107712996687
 GameObject:
   m_ObjectHideFlags: 0
