@@ -73,28 +73,8 @@ namespace PC.Component.Software
                     });
                 count++;
             }
-            if (count == 0)
-            {
-                // Preserve the existing turquoise empty state and white text.
-                var empty = new GameObject("Нет роутеров", typeof(RectTransform),
-                    typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
-                empty.transform.SetParent(repeaterList, false);
-                empty.GetComponent<Image>().color = new Color(.3372549f, .76470596f, .8235295f);
-                empty.GetComponent<LayoutElement>().preferredHeight = 32f;
-                var label = new GameObject("Сообщение", typeof(RectTransform),
-                    typeof(CanvasRenderer), typeof(Text));
-                label.transform.SetParent(empty.transform, false);
-                var rect = (RectTransform)label.transform;
-                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
-                rect.offsetMin = rect.offsetMax = Vector2.zero;
-                var text = label.GetComponent<Text>();
-                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                text.fontSize = 14;
-                text.color = Color.white;
-                text.alignment = TextAnchor.MiddleCenter;
-                text.text = "Нет включённых роутеров для подключения";
-            }
-            if (status != null) status.text = "Роутер #" + current.Id + ". Найдено: " + count;
+            if (status != null) status.text = "Роутер #" + current.Id +
+                (count > 0 ? ". Найдено: " + count : "");
         }
 
         private void SelectEntry(WifiNetworkEntry entry, int id)

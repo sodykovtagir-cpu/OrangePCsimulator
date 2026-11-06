@@ -193,17 +193,11 @@ namespace PC.Component.Networking
                 if (parent.Password != parentPassword ||
                     parent.WifiSignal(transform, wifiRange) <= 0f) return false;
             }
-            else if (CableMode.Enabled)
-            {
-                if (!PhysicalLanTo(parent, out var ownPort, out var upstreamPort)) return false;
-                upstreamLanPortIndex = upstreamPort;
-            }
             else
             {
-                if (!parent.WithinLanRange(transform)) return false;
-                upstreamLanPortIndex = upstreamId == parentId && !upstreamWireless
-                    ? upstreamLanPortIndex : parent.FirstFreeVirtualPort(service);
-                if (upstreamLanPortIndex == 0) return false;
+                if (!CableMode.Enabled ||
+                    !PhysicalLanTo(parent, out _, out var upstreamPort)) return false;
+                upstreamLanPortIndex = upstreamPort;
             }
             upstreamId = parentId;
             upstreamWireless = wifi;
@@ -308,8 +302,7 @@ namespace PC.Component.Networking
                 if (parent.Password != upstreamPassword) return 0f;
                 hop = parent.WifiSignal(transform, wifiRange) * .85f;
             }
-            else hop = (CableMode.Enabled ? PhysicalLanTo(parent, out _, out _) :
-                parent.WithinLanRange(transform)) ? .98f : 0f;
+            else hop = CableMode.Enabled && PhysicalLanTo(parent, out _, out _) ? .98f : 0f;
             if (hop <= 0f) return 0f;
             return hop * parent.UpstreamQuality(service, seen);
         }

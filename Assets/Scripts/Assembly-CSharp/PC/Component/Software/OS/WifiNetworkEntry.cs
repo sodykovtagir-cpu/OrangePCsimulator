@@ -21,8 +21,6 @@ namespace PC.Component.Software.OS
         private RouterDevice router;
         private InternetService service;
         private bool enteringPassword;
-        private bool isLan;
-        private Action onLanChanged;
         private Action<WifiNetworkEntry> onSelected;
         private Action onRepeaterChanged;
         private RouterDevice repeaterParent;
@@ -35,24 +33,9 @@ namespace PC.Component.Software.OS
             router = target;
             service = currentService;
             enteringPassword = false;
-            isLan = false;
-            onLanChanged = null;
             onSelected = selected;
             repeaterParent = repeaterTarget = null;
             if (password != null) { password.contentType = InputField.ContentType.Password; password.text = ""; }
-            if (connect != null) connect.onClick.AddListener(ConnectClicked);
-            Refresh();
-        }
-
-        public void InitializeLan(Motherboard currentBoard, RouterDevice target,
-            InternetService currentService, Action changed)
-        {
-            board = currentBoard;
-            router = target;
-            service = currentService;
-            enteringPassword = false;
-            isLan = true;
-            onLanChanged = changed;
             if (connect != null) connect.onClick.AddListener(ConnectClicked);
             Refresh();
         }
@@ -70,7 +53,6 @@ namespace PC.Component.Software.OS
             onSelected = selected;
             onRepeaterChanged = changed;
             enteringPassword = false;
-            isLan = false;
             if (password != null)
             {
                 password.contentType = InputField.ContentType.Password;
@@ -109,8 +91,7 @@ namespace PC.Component.Software.OS
         {
             if (board == null || router == null || service == null) return false;
             var status = service.Status(board);
-            return isLan ? board.LanRouterId == router.Id && status.Wired && status.Router == router :
-                board.WifiEnabled && !status.Wired && status.Router == router;
+            return board.WifiEnabled && !status.Wired && status.Router == router;
         }
 
         public void Refresh()
@@ -118,7 +99,8 @@ namespace PC.Component.Software.OS
             if (repeaterTarget != null)
             {
                 bool repeaterConnected = repeaterParent != null &&
-                    repeaterTarget.UpstreamId == repeaterParent.Id;
+                    repeaterTarget.UpstreamId == repeaterParent.Id &&
+                    (repeaterTarget.UpstreamWireless || PC.Component.Cabling.CableMode.Enabled);
                 bool wired = repeaterConnected && !repeaterTarget.UpstreamWireless;
                 if (ssid != null)
                 {
@@ -142,12 +124,12 @@ namespace PC.Component.Software.OS
             if (connect != null) connect.interactable = true;
             bool connected = Connected();
             if (connected && enteringPassword) enteringPassword = false;
-            if (ssid != null) { ssid.text = isLan ? "LAN: " + router.Ssid : router.Ssid;
+            if (ssid != null) { ssid.text = router.Ssid;
                 ssid.gameObject.SetActive(!enteringPassword); }
-            if (icon != null) icon.SetActive(!enteringPassword && !isLan);
+            if (icon != null) icon.SetActive(!enteringPassword);
             if (description != null)
             {
-                description.text = connected ? "Connected" : isLan ? "LAN" :
+                description.text = connected ? "Connected" :
                     "Signal: " + Mathf.RoundToInt(router.WifiSignal(board.transform, board.WifiRange) * 100f) + "%";
                 description.gameObject.SetActive(!enteringPassword);
             }
@@ -158,7 +140,8 @@ namespace PC.Component.Software.OS
         private void ConnectRepeaterClicked()
         {
             if (service == null || repeaterParent == null || repeaterTarget == null) return;
-            if (repeaterTarget.UpstreamId == repeaterParent.Id)
+            if (repeaterTarget.UpstreamId == repeaterParent.Id &&
+                (repeaterTarget.UpstreamWireless || PC.Component.Cabling.CableMode.Enabled))
             {
                 if (!repeaterTarget.UpstreamWireless) return; // unplug physical LAN
                 repeaterTarget.DisconnectUpstream();
@@ -198,18 +181,6 @@ namespace PC.Component.Software.OS
         {
             if (repeaterTarget != null) { ConnectRepeaterClicked(); return; }
             if (board == null || router == null || service == null) return;
-            if (isLan)
-            {
-                if (board.LanRouterId == router.Id) board.ConfigureLan(0);
-                else if (!service.JoinLan(board, router.Id))
-                {
-                    if (description != null) description.text = "LAN: порт занят или роутер недоступен";
-                    return;
-                }
-                Refresh();
-                onLanChanged?.Invoke();
-                return;
-            }
             if (Connected())
             {
                 board.ConfigureLan(0); // does not unplug an actual LAN cable

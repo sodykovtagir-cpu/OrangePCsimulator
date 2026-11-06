@@ -15,7 +15,7 @@ namespace PC.Component.Software
         private static readonly Color fg = new Color(.9f, .94f, 1f);
         private static readonly Color button = new Color(.17f, .32f, .57f);
         public static bool IsLocalAddress(string url) =>
-            url == "192.168.1.1/panel" || url == "typolink.com/tariffs";
+            url == "192.168.1.1" || url == "www.typolink.com/tariffs";
 
         private static GameObject Make(string name, Transform parent, bool image = false)
         {
@@ -121,15 +121,15 @@ namespace PC.Component.Software
             var service = InternetService.Instance;
             if (service == null) { Label(body, "Сетевая служба не найдена"); return root; }
             Label(body, "TYPO-LINK  /  " + url, 23);
-            if (url == "typolink.com/tariffs") Tariffs(browser, body, board, service);
+            if (url == "www.typolink.com/tariffs") Tariffs(browser, body, board, service);
             else Panel(browser, body, board, service);
             return root;
         }
 
         private static void Links(Browser browser, Transform body)
         {
-            AddButton(body, "Тарифы", () => browser.ShowNetworkPage("typolink.com/tariffs"));
-            AddButton(body, "Панель роутера", () => browser.ShowNetworkPage("192.168.1.1/panel"));
+            AddButton(body, "Тарифы", () => browser.ShowNetworkPage("www.typolink.com/tariffs"));
+            AddButton(body, "Панель роутера", () => browser.ShowNetworkPage("192.168.1.1"));
         }
 
         private static void Tariffs(Browser browser, Transform body, Motherboard board, InternetService service)
@@ -147,7 +147,7 @@ namespace PC.Component.Software
                 int id = i;
                 AddButton(body, InternetService.PlanNames[i] + " — 1 ГБ / $" +
                     InternetService.PricePerGB[i] + ". " + notes[i],
-                    () => { service.SetPlan(id); browser.ShowNetworkPage("typolink.com/tariffs"); });
+                    () => { service.SetPlan(id); browser.ShowNetworkPage("www.typolink.com/tariffs"); });
             }
             Links(browser, body);
         }
@@ -161,15 +161,15 @@ namespace PC.Component.Software
             Label(body, "SSID (имя точки Wi-Fi)");
             var ssid = Entry(body, "Новое имя сети", router.Ssid);
             AddButton(body, "Сохранить имя Wi-Fi", () =>
-            { if (router.SetSsid(ssid.text)) browser.ShowNetworkPage("192.168.1.1/panel");
+            { if (router.SetSsid(ssid.text)) browser.ShowNetworkPage("192.168.1.1");
               else Label(body, "Имя сети должно быть от 1 до 32 символов"); });
             Label(body, "Новый пароль Wi-Fi (8–63 символа)");
             var key = Entry(body, "Новый пароль"); key.contentType = InputField.ContentType.Password;
             AddButton(body, "Сохранить пароль", () =>
-            { if (router.SetPassword(key.text)) browser.ShowNetworkPage("192.168.1.1/panel");
+            { if (router.SetPassword(key.text)) browser.ShowNetworkPage("192.168.1.1");
               else Label(body, "Нужен пароль от 8 до 63 символов"); });
             AddButton(body, "Назначить шлюзом провайдера", () =>
-            { if (service.SetGateway(router.Id)) browser.ShowNetworkPage("192.168.1.1/panel"); });
+            { if (service.SetGateway(router.Id)) browser.ShowNetworkPage("192.168.1.1"); });
             Label(body, "Другие роутеры (подключить к этому как повторители):");
             foreach (var other in UnityEngine.Object.FindObjectsOfType<RouterDevice>())
             {
@@ -177,24 +177,18 @@ namespace PC.Component.Software
                 var child = other;
                 Label(body, "#" + child.Id + ": " + child.Ssid +
                     " / " + (child.UpstreamId == 0 ? "нет родителя" : "родитель #" + child.UpstreamId));
-                // The code-built fallback is used only without RouterPanel.prefab.
-                // In cable mode LAN is automatic; never offer a fake LAN button.
-                if (!PC.Component.Cabling.CableMode.Enabled)
-                    AddButton(body, "Подключить #" + child.Id + " через LAN", () =>
-                    { if (child.ConnectUpstream(router.Id, false)) browser.ShowNetworkPage("192.168.1.1/panel");
-                      else Label(body, "LAN: слишком далеко, нет порта или получился цикл"); });
                 Label(body, "Пароль основной Wi-Fi сети для #" + child.Id);
                 var parentKey = Entry(body, "Введи пароль");
                 parentKey.contentType = InputField.ContentType.Password;
                 AddButton(body, "Подключить #" + child.Id + " как Wi-Fi повторитель", () =>
                 { if (!string.IsNullOrEmpty(parentKey.text) &&
                       child.ConnectUpstream(router.Id, true, parentKey.text))
-                      browser.ShowNetworkPage("192.168.1.1/panel");
+                      browser.ShowNetworkPage("192.168.1.1");
                   else Label(body, "Wi-Fi: неверный пароль, нет сигнала или возник цикл"); });
             }
             if (router.UpstreamId != 0)
                 AddButton(body, "Отключить этот роутер от родителя", () =>
-                { router.DisconnectUpstream(); browser.ShowNetworkPage("192.168.1.1/panel"); });
+                { router.DisconnectUpstream(); browser.ShowNetworkPage("192.168.1.1"); });
             Links(browser, body);
         }
     }

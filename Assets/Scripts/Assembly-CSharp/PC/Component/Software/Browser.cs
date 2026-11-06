@@ -271,19 +271,14 @@ namespace PC.Component.Software
 
         private bool Matches(WebsiteItem site, string query)
         {
-            if (site.url.ToLower().Contains(query))
-                return true;
-
-            if (site.keywords != null)
-            {
-                foreach (var word in site.keywords)
-                {
-                    if (word.ToLower().Contains(query))
-                        return true;
-                }
-            }
-
-            return false;
+            if (site == null || string.IsNullOrWhiteSpace(query)) return false;
+            var terms = query.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            var indexed = (site.url ?? "") + " " + (site.description ?? "") + " " +
+                string.Join(" ", site.keywords ?? new string[0]);
+            foreach (var term in terms)
+                if (indexed.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
+                    return false;
+            return terms.Length > 0;
         }
     }
 }

@@ -35,13 +35,16 @@ assert 'service.JoinWifi' not in web and 'service.JoinLan' not in web
 assert 'url == "wifi-settings"' not in web
 tray=src('PC/Component/Software/OS/WifiTaskbarController.cs')
 entry=src('PC/Component/Software/OS/WifiNetworkEntry.cs')
-assert 'service.JoinWifi' in entry and 'service.JoinLan' in entry
+assert 'service.JoinWifi' in entry and 'service.JoinLan' not in entry
 assert 'router.CredentialsMatch' in entry and 'passwordMessage.text = "Неверный пароль"' in entry
 assert 'board.SetWifiEnabled' in tray and 'WifiNetworkEntry' in tray
 assert 'board.WifiEnabled' in net and 'jObject["wifiEnabled"]' in board
 assert 'board.WifiEnabled' in grid and 'watts += 2f;' in grid
 assert 'service.SetPlan(id)' in web and 'child.ConnectUpstream(router.Id, true' in web
-assert 'child.ConnectUpstream(router.Id, false)' in web
+assert 'child.ConnectUpstream(router.Id, false)' not in web
+assert 'if (!CableMode.Enabled || board == null) return false;' in net
+assert 'else if (board.LanRouterId != 0)' not in net
+assert 'if (!CableMode.Enabled ||' in router and 'PhysicalLanTo(parent, out _, out var upstreamPort)' in router
 assert 'RouterWebPages.IsLocalAddress(url)' in browser
 assert 'LoadOnline(site.url, Mathf.Max(.1f, site.trafficMB)' in browser
 assert 'WaitForSecondsRealtime(step)' in browser and 'SignalTraffic(system' in browser
@@ -52,7 +55,7 @@ assert 'out delay, out error' in browser and 'out var error' not in browser
 assert 'if (site != null && site.page != null && NormalizeUrl(site.url) == url)' in browser
 assert 'WifiSignal(board.transform, board.WifiRange)' in net
 assert 'service.Router(board.LanRouterId)' not in net # actual local Router() resolution
-assert 'router.WithinLanRange(board.transform)' in net
+assert 'router.WithinLanRange(board.transform)' not in net
 assert 'private float wifiRange = 30f;' in board and 'private float wifiRange = 55f;' in router
 assert 'private float maxLanLength = 500f;' in router
 assert 'new HashSet<int>()' in net and 'seen.Add(step.Id)' in router
@@ -73,4 +76,4 @@ for price in (19,79,499):
         paid+=whole
         owed-=whole
     assert paid==price and abs(owed)<1e-6
-print('PASS: tariffs, fractional billing, Wi-Fi/LAN, router chains, saves, browser and electricity')
+print('PASS: tariffs, fractional billing, Wi-Fi and physical-only LAN, router chains, saves, browser and electricity')
