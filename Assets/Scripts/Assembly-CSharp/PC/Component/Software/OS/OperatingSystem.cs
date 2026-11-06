@@ -3335,6 +3335,11 @@ namespace PC.Component.Software.OS
         private void Update()
         {
             if (!Ready) return;
+            if (startMenuOpened && ShellRunning &&
+                PC.Component.Software.WindowChrome.ClickedOutside(
+                    startMenu != null ? startMenu.transform as RectTransform : null,
+                    startButton != null ? startButton.transform as RectTransform : null))
+                ToggleStartMenu();
             UpdateWorkload();
             // Short missed-input intervals simulate a saturated desktop without
             // slowing Time.timeScale (which would also slow mining). An iGPU

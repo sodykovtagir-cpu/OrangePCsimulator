@@ -111,7 +111,11 @@ namespace PC.Component.Software
         public static GameObject Message(Transform host, string text)
         {
             var root = Surface(host, out var body);
-            Label(body, text, 21);
+            root.GetComponent<Image>().color = Color.white;
+            var viewport = root.transform.Find("Viewport");
+            if (viewport != null && viewport.TryGetComponent<Image>(out var background))
+                background.color = Color.white;
+            Label(body, text, 21).color = Color.black;
             return root;
         }
 

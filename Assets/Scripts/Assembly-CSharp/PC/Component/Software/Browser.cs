@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using PC.Component.Networking;
+using System.Collections.Generic;
 
 namespace PC.Component.Software
 {
@@ -52,6 +53,18 @@ namespace PC.Component.Software
         private Website currentPage;
         private GameObject networkPage;
         private Coroutine pendingLoad;
+        private const string RecentSitesPath = "System/oggle_recent.json";
+        private const int MaxRecentSites = 5;
+        [Serializable]
+        private sealed class RecentSites
+        {
+            public List<string> urls = new List<string>();
+        }
+        private readonly List<string> recentUrls = new List<string>();
+        private RectTransform recentPanel;
+        private RectTransform recentRows;
+        private GameObject addSiteDialog;
+        private bool recentLoaded;
 
         protected override void Start()
         {
@@ -64,7 +77,198 @@ namespace PC.Component.Software
         public void ShowHome()
         {
             ClearPage();
+            if (oggleHome == null) return;
             oggleHome.SetActive(true);
+            LoadRecentSites();
+            RenderRecentSites();
+        }
+
+        private void LoadRecentSites()
+        {
+            if (recentLoaded || system == null || system.FileManager == null) return;
+            recentLoaded = true;
+            if (!system.FileManager.TryGetFile(0, RecentSitesPath, out var saved) ||
+                saved == null || string.IsNullOrEmpty(saved.content) || saved.content.Length > 8192) return;
+            try
+            {
+                var data = JsonUtility.FromJson<RecentSites>(saved.content);
+                if (data == null || data.urls == null) return;
+                foreach (var url in data.urls)
+                {
+                    var normalized = NormalizeUrl(url);
+                    if (ValidSiteAddress(normalized) && !recentUrls.Contains(normalized))
+                        recentUrls.Add(normalized);
+                    if (recentUrls.Count == MaxRecentSites) break;
+                }
+            }
+            catch (ArgumentException) { /* Keep the PC's unrelated files intact. */ }
+        }
+
+        private bool SaveRecentSites()
+        {
+            if (system == null || system.FileManager == null) return false;
+            var payload = JsonUtility.ToJson(new RecentSites { urls = new List<string>(recentUrls) });
+            var saved = system.FileManager.Write(0, RecentSitesPath, payload);
+            if (saved == null || saved.content != payload) return false;
+            saved.hidden = true;
+            return true;
+        }
+
+        private static bool ValidSiteAddress(string address)
+        {
+            if (string.IsNullOrEmpty(address) || address.Length > 255 ||
+                address.IndexOf('.') < 0) return false;
+            foreach (char c in address)
+                if (char.IsWhiteSpace(c) || char.IsControl(c)) return false;
+            return true;
+        }
+
+        private void RememberSite(string url)
+        {
+            LoadRecentSites();
+            var normalized = NormalizeUrl(url);
+            if (!ValidSiteAddress(normalized)) return;
+            recentUrls.Remove(normalized);
+            recentUrls.Insert(0, normalized);
+            if (recentUrls.Count > MaxRecentSites)
+                recentUrls.RemoveRange(MaxRecentSites, recentUrls.Count - MaxRecentSites);
+            SaveRecentSites();
+        }
+
+        private static RectTransform Box(Transform parent, string name, Vector2 size, Vector2 position,
+            Color? background = null)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+            if (background.HasValue) go.AddComponent<Image>().color = background.Value;
+            return rect;
+        }
+
+        private static Text Caption(Transform parent, string value, Vector2 size, Vector2 position,
+            int fontSize = 14, TextAnchor alignment = TextAnchor.MiddleLeft)
+        {
+            var rect = Box(parent, "Text", size, position);
+            var label = rect.gameObject.AddComponent<Text>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.fontSize = fontSize;
+            label.color = Color.black;
+            label.alignment = alignment;
+            label.text = value;
+            label.raycastTarget = false;
+            return label;
+        }
+
+        private static Button ActionButton(Transform parent, string name, Vector2 size,
+            Vector2 position, Action click)
+        {
+            var rect = Box(parent, name, size, position,
+                new Color(.88f, .93f, .97f, 1f));
+            var button = rect.gameObject.AddComponent<Button>();
+            button.onClick.AddListener(() => click());
+            Caption(rect, name, size, Vector2.zero, 13, TextAnchor.MiddleCenter);
+            return button;
+        }
+
+        private void RenderRecentSites()
+        {
+            if (oggleHome == null) return;
+            if (recentPanel == null)
+            {
+                recentPanel = Box(oggleHome.transform, "Recent sites", new Vector2(450, 124),
+                    new Vector2(0, -98), new Color(1f, 1f, 1f, .96f));
+                Caption(recentPanel, "Недавние сайты", new Vector2(260, 25),
+                    new Vector2(-85, 44), 15);
+                ActionButton(recentPanel, "+ Добавить", new Vector2(96, 26),
+                    new Vector2(167, 44), OpenAddSiteDialog);
+                recentRows = Box(recentPanel, "Recent links", new Vector2(430, 95),
+                    new Vector2(0, -14));
+            }
+            for (int i = recentRows.childCount - 1; i >= 0; i--)
+            {
+                var oldRow = recentRows.GetChild(i).gameObject;
+                oldRow.SetActive(false);
+                Destroy(oldRow);
+            }
+            for (int i = 0; i < recentUrls.Count; i++)
+            {
+                string url = recentUrls[i];
+                var title = url.Length > 52 ? url.Substring(0, 49) + "..." : url;
+                ActionButton(recentRows, title, new Vector2(425, 18),
+                    new Vector2(0, 33 - i * 18), () => OpenRecentSite(url));
+            }
+        }
+
+        private void OpenRecentSite(string url)
+        {
+            var normalized = NormalizeUrl(url);
+            if (websites != null)
+                foreach (var site in websites)
+                    if (site != null && site.page != null &&
+                        NormalizeUrl(site.url) == normalized)
+                    { OpenSite(site); return; }
+            if (RouterWebPages.IsLocalAddress(normalized))
+            { ShowNetworkPage(normalized); return; }
+            ShowError("Сайт " + normalized + " пока недоступен в Oggle");
+        }
+
+        private void CloseAddSiteDialog()
+        {
+            if (addSiteDialog == null) return;
+            Destroy(addSiteDialog);
+            addSiteDialog = null;
+        }
+
+        private void OpenAddSiteDialog()
+        {
+            if (addSiteDialog != null) return;
+            var overlay = Box(transform, "Add site overlay", Vector2.zero, Vector2.zero,
+                new Color(0f, 0f, 0f, .30f));
+            overlay.anchorMin = Vector2.zero;
+            overlay.anchorMax = Vector2.one;
+            overlay.offsetMin = overlay.offsetMax = Vector2.zero;
+            addSiteDialog = overlay.gameObject;
+            overlay.gameObject.AddComponent<Button>().onClick.AddListener(CloseAddSiteDialog);
+            var modal = Box(overlay, "Add site dialog", new Vector2(390, 184), Vector2.zero,
+                new Color(.94f, .96f, .98f, 1f));
+            WindowChrome.Apply(modal);
+            Caption(modal, "Добавить сайт", new Vector2(345, 30), new Vector2(0, 65), 18);
+            Caption(modal, "Адрес сайта", new Vector2(345, 24), new Vector2(0, 26));
+            var field = Box(modal, "Website address", new Vector2(345, 32),
+                new Vector2(0, -5), Color.white);
+            var input = field.gameObject.AddComponent<InputField>();
+            var text = Caption(field, "", new Vector2(325, 28), Vector2.zero);
+            input.textComponent = text;
+            input.characterLimit = 255;
+            input.text = "";
+            var warning = Caption(modal, "", new Vector2(345, 22), new Vector2(0, -37), 12);
+            ActionButton(modal, "Добавить", new Vector2(108, 30), new Vector2(56, -68), () =>
+            {
+                var url = NormalizeUrl(input.text);
+                if (!ValidSiteAddress(url))
+                { warning.text = "Укажи адрес сайта с точкой"; return; }
+                LoadRecentSites();
+                var previous = new List<string>(recentUrls);
+                recentUrls.Remove(url);
+                recentUrls.Insert(0, url);
+                if (recentUrls.Count > MaxRecentSites)
+                    recentUrls.RemoveRange(MaxRecentSites, recentUrls.Count - MaxRecentSites);
+                if (!SaveRecentSites())
+                {
+                    recentUrls.Clear();
+                    recentUrls.AddRange(previous);
+                    warning.text = "Не удалось сохранить на диск ПК";
+                    return;
+                }
+                CloseAddSiteDialog();
+                RenderRecentSites();
+            });
+            ActionButton(modal, "Отмена", new Vector2(105, 30), new Vector2(-67, -68),
+                CloseAddSiteDialog);
+            input.ActivateInputField();
         }
 
         // ================= SEARCH =================
@@ -112,6 +316,7 @@ namespace PC.Component.Software
             ClearPage();
             oggleHome.SetActive(false);
             networkPage = RouterWebPages.Create(this, pageContainer, board, url);
+            RememberSite(url);
         }
 
         private void ShowError(string message)
@@ -239,6 +444,7 @@ namespace PC.Component.Software
                 }
                 currentPage = Instantiate(site.page, pageContainer);
                 currentPage.Init(system);
+                RememberSite(site.url);
                 return;
             }
             LoadOnline(site.url, Mathf.Max(.1f, site.trafficMB), () =>
@@ -247,6 +453,7 @@ namespace PC.Component.Software
                 oggleHome.SetActive(false);
                 currentPage = Instantiate(site.page, pageContainer);
                 currentPage.Init(system);
+                RememberSite(site.url);
             });
         }
 
@@ -254,6 +461,7 @@ namespace PC.Component.Software
 
         private void ClearPage()
         {
+            CloseAddSiteDialog();
             if (loadingPage != null) loadingPage.SetActive(false);
             if (errorPage != null) errorPage.SetActive(false);
             if (pendingLoad != null) { StopCoroutine(pendingLoad); pendingLoad = null; }

@@ -14,6 +14,30 @@ namespace PC.Component.Software
         static Sprite roundedFill;
         static Sprite roundedGlow;
 
+        // Geometry check does not consume the click: the desktop, apps and
+        // taskbar still receive their usual pointer events after a menu closes.
+        public static bool ClickedOutside(RectTransform panel, RectTransform trigger)
+        {
+            if (panel == null || !panel.gameObject.activeInHierarchy) return false;
+            Vector2 point;
+            if (Input.touchCount > 0)
+            {
+                var touch = Input.GetTouch(0);
+                if (touch.phase != TouchPhase.Began) return false;
+                point = touch.position;
+            }
+            else
+            {
+                if (!Input.GetMouseButtonDown(0) && !Input.GetMouseButtonDown(1)) return false;
+                point = Input.mousePosition;
+            }
+            var canvas = panel.GetComponentInParent<Canvas>();
+            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera : null;
+            return !RectTransformUtility.RectangleContainsScreenPoint(panel, point, camera) &&
+                (trigger == null || !RectTransformUtility.RectangleContainsScreenPoint(trigger, point, camera));
+        }
+
         public static void Apply(RectTransform window)
         {
             if (window == null) return;

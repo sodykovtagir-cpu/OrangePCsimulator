@@ -51,6 +51,14 @@ namespace PC.Component.Software.OS
             if (powerButton != null) powerButton.onClick.RemoveListener(ToggleRadio);
         }
 
+        private void Update()
+        {
+            if (os != null && os.ShellRunning &&
+                PC.Component.Software.WindowChrome.ClickedOutside(panel,
+                    trayButton != null ? trayButton.transform as RectTransform : null))
+                panel.gameObject.SetActive(false);
+        }
+
         private void TogglePanel()
         {
             if (panel == null) return;
