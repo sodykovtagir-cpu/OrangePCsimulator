@@ -124,13 +124,6 @@ namespace PC.Component.Networking
                     break;
                 }
             }
-            else if (board.LanRouterId != 0)
-            {
-                var router = Router(board.LanRouterId);
-                if (router != null && router.IsPowered && router.WithinLanRange(board.transform))
-                { result.Router = router; result.Wired = true; result.Signal = 1f;
-                  result.LanPort = board.LanPortIndex; }
-            }
             if (result.Router == null && board.WifiEnabled && !string.IsNullOrEmpty(board.WifiSsid))
             {
                 foreach (var router in FindObjectsOfType<RouterDevice>())
@@ -142,7 +135,8 @@ namespace PC.Component.Networking
                 }
             }
             if (result.Router == null)
-            { result.Message = "Нет LAN или подходящей сети Wi-Fi"; return result; }
+            { result.Message = CableMode.Enabled ? "Нет LAN или подходящей сети Wi-Fi" :
+                "Нет подходящей сети Wi-Fi"; return result; }
             result.Quality = result.Signal * result.Router.UpstreamQuality(this, new HashSet<int>());
             result.Message = result.Quality > 0f ? "Подключено" : "Роутер без подключения к провайдеру";
             return result;
@@ -159,19 +153,14 @@ namespace PC.Component.Networking
             return false;
         }
 
-        // LAN is a saved, distance-limited LOGICAL link until authored cable
-        // meshes, ports and connectors exist. No fake cable object is spawned.
+        // LAN connections require a physical cable. Old saved virtual LAN IDs
+        // are ignored by Status in cable-free mode.
         public bool JoinLan(Motherboard board, int routerId)
         {
+            if (!CableMode.Enabled || board == null) return false;
             var router = Router(routerId);
-            if (CableMode.Enabled) return board != null && Status(board).Router == router &&
-                Status(board).Wired; // inserting the physical LAN plug is what connects it
-            if (board == null || router == null || !router.WithinLanRange(board.transform) ||
-                (board.LanRouterId != routerId && router.LanClients(this) >= router.LanPorts)) return false;
-            int port = router.FirstFreeVirtualPort(this, board);
-            if (port == 0) return false;
-            board.ConfigureLan(routerId, port);
-            return true;
+            var status = Status(board);
+            return router != null && status.Router == router && status.Wired;
         }
 
         public bool CanOpenLocalPanel(Motherboard board, out RouterDevice router)
@@ -188,7 +177,7 @@ namespace PC.Component.Networking
             var status = Status(board);
             if (status.Router == null || status.Quality <= 0f)
             { error = status.Message; return false; }
-            if (plan == 0) { error = "Тариф не подключён. Открой typolink.com/tariffs"; return false; }
+            if (plan == 0) { error = "Тариф не подключён. Открой www.typolink.com/tariffs"; return false; }
             if (main == null || main.Money <= 0)
             { error = "Недостаточно денег для интернета"; return false; }
 

@@ -91,7 +91,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   icon: {fileID: 0}
-  websiteName: typolink.com/tarrifs
+  websiteName: www.typolink.com/tariffs
   ssidInput: {fileID: 0}
   passwordInput: {fileID: 0}
   routerIdInput: {fileID: 0}

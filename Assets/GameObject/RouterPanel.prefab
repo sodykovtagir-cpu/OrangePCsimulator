@@ -92,7 +92,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   icon: {fileID: 0}
-  websiteName: 192.168.1.1/panel
+  websiteName: 192.168.1.1
   ssidInput: {fileID: 6479793300015015979}
   passwordInput: {fileID: 6534182772579408902}
   routerIdInput: {fileID: 0}

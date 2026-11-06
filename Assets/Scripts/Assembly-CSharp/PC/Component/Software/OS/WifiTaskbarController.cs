@@ -1,5 +1,4 @@
 using System;
-using PC.Component.Cabling;
 using PC.Component.Networking;
 using UnityEngine;
 using UnityEngine.UI;
@@ -104,18 +103,10 @@ namespace PC.Component.Software.OS
                 {
                     if (router == null || router.Id == 0 || !router.IsPowered ||
                         router.WifiSignal(board.transform, board.WifiRange) <= 0f) continue;
-                    AddRow(board, router, service, false);
+                    AddRow(board, router, service);
                     found++;
                 }
             }
-            // No virtual LAN button in physical-cable mode. In the cable-free
-            // mode, reuse the player's WifiPanelPrefab so even LAN rows follow
-            // the same authored UI palette instead of generating new buttons.
-            if (!CableMode.Enabled)
-                foreach (var router in FindObjectsOfType<RouterDevice>())
-                    if (router != null && router.Id != 0 && router.IsPowered &&
-                        router.WithinLanRange(board.transform))
-                        AddRow(board, router, service, true);
             var connection = service.Status(board);
             status.text = board.WifiEnabled ?
                 (found == 0 ? "Wi-Fi сети не найдены" : "Wi-Fi сетей: " + found) :
@@ -130,7 +121,7 @@ namespace PC.Component.Software.OS
             selectedEntry = entry;
         }
 
-        private void AddRow(Motherboard board, RouterDevice router, InternetService service, bool lan)
+        private void AddRow(Motherboard board, RouterDevice router, InternetService service)
         {
             var row = Instantiate(rowPrefab, list);
             row.SetPcosCardColors();
@@ -141,8 +132,11 @@ namespace PC.Component.Software.OS
             if (element == null) element = row.gameObject.AddComponent<LayoutElement>();
             element.preferredHeight = 54;
             element.preferredWidth = 415;
-            if (lan) row.InitializeLan(board, router, service, Scan);
-            else row.Initialize(board, router, service, SelectEntry);
+            // This prefab is shared with the router site. Remove its root
+            // background only from the PCOS instance, not the authored asset.
+            var background = row.GetComponent<Image>();
+            if (background != null) Destroy(background);
+            row.Initialize(board, router, service, SelectEntry);
         }
     }
 }

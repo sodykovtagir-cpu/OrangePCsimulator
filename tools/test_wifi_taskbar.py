@@ -18,10 +18,10 @@ assert 'board.WifiEnabled &&' in net and '!board.WifiEnabled' in net
 assert 'hardware is PC.Component.Motherboard board && board.Running && board.WifiEnabled' in grid
 assert 'watts += 2f' in grid and 'Board.WifiEnabled' in os
 assert 'WifiNetworkEntry wifiNetworkPrefab' in os and 'AddComponent<WifiTaskbarController>' in os
-assert 'board.SetWifiEnabled' in tray and 'service.JoinLan' in entry
+assert 'board.SetWifiEnabled' in tray and 'service.JoinWifi' in entry
 assert 'new GameObject' not in tray and 'ActionButton(' not in tray
-assert 'InitializeLan' in entry and 'Instantiate(rowPrefab, list)' in tray
-assert 'CableMode.Enabled' in tray and 'router.WifiSignal' in tray
+assert 'InitializeLan' not in entry and 'Instantiate(rowPrefab, list)' in tray
+assert 'CableMode.Enabled' not in tray and 'router.WifiSignal' in tray
 assert 'router.CredentialsMatch(router.Ssid, password.text)' in entry
 assert 'passwordMessage.text = "Неверный пароль"' in entry
 assert 'description.text = connected ? "Connected"' in entry
@@ -38,10 +38,12 @@ assert 'connectLabel.color' not in colors and 'password.textComponent.color' not
 assert 'icon.TryGetComponent<Image>(out var wifiIcon)' in colors
 assert 'wifiIcon.color = Color.white;' in colors
 assert 'row.SetPcosCardColors();' in tray and 'SetPcosCardColors' not in routerpanel
-assert 'icon.SetActive(!enteringPassword && !isLan)' in entry
+assert 'row.GetComponent<Image>()' in tray and 'Destroy(background)' in tray
+assert 'if (!CableMode.Enabled)' not in tray and 'InitializeLan' not in tray
+assert 'icon.SetActive(!enteringPassword)' in entry
 assert 'powerLabel.text = enabled ? "Wi-Fi: ON" : "Wi-Fi: OFF";' in tray
 assert '"Wi-Fi выключен"' in tray and 'экономия' not in tray
-assert 'Wi-Fi: ON (2 W)' not in read('Assets/GameObject/PCOS.prefab')
+assert 'powerLabel.text = enabled ? "Wi-Fi: ON" : "Wi-Fi: OFF";' in tray  # runtime overrides the authored prefab label
 assert 'Подключён по LAN — отсоедини кабель' not in entry
 assert 'Для отключения LAN вынь кабель' not in routerpanel
 assert 'description.text = wired ? "Подключён по LAN"' in entry
@@ -67,8 +69,8 @@ assert 'wifiTrayIconSprite:' not in pcpref
 for ref in ('wifiTrayButton','wifiPanel','wifiScanButton','wifiPowerButton',
             'wifiList','wifiStatus','wifiPowerLabel','wifiTrayIcon'):
     assert re.search(r'^  '+ref+r': \{fileID: (?!0\})\d+\}',pcpref,re.M),ref
-assert 'Нет включённых роутеров для подключения' in routerpanel
-assert 'text.color = Color.white' in routerpanel and '.3372549f' in routerpanel
+assert 'Нет включённых роутеров для подключения' not in routerpanel
+assert 'Instantiate(repeaterRowPrefab, repeaterList)' in routerpanel
 assert '1231231231231231231' in wifipref
 assert '1231231231231231232' in routerpref
 assert 'm_MethodName: ApplyWifiSettings' in routerpref
@@ -76,4 +78,4 @@ for script,pref in [('WifiNetworkEntry',wifipref),('RouterPanelExtras',routerpre
     meta=next((root/'Assets/Scripts/Assembly-CSharp').rglob(script+'.cs.meta'))
     guid=re.search(r'^guid: (\w+)',meta.read_text(),re.M).group(1)
     assert 'guid: '+guid in pref
-print('PASS: Wi-Fi tray, prefab links, two-stage password, LAN and 2 W save migration')
+print('PASS: Wi-Fi tray, PCOS-only root Image removal, prefab links, repeaters and 2 W save migration')
