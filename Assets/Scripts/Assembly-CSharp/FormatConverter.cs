@@ -65,7 +65,9 @@ public static class FormatConverter
 
 	public static Texture2D BytesToTexture(byte[] data, bool markNonReadable)
 	{
-		var tex = new Texture2D(2, 2, TextureFormat.RGB24, false);
+		// PNG may have alpha even at HD resolution. Starting from RGB24 can
+		// discard that channel on some import paths; JPEG stays opaque anyway.
+		var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 		tex.filterMode = FilterMode.Point;
 		ImageConversion.LoadImage(tex, data, markNonReadable);
 		return tex;

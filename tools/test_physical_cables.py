@@ -133,7 +133,7 @@ assert 'restoringPhysics = false;\n            overstretchSteps = 0;' in rope
 assert 'private void RefreshYankedPort()' in plug
 assert 'if (yankedPort != null && !NearPort(yankedPort, .10f)) yankedPort = null;' in plug
 assert 'private void FixedUpdate()\n        {\n            RefreshYankedPort();' in plug
-assert 'if (!restoring && port == yankedPort) return false;' in plug
+assert 'port == yankedPort ||' in plug and 'port == manualReinsertPort && !IsHeld' in plug
 # The HDMI BoxCollider is offset from its Rigidbody origin. A port touching
 # its body must accept it even when the origin lies outside the trigger.
 assert 'solid.ClosestPoint(port.TriggerCenter)' in plug

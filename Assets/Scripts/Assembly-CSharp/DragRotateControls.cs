@@ -224,11 +224,15 @@ public class DragRotateControls : MonoBehaviour
     /// <summary>HUD-канвас игры (общий для панели стрелок и подписи режима сетки).</summary>
     public static Canvas FindHudCanvas()
     {
-        var functions = FindObjectOfType<Functions>();
-        if (functions != null)
+        // Several room scenes contain more than one Functions component.
+        // FindObjectOfType picks an arbitrary one (sometimes on a world-space
+        // monitor); its controls render but cannot receive HUD touch events.
+        var functions = FindObjectsOfType<Functions>();
+        for (int i = 0; i < functions.Length; i++)
         {
-            var canvas = functions.GetComponentInParent<Canvas>();
-            if (canvas != null) return canvas;
+            var canvas = functions[i].GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                return canvas;
         }
 
         var canvases = FindObjectsOfType<Canvas>();

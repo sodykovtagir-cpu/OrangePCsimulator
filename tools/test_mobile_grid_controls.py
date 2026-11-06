@@ -35,6 +35,20 @@ assert 'Instance = controls;' in create
 assert 'if (Instance == this) Instance = null;' in destroy
 assert 'platformChecked' not in controls
 assert 'DragRotateControls.EnsureExists(this)' in ray.split('private void Update()')[1].split('private void LateUpdate()')[0]
+assert 'canvas.renderMode == RenderMode.ScreenSpaceOverlay' in controls.split('public static Canvas FindHudCanvas()')[1].split('public static float UiScale()')[0]
+mobile = (scripts / 'MobileFreeDraggable.cs').read_text(encoding='utf-8')
+assert 'MobileFreeDraggable.EnsureRoomHudLayout();' in ray
+for name, key in [('Functions/Icon', 'PanelOpen'), ('Pause', 'MenuButton'),
+                  ('Fixed Joystick', 'Joystick'), ('Run', 'Run')]:
+    assert f'EnsureControl(root.Find("{name}"), "{key}", bounds);' in mobile
+assert 'if (target == null || target.GetComponent<MobileFreeDraggable>() != null) return;' in mobile
+assert 'EditMode = false;' in custom.split('private void OnDisable()')[1].split('private IEnumerator')[0]
+# These five room scenes historically omitted every draggable component;
+# runtime installation must cover them without overwriting Medium's layout.
+scenes = scripts.parents[1] / 'Scenes'
+guid = '8c5c785935baa01478a9fbe70f968b02'
+for name in ('Main 2', 'Main 3', 'Main 4', 'Main 5', 'Main 6'):
+    assert guid not in (scenes / (name + '.unity')).read_text()
 
 # Same geometry in the actual panel and the draggable preview; test all nine
 # touch rectangles, not just the adjacent arrows. A shared positive scale

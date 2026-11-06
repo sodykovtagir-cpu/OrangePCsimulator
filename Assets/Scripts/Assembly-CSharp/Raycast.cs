@@ -151,6 +151,9 @@ public class Raycast : MonoBehaviour
             gridGo.AddComponent<PlacementGrid>();
         }
 
+        // Every room uses the same mobile layout IDs. Some room scenes omitted
+        // the draggable components that were authored only in Main (Medium).
+        MobileFreeDraggable.EnsureRoomHudLayout();
         // Панель поворота предмета (стрелки) — создаём сразу, показываем при перетаскивании
         DragRotateControls.EnsureExists(this);
 

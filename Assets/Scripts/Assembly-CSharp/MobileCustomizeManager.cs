@@ -52,6 +52,13 @@ public class MobileCustomizeManager : MonoBehaviour
         StartCoroutine(ApplySavedLayoutAfterStart());
     }
 
+    private void OnDisable()
+    {
+        // EditMode is static across scene loads. Leaving the settings menu
+        // while editing must not disable every mobile HUD button in a room.
+        EditMode = false;
+    }
+
     private IEnumerator ApplySavedLayoutAfterStart()
     {
         yield return null;

@@ -46,6 +46,7 @@ public class FileInformation : MonoBehaviour
 	private FileMenu.Load load;
 	private MenuManager menuManager;
 	private static Texture2D coverPlaceholder;
+	private Texture2D screenshotPreview;
 
 	private void Awake()
 	{
@@ -77,6 +78,13 @@ public class FileInformation : MonoBehaviour
 	{
 		AccountManager.AccountChanged -= OnAccountChanged;
 		ServerAccounts.StateChanged -= OnAccountChanged;
+		if (screenshotPreview != null)
+		{
+			if (wsCover != null && wsCover.texture == screenshotPreview)
+				wsCover.texture = CoverPlaceholder();
+			Destroy(screenshotPreview);
+			screenshotPreview = null;
+		}
 	}
 
 	private void OnAccountChanged()
@@ -99,6 +107,14 @@ public class FileInformation : MonoBehaviour
 		if (load.loader.GameData.sign == null) load.loader.GameData.sign = "";
 		signInput.text = localDesc;
 		signNameText.text = string.IsNullOrEmpty(localDesc) ? "No Sign" : localDesc;
+		if (!string.IsNullOrEmpty(localDesc))
+			PassiveDescriptionMarquee.Attach(signNameText, signInput);
+		else
+		{
+			var scroll = signNameText.GetComponent<PassiveDescriptionMarquee>();
+			if (scroll != null) { scroll.enabled = false; Destroy(scroll); signNameText.text = "No Sign"; }
+		}
+		if (wsDesc != null) PassiveDescriptionMarquee.Attach(wsDesc.textComponent, wsDesc);
 		playtimeText.text = Localization.GetText("Playing Time") + ":\n" + (load.loader.GameData.playtime / 60f).ToString("0.00") + " min";
 		fileLocationText.text = Path.GetFileName(load.loader.Path);
 		if (load.loader.GameData.workshopId > 0 && !string.IsNullOrEmpty(load.loader.GameData.workshopKey))
@@ -403,7 +419,10 @@ public class FileInformation : MonoBehaviour
 		}
 		else
 		{
-			WorkshopClient.Instance.Upload(load.loader.Path, title, author, desc, coverJpg, (id, key, err) =>
+			// Keep an existing published cover on updates; for a new listing,
+			// fall back to the last screenshot stored inside this save.
+			var uploadCover = coverJpg ?? WorkshopMenu.ScreenshotCover(load.loader.GameData);
+			WorkshopClient.Instance.Upload(load.loader.Path, title, author, desc, uploadCover, (id, key, err) =>
 			{
 				if (err != null) { SetWsStatus(err); return; }
 				WorkshopLocal.Put(load.loader.Path, id, key);
@@ -645,8 +664,16 @@ public class FileInformation : MonoBehaviour
 	private void ResetCover()
 	{
 		coverJpg = null;
+		if (screenshotPreview != null) Destroy(screenshotPreview);
+		screenshotPreview = null;
 		if (wsCover == null) return;
-		wsCover.texture = CoverPlaceholder();
+		var data = load != null && load.loader != null ? load.loader.GameData : null;
+		if (data != null && !string.IsNullOrEmpty(data.icon))
+		{
+			try { screenshotPreview = FormatConverter.StringToTexture(data.icon); }
+			catch { screenshotPreview = null; }
+		}
+		wsCover.texture = screenshotPreview != null ? screenshotPreview : CoverPlaceholder();
 		wsCover.color = Color.white;
 		wsCover.uvRect = new Rect(0f, 0f, 1f, 1f);
 		wsCover.gameObject.SetActive(true);

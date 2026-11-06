@@ -82,6 +82,16 @@ public class Functions : MonoBehaviour
 
     private void Start()
     {
+        // Some room HUD canvases display their mobile Grid button but have no
+        // GraphicRaycaster, so the Button receives no touch events there.
+#if UNITY_ANDROID || UNITY_IOS
+        if (gridImage != null)
+        {
+            var canvas = gridImage.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
+                canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+#endif
         // Синхронизируем иконку сетки с сохранённым состоянием
         RefreshGridIcon();
 
@@ -430,7 +440,7 @@ public class Functions : MonoBehaviour
         if (spr == null) spr = on ? gridOffSprite : gridOnSprite;
         if (spr != null) gridImage.sprite = spr;
 
-        // Neutral active state; the icon sprite already communicates the mode.
-        gridImage.color = on ? new Color(.75f, .81f, .86f, 1f) : gridOffColor;
+        // Match the other active controls; leave each scene's authored off tint.
+        gridImage.color = on ? Color.red : gridOffColor;
     }
 }

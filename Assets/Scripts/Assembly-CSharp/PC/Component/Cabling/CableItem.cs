@@ -455,6 +455,14 @@ namespace PC.Component.Cabling
             // covers the chord error of the initial coil and solver tolerance.
             bool tooLong = path > length + Mathf.Max(.06f, length * .02f) ||
                            span > length + .02f;
+            // Short LAN coils can exceed the centre-to-centre path allowance
+            // while their fixed endpoints still have plenty of slack. That
+            // is not a reason to release the router pin every fixed step.
+            // Preserve the hard stop for an actually taut or grossly stretched
+            // rope; never weaken the pin's ordinary physical break force.
+            if (kind == CableKind.LAN && span < length * .95f &&
+                path < length + Mathf.Max(.5f, length * .1f))
+                tooLong = false;
             overstretchSteps = tooLong ? overstretchSteps + 1 : 0;
             bool hardLimit = overstretchSteps >= 2;
             Vector3 relativeVelocity = plugs[1].GetComponent<Rigidbody>().velocity -
@@ -480,7 +488,7 @@ namespace PC.Component.Cabling
                     $"span={span:0.000} path={path:0.000} length={length:0.000} " +
                     $"hardLimit={hardLimit} movingApart={movingApart}");
 #endif
-            release.Unplug(); // break the device connection before the chain can stretch
+            release.Unplug(true); // prevent an unattended LAN plug/socket bounce loop
             overstretchSteps = 0;
             strainCooldownUntil = Time.time + .35f; // let the loose cable settle
             return true;
@@ -534,7 +542,7 @@ namespace PC.Component.Cabling
                 length.ToString("0.00") + "m pinLoad=" +
                 candidate.PinLoad.ToString("0.0") + "N");
 #endif
-            candidate.Unplug();
+            candidate.Unplug(true);
             loadedEnd = null;
             strainCooldownUntil = Time.time + .35f;
             return true;

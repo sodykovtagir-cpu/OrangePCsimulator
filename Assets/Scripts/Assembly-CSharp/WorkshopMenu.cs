@@ -212,12 +212,46 @@ public class WorkshopMenu : MonoBehaviour
 		localSavesDropdown.AddOptions(opts);
 	}
 
+	// SaveManager already records the last in-game screenshot in GameData.icon.
+	// Use it when publishing a save without an explicitly selected cover.
+	public static byte[] ScreenshotCover(GameData data)
+	{
+		if (data == null || string.IsNullOrEmpty(data.icon)) return null;
+		Texture2D texture = null;
+		try
+		{
+			texture = FormatConverter.StringToTexture(data.icon);
+			return texture.EncodeToJPG(75);
+		}
+		catch (System.Exception e)
+		{
+			Debug.LogWarning("Cannot use save screenshot as cover: " + e.Message);
+			return null;
+		}
+		finally { if (texture != null) Object.Destroy(texture); }
+	}
+
 	private string SelectedPath()
 	{
 		if (localPaths.Count == 0) return null;
 		int i = localSavesDropdown != null ? localSavesDropdown.value : 0;
 		if (i < 0 || i >= localPaths.Count) i = 0;
 		return localPaths[i];
+	}
+
+	private static byte[] CoverForSave(string path)
+	{
+		try
+		{
+			var loader = new DataLoader(path);
+			loader.LoadHeaderFromPath();
+			return ScreenshotCover(loader.GameData);
+		}
+		catch (System.Exception e)
+		{
+			Debug.LogWarning("Cannot read save cover: " + e.Message);
+			return null;
+		}
 	}
 
 	private bool SelectedIsOwner(out int wid, out string wkey, out int sourceId)
@@ -300,7 +334,7 @@ public class WorkshopMenu : MonoBehaviour
 		}
 
 		SetStatus(Tr("Uploading..."));
-		WorkshopClient.Instance.Upload(path, title, author, desc, null, (id, key, err) =>
+		WorkshopClient.Instance.Upload(path, title, author, desc, CoverForSave(path), (id, key, err) =>
 		{
 			if (err != null) { SetStatus(Tr("Upload: {0}", err)); return; }
 			WorkshopLocal.Put(path, id, key);
@@ -412,6 +446,10 @@ public class WorkshopMenu : MonoBehaviour
 		SetChildText(t, "Downloads", it.downloads.ToString());
 		SetChildText(t, "Likes", it.likes.ToString());
 		SetChildText(t, "Description", it.description ?? "");
+		var description = t.Find("Description");
+		if (description != null)
+			PassiveDescriptionMarquee.Attach(description.GetComponent<Text>(),
+				description.GetComponent<InputField>());
 
 		var play = t.Find("Play");
 		if (play != null)

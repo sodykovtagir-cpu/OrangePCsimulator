@@ -67,7 +67,8 @@ assert 'currentFolder = startFolderPath;' in open_path
 # Showing a folder is not a permission grant: contents and mutation are still
 # blocked from normal Explorer, Save As and Lua/OS file operations.
 assert 'bool protect = IsProtectedFile(file) && !IsAdministrator;' in explorer
-assert 'if (!IsAdministrator && IsProtectedFile(file)) return;' in explorer
+assert 'if (!IsAdministrator && IsProtectedFile(file, false)) return;' in explorer
+assert 'hiddenToggle.SetIsOnWithoutNotify(file.hidden);' in explorer
 assert 'if (IsSystemPath(file.path)) return true;' in os
 assert 'if (IsSystemPath(file.path)) return false;' in os
 assert '(!administrator && OperatingSystem.IsSystemPath(currentFolder))' in (SRC / 'OS/SaveDialog.cs').read_text()

@@ -397,7 +397,7 @@ namespace PC.Component.Software
             return path.Substring(lastSlash + 1);
         }
 
-        private bool IsProtectedFile(File file)
+        private bool IsProtectedFile(File file, bool includeHidden = true)
         {
             if (file == null) return false;
             if (OS.OperatingSystem.IsSystemPath(file.path)) return true;
@@ -409,7 +409,7 @@ namespace PC.Component.Software
                 if (LuaAppPackage.IsPackage(file.content)) return false;
                 return true;
             }
-            return file.path == "System/boot.bin" || file.hidden;
+            return file.path == "System/boot.bin" || (includeHidden && file.hidden);
         }
 
         private void OpenFolder(int index)
@@ -509,8 +509,9 @@ namespace PC.Component.Software
 
             if (hiddenToggle != null)
             {
-                hiddenToggle.interactable = !file.isFolder;
-                hiddenToggle.isOn = file.hidden;
+                hiddenToggle.interactable = !file.isFolder &&
+                    (IsAdministrator || !IsProtectedFile(file, false));
+                hiddenToggle.SetIsOnWithoutNotify(file.hidden);
             }
         }
 
@@ -519,7 +520,9 @@ namespace PC.Component.Software
             var file = GetSelectedFile();
             if (file == null || file.isFolder) return;
 
-            if (!IsAdministrator && IsProtectedFile(file)) return;
+            // A user-hidden file is not a protected system file. Check its
+            // intrinsic permissions only, so the same toggle can unhide it.
+            if (!IsAdministrator && IsProtectedFile(file, false)) return;
             file.hidden = hidden;
             if (system != null) system.RefreshDesktopIcon();
 

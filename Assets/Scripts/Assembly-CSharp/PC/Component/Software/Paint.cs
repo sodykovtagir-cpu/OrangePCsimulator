@@ -316,15 +316,17 @@ namespace PC.Component.Software
 
         public void Save()
         {
-            byte[] bytes;
-            if (texture != null && (texture.width > 128 || texture.height > 128))
-            {
-                bytes = ImageConversion.EncodeToJPG(texture, 85);
-            }
-            else
-            {
-                bytes = ImageConversion.EncodeToPNG(texture);
-            }
+            if (texture == null) return;
+            // JPEG has no alpha. The old size-based rule silently flattened
+            // transparent HD canvases while 32x32 PNGs kept transparency.
+            // Keep JPEG for opaque HD art to avoid bloating disk saves.
+            bool translucent = false;
+            var pixels = texture.GetPixels32();
+            for (int i = 0; i < pixels.Length; i++)
+                if (pixels[i].a != 255) { translucent = true; break; }
+            byte[] bytes = !translucent && (texture.width > 128 || texture.height > 128)
+                ? ImageConversion.EncodeToJPG(texture, 85)
+                : ImageConversion.EncodeToPNG(texture);
             var content = System.Convert.ToBase64String(bytes);
             var os = system;
             if (os == null) return;

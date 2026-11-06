@@ -35,6 +35,44 @@ public class FileMenu : MonoBehaviour
 
 	private List<Load> loads;
 
+	private sealed class CachedHeader
+	{
+		public long size;
+		public DateTime modifiedUtc;
+		public DataLoader loader;
+	}
+	private static readonly Dictionary<string, CachedHeader> headerCache =
+		new Dictionary<string, CachedHeader>(StringComparer.Ordinal);
+
+	private static DataLoader HeaderFor(string path)
+	{
+		var info = new FileInfo(path);
+		if (!info.Exists) throw new FileNotFoundException("Save file is missing.", path);
+		CachedHeader cached;
+		if (headerCache.TryGetValue(path, out cached) &&
+			cached.size == info.Length && cached.modifiedUtc == info.LastWriteTimeUtc)
+			return cached.loader;
+		var loader = new DataLoader(path);
+		loader.LoadHeaderFromPath();
+		headerCache[path] = new CachedHeader {
+			size = info.Length, modifiedUtc = info.LastWriteTimeUtc, loader = loader
+		};
+		return loader;
+	}
+
+	// Called at boot, one header per frame. The list is ready before the player
+	// opens Saves, and returning to the menu reuses unchanged validated headers.
+	public static System.Collections.IEnumerator PreloadHeaders()
+	{
+		var folder = SaveUtility.GetFolderPath();
+		foreach (var path in Directory.GetFiles(folder, "*" + SaveUtility.extension))
+		{
+			try { HeaderFor(path); }
+			catch (Exception e) { Debug.LogWarning("Cannot index save " + Path.GetFileName(path) + ": " + e.Message); }
+			yield return null;
+		}
+	}
+
 	[SerializeField]
 	private FileInformation fileInformation;
 
@@ -48,43 +86,22 @@ public class FileMenu : MonoBehaviour
 		if (Instance == this) Instance = null;
 	}
 
-	private void Start()
+	private void OnEnable()
 	{
-		RefreshFromDisk();
+		// Returning from a save creates a new scene; entering this menu again
+		// must show new/renamed/deleted saves without an explicit Refresh click.
+		RebuildList();
 	}
 
 	/// <summary>Refresh the list after picker / Android Files import.</summary>
-	public void RefreshFromDisk()
-	{
-		loads = new List<Load>();
-		for (int i = slotParent.childCount - 1; i >= 0; i--)
-			Destroy(slotParent.GetChild(i).gameObject);
-		string fpath = SaveUtility.GetFolderPath();
-		string pattern = "*" + SaveUtility.extension;
-		// get date list
-		Dictionary<string, DateTime> nList = new Dictionary<string, DateTime>();
-		foreach (var b in Directory.GetFiles(fpath, pattern))
-		{
-			DateTime f = File.GetLastWriteTime(b);
-			nList.Add(b, f);
-		}
-		// sort
-		var sort = nList.OrderByDescending(kvp => kvp.Value);
-		// append
-		foreach (var x in sort)
-		{
-			AddSlot(x.Key);
-		}
-		empty.SetActive(loads.Count == 0);
-	}
+	public void RefreshFromDisk() { RebuildList(); }
 
 	private bool AddSlot(string path)
 	{
 		try
 		{
 			// read
-			DataLoader l = new DataLoader(path);
-            l.LoadHeaderFromPath(); // authenticate, but inflate only GameData for the list
+			DataLoader l = HeaderFor(path); // validated metadata, cached until file changes
 			// load
 			var parent = slotParent;
 			var pref = slotPrefab;
@@ -104,6 +121,7 @@ public class FileMenu : MonoBehaviour
             {
                 try
                 {
+                    headerCache.Remove(path); // don't retain the full world in the menu cache
                     var world = l.Content; // full verification/decompression only on open
                     MainMenu.Instance.LoadFile(l);
                 }
@@ -130,8 +148,12 @@ public class FileMenu : MonoBehaviour
 		loads.Clear();
 		if (slotParent != null)
 		{
-			for (int i = slotParent.childCount - 1; i >= 0; i--)
-				Destroy(slotParent.GetChild(i).gameObject);
+		for (int i = slotParent.childCount - 1; i >= 0; i--)
+		{
+			var old = slotParent.GetChild(i).gameObject;
+			old.SetActive(false); // Destroy is deferred until end of frame.
+			Destroy(old);
+		}
 		}
 		string fpath = SaveUtility.GetFolderPath();
 		string pattern = "*" + SaveUtility.extension;

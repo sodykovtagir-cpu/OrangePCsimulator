@@ -21,7 +21,7 @@ assert 'CanPull(rb, 0)' in suspension
 assert 'plug.PinLoad < Mathf.Max(2.5f, weight * .4f)' in suspension
 assert 'HasSolidSupport(rb)' in suspension
 assert 'Time.time - loadedSince < .5f' in suspension
-assert 'candidate.Unplug();' in suspension
+assert 'candidate.Unplug(true);' in suspension  # no unattended LAN reinsert loop
 assert 'private bool HasSolidSupport(Rigidbody rb)' in suspension
 assert 'Physics.OverlapBoxNonAlloc' in suspension
 assert 'other.GetComponentInParent<CableItem>() != null' in suspension
@@ -30,6 +30,7 @@ assert 'internal float PinLoad => pin != null ? pin.currentForce.magnitude : 0f;
 # Leaving the tiny inner core is insufficient: while still in the trigger the
 # same plug would immediately be inserted again on OnTriggerStay.
 assert 'candidate.TryInsert(this);' in ports
-assert 'if (!restoring && port == yankedPort) return false;' in plug
+assert 'port == manualReinsertPort && !IsHeld' in plug
+assert 'if (held) manualReinsertPort = null;' in plug
 assert 'if (yankedPort != null && !NearPort(yankedPort, .10f)) yankedPort = null;' in plug
 print('PASS: sustained loaded, unsupported taut cable releases; no premature reinsert (Unity run still required)')

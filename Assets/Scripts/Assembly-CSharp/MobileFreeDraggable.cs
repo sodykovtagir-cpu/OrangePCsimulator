@@ -14,6 +14,31 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         get { return controlId; }
     }
 
+    // Main (Medium) has these components authored in the scene. Other room
+    // scenes share the same HUD names but lack the draggable scripts entirely.
+    // Install only the missing ones; never replace an authored placement.
+    public static void EnsureRoomHudLayout()
+    {
+        foreach (var root in FindObjectsOfType<Transform>())
+        {
+            if (root == null || root.name != "Mobile" || !root.gameObject.activeInHierarchy)
+                continue;
+            var bounds = root as RectTransform;
+            if (bounds == null) continue;
+            EnsureControl(root.Find("Functions/Icon"), "PanelOpen", bounds);
+            EnsureControl(root.Find("Pause"), "MenuButton", bounds);
+            EnsureControl(root.Find("Fixed Joystick"), "Joystick", bounds);
+            EnsureControl(root.Find("Run"), "Run", bounds);
+        }
+    }
+
+    private static void EnsureControl(Transform target, string id, RectTransform bounds)
+    {
+        if (target == null || target.GetComponent<MobileFreeDraggable>() != null) return;
+        var control = target.gameObject.AddComponent<MobileFreeDraggable>();
+        control.Init(id, bounds);
+    }
+
     /// <summary>
     /// Инициализация для панелей, которые создаются кодом (стрелки сетки):
     /// controlId и область, внутри которой элемент двигается. После Init

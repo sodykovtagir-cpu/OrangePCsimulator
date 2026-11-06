@@ -45,6 +45,7 @@ public class MainMenu : MonoBehaviour
     private void Start()
     {
         FpsSetting.RestoreSetting();
+        StartCoroutine(FileMenu.PreloadHeaders());
 
         // Настройки разрешения/RTX/отражений применяются автоматически
         // через GraphicsBootstrap при старте игры и при загрузке сцен.

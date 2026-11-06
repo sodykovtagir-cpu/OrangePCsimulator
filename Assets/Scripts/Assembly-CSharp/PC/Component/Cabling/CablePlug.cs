@@ -15,6 +15,9 @@ namespace PC.Component.Cabling
         private FixedJoint pin;
         private float cooldown;
         private CablePort yankedPort;
+        // A passively broken LAN pin must not reconnect every time its loose
+        // plug bounces back into the same socket. A deliberate hand grab rearms it.
+        private CablePort manualReinsertPort;
         private Action<CablePlug> releaseDrag;
         [SerializeField, Min(10f)] private float pullOutForce = 200f;
         // Authored marker on the connector model where the jacket and first
@@ -109,6 +112,7 @@ namespace PC.Component.Cabling
         public void SetHeld(bool held, Action<CablePlug> onAutoSnap = null)
         {
             IsHeld = held;
+            if (held) manualReinsertPort = null;
             releaseDrag = held ? onAutoSnap : null;
         }
         public bool TryInsert(CablePort port, bool restoring = false)
@@ -121,7 +125,8 @@ namespace PC.Component.Cabling
             // Prevent immediate reinsertion inside the same trigger, but allow
             // insertion again once FixedUpdate observed the plug leaving it.
             RefreshYankedPort();
-            if (!restoring && port == yankedPort) return false;
+            if (!restoring && (port == yankedPort ||
+                (port == manualReinsertPort && !IsHeld))) return false;
             var other = Cable.End(1 - End);
             if (other != null && other.Connected != null)
             {
@@ -453,11 +458,15 @@ namespace PC.Component.Cabling
             restoreRoutine = null;
         }
 
-        public void Unplug()
+        public void Unplug() { Unplug(false); }
+
+        public void Unplug(bool blockAutomaticReinsert)
         {
             if (Connected == null) return;
             var old = Connected;
             yankedPort = old;
+            if (blockAutomaticReinsert && Cable != null && Cable.Kind == CableKind.LAN)
+                manualReinsertPort = old;
             Connected = null;
             if (old != null && old.plug == this) old.plug = null;
             if (pin != null) Destroy(pin);
@@ -479,13 +488,14 @@ namespace PC.Component.Cabling
                 Debug.LogWarning($"Cable stress: PIN BREAK cable={Cable?.spawnId} id={Cable?.Id} " +
                     $"end={End} owner={Connected.owner?.name} id={Connected.owner?.Id} " +
                     $"port={Connected.name} force={force:0.00}");
-            else if (Connected != null && Cable != null && Cable.Kind == CableKind.HDMI)
-                Debug.LogWarning($"Cable HDMI: PIN BREAK end={End} " +
+            else if (Connected != null && Cable != null &&
+                (Cable.Kind == CableKind.HDMI || Cable.Kind == CableKind.LAN))
+                Debug.LogWarning($"Cable {Cable.Kind}: PIN BREAK end={End} " +
                     $"owner={Connected.owner?.name} port={Connected.name} " +
                     $"force={force:0.00} held={IsHeld} " +
                     $"sincePlugged={Time.time - ConnectedAt:0.00}s");
 #endif
-            if (Connected != null) Unplug();
+            if (Connected != null) Unplug(!IsHeld);
         }
 
         private void OnEnable()
