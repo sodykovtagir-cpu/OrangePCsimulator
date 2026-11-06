@@ -1364,6 +1364,13 @@ MonoBehaviour:
   homeSearchInput: {fileID: 8663870132557709944}
   resultsPage: {fileID: 203889556625728503}
   resultsSearchInput: {fileID: 7700160164830511986}
+  historyContent: {fileID: 4329434395847748119}
+  favoritesPanel: {fileID: 6510275321744835450}
+  addFavoritesPanel: {fileID: 4975728224049382311}
+  favoriteAddressInput: {fileID: 5843212555252329505}
+  addFavoritesTitle: {fileID: 1413617616655323745}
+  historyItemPrefab: {fileID: 1291933620389674571, guid: df583bcea98a2c14f9236f41c733d80c, type: 3}
+  favoritesItemPrefab: {fileID: 7439697941606578863, guid: 6288bce4648b83d4792c37f92991c766, type: 3}
 --- !u!1 &150600107712996687
 GameObject:
   m_ObjectHideFlags: 0
@@ -2534,7 +2541,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3865968315747985363}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114482999165124040}
+        m_TargetAssemblyTypeName: PC.Component.Software.Browser, Assembly-CSharp
+        m_MethodName: CloseAddSiteDialog
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument:
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &2158468276555099989
 GameObject:
   m_ObjectHideFlags: 0
@@ -3055,7 +3074,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2788287834312305206}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114482999165124040}
+        m_TargetAssemblyTypeName: PC.Component.Software.Browser, Assembly-CSharp
+        m_MethodName: OpenAddSiteDialog
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument:
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &3276365431877196098
 GameObject:
   m_ObjectHideFlags: 0
@@ -3673,7 +3704,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 5545646856701706455}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114482999165124040}
+        m_TargetAssemblyTypeName: PC.Component.Software.Browser, Assembly-CSharp
+        m_MethodName: AddFavorite
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument:
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &5343446352658590486
 GameObject:
   m_ObjectHideFlags: 0

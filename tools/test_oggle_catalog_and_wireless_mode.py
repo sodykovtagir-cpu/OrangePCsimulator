@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Static contracts for the authored Oggle catalog and cable-free networking."""
-import json
+import yaml
 import re
 from pathlib import Path
 
@@ -24,8 +24,8 @@ assert len(urls) == len(entries)
 assert {"www.typolink.com/tariffs", "192.168.1.1"} <= urls
 for url, body in entries:
     assert "    visible: 1\n" in body, url
-    keyword_lines = re.findall(r'^    - (.+)$', body.split('    keywords:\n', 1)[1], re.M)
-    keywords = [json.loads(line) for line in keyword_lines]
+    # Unity YAML can wrap quoted keyword strings across lines.
+    keywords = yaml.safe_load(body)['keywords']
     assert len(keywords) >= 20 and len(keywords) == len(set(keywords)), url
     assert all(word and word.strip() == word for word in keywords), url
 assert "description: Welcome to TypoLink router panel.\n" in dict(entries)["192.168.1.1"]

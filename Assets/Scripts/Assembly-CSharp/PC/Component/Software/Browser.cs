@@ -42,6 +42,15 @@ namespace PC.Component.Software
         [SerializeField] private GameObject resultsPage;
         [SerializeField] private InputField resultsSearchInput;
 
+        [Header("Oggle home (authored prefab)")]
+        [SerializeField] private RectTransform historyContent;
+        [SerializeField] private RectTransform favoritesPanel;
+        [SerializeField] private GameObject addFavoritesPanel;
+        [SerializeField] private InputField favoriteAddressInput;
+        [SerializeField] private Text addFavoritesTitle;
+        [SerializeField] private GameObject historyItemPrefab;
+        [SerializeField] private GameObject favoritesItemPrefab;
+
         public void SearchFromResults()
         {
             if (resultsSearchInput == null) return;
@@ -54,6 +63,7 @@ namespace PC.Component.Software
         private GameObject networkPage;
         private Coroutine pendingLoad;
         private const string RecentSitesPath = "System/oggle_recent.json";
+        private const string FavoritesPath = "System/oggle_favorites.json";
         private const int MaxRecentSites = 5;
         [Serializable]
         private sealed class RecentSites
@@ -61,10 +71,11 @@ namespace PC.Component.Software
             public List<string> urls = new List<string>();
         }
         private readonly List<string> recentUrls = new List<string>();
-        private RectTransform recentPanel;
-        private RectTransform recentRows;
-        private GameObject addSiteDialog;
+        private readonly List<string> favoriteUrls = new List<string>();
+        private readonly List<GameObject> historyItems = new List<GameObject>();
+        private readonly List<GameObject> favoriteItems = new List<GameObject>();
         private bool recentLoaded;
+        private bool favoritesLoaded;
 
         protected override void Start()
         {
@@ -80,7 +91,9 @@ namespace PC.Component.Software
             if (oggleHome == null) return;
             oggleHome.SetActive(true);
             LoadRecentSites();
+            LoadFavorites();
             RenderRecentSites();
+            RenderFavorites();
         }
 
         private void LoadRecentSites()
@@ -104,15 +117,38 @@ namespace PC.Component.Software
             catch (ArgumentException) { /* Keep the PC's unrelated files intact. */ }
         }
 
-        private bool SaveRecentSites()
+        private void LoadFavorites()
+        {
+            if (favoritesLoaded || system == null || system.FileManager == null) return;
+            favoritesLoaded = true;
+            if (!system.FileManager.TryGetFile(0, FavoritesPath, out var saved) ||
+                saved == null || string.IsNullOrEmpty(saved.content) || saved.content.Length > 8192) return;
+            try
+            {
+                var data = JsonUtility.FromJson<RecentSites>(saved.content);
+                if (data == null || data.urls == null) return;
+                foreach (var url in data.urls)
+                {
+                    var normalized = NormalizeUrl(url);
+                    if (ValidSiteAddress(normalized) && !favoriteUrls.Contains(normalized))
+                        favoriteUrls.Add(normalized);
+                    if (favoriteUrls.Count == MaxRecentSites) break;
+                }
+            }
+            catch (ArgumentException) { /* Corrupt favorites must not damage other PC files. */ }
+        }
+
+        private bool SaveUrls(string path, List<string> urls)
         {
             if (system == null || system.FileManager == null) return false;
-            var payload = JsonUtility.ToJson(new RecentSites { urls = new List<string>(recentUrls) });
-            var saved = system.FileManager.Write(0, RecentSitesPath, payload);
+            var payload = JsonUtility.ToJson(new RecentSites { urls = new List<string>(urls) });
+            var saved = system.FileManager.Write(0, path, payload);
             if (saved == null || saved.content != payload) return false;
             saved.hidden = true;
             return true;
         }
+
+        private bool SaveRecentSites() { return SaveUrls(RecentSitesPath, recentUrls); }
 
         private static bool ValidSiteAddress(string address)
         {
@@ -135,70 +171,52 @@ namespace PC.Component.Software
             SaveRecentSites();
         }
 
-        private static RectTransform Box(Transform parent, string name, Vector2 size, Vector2 position,
-            Color? background = null)
+        private static void ClearItems(List<GameObject> items)
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
-            rect.sizeDelta = size;
-            rect.anchoredPosition = position;
-            if (background.HasValue) go.AddComponent<Image>().color = background.Value;
-            return rect;
-        }
-
-        private static Text Caption(Transform parent, string value, Vector2 size, Vector2 position,
-            int fontSize = 14, TextAnchor alignment = TextAnchor.MiddleLeft)
-        {
-            var rect = Box(parent, "Text", size, position);
-            var label = rect.gameObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.fontSize = fontSize;
-            label.color = Color.black;
-            label.alignment = alignment;
-            label.text = value;
-            label.raycastTarget = false;
-            return label;
-        }
-
-        private static Button ActionButton(Transform parent, string name, Vector2 size,
-            Vector2 position, Action click)
-        {
-            var rect = Box(parent, name, size, position,
-                new Color(.88f, .93f, .97f, 1f));
-            var button = rect.gameObject.AddComponent<Button>();
-            button.onClick.AddListener(() => click());
-            Caption(rect, name, size, Vector2.zero, 13, TextAnchor.MiddleCenter);
-            return button;
+            foreach (var item in items)
+                if (item != null) { item.SetActive(false); Destroy(item); }
+            items.Clear();
         }
 
         private void RenderRecentSites()
         {
-            if (oggleHome == null) return;
-            if (recentPanel == null)
+            ClearItems(historyItems);
+            if (historyContent == null || historyItemPrefab == null) return;
+            foreach (var url in recentUrls)
             {
-                recentPanel = Box(oggleHome.transform, "Recent sites", new Vector2(450, 124),
-                    new Vector2(0, -98), new Color(1f, 1f, 1f, .96f));
-                Caption(recentPanel, "Недавние сайты", new Vector2(260, 25),
-                    new Vector2(-85, 44), 15);
-                ActionButton(recentPanel, "+ Добавить", new Vector2(96, 26),
-                    new Vector2(167, 44), OpenAddSiteDialog);
-                recentRows = Box(recentPanel, "Recent links", new Vector2(430, 95),
-                    new Vector2(0, -14));
+                var row = Instantiate(historyItemPrefab, historyContent);
+                row.name = "History: " + url;
+                var label = row.GetComponentInChildren<Text>();
+                if (label != null) label.text = url;
+                // The author's history row has an Image but no Button.
+                var button = row.GetComponent<Button>() ?? row.AddComponent<Button>();
+                button.targetGraphic = row.GetComponent<Image>();
+                var capturedUrl = url;
+                button.onClick.AddListener(() => OpenRecentSite(capturedUrl));
+                historyItems.Add(row);
             }
-            for (int i = recentRows.childCount - 1; i >= 0; i--)
+        }
+
+        private void RenderFavorites()
+        {
+            ClearItems(favoriteItems);
+            if (favoritesPanel == null || favoritesItemPrefab == null) return;
+            foreach (var url in favoriteUrls)
             {
-                var oldRow = recentRows.GetChild(i).gameObject;
-                oldRow.SetActive(false);
-                Destroy(oldRow);
-            }
-            for (int i = 0; i < recentUrls.Count; i++)
-            {
-                string url = recentUrls[i];
-                var title = url.Length > 52 ? url.Substring(0, 49) + "..." : url;
-                ActionButton(recentRows, title, new Vector2(425, 18),
-                    new Vector2(0, 33 - i * 18), () => OpenRecentSite(url));
+                var tile = Instantiate(favoritesItemPrefab, favoritesPanel);
+                tile.name = "Favorite: " + url;
+                var label = tile.GetComponentInChildren<Text>();
+                // The author's compact tile is 67px wide: show the hostname,
+                // but keep the full URL in the click handler and save file.
+                if (label != null)
+                {
+                    var host = url.Split('/')[0];
+                    label.text = host.Length > 12 ? host.Substring(0, 11) + "…" : host;
+                }
+                var button = tile.GetComponent<Button>();
+                var capturedUrl = url;
+                if (button != null) button.onClick.AddListener(() => OpenRecentSite(capturedUrl));
+                favoriteItems.Add(tile);
             }
         }
 
@@ -215,60 +233,45 @@ namespace PC.Component.Software
             ShowError("Сайт " + normalized + " пока недоступен в Oggle");
         }
 
-        private void CloseAddSiteDialog()
+        public void CloseAddSiteDialog()
         {
-            if (addSiteDialog == null) return;
-            Destroy(addSiteDialog);
-            addSiteDialog = null;
+            if (addFavoritesPanel != null) addFavoritesPanel.SetActive(false);
         }
 
-        private void OpenAddSiteDialog()
+        public void OpenAddSiteDialog()
         {
-            if (addSiteDialog != null) return;
-            var overlay = Box(transform, "Add site overlay", Vector2.zero, Vector2.zero,
-                new Color(0f, 0f, 0f, .30f));
-            overlay.anchorMin = Vector2.zero;
-            overlay.anchorMax = Vector2.one;
-            overlay.offsetMin = overlay.offsetMax = Vector2.zero;
-            addSiteDialog = overlay.gameObject;
-            overlay.gameObject.AddComponent<Button>().onClick.AddListener(CloseAddSiteDialog);
-            var modal = Box(overlay, "Add site dialog", new Vector2(390, 184), Vector2.zero,
-                new Color(.94f, .96f, .98f, 1f));
-            WindowChrome.Apply(modal);
-            Caption(modal, "Добавить сайт", new Vector2(345, 30), new Vector2(0, 65), 18);
-            Caption(modal, "Адрес сайта", new Vector2(345, 24), new Vector2(0, 26));
-            var field = Box(modal, "Website address", new Vector2(345, 32),
-                new Vector2(0, -5), Color.white);
-            var input = field.gameObject.AddComponent<InputField>();
-            var text = Caption(field, "", new Vector2(325, 28), Vector2.zero);
-            input.textComponent = text;
-            input.characterLimit = 255;
-            input.text = "";
-            var warning = Caption(modal, "", new Vector2(345, 22), new Vector2(0, -37), 12);
-            ActionButton(modal, "Добавить", new Vector2(108, 30), new Vector2(56, -68), () =>
+            if (addFavoritesPanel == null || favoriteAddressInput == null) return;
+            LoadFavorites();
+            favoriteAddressInput.text = "";
+            if (addFavoritesTitle != null) addFavoritesTitle.text = "Add Favorites";
+            addFavoritesPanel.SetActive(true);
+            favoriteAddressInput.ActivateInputField();
+        }
+
+        public void AddFavorite()
+        {
+            if (favoriteAddressInput == null) return;
+            var url = NormalizeUrl(favoriteAddressInput.text);
+            if (!ValidSiteAddress(url))
             {
-                var url = NormalizeUrl(input.text);
-                if (!ValidSiteAddress(url))
-                { warning.text = "Укажи адрес сайта с точкой"; return; }
-                LoadRecentSites();
-                var previous = new List<string>(recentUrls);
-                recentUrls.Remove(url);
-                recentUrls.Insert(0, url);
-                if (recentUrls.Count > MaxRecentSites)
-                    recentUrls.RemoveRange(MaxRecentSites, recentUrls.Count - MaxRecentSites);
-                if (!SaveRecentSites())
-                {
-                    recentUrls.Clear();
-                    recentUrls.AddRange(previous);
-                    warning.text = "Не удалось сохранить на диск ПК";
-                    return;
-                }
-                CloseAddSiteDialog();
-                RenderRecentSites();
-            });
-            ActionButton(modal, "Отмена", new Vector2(105, 30), new Vector2(-67, -68),
-                CloseAddSiteDialog);
-            input.ActivateInputField();
+                if (addFavoritesTitle != null) addFavoritesTitle.text = "Укажи адрес сайта с точкой";
+                return;
+            }
+            LoadFavorites();
+            var previous = new List<string>(favoriteUrls);
+            favoriteUrls.Remove(url);
+            favoriteUrls.Insert(0, url);
+            if (favoriteUrls.Count > MaxRecentSites)
+                favoriteUrls.RemoveRange(MaxRecentSites, favoriteUrls.Count - MaxRecentSites);
+            if (!SaveUrls(FavoritesPath, favoriteUrls))
+            {
+                favoriteUrls.Clear();
+                favoriteUrls.AddRange(previous);
+                if (addFavoritesTitle != null) addFavoritesTitle.text = "Не удалось сохранить на диск ПК";
+                return;
+            }
+            CloseAddSiteDialog();
+            RenderFavorites();
         }
 
         // ================= SEARCH =================
