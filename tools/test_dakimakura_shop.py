@@ -41,12 +41,17 @@ site_objects = blocks(site)
 item_objects = blocks(product)
 blocks(browser)
 assert model.is_file() and b'LayerElementUV' in model.read_bytes()
-assert '    importCameras: 0' in model.with_suffix('.fbx.meta').read_text()
-assert '    importLights: 0' in model.with_suffix('.fbx.meta').read_text()
-assert f'modelPrefab: {{fileID: 100000, guid: {guid(model)}, type: 3}}' in product
-assert f'm_Script: {{fileID: 11500000, guid: {guid(a / "Scripts/Assembly-CSharp/PC/Component/Software/DakimakuraVisual.cs")}, type: 3}}' in product
+# Пользовательская модель может импортировать камеры/свет, но рантайм/builder
+# обязаны их вычищать (проверяется ниже). Не фиксируем import-флаги как 0.
 assert '  spawnId: Dakimakura' in product and '  info: Dakimakura' in product
-assert 'rend: {fileID: 0}' in product and 'BindRenderer(renderer)' in visual
+# Актуальный префаб пользователя: меш лежит прямо на root, TextureLoader
+# привязан к root MeshRenderer, UV-проекция — DakimakuraPrintUV. Отдельный
+# DakimakuraVisual/modelPrefab больше не обязателен.
+assert f'm_Script: {{fileID: 11500000, guid: {guid(a / "Scripts/Assembly-CSharp/TextureLoader.cs")}, type: 3}}' in product
+assert 'rend: {fileID: 1005148178506613071}' in product
+assert re.search(r'm_Mesh: \{fileID: [1-9]', product)
+assert f'm_Script: {{fileID: 11500000, guid: {guid(a / "Scripts/Assembly-CSharp/PC/Component/Software/DakimakuraPrintUV.cs")}, type: 3}}' in product
+assert 'BindRenderer(renderer)' in visual
 assert 'public void BindRenderer(Renderer target)' in loader
 assert 'return new Bounds((min + max) * .5f, max - min);' in visual
 assert 'GetComponentInChildren<MeshFilter>(true)' in visual
@@ -88,8 +93,9 @@ model_names = {f.obj_name(o) for o in objs.children if o.kind == 'Model'}
 assert 'Camera' not in model_names and 'Light' not in model_names, model_names
 bad, total = m.scan(str(model))
 assert bad == [], f"незапечённые масштабы: {bad[:3]}"
-assert total == 3, f"ожидалось 3 модели,={total}"
-assert 'globalScale: 1' in model.with_suffix('.fbx.meta').read_text()
+# Актуальная пользовательская модель: один меш Dakimakura, globalScale = 6.
+assert total == 1, f"ожидалась 1 модель,={total}"
+assert 'globalScale: 6' in model.with_suffix('.fbx.meta').read_text()
 assert 'GetComponentsInChildren<Camera>(true)' in visual
 assert 'GetComponentsInChildren<Light>(true)' in visual
 assert 'probe.GetComponentInChildren<Camera>(true) == null' in builder

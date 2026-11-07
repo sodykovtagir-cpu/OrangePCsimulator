@@ -17,9 +17,22 @@ public class Impact : MonoBehaviour
 	private AudioSource source;
     private float nextSoundTime;
 
-	private void Start()
+	private void Awake()
 	{
 		source = GetComponent<AudioSource>();
+
+		// Impact FX — только по столкновению. Если на префабе/инстансе случайно
+		// оставлен Play On Awake, перья/искры не должны сыпаться сразу при
+		// загрузке комнаты или спавне предмета.
+		if (particle != null)
+		{
+			var main = particle.main;
+			if (main.playOnAwake)
+			{
+				main.playOnAwake = false;
+				particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+			}
+		}
 	}
 
 	private void OnCollisionEnter(Collision collision)
