@@ -3,28 +3,23 @@ using UnityEngine;
 namespace PC.Component.Software
 {
     /// <summary>
-    /// Чинит рендер принта на дакимакуре.
+    /// Чинит ТОЛЬКО рендер принта на дакимакуре (UV). Размер, масштаб и коллайдер
+    /// не трогает — они берутся из префаба как есть.
     ///
     /// Модель со Sketchfab приезжает с запечённой atlas-развёрткой UV под свою
     /// родную текстуру: на большой грани UV повёрнуты на 90° и занимают лишь
     /// кусок атласа. Когда TextureLoader подменяет mainTexture на картинку
-    /// игрока, она ложится через эту кривую развёртку — боком и растянуто
-    /// (ровно то, что было на скрине).
+    /// игрока, она ложится через эту развёртку — боком и растянуто.
     ///
     /// Компонент заново проецирует UV0 плоскостью вдоль тонкой оси подушки:
     /// длинная сторона становится высотой картинки (v), короткая — шириной (u).
     /// Пропорции грани (~0.46) совпадают с пропорциями принта (32×70 / 1024×2240),
-    /// поэтому изображение встаёт ровно и без искажений. Заодно нормализует
-    /// размер до реальной дакимакуры и подгоняет BoxCollider, так что результат
-    /// не зависит от масштаба импорта FBX.
+    /// поэтому изображение встаёт ровно и без искажений.
     /// </summary>
     [RequireComponent(typeof(MeshFilter))]
     [DisallowMultipleComponent]
     public sealed class DakimakuraPrintUV : MonoBehaviour
     {
-        [Tooltip("Длина подушки в метрах (длинная сторона). 1.5 — стандартная дакимакура.")]
-        [SerializeField] private float lengthMetres = 1.5f;
-
         [Tooltip("Отразить принт по горизонтали, если он оказался зеркальным.")]
         [SerializeField] private bool flipU = false;
 
@@ -46,8 +41,6 @@ namespace PC.Component.Software
             // другие подушки и превью получают свои UV независимо.
             meshInstance = filter.mesh;
             ReprojectUV(meshInstance);
-            NormalizeSize(meshInstance);
-            FitCollider(meshInstance);
         }
 
         private void OnDestroy()
@@ -91,30 +84,6 @@ namespace PC.Component.Software
                 uv[i] = new Vector2(u, vv);
             }
             mesh.uv = uv;
-        }
-
-        private void NormalizeSize(Mesh mesh)
-        {
-            if (lengthMetres <= 0f)
-                return;
-            Vector3 size = mesh.bounds.size;
-            float longest = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
-            if (longest > 1e-4f)
-            {
-                float s = lengthMetres / longest;
-                transform.localScale = new Vector3(s, s, s);
-            }
-        }
-
-        private void FitCollider(Mesh mesh)
-        {
-            var box = GetComponent<BoxCollider>();
-            if (box == null)
-                return;
-            // Коллайдер в локальных координатах; transform.localScale масштабирует
-            // его вместе с мешем, поэтому берём именно локальные bounds меша.
-            box.center = mesh.bounds.center;
-            box.size = mesh.bounds.size;
         }
     }
 }
