@@ -1525,6 +1525,7 @@ GameObject:
   - component: {fileID: 748}
   - component: {fileID: 618289701}
   - component: {fileID: 767}
+  - component: {fileID: 220799478}
   m_Layer: 5
   m_Name: Fixed Joystick
   m_TagString: Untagged
@@ -2042,6 +2043,7 @@ GameObject:
   - component: {fileID: 577}
   - component: {fileID: 366}
   - component: {fileID: 625}
+  - component: {fileID: 166006407}
   m_Layer: 5
   m_Name: Pause
   m_TagString: Untagged
@@ -2250,6 +2252,7 @@ GameObject:
   - component: {fileID: 578}
   - component: {fileID: 455}
   - component: {fileID: 794}
+  - component: {fileID: 1132660532}
   m_Layer: 5
   m_Name: Icon
   m_TagString: Untagged
@@ -2634,6 +2637,7 @@ GameObject:
   - component: {fileID: 417}
   - component: {fileID: 746}
   - component: {fileID: 731}
+  - component: {fileID: 1484621200}
   m_Layer: 5
   m_Name: Run
   m_TagString: Untagged
@@ -23943,7 +23947,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 7
+  m_Text: G
 --- !u!1 &939000814
 GameObject:
   m_ObjectHideFlags: 0
@@ -25340,7 +25344,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 98843b49250d924469e8c9e2828a4bf1, type: 2}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -25389,7 +25393,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: a4b2aca6cd893d641bb63325042e08ca, type: 2}
+  m_Sprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -26139,3 +26143,67 @@ SceneRoots:
   - {fileID: 236}
   - {fileID: 180188429}
   - {fileID: 302568634}
+--- !u!114 &1132660532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 156}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: PanelOpen
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
+--- !u!114 &166006407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: MenuButton
+  parentRect: {fileID: 0}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
+--- !u!114 &220799478
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 113}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Joystick
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
+--- !u!114 &1484621200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Run
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16

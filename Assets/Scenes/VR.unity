@@ -1869,6 +1869,7 @@ GameObject:
   - component: {fileID: 643}
   - component: {fileID: 703}
   - component: {fileID: 704}
+  - component: {fileID: 174514045}
   m_Layer: 5
   m_Name: Fixed Joystick
   m_TagString: Untagged
@@ -34429,3 +34430,19 @@ MonoBehaviour:
   m_FirstSelected: {fileID: 0}
   m_sendNavigationEvents: 1
   m_DragThreshold: 5
+--- !u!114 &174514045
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 108}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Joystick
+  parentRect: {fileID: 647}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
