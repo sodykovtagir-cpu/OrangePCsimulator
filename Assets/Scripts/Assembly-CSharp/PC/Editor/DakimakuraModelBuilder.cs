@@ -111,6 +111,33 @@ namespace PC.Component.Software.EditorTools
                            source.GetComponentInChildren<Renderer>(true) != null;
             Report(hasMesh, "Модель содержит видимый меш (MeshFilter + Renderer)");
 
+            // Честная проверка модели: камеры/свет в иерархии и трансформы
+            // 1x1x1 (запечённый масштаб — не 0.01/25 из грязного FBX).
+            UnityEngine.Object probe = source != null ? UnityEngine.Object.Instantiate(source) : null;
+            if (probe != null) probe.name = "Dakimakura Probe";
+            Report(probe != null && probe.GetComponentInChildren<Camera>(true) == null,
+                "Модель: нет Camera в иерархии");
+            Report(probe != null && probe.GetComponentInChildren<Light>(true) == null,
+                "Модель: нет Light в иерархии");
+
+            bool badScale = false;
+            string badNode = "—";
+            if (probe != null)
+            {
+                foreach (var tr in probe.GetComponentsInChildren<Transform>(true))
+                {
+                    if ((tr.localScale - Vector3.one).magnitude > 1e-4f)
+                    {
+                        badScale = true;
+                        badNode = tr.name + " " + tr.localScale.ToString("F3");
+                        break;
+                    }
+                }
+            }
+            Report(probe != null && !badScale,
+                "Модель: все трансформы 1x1x1" + (badScale ? $" (узел {badNode})" : ""));
+            UnityEngine.Object.DestroyImmediate(probe);
+
             var importer = modelPath != null ? AssetImporter.GetAtPath(modelPath) : null;
             if (importer is ModelImporter mi)
             {
