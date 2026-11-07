@@ -18978,6 +18978,7 @@ MonoBehaviour:
   elevatorMovingSound: {fileID: 8300000, guid: 1d020b2496c728a49896de465f9afdee, type: 3}
   elevatorStopSound: {fileID: 8300000, guid: 7ae465d24db4f6c4b990865c74723817, type: 3}
   buttonMaterial: {fileID: 2100000, guid: a7aebfa43c2220d4d8efb7310ad93a21, type: 2}
+  buttonOnMaterial: {fileID: 2100000, guid: 96d10828999b8c948b6b53bd202a4c1f, type: 2}
   goA: 0
 --- !u!114 &634
 MonoBehaviour:

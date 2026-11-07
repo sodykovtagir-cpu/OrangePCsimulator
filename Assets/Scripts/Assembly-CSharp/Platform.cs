@@ -24,11 +24,17 @@ public class Platform : SceneObject
 
 	public Material buttonMaterial;
 
+	// Материал «нажатой» кнопки лифта. Если назначен — кнопки реально меняют
+	// цвет, а не только keyword _EMISSION (который может быть вырезан из билда).
+	public Material buttonOnMaterial;
+
 	public bool goA;
 
 	private AudioSource source;
 
 	private Rigidbody rb;
+
+	private Renderer[] buttonRenderers;
 
 	private bool moving;
 
@@ -42,7 +48,47 @@ public class Platform : SceneObject
     {
 		source = GetComponent<AudioSource>();
 		rb = GetComponent<Rigidbody>();
+		CacheButtonRenderers();
+		SetButtonLit(false);
     }
+
+	private void CacheButtonRenderers()
+	{
+		var list = new List<Renderer>();
+		if (buttonMaterial != null)
+		{
+			foreach (var root in gameObject.scene.GetRootGameObjects())
+			{
+				foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+				{
+					if (r != null && r.sharedMaterial == buttonMaterial)
+						list.Add(r);
+				}
+			}
+		}
+		buttonRenderers = list.ToArray();
+	}
+
+	private void SetButtonLit(bool lit)
+	{
+		// Надёжный визуальный отклик: меняем материал кнопок на «включённый».
+		if (buttonOnMaterial != null && buttonRenderers != null)
+		{
+			var mat = lit ? buttonOnMaterial : buttonMaterial;
+			foreach (var r in buttonRenderers)
+			{
+				if (r != null && mat != null)
+					r.sharedMaterial = mat;
+			}
+		}
+
+		// Совместимость со старыми сценами, где назначен только buttonMaterial.
+		if (buttonMaterial != null)
+		{
+			if (lit) buttonMaterial.EnableKeyword("_EMISSION");
+			else buttonMaterial.DisableKeyword("_EMISSION");
+		}
+	}
 
 	public void Move()
 	{
@@ -80,7 +126,7 @@ public class Platform : SceneObject
 		moving = true;
 		rb.isKinematic = false;
 		speed = 0f;
-		buttonMaterial.EnableKeyword("_EMISSION");
+		SetButtonLit(true);
 		var lastPos = transform.position;
 		while (true)
 		{
@@ -118,12 +164,12 @@ public class Platform : SceneObject
 			source.PlayOneShot(elevatorStopSound);
 		}
 		if (rb != null) rb.isKinematic = true;
-		if (buttonMaterial != null) buttonMaterial.DisableKeyword("_EMISSION");
+		SetButtonLit(false);
 	}
 
 	private void OnDestroy()
     {
-		buttonMaterial.DisableKeyword("_EMISSION");
+		SetButtonLit(false);
     }
 
 	public override void ToData(JObject jObject)
