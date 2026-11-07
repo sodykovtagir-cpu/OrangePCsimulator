@@ -64,4 +64,15 @@ assert 'previewRigPrefab:' in site and 'previewImage:' in site
 assert f'page: {{fileID: 114021143164813130, guid: {guid(shop)}, type: 3}}' in browser
 assert '  - url: www.dakimakuraexpert.com' in browser
 assert '  - url: www.printexpert.com' in browser
-print('PASS: dakimakura .pic/HD/preview/delivery/save wiring and distinct catalog/item prefabs')
+
+# Zero-config builder: one click wires modelPrefab + collider + reimport.
+builder = (a / 'Scripts/Assembly-CSharp/PC/Editor/DakimakuraModelBuilder.cs').read_text()
+assert 'Tools/Dakimakura/Застроить дакимакуру' in builder
+assert 'SetPrivateField(visual, "modelPrefab", source)' in builder
+assert 'AssetDatabase.ImportAsset(modelPath, ImportAssetOptions.ForceUpdate' in builder
+assert 'DakimakuraVisual.FitToLengthMetres(model, lengthMetres)' in builder
+assert 'Tools/Dakimakura/Проверить дакимакуру' in builder
+assert 'Resources.Load<GameObject>(FallbackModelResourcesPath)' in visual
+assert 'public const string FallbackModelResourcesPath = "components/DakimakuraModel";' in visual
+assert 'ModelBoundsInSpace' in visual and 'FitToLengthMetres' in visual
+print('PASS: dakimakura .pic/HD/preview/delivery/save wiring, one-click model builder')
