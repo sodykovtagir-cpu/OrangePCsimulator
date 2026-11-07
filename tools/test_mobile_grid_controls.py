@@ -53,6 +53,18 @@ adaptive = (scripts / 'MobileAdaptiveSlidePanel.cs').read_text(encoding='utf-8')
 assert 'MobileFreeDraggable.EnsureRoomHudLayout();' in control_rig.split('mobile.SetActive(true);')[1]
 assert 'EnsureAdaptivePanel(root.Find("Functions/Panel"), "FunctionsPanel", bounds);' in mobile
 assert 'public void Init(string id, RectTransform parent)' in adaptive
+# Legacy hotbar migration: rooms other than Medium opened the hotbar with an
+# Animator + DoAnimation.Play on the icon. Leaving that alive next to the new
+# adaptive panel half-opened it and kept CanvasGroup.interactable=false (grey,
+# dead buttons). The migration must kill the legacy animator and rewire the
+# icon to adaptive.Toggle, without double-adding Toggle where it is authored.
+assert 'MigrateLegacyHotbar(' in mobile
+migrate = mobile.split('private static void MigrateLegacyHotbar(')[1].split('/// <summary>')[0]
+assert 'animator.enabled = false' in migrate
+assert 'legacy.enabled = false' in migrate
+assert 'SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off)' in migrate
+assert 'if (disabledLegacy && !hasPersistentToggle)' in migrate
+assert 'button.onClick.AddListener(panel.Toggle)' in migrate
 scenes = scripts.parents[1] / 'Scenes'
 guid = '8c5c785935baa01478a9fbe70f968b02'
 for name in ('Main 2', 'Main 3', 'Main 4', 'Tutorial'):

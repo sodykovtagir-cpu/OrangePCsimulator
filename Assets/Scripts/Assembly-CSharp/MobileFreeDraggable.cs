@@ -45,9 +45,69 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
     private static void EnsureAdaptivePanel(Transform target, string id, RectTransform bounds)
     {
-        if (target == null || target.GetComponent<MobileAdaptiveSlidePanel>() != null) return;
-        var panel = target.gameObject.AddComponent<MobileAdaptiveSlidePanel>();
-        panel.Init(id, bounds);
+        if (target == null) return;
+
+        var panel = target.GetComponent<MobileAdaptiveSlidePanel>();
+        if (panel == null)
+        {
+            panel = target.gameObject.AddComponent<MobileAdaptiveSlidePanel>();
+            panel.Init(id, bounds);
+        }
+
+        MigrateLegacyHotbar(target, panel, bounds);
+    }
+
+    // На картах кроме Medium хотбар исторически открывался СТАРЫМ механизмом:
+    // Animator + DoAnimation.Play на кнопке-иконке. Когда мы доставляем сюда
+    // MobileAdaptiveSlidePanel, старый аниматор продолжает двигать панель
+    // наполовину, а адаптивная панель считает хотбар закрытым и глушит
+    // CanvasGroup.interactable/alpha — иконки серые и кнопки не нажимаются.
+    // Поэтому гасим старый аниматор и перекидываем иконку на adaptive.Toggle.
+    private static void MigrateLegacyHotbar(Transform panelTransform, MobileAdaptiveSlidePanel panel, RectTransform bounds)
+    {
+        var functions = panelTransform.parent;
+        if (functions != null)
+        {
+            var animator = functions.GetComponent<Animator>();
+            if (animator != null) animator.enabled = false;
+
+            var legacy = functions.GetComponent<DoAnimation>();
+            if (legacy != null) legacy.enabled = false;
+        }
+
+        if (bounds == null) return;
+        var icon = bounds.Find("Functions/Icon/Image");
+        if (icon == null) return;
+
+        var button = icon.GetComponent<Button>();
+        if (button == null) return;
+
+        bool disabledLegacy = false;
+        bool hasPersistentToggle = false;
+
+        for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+        {
+            var target = button.onClick.GetPersistentTarget(i);
+            string method = button.onClick.GetPersistentMethodName(i);
+
+            if (target is DoAnimation)
+            {
+                button.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
+                disabledLegacy = true;
+            }
+            else if (target is MobileAdaptiveSlidePanel && method == "Toggle")
+            {
+                hasPersistentToggle = true;
+            }
+        }
+
+        // В Medium Toggle уже прошит в сцене — не дублируем его рантайм-листенером,
+        // иначе один клик открывал бы и сразу закрывал панель.
+        if (disabledLegacy && !hasPersistentToggle)
+        {
+            button.onClick.RemoveListener(panel.Toggle);
+            button.onClick.AddListener(panel.Toggle);
+        }
     }
 
     /// <summary>
