@@ -30644,7 +30644,7 @@ MonoBehaviour:
   autoOffSprite: {fileID: 21300000, guid: 70e45a12e6cda3543a46e4091d838cac, type: 2}
   gridOffSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   gridOnSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
-  gridImage: {fileID: 1540093402}
+  gridImage: {fileID: 604090331}
   visualWiring: {fileID: 1332}
   visualWiringOn: {fileID: 21300000, guid: 5ed66d920dc67cc4cb1bdf5024308f85, type: 2}
   visualWiringOff: {fileID: 21300000, guid: a4b2aca6cd893d641bb63325042e08ca, type: 2}
