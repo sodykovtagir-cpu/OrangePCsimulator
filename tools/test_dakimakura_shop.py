@@ -2,9 +2,14 @@
 """Static links for the new pillow print site. Unity import and Play Mode remain required."""
 from pathlib import Path
 import re
+import sys
 import yaml
 
 root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import check_fbx_transforms as m
+import fix_fbx_transforms as f
+
 a = root / 'Assets'
 shop = a / 'GameObject/DakimakuraExpert.prefab'
 item = a / 'Resources/components/Dakimakura.prefab'
@@ -75,4 +80,19 @@ assert 'Tools/Dakimakura/Проверить дакимакуру' in builder
 assert 'Resources.Load<GameObject>(FallbackModelResourcesPath)' in visual
 assert 'public const string FallbackModelResourcesPath = "components/DakimakuraModel";' in visual
 assert 'ModelBoundsInSpace' in visual and 'FitToLengthMetres' in visual
-print('PASS: dakimakura .pic/HD/preview/delivery/save wiring, one-click model builder')
+
+# Чистая модель: нет Camera/Light в FBX, все масштабы единичные (не 0.01/25).
+tops, _ = f.parse_fbx(model.read_bytes())
+objs = next(t for t in tops if t.kind == 'Objects')
+model_names = {f.obj_name(o) for o in objs.children if o.kind == 'Model'}
+assert 'Camera' not in model_names and 'Light' not in model_names, model_names
+bad, total = m.scan(str(model))
+assert bad == [], f"незапечённые масштабы: {bad[:3]}"
+assert total == 3, f"ожидалось 3 модели,={total}"
+assert 'globalScale: 1' in model.with_suffix('.fbx.meta').read_text()
+assert 'GetComponentsInChildren<Camera>(true)' in visual
+assert 'GetComponentsInChildren<Light>(true)' in visual
+assert 'probe.GetComponentInChildren<Camera>(true) == null' in builder
+assert 'probe.GetComponentInChildren<Light>(true) == null' in builder
+assert 'все трансформы 1x1x1' in builder
+print('PASS: dakimakura .pic/HD/preview/delivery/save wiring, one-click model builder, clean FBX')

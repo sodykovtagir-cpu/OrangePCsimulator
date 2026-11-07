@@ -36,6 +36,14 @@ namespace PC.Component.Software
             }
             visual.name = "Dakimakura Model";
 
+            // Защита от грязного FBX: экспортёры иногда вешают Camera/Light
+            // в иерархию модели — убираем их, чтобы в готовом предмете
+            // не было лишних камер и огней.
+            foreach (var cam in visual.GetComponentsInChildren<Camera>(true))
+                Destroy(cam);
+            foreach (var light in visual.GetComponentsInChildren<Light>(true))
+                Destroy(light);
+
             var mesh = visual.GetComponentInChildren<MeshFilter>(true);
             var renderer = visual.GetComponentInChildren<Renderer>(true);
             if (mesh == null || mesh.sharedMesh == null || renderer == null)
