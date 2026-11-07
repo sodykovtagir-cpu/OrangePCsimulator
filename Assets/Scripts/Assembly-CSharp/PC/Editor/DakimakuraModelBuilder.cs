@@ -139,8 +139,9 @@ namespace PC.Component.Software.EditorTools
             }
 
             var itemCollider = item?.GetComponent<BoxCollider>();
+            string colliderText = itemCollider != null ? itemCollider.size.ToString("F2") : "—";
             Report(itemCollider != null && itemCollider.size.magnitude > 0.001f,
-                $"Предмет: коллайдер под модель ({itemCollider != null ? itemCollider.size.ToString("F2") : "—"})");
+                $"Предмет: коллайдер под модель ({colliderText})");
 
             var shop = AssetDatabase.LoadAssetAtPath<GameObject>(ShopPrefabPath);
             var printExpert = shop?.GetComponent<PrintExpert>();
