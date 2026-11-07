@@ -14,6 +14,8 @@ GameObject:
   - component: {fileID: 114199597051567337}
   - component: {fileID: 1005148178506613071}
   - component: {fileID: 5387693403189817956}
+  - component: {fileID: 855660000000000001}
+  - component: {fileID: 855660000000000003}
   m_Layer: 0
   m_Name: Dakimakura
   m_TagString: Pillow
@@ -82,8 +84,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.126148, y: 5.9567146, z: 2.7462084}
-  m_Center: {x: 0.0012011528, y: -0.003583908, z: 0.059512377}
+  m_Size: {x: 0.2836, y: 1.5, z: 0.6916}
+  m_Center: {x: 0, y: 0, z: 0.015}
 --- !u!114 &114199597051567337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -151,3 +153,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1172905954065532}
   m_Mesh: {fileID: -2317301750207737916, guid: ae10db299e6531841a3da271f5fc0369, type: 3}
+--- !u!114 &855660000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1172905954065532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4c89333a6687014af6ab7aaabbddda7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rend: {fileID: 1005148178506613071}
+  matIndex: 0
+--- !u!114 &855660000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1172905954065532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 73d1fdec956747888a03d5230b828d1e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lengthMetres: 1.5
+  flipU: 0
+  flipV: 0
