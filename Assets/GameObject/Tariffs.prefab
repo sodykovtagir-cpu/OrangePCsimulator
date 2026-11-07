@@ -90,7 +90,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c397d8db06444c98bb8ad32d6810738, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  icon: {fileID: 21300000, guid: 7868701f29c3d2d4c97bb57c11ef59fd, type: 3}
+  icon: {fileID: 21300000, guid: 041480c18fb3e8d48b87688e4377b3cf, type: 3}
   websiteName: www.typolink.com/tariffs
   ssidInput: {fileID: 0}
   passwordInput: {fileID: 0}
