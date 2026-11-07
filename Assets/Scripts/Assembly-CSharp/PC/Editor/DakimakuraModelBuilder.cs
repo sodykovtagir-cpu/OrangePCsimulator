@@ -113,7 +113,7 @@ namespace PC.Component.Software.EditorTools
 
             // Честная проверка модели: камеры/свет в иерархии и трансформы
             // 1x1x1 (запечённый масштаб — не 0.01/25 из грязного FBX).
-            UnityEngine.Object probe = source != null ? UnityEngine.Object.Instantiate(source) : null;
+            GameObject probe = source != null ? UnityEngine.Object.Instantiate(source) : null;
             if (probe != null) probe.name = "Dakimakura Probe";
             Report(probe != null && probe.GetComponentInChildren<Camera>(true) == null,
                 "Модель: нет Camera в иерархии");
