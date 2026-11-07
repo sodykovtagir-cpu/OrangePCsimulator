@@ -66,7 +66,7 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     private bool counterRotateIcons = true;
 
     [SerializeField]
-    private bool fadeWhenClosed = false;
+    private bool fadeWhenClosed = true;
 
     [SerializeField]
     private bool disableRaycastWhenClosed = true;
@@ -99,6 +99,27 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
         EnsureRefs();
         CollectIconsIfNeeded();
 
+        CalculateDefaultPosition();
+
+        opened = startOpened;
+
+        LoadPosition();
+        ApplyInstant();
+    }
+
+    /// <summary>
+    /// Рантайм-установка на картах, где хотбар был свёрстан без этого компонента
+    /// (Medium — единственная сцена, где он был добавлен вручную). Awake уже
+    /// отработал на AddComponent, поэтому после назначения id/области повторяем
+    /// загрузку сохранённой раскладки.
+    /// </summary>
+    public void Init(string id, RectTransform parent)
+    {
+        controlId = id;
+        if (parent != null) parentRect = parent;
+
+        EnsureRefs();
+        CollectIconsIfNeeded();
         CalculateDefaultPosition();
 
         opened = startOpened;

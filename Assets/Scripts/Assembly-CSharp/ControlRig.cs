@@ -11,6 +11,10 @@ public class ControlRig : MonoBehaviour
 #if UNITY_ANDROID || UNITY_IOS
 		standalone.SetActive(false);
 		mobile.SetActive(true);
+		// Raycast.Start may run while Mobile is still inactive, so the layout
+		// bootstrap there sees nothing. Install the shared room HUD layout now
+		// that the mobile root is actually enabled (Factory and other rooms).
+		MobileFreeDraggable.EnsureRoomHudLayout();
 #elif UNITY_STANDALONE
 		standalone.SetActive(true);
 		mobile.SetActive(false);

@@ -43,12 +43,20 @@ for name, key in [('Functions/Icon', 'PanelOpen'), ('Pause', 'MenuButton'),
     assert f'EnsureControl(root.Find("{name}"), "{key}", bounds);' in mobile
 assert 'if (target == null || target.GetComponent<MobileFreeDraggable>() != null) return;' in mobile
 assert 'EditMode = false;' in custom.split('private void OnDisable()')[1].split('private IEnumerator')[0]
-# These five room scenes historically omitted every draggable component;
-# runtime installation must cover them without overwriting Medium's layout.
+# The build rooms now carry the four free draggables, but the sliding hotbar
+# (FunctionsPanel) was still authored only in Medium. Runtime installation must
+# cover it on every room, and ControlRig must bootstrap AFTER it enables Mobile:
+# Raycast.Start can run while the mobile root is still inactive, which is why
+# Factory/other rooms ignored the saved layout.
+control_rig = (scripts / 'ControlRig.cs').read_text(encoding='utf-8')
+adaptive = (scripts / 'MobileAdaptiveSlidePanel.cs').read_text(encoding='utf-8')
+assert 'MobileFreeDraggable.EnsureRoomHudLayout();' in control_rig.split('mobile.SetActive(true);')[1]
+assert 'EnsureAdaptivePanel(root.Find("Functions/Panel"), "FunctionsPanel", bounds);' in mobile
+assert 'public void Init(string id, RectTransform parent)' in adaptive
 scenes = scripts.parents[1] / 'Scenes'
 guid = '8c5c785935baa01478a9fbe70f968b02'
-for name in ('Main 2', 'Main 3', 'Main 4', 'Main 5', 'Main 6'):
-    assert guid not in (scenes / (name + '.unity')).read_text()
+for name in ('Main 2', 'Main 3', 'Main 4', 'Tutorial'):
+    assert (scenes / (name + '.unity')).read_text().count('guid: ' + guid) >= 4
 
 # Same geometry in the actual panel and the draggable preview; test all nine
 # touch rectangles, not just the adjacent arrows. A shared positive scale

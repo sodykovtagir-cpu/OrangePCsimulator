@@ -29,6 +29,10 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
             EnsureControl(root.Find("Pause"), "MenuButton", bounds);
             EnsureControl(root.Find("Fixed Joystick"), "Joystick", bounds);
             EnsureControl(root.Find("Run"), "Run", bounds);
+            // Medium has the sliding hotbar authored in the scene; the other
+            // rooms only had the static panel. Without this component the
+            // saved FunctionsPanel layout has nothing to attach to there.
+            EnsureAdaptivePanel(root.Find("Functions/Panel"), "FunctionsPanel", bounds);
         }
     }
 
@@ -37,6 +41,13 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         if (target == null || target.GetComponent<MobileFreeDraggable>() != null) return;
         var control = target.gameObject.AddComponent<MobileFreeDraggable>();
         control.Init(id, bounds);
+    }
+
+    private static void EnsureAdaptivePanel(Transform target, string id, RectTransform bounds)
+    {
+        if (target == null || target.GetComponent<MobileAdaptiveSlidePanel>() != null) return;
+        var panel = target.gameObject.AddComponent<MobileAdaptiveSlidePanel>();
+        panel.Init(id, bounds);
     }
 
     /// <summary>
@@ -186,6 +197,7 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         rect.anchorMin = normalized;
         rect.anchorMax = normalized;
         rect.anchoredPosition = Vector2.zero;
+        ClampAnchoredPosition();
     }
 
     public void OnEndDrag(PointerEventData eventData)
@@ -275,20 +287,44 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         return new Vector2(x, y);
     }
 
-    private Vector2 GetSmartAnchor(Vector2 normalizedCenter)
+    // Выбираем якорь по КРАЮ панели, а не по её центру. Иначе широкая панель
+    // (стрелки сетки), пристыкованная к правому краю, оставалась с якорем 0.5 и
+    // большим pixel-offset; на другом размере экрана/превью этот offset уводил
+    // её за экран. Теперь «прижато к правому краю» = anchor.x = 1 и малый offset.
+    private Vector2 GetSmartAnchor(Vector2 normalizedPivot)
     {
         float ax = 0.5f;
         float ay = 0.5f;
 
-        if (normalizedCenter.x <= edgeSnapZone)
-            ax = 0f;
-        else if (normalizedCenter.x >= 1f - edgeSnapZone)
-            ax = 1f;
+        if (!EnsureRefs())
+            return new Vector2(ax, ay);
 
-        if (normalizedCenter.y <= edgeSnapZone)
-            ay = 0f;
-        else if (normalizedCenter.y >= 1f - edgeSnapZone)
-            ay = 1f;
+        Rect parent = parentRect.rect;
+        Rect self = rect.rect;
+
+        if (parent.width > 0f)
+        {
+            float width = self.width / parent.width;
+            float minX = normalizedPivot.x - width * rect.pivot.x;
+            float maxX = minX + width;
+
+            if (minX <= edgeSnapZone)
+                ax = 0f;
+            else if (maxX >= 1f - edgeSnapZone)
+                ax = 1f;
+        }
+
+        if (parent.height > 0f)
+        {
+            float height = self.height / parent.height;
+            float minY = normalizedPivot.y - height * rect.pivot.y;
+            float maxY = minY + height;
+
+            if (minY <= edgeSnapZone)
+                ay = 0f;
+            else if (maxY >= 1f - edgeSnapZone)
+                ay = 1f;
+        }
 
         return new Vector2(ax, ay);
     }
@@ -298,19 +334,58 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
         if (!EnsureRefs())
             return;
 
-        Vector2 normalized = GetCurrentNormalizedPosition();
-        normalized = ClampNormalized(normalized);
-
-        Vector2 newAnchor = GetSmartAnchor(normalized);
-
+        // Клампим именно pivot (как в OnDrag), а не центр: ClampNormalized
+        // рассчитан на pivot. Раньше сюда передавался центр, а финальная позиция
+        // бралась из НЕклампнутого pivot — панель могла выехать за экран.
         Vector2 pivotLocal = GetCurrentPivotLocalInParent();
+        Vector2 normalizedPivot = ClampNormalized(LocalToNormalized(pivotLocal));
+        Vector2 clampedPivotLocal = AnchorToLocalPoint(normalizedPivot);
+
+        Vector2 newAnchor = GetSmartAnchor(normalizedPivot);
         Vector2 anchorLocal = AnchorToLocalPoint(newAnchor);
 
         rect.anchorMin = newAnchor;
         rect.anchorMax = newAnchor;
-        rect.anchoredPosition = pivotLocal - anchorLocal;
+        rect.anchoredPosition = clampedPivotLocal - anchorLocal;
+        ClampAnchoredPosition();
 
         Debug.Log("SMART ANCHOR " + controlId + " anchor=" + newAnchor + " pos=" + rect.anchoredPosition);
+    }
+
+    // Жёсткая граница экрана: после загрузки/снапа/сброса панель не может
+    // оказаться за пределами parentRect, даже если сохранённая раскладка была
+    // записана на другом размере окна превью или старым багом.
+    private void ClampAnchoredPosition()
+    {
+        if (!EnsureRefs())
+            return;
+
+        Rect parent = parentRect.rect;
+        Rect self = rect.rect;
+
+        if (parent.width <= 0f || parent.height <= 0f)
+            return;
+
+        Vector2 anchor = (rect.anchorMin + rect.anchorMax) * 0.5f;
+        Vector2 anchorLocal = AnchorToLocalPoint(anchor);
+        Vector2 pivotLocal = anchorLocal + rect.anchoredPosition;
+
+        float minPivotX = parent.xMin + self.width * rect.pivot.x;
+        float maxPivotX = parent.xMax - self.width * (1f - rect.pivot.x);
+        float minPivotY = parent.yMin + self.height * rect.pivot.y;
+        float maxPivotY = parent.yMax - self.height * (1f - rect.pivot.y);
+
+        // Панель больше области — центрируем саму панель (не pivot), а не
+        // выталкиваем за край.
+        if (minPivotX > maxPivotX)
+            minPivotX = maxPivotX = (parent.xMin + parent.xMax) * 0.5f + (rect.pivot.x - 0.5f) * self.width;
+        if (minPivotY > maxPivotY)
+            minPivotY = maxPivotY = (parent.yMin + parent.yMax) * 0.5f + (rect.pivot.y - 0.5f) * self.height;
+
+        pivotLocal.x = Mathf.Clamp(pivotLocal.x, minPivotX, maxPivotX);
+        pivotLocal.y = Mathf.Clamp(pivotLocal.y, minPivotY, maxPivotY);
+
+        rect.anchoredPosition = pivotLocal - anchorLocal;
     }
 
     public void SavePosition()
@@ -326,6 +401,8 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
         if (useSmartAnchors)
             SnapAnchorKeepingPosition();
+        else
+            ClampAnchoredPosition();
 
         Vector2 anchor = (rect.anchorMin + rect.anchorMax) * 0.5f;
         Vector2 pos = rect.anchoredPosition;
@@ -368,7 +445,15 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
             rect.anchorMax = anchor;
             rect.anchoredPosition = pos;
 
-            Debug.Log("LOADED SMART " + controlId + " anchor=" + anchor + " pos=" + pos);
+            // Сохранённая раскладка могла быть записана в превью другого размера
+            // или старым багом без клампа. Возвращаем панель на экран и, если
+            // нужно, перепривязываем якорь к ближайшему краю.
+            if (useSmartAnchors)
+                SnapAnchorKeepingPosition();
+            else
+                ClampAnchoredPosition();
+
+            Debug.Log("LOADED SMART " + controlId + " anchor=" + rect.anchorMin + " pos=" + rect.anchoredPosition);
             return;
         }
 
@@ -387,6 +472,8 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
             if (useSmartAnchors)
                 SnapAnchorKeepingPosition();
+            else
+                ClampAnchoredPosition();
 
             Debug.Log("LOADED OLD " + controlId + " normalized=" + normalized);
         }
@@ -438,6 +525,8 @@ public class MobileFreeDraggable : MonoBehaviour, IDragHandler, IEndDragHandler
 
         if (useSmartAnchors)
             SnapAnchorKeepingPosition();
+        else
+            ClampAnchoredPosition();
 
         PlayerPrefs.Save();
 
