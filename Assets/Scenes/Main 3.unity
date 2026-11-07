@@ -21364,7 +21364,7 @@ MonoBehaviour:
   visualWiring: {fileID: 657}
   visualWiringOn: {fileID: 21300000, guid: 5ed66d920dc67cc4cb1bdf5024308f85, type: 2}
   visualWiringOff: {fileID: 21300000, guid: a4b2aca6cd893d641bb63325042e08ca, type: 2}
-  gridImage: {fileID: 616495195}
+  gridImage: {fileID: 1882807349}
   gridOnSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   gridOffSprite: {fileID: 21300000, guid: 5cff8738753140a890699e9b85d2c249, type: 3}
   visualLinePrefab: {fileID: 114454353502528964, guid: 148b8799dc8326a44971ab6a1b2afe16, type: 3}
