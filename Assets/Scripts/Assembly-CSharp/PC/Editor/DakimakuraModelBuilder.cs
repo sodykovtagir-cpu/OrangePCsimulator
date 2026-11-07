@@ -58,7 +58,7 @@ namespace PC.Component.Software.EditorTools
             }
 
             // 1) Готовим модель в памяти: иерархия FBX сохраняется, как в игре.
-            var model = Instantiate(source);
+            var model = UnityEngine.Object.Instantiate(source);
             model.name = "Dakimakura Model";
             model.transform.position = item.transform.position;
             model.transform.rotation = item.transform.rotation;
@@ -79,7 +79,7 @@ namespace PC.Component.Software.EditorTools
             // 3) Проставляем modelPrefab в префаб — без ручной ручежни в Inspector.
             SetPrivateField(visual, "modelPrefab", source);
 
-            DestroyImmediate(model);
+            UnityEngine.Object.DestroyImmediate(model);
             AssetDatabase.SaveAssets();
 
             Debug.Log($"[Dakimakura] Модель подключена: {modelPath}");
@@ -114,7 +114,7 @@ namespace PC.Component.Software.EditorTools
             var importer = modelPath != null ? AssetImporter.GetAtPath(modelPath) : null;
             if (importer is ModelImporter mi)
             {
-                Report(mi.importCameras == 0 && mi.importLights == 0,
+                Report(!mi.importCameras && !mi.importLights,
                     $"Импортер: камеры/свет из FBX не завезены (importCameras={mi.importCameras}, importLights={mi.importLights})");
             }
             else
@@ -205,7 +205,9 @@ namespace PC.Component.Software.EditorTools
                     return path;
                 }
             }
-            return AssetDatabase.AssetExists(DefaultModelAssetPath) ? DefaultModelAssetPath : null;
+            if (System.IO.File.Exists(System.IO.Path.Combine(Application.dataPath, "Models", "dakimakura.fbx")))
+                return DefaultModelAssetPath;
+            return null;
         }
 
         private static float ReadLengthMetres(DakimakuraVisual visual)
