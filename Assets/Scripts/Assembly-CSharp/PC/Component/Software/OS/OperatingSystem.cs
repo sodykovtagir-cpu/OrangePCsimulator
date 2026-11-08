@@ -3589,21 +3589,20 @@ namespace PC.Component.Software.OS
 
         private bool IsTopmostWindow(App app)
         {
-            if (app == null || appParent == null) return false;
+            if (app == null || appParent == null || app.IsMinimized) return false;
             var target = app.transform;
-            int topIndex = -1;
-            Transform top = null;
-            for (int i = 0; i < appParent.childCount; i++)
+            // Only real app windows count. Non-window overlays under appParent
+            // must not steal "topmost" and turn a taskbar click into a raise
+            // instead of a minimize.
+            for (int i = appParent.childCount - 1; i >= 0; i--)
             {
                 var child = appParent.GetChild(i);
                 if (child == null || !child.gameObject.activeSelf) continue;
-                if (child.GetSiblingIndex() > topIndex)
-                {
-                    topIndex = child.GetSiblingIndex();
-                    top = child;
-                }
+                var other = child.GetComponent<App>();
+                if (other == null || other.IsMinimized) continue;
+                return child == target;
             }
-            return top == target;
+            return false;
         }
 
         public void OnAppMinimized(App app)

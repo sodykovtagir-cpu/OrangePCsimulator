@@ -230,7 +230,14 @@ namespace PC.Component.Software
 		/// </summary>
 		public virtual void Minimize()
 		{
-			if (closing || minimized) return;
+			if (closing) return;
+			if (minimized)
+			{
+				// Само-починка: прошлая анимация сворачивания могла быть прервана,
+				// и окно осталось видимым. Гарантированно прячем его повторно.
+				if (gameObject.activeSelf) HideMinimizedNow();
+				return;
+			}
 
 			minimized = true;
 			wasMaximizedWhenMinimized = maximized;
@@ -270,44 +277,55 @@ namespace PC.Component.Software
 			int id = animId;
 			animating = true;
 
-			// Нужна корректная раскладка до начала анимации.
-
 			var rt = transform as RectTransform;
 			var os = system;
 			Vector3 target = os != null ? os.GetTaskbarIconWorldPos(this) : Vector3.zero;
 
 			var cg = WindowChromeGroup();
-			cg.alpha = 1f;
+			if (cg != null) cg.alpha = 1f;
 
-			// Сразу создаём/обновляем кнопку в таскбаре, чтобы было к чему лететь.
 			if (os != null) os.OnAppMinimized(this);
 
-			// Та же длительность и кривая, что у меню «Пуск»/открытия окон.
 			const float duration = 0.2f;
 			float t = 0f;
+			float startedAt = Time.unscaledTime;
 			Vector3 startPos = rt != null ? rt.position : Vector3.zero;
 			Vector3 startScale = rt != null ? rt.localScale : Vector3.one;
 			Vector3 endScale = startScale * 0.2f;
 
+			// Скрытие окна не должно зависеть от лага UI: идём по реальному
+			// unscaled-времени и страхуемся жёстким таймаутом, чтобы окно
+			// всегда исчезало, даже если кадры проседают.
 			while (t < duration && rt != null)
 			{
-				if (id != animId) yield break; // нас перебили (развернули)
-				t += Mathf.Min(Time.unscaledDeltaTime, duration * .25f) *
-                    (system != null ? system.UiResponsiveness : 1f);
+				if (id != animId) yield break;
+				t += Time.unscaledDeltaTime;
 				float k = Mathf.Clamp01(t / duration);
-				float e = 1f - (1f - k) * (1f - k); // ease-out quad
+				float e = 1f - (1f - k) * (1f - k);
 				rt.position = Vector3.Lerp(startPos, target, e);
 				rt.localScale = Vector3.LerpUnclamped(startScale, endScale, e);
-				cg.alpha = 1f - k * 0.9f;
+				if (cg != null) cg.alpha = 1f - k * 0.9f;
 				yield return null;
+				if (Time.unscaledTime - startedAt > duration + 0.5f) break;
 			}
 
-			if (id != animId) yield break; // не финализируем устаревшую анимацию
-			animating = false;
-			gameObject.SetActive(false);
+			if (id != animId) yield break;
+			HideMinimizedNow();
+		}
 
-			// Возвращаем трансформ в исходную раскладку (визуально не видно — окно скрыто).
-			if (rt != null)
+		// Финальное состояние свёрнутого окна, не зависящее от анимации.
+		private void HideMinimizedNow()
+		{
+			if (animCoroutine != null)
+			{
+				StopCoroutine(animCoroutine);
+				animCoroutine = null;
+			}
+			animating = false;
+			restoreFlying = false;
+
+			var rt = transform as RectTransform;
+			if (rt != null && hasMinState)
 			{
 				rt.anchorMin = minAnchorMin;
 				rt.anchorMax = minAnchorMax;
@@ -318,7 +336,9 @@ namespace PC.Component.Software
 				rt.offsetMax = minOffsetMax;
 				rt.localScale = Vector3.one;
 			}
-			cg.alpha = 1f;
+			var cg = WindowChromeGroup();
+			if (cg != null) { cg.alpha = 1f; cg.blocksRaycasts = true; }
+			if (gameObject.activeSelf) gameObject.SetActive(false);
 		}
 
 		/// <summary>
