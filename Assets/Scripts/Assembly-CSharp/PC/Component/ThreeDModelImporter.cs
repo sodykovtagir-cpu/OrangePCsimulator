@@ -596,12 +596,12 @@ namespace PC.Component
 					// zlib wrapper: skip 2-byte header before raw deflate.
 					using (var deflate = new DeflateStream(new MemoryStream(bytes, position + 2, compressedLength - 2), CompressionMode.Decompress))
 					{
-						int read = 0;
-						while (read < raw.Length)
+						int totalRead = 0;
+						while (totalRead < raw.Length)
 						{
-							int n = deflate.Read(raw, read, raw.Length - read);
+							int n = deflate.Read(raw, totalRead, raw.Length - totalRead);
 							if (n <= 0) break;
-							read += n;
+							totalRead += n;
 						}
 					}
 					position += compressedLength;
