@@ -48,6 +48,11 @@ namespace PC.Component
 		[SerializeField] private float axisYDirection = 0f;
 		[SerializeField] private float toolpathScale = 1f;
 
+		[Header("Print volume (bed local units)")]
+		[SerializeField] private Vector3 maxPrintSize = new Vector3(0.8f, 0.8f, 0.8f);
+		[SerializeField] private bool autoFitModel = true;
+		[SerializeField] private bool rejectOversizedModels = false;
+
 		[Header("Print time / filament model")]
 		[SerializeField] private int referenceTriangles = 10000;
 		[SerializeField] private float averagePrintSeconds = 600f;
@@ -71,6 +76,9 @@ namespace PC.Component
 		private float modelHeight;
 		private float toolCenterX;
 		private float toolCenterZ;
+		private float printFitScale = 1f;
+		private Vector3 extruderTravelAxis = Vector3.right;
+		private float extruderTravelLimit;
 
 		public PrinterState State { get; private set; } = PrinterState.Idle;
 		public bool IsPrinting => State == PrinterState.Printing;
@@ -93,6 +101,7 @@ namespace PC.Component
 			if (axisX != null) axisXRest = axisX.localPosition;
 			if (axisY != null) axisYRest = axisY.localPosition;
 			if (axisZ != null) axisZRest = axisZ.localPosition;
+			CacheExtruderAxis();
 			UpdateScreen();
 		}
 
@@ -273,15 +282,39 @@ namespace PC.Component
 			printProgressRoot.transform.localRotation = Quaternion.identity;
 			printProgressRoot.transform.localScale = Vector3.one;
 			model.Instance.SetActive(true);
+			StripPhysicsForPrint(model.Instance);
 			model.Instance.transform.SetParent(printProgressRoot.transform, false);
 
-			// Seat the model bottom on the bed without touching its localScale.
+			// Seat and center the model on the bed without touching its localScale.
 			Bounds seated = GetLocalBounds(model.Instance, printProgressRoot.transform);
 			if (seated.size.sqrMagnitude > 0.000001f)
-				model.Instance.transform.localPosition -= Vector3.up * seated.min.y;
+			{
+				model.Instance.transform.localPosition -= new Vector3(seated.center.x, seated.min.y, seated.center.z);
+				seated = GetLocalBounds(model.Instance, printProgressRoot.transform);
+			}
 
+			printFitScale = 1f;
+			Vector3 size = seated.size;
+			bool oversized = size.x > maxPrintSize.x || size.y > maxPrintSize.y || size.z > maxPrintSize.z;
+			if (rejectOversizedModels && oversized)
+			{
+				CleanupPrintRoot();
+				CurrentModel = null;
+				Fail("Model too large for print volume");
+				return false;
+			}
+			if (autoFitModel && oversized)
+			{
+				float sx = maxPrintSize.x > 0.0001f ? maxPrintSize.x / Mathf.Max(0.0001f, size.x) : 1f;
+				float sy = maxPrintSize.y > 0.0001f ? maxPrintSize.y / Mathf.Max(0.0001f, size.y) : 1f;
+				float sz = maxPrintSize.z > 0.0001f ? maxPrintSize.z / Mathf.Max(0.0001f, size.z) : 1f;
+				printFitScale = Mathf.Clamp01(Mathf.Min(sx, Mathf.Min(sy, sz)));
+				if (printFitScale < 0.0001f) printFitScale = 0.0001f;
+			}
+
+			CacheExtruderAxis();
 			BuildToolpath(model);
-			printProgressRoot.transform.localScale = new Vector3(1f, 0.001f, 1f);
+			printProgressRoot.transform.localScale = new Vector3(printFitScale, 0.001f * printFitScale, printFitScale);
 
 			if (loopAudio != null && printingClip != null)
 			{
@@ -353,7 +386,7 @@ namespace PC.Component
 			printCoroutine = null;
 			StopPrintAudio();
 			if (printProgressRoot != null)
-				printProgressRoot.transform.localScale = Vector3.one;
+				printProgressRoot.transform.localScale = new Vector3(printFitScale, printFitScale, printFitScale);
 
 			// Release the finished object into the world so its Rigidbody can
 			// interact with the bed/room instead of fighting the printer hierarchy.
@@ -459,20 +492,21 @@ namespace PC.Component
 				min = Vector3.Min(min, verts[i]);
 				max = Vector3.Max(max, verts[i]);
 			}
-			modelHeight = Mathf.Max(0.001f, max.y - min.y);
+			float fullHeight = Mathf.Max(0.001f, max.y - min.y);
+			modelHeight = fullHeight * printFitScale;
 			toolCenterX = (min.x + max.x) * 0.5f;
 			toolCenterZ = (min.z + max.z) * 0.5f;
 
 			int layers = Mathf.Max(1, layerCount);
 			int lines = Mathf.Max(2, infillLinesPerLayer);
 			int passes = Mathf.Max(1, perimeterPasses);
-			float scale = Mathf.Max(0.0001f, toolpathScale);
+			float scale = Mathf.Max(0.0001f, toolpathScale * printFitScale);
 
 			for (int layer = 0; layer < layers; layer++)
 			{
-				float y0 = min.y + modelHeight * layer / layers;
-				float y1 = min.y + modelHeight * (layer + 1) / layers;
-				float y = y0 + nozzleHeightOffset;
+				float y0 = min.y + fullHeight * layer / layers;
+				float y1 = min.y + fullHeight * (layer + 1) / layers;
+				float y = (y0 + nozzleHeightOffset) * printFitScale;
 
 				// Footprint of this layer from vertices that lie in the slice.
 				Vector3 lmin = new Vector3(float.MaxValue, 0f, float.MaxValue);
@@ -556,13 +590,57 @@ namespace PC.Component
 			float xSign = axisX != null && axisX == printBed ? -1f : 1f;
 			float zSign = axisZ != null && axisZ == printBed ? -1f : 1f;
 			if (axisX != null)
-				axisX.localPosition = axisXRest + Vector3.right * (point.x * xSign);
+			{
+				float x = point.x * xSign;
+				if (extruderTravelLimit > 0.0001f)
+					x = Mathf.Clamp(x, -extruderTravelLimit, extruderTravelLimit);
+				// The extruder is a child of the beam; travel along the beam's long
+				// local axis, not blindly along world X.
+				axisX.localPosition = axisXRest + extruderTravelAxis * x;
+			}
 			if (axisZ != null)
 				axisZ.localPosition = axisZRest + Vector3.forward * (point.z * zSign);
 			if (axisY != null)
 			{
 				float printedHeight = modelHeight * Mathf.Clamp01(progress);
 				axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * printedHeight);
+			}
+		}
+
+		private void CacheExtruderAxis()
+		{
+			extruderTravelAxis = Vector3.right;
+			extruderTravelLimit = 0f;
+			if (axisX == null || axisX.parent == null) return;
+			Transform beam = axisX.parent;
+			var mf = beam.GetComponent<MeshFilter>();
+			if (mf == null) mf = beam.GetComponentInChildren<MeshFilter>(true);
+			if (mf == null || mf.sharedMesh == null) return;
+			Vector3 s = mf.sharedMesh.bounds.size;
+			int dom = s.x >= s.y && s.x >= s.z ? 0 : (s.y >= s.z ? 1 : 2);
+			extruderTravelAxis = dom == 0 ? Vector3.right : (dom == 1 ? Vector3.up : Vector3.forward);
+			extruderTravelLimit = Mathf.Max(0.01f, s[dom] * 0.5f - 0.02f);
+		}
+
+		private static void StripPhysicsForPrint(GameObject root)
+		{
+			if (root == null) return;
+			// While the object is being printed it is a visual only: no Rigidbody,
+			// no colliders. Finished physics is added once in FinishPrint.
+			var colliders = root.GetComponentsInChildren<Collider>(true);
+			for (int i = 0; i < colliders.Length; i++)
+			{
+				if (colliders[i] == null) continue;
+				colliders[i].enabled = false;
+				Destroy(colliders[i]);
+			}
+			var bodies = root.GetComponentsInChildren<Rigidbody>(true);
+			for (int i = 0; i < bodies.Length; i++)
+			{
+				if (bodies[i] == null) continue;
+				bodies[i].isKinematic = true;
+				bodies[i].detectCollisions = false;
+				Destroy(bodies[i]);
 			}
 		}
 
@@ -576,7 +654,8 @@ namespace PC.Component
 		private void GrowPrint(float progress)
 		{
 			if (printProgressRoot == null) return;
-			printProgressRoot.transform.localScale = new Vector3(1f, Mathf.Max(0.001f, progress), 1f);
+			float y = Mathf.Max(0.001f, progress) * printFitScale;
+			printProgressRoot.transform.localScale = new Vector3(printFitScale, y, printFitScale);
 		}
 
 		private static void CollectVerticesInSpace(GameObject root, Transform space, List<Vector3> output)
