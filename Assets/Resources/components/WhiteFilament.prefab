@@ -98,7 +98,6 @@ MonoBehaviour:
   capacityMeters: 5
   remainingMeters: 5
   spoolVisual: {fileID: 2571871021248840995}
-  visualRotationPerMeter: 360
   colorRenderers: []
   keepCentered: 1
   filamentColor: {r: 1, g: 1, b: 1, a: 1}
