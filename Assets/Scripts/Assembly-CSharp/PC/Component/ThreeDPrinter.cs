@@ -6,17 +6,17 @@ using UnityEngine;
 namespace PC.Component
 {
 	/// <summary>
-	/// Logic-only FDM 3D printer. The visual model (body, moving axes, spool mount,
-	/// screen, print bed) is wired later through the serialized hooks below.
-	/// Print time scales with triangle count; filament is consumed gradually from
-	/// an attached 1 m spool. Spools cannot be swapped while printing.
+	/// FDM 3D printer. Print time scales with triangle count; filament is consumed
+	/// gradually from an attached spool. The spool is mounted physically through
+	/// Slot/Connector (remove mode or pull force). Importing a model and starting
+	/// a print are separate steps so the desktop app can show a preview first.
 	/// </summary>
 	[RequireComponent(typeof(Item))]
 	public class ThreeDPrinter : Device
 	{
 		public enum PrinterState { Idle, Printing, Finished, Error }
 
-		[Header("Model hooks (assign when the printer model is ready)")]
+		[Header("Model hooks")]
 		[SerializeField] private Transform spoolMount;
 		[SerializeField] private Transform printBed;
 		[SerializeField] private Transform axisX;
@@ -54,11 +54,14 @@ namespace PC.Component
 		public bool IsPrinting => State == PrinterState.Printing;
 		public FilamentSpool AttachedSpool { get; private set; }
 		public PrintableModel CurrentModel { get; private set; }
+		public PrintableModel PendingModel { get; private set; }
 		public float Progress01 { get; private set; }
 		public float RemainingSeconds { get; private set; }
 		public string LastError { get; private set; }
 
 		public event Action<PrintableModel> PrintFinished;
+		public event Action<PrintableModel> ModelImported;
+		public event Action StateChanged;
 
 		protected override void Awake()
 		{
@@ -74,6 +77,8 @@ namespace PC.Component
 		private void OnDestroy()
 		{
 			StopPrintAudio();
+			if (AttachedSpool != null) AttachedSpool.SetPrinter(null);
+			if (PendingModel != null) PendingModel.DestroyInstance();
 		}
 
 		public override void OnDeviceStop()
@@ -111,9 +116,28 @@ namespace PC.Component
 			return true;
 		}
 
+		// Called by FilamentSpool when the physical Slot/Connector attaches it.
+		public void OnSpoolPhysicallyAttached(FilamentSpool spool)
+		{
+			if (spool == null) return;
+			AttachedSpool = spool;
+			spool.SetPrinter(this);
+			UpdateScreen();
+		}
+
+		// Called by FilamentSpool when remove mode / pull force / destruction detaches it.
+		public void OnSpoolPhysicallyDetached(FilamentSpool spool)
+		{
+			if (spool == null || AttachedSpool != spool) return;
+			AttachedSpool = null;
+			spool.SetPrinter(null);
+			if (IsPrinting) Fail("Spool removed");
+			UpdateScreen();
+		}
+
 		// ----- Import / print -------------------------------------------------
 
-		public void OpenImportDialog()
+		public void ImportModelDialog()
 		{
 			if (IsPrinting)
 			{
@@ -130,18 +154,24 @@ namespace PC.Component
 				}
 				NativeFilePicker.PickFile(path =>
 				{
-					if (!string.IsNullOrEmpty(path)) ImportAndStartPrint(path);
+					if (!string.IsNullOrEmpty(path)) ImportModel(path);
 				}, ThreeDModelImporter.SupportedExtensions);
 			});
 		}
 
-		public bool ImportAndStartPrint(string path)
+		public bool ImportModel(string path)
 		{
+			if (IsPrinting) return false;
 			try
 			{
-				var parent = printBed != null ? printBed : transform;
-				var model = ThreeDModelImporter.Import(path, parent);
-				return StartPrint(model);
+				var model = ThreeDModelImporter.Import(path, null);
+				if (model.Instance != null) model.Instance.SetActive(false);
+				if (PendingModel != null) PendingModel.DestroyInstance();
+				PendingModel = model;
+				ApplySpoolColor(model);
+				ModelImported?.Invoke(model);
+				UpdateScreen();
+				return true;
 			}
 			catch (Exception e)
 			{
@@ -150,10 +180,44 @@ namespace PC.Component
 			}
 		}
 
+		// Backwards-compatible helper: import and immediately start.
+		public void OpenImportDialog()
+		{
+			if (IsPrinting)
+			{
+				Fail("Printer is busy");
+				return;
+			}
+			NativeFilePicker.RequestPermissionAsync(permission =>
+			{
+				if (permission != NativeFilePicker.Permission.Granted)
+				{
+					Fail("Storage permission denied");
+					return;
+				}
+				NativeFilePicker.PickFile(path =>
+				{
+					if (!string.IsNullOrEmpty(path)) ImportAndStartPrint(path);
+				}, ThreeDModelImporter.SupportedExtensions);
+			});
+		}
+
+		public bool ImportAndStartPrint(string path)
+		{
+			if (!ImportModel(path)) return false;
+			return StartPrint(PendingModel);
+		}
+
+		public bool StartPrint()
+		{
+			return StartPrint(PendingModel);
+		}
+
 		public bool StartPrint(PrintableModel model)
 		{
 			if (IsPrinting) return false;
 			LastError = null;
+			if (model == null) model = PendingModel;
 
 			if (model == null || model.Instance == null)
 			{
@@ -174,10 +238,12 @@ namespace PC.Component
 			}
 
 			CurrentModel = model;
+			if (PendingModel == model) PendingModel = null;
 			totalSeconds = EstimatePrintSeconds(model.TriangleCount);
 			RemainingSeconds = totalSeconds;
 			Progress01 = 0f;
-			State = PrinterState.Printing;
+			SetState(PrinterState.Printing);
+			ApplySpoolColor(model);
 
 			// Wrap the imported model so we never overwrite the model's own
 			// localScale (important for user-authored FBX/prefab scales).
@@ -187,6 +253,7 @@ namespace PC.Component
 			printProgressRoot.transform.localPosition = Vector3.zero;
 			printProgressRoot.transform.localRotation = Quaternion.identity;
 			printProgressRoot.transform.localScale = new Vector3(1f, 0.001f, 1f);
+			model.Instance.SetActive(true);
 			model.Instance.transform.SetParent(printProgressRoot.transform, false);
 
 			if (loopAudio != null && printingClip != null)
@@ -209,7 +276,7 @@ namespace PC.Component
 			StopPrintAudio();
 			CleanupPrintRoot();
 			CurrentModel = null;
-			State = PrinterState.Idle;
+			SetState(PrinterState.Idle);
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
 			ResetAxes();
@@ -260,7 +327,7 @@ namespace PC.Component
 			StopPrintAudio();
 			if (printProgressRoot != null)
 				printProgressRoot.transform.localScale = Vector3.one;
-			State = PrinterState.Finished;
+			SetState(PrinterState.Finished);
 			Progress01 = 1f;
 			RemainingSeconds = 0f;
 			ResetAxes();
@@ -276,7 +343,7 @@ namespace PC.Component
 			if (printCoroutine != null) StopCoroutine(printCoroutine);
 			printCoroutine = null;
 			StopPrintAudio();
-			State = PrinterState.Error;
+			SetState(PrinterState.Error);
 			ResetAxes();
 			UpdateScreen();
 		}
@@ -290,6 +357,20 @@ namespace PC.Component
 		private void StopPrintAudio()
 		{
 			if (loopAudio != null) loopAudio.Stop();
+		}
+
+		private void SetState(PrinterState state)
+		{
+			if (State == state) return;
+			State = state;
+			StateChanged?.Invoke();
+		}
+
+		private void ApplySpoolColor(PrintableModel model)
+		{
+			if (model == null) return;
+			Color color = AttachedSpool != null ? AttachedSpool.FilamentColor : Color.white;
+			model.ApplyColor(color);
 		}
 
 		// ----- Estimation -----------------------------------------------------
@@ -347,13 +428,15 @@ namespace PC.Component
 		{
 			if (screen == null) return;
 			float filament = AttachedSpool != null ? AttachedSpool.RemainingMeters : 0f;
+			string modelName = CurrentModel != null ? CurrentModel.Name :
+				PendingModel != null ? PendingModel.Name : "Model";
 			switch (State)
 			{
 				case PrinterState.Printing:
-					screen.ShowPrinting(CurrentModel != null ? CurrentModel.Name : "Model", RemainingSeconds, filament, Progress01);
+					screen.ShowPrinting(modelName, RemainingSeconds, filament, Progress01);
 					break;
 				case PrinterState.Finished:
-					screen.ShowFinished(CurrentModel != null ? CurrentModel.Name : "Model", filament);
+					screen.ShowFinished(modelName, filament);
 					break;
 				case PrinterState.Error:
 					screen.ShowError(string.IsNullOrEmpty(LastError) ? "Error" : LastError, filament);
@@ -381,7 +464,7 @@ namespace PC.Component
 			if (AttachedSpool != null && jObject.TryGetValue("tdpSpoolRemaining", out var rem) && rem != null)
 				AttachedSpool.SetRemaining(rem.Value<float>());
 			// A live print cannot be resumed without the imported mesh; load idle.
-			State = PrinterState.Idle;
+			SetState(PrinterState.Idle);
 			CurrentModel = null;
 			Progress01 = 0f;
 			RemainingSeconds = 0f;

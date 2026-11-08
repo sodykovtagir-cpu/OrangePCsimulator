@@ -58,5 +58,16 @@ namespace PC.Component
 			if (Instance != null) UnityEngine.Object.Destroy(Instance);
 			Instance = null;
 		}
+
+		public void ApplyColor(Color color)
+		{
+			if (Instance == null) return;
+			var block = new MaterialPropertyBlock();
+			block.SetColor("_Color", color);
+			block.SetColor("_BaseColor", color);
+			var renderers = Instance.GetComponentsInChildren<Renderer>(true);
+			for (int i = 0; i < renderers.Length; i++)
+				if (renderers[i] != null) renderers[i].SetPropertyBlock(block);
+		}
 	}
 }

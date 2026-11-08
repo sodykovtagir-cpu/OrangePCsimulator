@@ -60,7 +60,7 @@ def test_screen_shows_time_model_filament():
     for token in ("modelNameText", "timeText", "filamentText", "ShowPrinting", "FormatTime", "FormatFilament"):
         assert token in text
     printer = PRINTER.read_text(encoding="utf-8")
-    assert "screen.ShowPrinting(CurrentModel" in printer
+    assert "screen.ShowPrinting(modelName" in printer
     assert "RemainingSeconds" in printer
 
 

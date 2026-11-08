@@ -34,6 +34,11 @@ namespace PC.Component.Software.OS
 
 		public void PickDevice(OperatingSystem os, Action<Device> callback, int type)
 		{
+			PickDevice(os, callback, type, false);
+		}
+
+		public void PickDevice(OperatingSystem os, Action<Device> callback, int type, bool discoverNearby)
+		{
 			this.callback = callback;
 			this.os = os;
 
@@ -45,7 +50,7 @@ namespace PC.Component.Software.OS
 
 			listView.Clear();
 
-			var src = os.ListInstalledDevices();
+			var src = discoverNearby ? os.DiscoverDevices() : os.ListInstalledDevices();
 			DeviceDetail[] filtered;
 
 			if (src != null && src.Count > 0)
