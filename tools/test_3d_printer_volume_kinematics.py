@@ -22,10 +22,10 @@ def test_print_volume_limit_and_autofit():
 def test_extruder_travels_along_beam_local_axis():
     text = PRINTER.read_text(encoding="utf-8")
     assert "CacheExtruderAxis()" in text
-    assert "Transform beam = axisX.parent;" in text
+    assert "Transform beam = mover.parent;" in text
     assert "extruderTravelAxis" in text
     assert "extruderTravelLimit" in text
-    assert "axisX.localPosition = axisXRest + extruderTravelAxis * x;" in text
+    assert "motionX.localPosition = motionXRest + extruderTravelAxis * x;" in text
     # Bed forward/back is inverted when the bed itself is the Z axis.
     assert "axisZ == printBed ? -1f : 1f" in text
 
@@ -40,7 +40,7 @@ def test_no_collider_or_rigidbody_while_printing():
     assert "bodies[i].detectCollisions = false;" in text
     # Physics is only added after the print finishes.
     finish = text[text.index("private void FinishPrint()"):text.index("private void Fail(")]
-    assert "CurrentModel.AddFinishedPhysics();" in finish
+    assert "finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);" in finish
     start = text[text.index("public bool StartPrint(PrintableModel model)"):text.index("public void CancelPrint()")]
     assert "AddFinishedPhysics" not in start
 

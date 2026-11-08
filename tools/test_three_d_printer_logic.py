@@ -25,13 +25,13 @@ def test_print_time_scales_with_polygons_average_ten_minutes():
     assert "averagePrintSeconds = 600f" in text
     assert "referenceTriangles = 10000" in text
     assert "EstimatePrintSeconds(int triangleCount)" in text
-    assert "Mathf.Clamp(averagePrintSeconds * ratio, minPrintSeconds, maxPrintSeconds)" in text
+    assert "Mathf.Clamp(basePrintSeconds + averagePrintSeconds * ratio, minPrintSeconds, maxPrintSeconds)" in text
     # Mirror the formula: 10k tris -> 600 s, 5k -> 300 s, tiny -> min clamp.
     def estimate(tris):
-        return max(20.0, min(3600.0, 600.0 * (tris / 10000.0)))
-    assert abs(estimate(10000) - 600.0) < 1e-6
-    assert abs(estimate(5000) - 300.0) < 1e-6
-    assert estimate(1) == 20.0
+        return max(180.0, min(3600.0, 60.0 + 600.0 * (tris / 10000.0)))
+    assert abs(estimate(10000) - 660.0) < 1e-6
+    assert abs(estimate(5000) - 360.0) < 1e-6
+    assert estimate(1) == 180.0
 
 
 def test_spool_one_meter_and_gradual_consumption():
@@ -50,7 +50,7 @@ def test_spool_one_meter_and_gradual_consumption():
 def test_spool_swap_blocked_while_printing():
     text = PRINTER.read_text(encoding="utf-8")
     attach = text[text.index("public bool AttachSpool"):text.index("public bool DetachSpool")]
-    detach = text[text.index("public bool DetachSpool"):text.index("// ----- Import / print")]
+    detach = text[text.index("public bool DetachSpool"):text.index("// ----- Import / scale")]
     assert "if (IsPrinting || spool == null) return false;" in attach
     assert "if (IsPrinting || AttachedSpool == null) return false;" in detach
 

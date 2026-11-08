@@ -27,9 +27,9 @@ def test_vertical_axis_moves_with_print_and_bed_auto_direction():
     assert "VerticalDirection" in text
     assert "axisY == printBed ? -1f : 1f" in text
     assert "float printedHeight = modelHeight * Mathf.Clamp01(progress);" in text
-    assert "axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * printedHeight);" in text
+    assert "axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * (printedHeight + nozzleHeightOffset));" in text
     # If the bed itself is used as X/Z axis, invert so the model stays under nozzle.
-    assert "axisX == printBed ? -1f : 1f" in text
+    assert "motionX == printBed ? -1f : 1f" in text
     assert "axisZ == printBed ? -1f : 1f" in text
 
 
@@ -41,8 +41,8 @@ def test_finished_model_gets_rigidbody_and_island_box_colliders():
     assert "AddIslandColliders" in text
     assert "weldMap" in text and "union(a, b)" in text
     printer = PRINTER.read_text(encoding="utf-8")
-    assert "CurrentModel.AddFinishedPhysics();" in printer
-    assert "CurrentModel.Instance.transform.SetParent(null, true);" in printer
+    assert "finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);" in printer
+    assert "finished.Instance.transform.SetParent(null, true);" in printer
 
 
 def test_screen_progress_bar_is_horizontal_filled():

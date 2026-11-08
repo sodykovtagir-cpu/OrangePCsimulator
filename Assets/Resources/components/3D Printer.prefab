@@ -1281,17 +1281,29 @@ MonoBehaviour:
   infillLinesPerLayer: 12
   nozzleHeightOffset: 0.01
   axisYDirection: 0
+  extruderPivot: {fileID: 0}
+  grabClearance: 0.08
   toolpathScale: 1
+  printVolumeCollider: {fileID: 0}
   maxPrintSize: {x: 0.8, y: 0.8, z: 0.8}
   autoFitModel: 1
   rejectOversizedModels: 0
+  minPrintScaleFraction: 0.05
   referenceTriangles: 10000
+  basePrintSeconds: 60
   averagePrintSeconds: 600
-  minPrintSeconds: 20
+  minPrintSeconds: 180
   maxPrintSeconds: 3600
   filamentPerTriangle: 0.00008
   filamentPerCubicMeter: 0
   minFilamentMeters: 0.02
+  powerPort: {fileID: 0}
+  idleWatts: 12
+  minPrintWatts: 80
+  maxPrintWatts: 350
+  printedDensityKgPerCubicMeter: 180
+  minPrintedMassKg: 0.02
+  maxPrintedMassKg: 5
 --- !u!54 &206941935389873938
 Rigidbody:
   m_ObjectHideFlags: 0

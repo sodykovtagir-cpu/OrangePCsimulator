@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace PC.Component.Cabling
 {
-    public enum PortKind { Outlet, PcPower, MonitorPower, VgaInput, HdmiInput, BoardVideo, GpuVideo, RouterPower, RouterLan, PcLan }
+    public enum PortKind { Outlet, PcPower, MonitorPower, VgaInput, HdmiInput, BoardVideo, GpuVideo, RouterPower, RouterLan, PcLan, PrinterPower }
     public enum CableKind { Power, VGA, HDMI, LAN }
 
     // Put a CablePort with a SphereCollider (Is Trigger) on the device prefab.
@@ -16,7 +16,7 @@ namespace PC.Component.Cabling
         public Item owner;
         [SerializeField] private Transform snapPivot;
         public CablePlug plug;
-        private static readonly Material[] portMaterials = new Material[10];
+        private static readonly Material[] portMaterials = new Material[11];
         public Transform Snap => snapPivot != null ? snapPivot :
             transform.Find("Snap Pivot") != null ? transform.Find("Snap Pivot") : transform;
         public Vector3 TriggerCenter => GetComponent<SphereCollider>() is SphereCollider sphere
@@ -49,8 +49,9 @@ namespace PC.Component.Cabling
                 if (kind == PortKind.Outlet)
                     return candidate.End == 0 && (restoring || Powered) && (opposite == null ||
                         opposite.kind == PortKind.PcPower || opposite.kind == PortKind.MonitorPower ||
-                        opposite.kind == PortKind.RouterPower);
-                if (kind == PortKind.PcPower || kind == PortKind.MonitorPower || kind == PortKind.RouterPower)
+                        opposite.kind == PortKind.RouterPower || opposite.kind == PortKind.PrinterPower);
+                if (kind == PortKind.PcPower || kind == PortKind.MonitorPower ||
+                    kind == PortKind.RouterPower || kind == PortKind.PrinterPower)
                     return candidate.End == 1 && (opposite == null || opposite.kind == PortKind.Outlet);
                 return false;
             }
@@ -165,6 +166,7 @@ namespace PC.Component.Cabling
                             kind == PortKind.BoardVideo ? new Color(.18f, .67f, .35f) :
                             kind == PortKind.VgaInput ? new Color(.25f, .32f, .78f) :
                             kind == PortKind.HdmiInput ? new Color(.18f, .18f, .2f) :
+                            kind == PortKind.PrinterPower ? new Color(.30f, .22f, .12f) :
                             kind == PortKind.Outlet ? new Color(.85f, .85f, .82f) :
                             new Color(.25f, .25f, .25f);
                         portMaterials[index] = mat;

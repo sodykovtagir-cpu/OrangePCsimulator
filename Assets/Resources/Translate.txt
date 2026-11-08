@@ -601,3 +601,6 @@ Finished	Finished																	Готово
 Model	Model																	Модель																								
 Filament	Filament																	Филамент																								
 White Filament	White Filament																	Белый филамент																								
+Power	Power																	Питание																								
+Scale	Scale																	Масштаб																								
+No power	No power																	Нет питания																								

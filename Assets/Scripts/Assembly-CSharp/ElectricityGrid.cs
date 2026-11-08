@@ -218,6 +218,9 @@ public sealed class ElectricityGrid : MonoBehaviour
         foreach (var router in FindObjectsOfType<PC.Component.Networking.RouterDevice>())
             if (router != null && router.IsPowered)
                 watts += Mathf.Max(0f, router.PowerWatts);
+        foreach (var printer in FindObjectsOfType<PC.Component.ThreeDPrinter>())
+            if (printer != null && printer.IsPowered)
+                watts += Mathf.Max(0f, printer.CurrentWatts);
         CurrentWatts = watts;
     }
 }

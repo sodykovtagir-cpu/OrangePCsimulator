@@ -26,11 +26,11 @@ public class Item : MonoBehaviour, ISave
 		set => spawnId = value;
 	}
 
-	public string Info
-	{
-		get => info;
-		private set => info = value;
-	}
+    public string Info
+    {
+        get => info;
+        protected set => info = value;
+    }
 
 	public byte Match
 	{

@@ -4,9 +4,12 @@ using UnityEngine.UI;
 namespace PC.Component.Software
 {
 	/// <summary>
-	/// Desktop app for the physical 3D printer: select a nearby printer, import a
-	/// model, preview it, and start the print. Buttons/text/preview are wired in
-	/// the 3DPrinter app prefab.
+	/// Desktop app for the physical 3D printer. The preview is a real 3D scene:
+	/// the model stands on a small build plate, is lit from several sides and
+	/// slowly rotates. A slider scales the pending print from a tiny fraction up
+	/// to the maximum volume (optionally defined by a BoxCollider). The app
+	/// clears its selection/preview when closed, when the OS stops, and after a
+	/// print finishes.
 	/// </summary>
 	public class ThreeDPrinterApp : App
 	{
@@ -20,20 +23,30 @@ namespace PC.Component.Software
 		[SerializeField] private Text selectPrinterText;
 		[SerializeField] private Text importModelText;
 		[SerializeField] private Text startPrintText;
+		[SerializeField] private Text scaleText;
 
 		[Header("Preview")]
 		[SerializeField] private RawImage previewImage;
+		[SerializeField] private Slider scaleSlider;
+		[SerializeField] private BoxCollider previewMaxBounds;
 		[SerializeField] private int printerDeviceType = 4;
-		[SerializeField] private Vector2Int previewResolution = new Vector2Int(256, 256);
-		[SerializeField] private float previewRotationSpeed = 30f;
+		[SerializeField] private Vector2Int previewResolution = new Vector2Int(384, 384);
+		[SerializeField] private float previewRotationSpeed = 24f;
+		[SerializeField, Range(0.01f, 1f)] private float minPreviewScaleFraction = 0.05f;
 		[SerializeField] private Color previewBackground = new Color(0.10f, 0.10f, 0.12f, 1f);
 
 		private ThreeDPrinter selectedPrinter;
+		private ThreeDPrinter subscribedPrinter;
 		private GameObject previewRoot;
+		private GameObject previewPlate;
+		private Transform previewModelPivot;
 		private Camera previewCamera;
+		private Light previewLight;
 		private RenderTexture previewTexture;
 		private GameObject previewClone;
 		private PrintableModel previewModel;
+		private Vector3 previewBaseScale = Vector3.one;
+		private bool previewBaseValid;
 
 		protected override void Start()
 		{
@@ -44,14 +57,19 @@ namespace PC.Component.Software
 			if (selectPrinterText != null) selectPrinterText.text = Localization.GetText("Select Printer");
 			if (importModelText != null) importModelText.text = Localization.GetText("Import Model");
 			if (startPrintText != null) startPrintText.text = Localization.GetText("Start Print");
-			RefreshUI();
+			if (scaleSlider != null)
+			{
+				scaleSlider.minValue = 0f;
+				scaleSlider.maxValue = 1f;
+				scaleSlider.wholeNumbers = false;
+				scaleSlider.onValueChanged.AddListener(OnScaleSlider);
+			}
+			ResetAppState();
 		}
 
 		private void Bind(Button button, UnityEngine.Events.UnityAction action)
 		{
 			if (button == null) return;
-			// The prefab already wires persistent onClick calls. Only add a runtime
-			// listener as a fallback, otherwise Import/Start would fire twice.
 			if (button.onClick.GetPersistentEventCount() == 0)
 				button.onClick.AddListener(action);
 		}
@@ -69,22 +87,54 @@ namespace PC.Component.Software
 			var picker = os.DevicePicker;
 			if (picker != null)
 			{
-				picker.PickDevice(os, device =>
-				{
-					selectedPrinter = device as ThreeDPrinter;
-					ClearPreviewClone();
-					RefreshUI();
-				}, printerDeviceType, true);
+				picker.PickDevice(os, device => SetSelectedPrinter(device as ThreeDPrinter), printerDeviceType, true);
 				return;
 			}
-
 			var printers = FindObjectsOfType<ThreeDPrinter>();
-			if (printers != null && printers.Length > 0)
+			if (printers != null && printers.Length > 0) SetSelectedPrinter(printers[0]);
+		}
+
+		private void SetSelectedPrinter(ThreeDPrinter printer)
+		{
+			UnsubscribePrinter();
+			selectedPrinter = printer;
+			subscribedPrinter = printer;
+			if (subscribedPrinter != null)
 			{
-				selectedPrinter = printers[0];
-				ClearPreviewClone();
-				RefreshUI();
+				subscribedPrinter.PrintFinished += OnPrintFinished;
+				subscribedPrinter.ModelImported += OnModelImported;
+				subscribedPrinter.StateChanged += OnStateChanged;
+				if (scaleSlider != null) scaleSlider.SetValueWithoutNotify(subscribedPrinter.PrintScale01);
 			}
+			previewModel = null;
+			ClearPreviewClone();
+			RefreshUI();
+		}
+
+		private void UnsubscribePrinter()
+		{
+			if (subscribedPrinter == null) return;
+			subscribedPrinter.PrintFinished -= OnPrintFinished;
+			subscribedPrinter.ModelImported -= OnModelImported;
+			subscribedPrinter.StateChanged -= OnStateChanged;
+			subscribedPrinter = null;
+		}
+
+		private void OnPrintFinished(PrintableModel model)
+		{
+			ResetAppState();
+		}
+
+		private void OnModelImported(PrintableModel model)
+		{
+			previewModel = null;
+			ClearPreviewClone();
+			RefreshUI();
+		}
+
+		private void OnStateChanged()
+		{
+			RefreshUI();
 		}
 
 		public void ImportModel()
@@ -104,7 +154,15 @@ namespace PC.Component.Software
 				ShowHint("No printer selected");
 				return;
 			}
+			if (scaleSlider != null) selectedPrinter.SetPrintScale01(scaleSlider.value);
 			selectedPrinter.StartPrint();
+			RefreshUI();
+		}
+
+		private void OnScaleSlider(float value)
+		{
+			if (selectedPrinter != null) selectedPrinter.SetPrintScale01(value);
+			ApplyPreviewScale();
 			RefreshUI();
 		}
 
@@ -112,11 +170,16 @@ namespace PC.Component.Software
 		{
 			bool hasPrinter = selectedPrinter != null;
 			bool printing = hasPrinter && selectedPrinter.IsPrinting;
+			var model = hasPrinter ? (selectedPrinter.CurrentModel != null ? selectedPrinter.CurrentModel : selectedPrinter.PendingModel) : null;
 			bool canImport = hasPrinter && !printing;
-			bool canStart = hasPrinter && !printing && selectedPrinter.PendingModel != null && selectedPrinter.AttachedSpool != null;
+			bool canStart = hasPrinter && !printing && model != null && selectedPrinter.AttachedSpool != null && selectedPrinter.IsPowered;
 
 			if (importModelButton != null) importModelButton.interactable = canImport;
 			if (startPrintButton != null) startPrintButton.interactable = canStart;
+			if (scaleSlider != null) scaleSlider.interactable = hasPrinter && !printing && model != null;
+
+			float scale01 = scaleSlider != null ? scaleSlider.value : (hasPrinter ? selectedPrinter.PrintScale01 : 1f);
+			if (scaleText != null) scaleText.text = Localization.GetText("Scale") + ": " + Mathf.RoundToInt(scale01 * 100f) + "%";
 
 			if (infoText == null) return;
 			if (!hasPrinter)
@@ -127,20 +190,17 @@ namespace PC.Component.Software
 
 			var sb = new System.Text.StringBuilder();
 			sb.AppendLine(selectedPrinter.DeviceName);
-			var model = selectedPrinter.CurrentModel != null ? selectedPrinter.CurrentModel : selectedPrinter.PendingModel;
+			sb.AppendLine(Localization.GetText("Power") + ": " + (selectedPrinter.IsPowered
+				? selectedPrinter.CurrentWatts.ToString("0") + " W"
+				: Localization.GetText("No power")));
 			if (model != null)
 			{
 				sb.AppendLine(Localization.GetText("Model") + ": " + model.Name);
 				sb.AppendLine(Localization.GetText("Triangles") + ": " + model.TriangleCount);
-				float seconds = selectedPrinter.EstimatePrintSeconds(model.TriangleCount);
-				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(seconds));
-				float needed = selectedPrinter.EstimateFilamentMeters(model);
-				sb.AppendLine(Localization.GetText("Required filament") + ": " + needed.ToString("0.00") + " m");
+				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(selectedPrinter.EstimatePrintSeconds(model.TriangleCount)));
+				sb.AppendLine(Localization.GetText("Required filament") + ": " + selectedPrinter.EstimateFilamentMeters(model).ToString("0.00") + " m");
 			}
-			else
-			{
-				sb.AppendLine(Localization.GetText("No model imported"));
-			}
+			else sb.AppendLine(Localization.GetText("No model imported"));
 
 			var spool = selectedPrinter.AttachedSpool;
 			if (spool != null)
@@ -149,15 +209,10 @@ namespace PC.Component.Software
 					" / " + spool.CapacityMeters.ToString("0.00") + " m");
 				if (spool.IsLowFilament) sb.AppendLine(Localization.GetText("Low filament"));
 			}
-			else
-			{
-				sb.AppendLine(Localization.GetText("No filament spool"));
-			}
+			else sb.AppendLine(Localization.GetText("No filament spool"));
 
 			if (printing)
 				sb.AppendLine(Localization.GetText("Printing") + " " + Mathf.RoundToInt(selectedPrinter.Progress01 * 100f) + "%");
-			else if (selectedPrinter.State == ThreeDPrinter.PrinterState.Finished)
-				sb.AppendLine(Localization.GetText("Finished"));
 			else if (selectedPrinter.State == ThreeDPrinter.PrinterState.Error)
 				sb.AppendLine(Localization.GetText("Error") + ": " + selectedPrinter.LastError);
 
@@ -176,7 +231,22 @@ namespace PC.Component.Software
 			if (os != null) os.ShowMessageBox(Localization.GetText("3D Printer"), Localization.GetText(key));
 		}
 
-		// ----- Preview --------------------------------------------------------
+		public void ResetAppState()
+		{
+			UnsubscribePrinter();
+			selectedPrinter = null;
+			previewModel = null;
+			previewBaseValid = false;
+			ClearPreviewClone();
+			ReleasePreview();
+			if (scaleSlider != null) scaleSlider.SetValueWithoutNotify(1f);
+			if (infoText != null) infoText.text = Localization.GetText("No printer selected");
+			if (importModelButton != null) importModelButton.interactable = false;
+			if (startPrintButton != null) startPrintButton.interactable = false;
+			if (scaleSlider != null) scaleSlider.interactable = false;
+		}
+
+		// ----- 3D preview -----------------------------------------------------
 
 		private void UpdatePreview()
 		{
@@ -189,8 +259,8 @@ namespace PC.Component.Software
 				previewModel = model;
 				RebuildPreview(model);
 			}
-			if (previewRoot != null)
-				previewRoot.transform.Rotate(Vector3.up, previewRotationSpeed * Time.deltaTime, Space.World);
+			if (previewModelPivot != null)
+				previewModelPivot.Rotate(Vector3.up, previewRotationSpeed * Time.deltaTime, Space.World);
 			if (previewCamera != null) previewCamera.Render();
 		}
 
@@ -200,18 +270,46 @@ namespace PC.Component.Software
 			previewRoot = new GameObject("3DPrinterPreviewRoot");
 			previewRoot.transform.position = new Vector3(0f, -1000f, 0f);
 
+			var pivot = new GameObject("PreviewModelPivot");
+			pivot.transform.SetParent(previewRoot.transform, false);
+			previewModelPivot = pivot.transform;
+
+			previewPlate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+			previewPlate.name = "PreviewBuildPlate";
+			Destroy(previewPlate.GetComponent<Collider>());
+			previewPlate.transform.SetParent(previewRoot.transform, false);
+			previewPlate.transform.localPosition = new Vector3(0f, -0.03f, 0f);
+			previewPlate.transform.localScale = new Vector3(2.2f, 0.06f, 2.2f);
+			previewPlate.layer = 11;
+			var plateRenderer = previewPlate.GetComponent<Renderer>();
+			if (plateRenderer != null)
+			{
+				var mat = new Material(Shader.Find("Universal Render Pipeline/Lit") != null
+					? Shader.Find("Universal Render Pipeline/Lit") : Shader.Find("Standard"));
+				mat.color = new Color(0.16f, 0.16f, 0.18f, 1f);
+				plateRenderer.sharedMaterial = mat;
+			}
+
 			var camGo = new GameObject("3DPrinterPreviewCamera");
-			camGo.transform.position = previewRoot.transform.position + new Vector3(0f, 0f, -5f);
-			camGo.transform.rotation = Quaternion.identity;
+			camGo.transform.SetParent(previewRoot.transform, false);
+			camGo.transform.localPosition = new Vector3(2.35f, 1.85f, -2.75f);
+			camGo.transform.LookAt(previewRoot.transform.position + new Vector3(0f, 0.55f, 0f));
 			previewCamera = camGo.AddComponent<Camera>();
 			previewCamera.enabled = false;
-			previewCamera.cullingMask = 1 << 11; // Preview layer
+			previewCamera.cullingMask = 1 << 11;
 			previewCamera.clearFlags = CameraClearFlags.SolidColor;
 			previewCamera.backgroundColor = previewBackground;
-			previewCamera.orthographic = true;
-			previewCamera.orthographicSize = 1.5f;
+			previewCamera.fieldOfView = 38f;
 			previewCamera.nearClipPlane = 0.01f;
 			previewCamera.farClipPlane = 100f;
+
+			var lightGo = new GameObject("3DPrinterPreviewLight");
+			lightGo.transform.SetParent(previewRoot.transform, false);
+			lightGo.transform.localRotation = Quaternion.Euler(50f, -35f, 0f);
+			previewLight = lightGo.AddComponent<Light>();
+			previewLight.type = LightType.Directional;
+			previewLight.intensity = 1.15f;
+			previewLight.cullingMask = 1 << 11;
 
 			previewTexture = new RenderTexture(Mathf.Max(32, previewResolution.x), Mathf.Max(32, previewResolution.y), 24, RenderTextureFormat.ARGB32);
 			previewCamera.targetTexture = previewTexture;
@@ -222,10 +320,11 @@ namespace PC.Component.Software
 		private void RebuildPreview(PrintableModel model)
 		{
 			ClearPreviewClone();
+			previewBaseValid = false;
 			if (model == null || model.Instance == null) return;
 			EnsurePreviewRig();
 
-			previewClone = Instantiate(model.Instance, previewRoot.transform);
+			previewClone = Instantiate(model.Instance, previewModelPivot);
 			previewClone.name = "PreviewModel";
 			previewClone.SetActive(true);
 			SetLayerRecursive(previewClone, 11);
@@ -241,14 +340,40 @@ namespace PC.Component.Software
 			foreach (var r in previewClone.GetComponentsInChildren<Renderer>(true))
 				if (r != null) r.SetPropertyBlock(block);
 
+			previewBaseScale = previewClone.transform.localScale;
+			previewBaseValid = GetBounds(previewClone).size.sqrMagnitude > 0.000001f;
+			ApplyPreviewScale();
+		}
+
+		private Vector3 GetPreviewMaxSize()
+		{
+			if (previewMaxBounds != null) return previewMaxBounds.size;
+			if (selectedPrinter != null && selectedPrinter.PrintVolumeCollider != null)
+				return selectedPrinter.PrintVolumeCollider.size;
+			return new Vector3(1.6f, 1.6f, 1.6f);
+		}
+
+		private void ApplyPreviewScale()
+		{
+			if (previewClone == null || !previewBaseValid || previewModelPivot == null) return;
+			previewClone.transform.localScale = previewBaseScale;
+			Bounds baseBounds = GetBounds(previewClone);
+			if (baseBounds.size.sqrMagnitude <= 0.000001f) return;
+			Vector3 maxSize = GetPreviewMaxSize();
+			float sx = maxSize.x > 0.0001f ? maxSize.x / Mathf.Max(0.0001f, baseBounds.size.x) : 1f;
+			float sy = maxSize.y > 0.0001f ? maxSize.y / Mathf.Max(0.0001f, baseBounds.size.y) : 1f;
+			float sz = maxSize.z > 0.0001f ? maxSize.z / Mathf.Max(0.0001f, baseBounds.size.z) : 1f;
+			float maxFit = Mathf.Max(0.0001f, Mathf.Min(sx, Mathf.Min(sy, sz)));
+			float minFit = maxFit * Mathf.Clamp(minPreviewScaleFraction, 0.01f, 1f);
+			float t = scaleSlider != null ? scaleSlider.value : 1f;
+			float scale = Mathf.Lerp(minFit, maxFit, Mathf.Clamp01(t));
+			previewClone.transform.localScale = previewBaseScale * scale;
+
 			Bounds bounds = GetBounds(previewClone);
-			if (bounds.size.sqrMagnitude <= 0.000001f) return;
-			previewClone.transform.position += previewRoot.transform.position - bounds.center;
-			float max = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
-			float scale = 2f / Mathf.Max(0.0001f, max);
-			previewClone.transform.localScale *= scale;
-			Bounds bounds2 = GetBounds(previewClone);
-			previewClone.transform.position += previewRoot.transform.position - bounds2.center;
+			Vector3 target = previewModelPivot.position;
+			previewClone.transform.position += target - bounds.center;
+			bounds = GetBounds(previewClone);
+			previewClone.transform.position += Vector3.up * (target.y - bounds.min.y);
 		}
 
 		private static Bounds GetBounds(GameObject go)
@@ -275,6 +400,7 @@ namespace PC.Component.Software
 		{
 			if (previewClone != null) Destroy(previewClone);
 			previewClone = null;
+			previewBaseValid = false;
 		}
 
 		private void ReleasePreview()
@@ -282,6 +408,12 @@ namespace PC.Component.Software
 			ClearPreviewClone();
 			if (previewCamera != null) Destroy(previewCamera.gameObject);
 			previewCamera = null;
+			if (previewLight != null) Destroy(previewLight.gameObject);
+			previewLight = null;
+			if (previewPlate != null) Destroy(previewPlate);
+			previewPlate = null;
+			if (previewModelPivot != null) Destroy(previewModelPivot.gameObject);
+			previewModelPivot = null;
 			if (previewRoot != null) Destroy(previewRoot);
 			previewRoot = null;
 			if (previewTexture != null)
@@ -293,14 +425,20 @@ namespace PC.Component.Software
 			if (previewImage != null) previewImage.texture = null;
 		}
 
+		public override void OnSystemStop()
+		{
+			ResetAppState();
+		}
+
 		public override void Close()
 		{
-			ReleasePreview();
+			ResetAppState();
 			base.Close();
 		}
 
 		private void OnDestroy()
 		{
+			UnsubscribePrinter();
 			ReleasePreview();
 		}
 	}

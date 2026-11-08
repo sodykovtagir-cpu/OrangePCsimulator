@@ -78,6 +78,11 @@ namespace PC.Component
 		/// </summary>
 		public void AddFinishedPhysics()
 		{
+			AddFinishedPhysics(180f, 0.02f, 5f);
+		}
+
+		public void AddFinishedPhysics(float densityKgPerCubicMeter, float minMassKg, float maxMassKg)
+		{
 			if (Instance == null) return;
 			GameObject root = Instance;
 
@@ -85,7 +90,13 @@ namespace PC.Component
 			if (rb == null) rb = root.AddComponent<Rigidbody>();
 			rb.isKinematic = false;
 			rb.useGravity = true;
-			rb.mass = Mathf.Clamp(BoundsVolume * 50f, 0.05f, 20f);
+			// Printed plastic is mostly infill/air; use the actual finished world
+			// size, not the original import bounds, so tiny prints stay light.
+			float volume = GetWorldBoundsVolume(root);
+			float density = Mathf.Max(0f, densityKgPerCubicMeter);
+			float minMass = Mathf.Max(0.001f, minMassKg);
+			float maxMass = Mathf.Max(minMass, maxMassKg);
+			rb.mass = Mathf.Clamp(volume * density, minMass, maxMass);
 			rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 			rb.interpolation = RigidbodyInterpolation.Interpolate;
 
@@ -198,6 +209,22 @@ namespace PC.Component
 				added = true;
 			}
 			return added;
+		}
+
+		private static float GetWorldBoundsVolume(GameObject root)
+		{
+			var renderers = root.GetComponentsInChildren<Renderer>(true);
+			Bounds bounds = new Bounds(root.transform.position, Vector3.zero);
+			bool has = false;
+			for (int i = 0; i < renderers.Length; i++)
+			{
+				if (renderers[i] == null) continue;
+				if (!has) { bounds = renderers[i].bounds; has = true; }
+				else bounds.Encapsulate(renderers[i].bounds);
+			}
+			if (!has) return Mathf.Max(0f, BoundsVolume);
+			Vector3 s = bounds.size;
+			return Mathf.Max(0f, s.x) * Mathf.Max(0f, s.y) * Mathf.Max(0f, s.z);
 		}
 
 		private static Bounds WorldBoundsToLocal(Transform root, Bounds world)
