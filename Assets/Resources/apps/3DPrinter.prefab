@@ -323,6 +323,39 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &114300000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1857380037399119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 913e3e8ae06e4a08a65cfe79c0abcf7e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  appName: 3D Printer
+  icon: {fileID: 21300000, guid: 96a503055dda6c740a6e0955c72c6fc2, type: 2}
+  fileName: 
+  fileIcon: {fileID: 0}
+  size: 256
+  MenuBar: []
+  maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
+  normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}
+  windowState: {fileID: 3605613799578631203}
+  selectPrinterButton: {fileID: 6356803466772139884}
+  importModelButton: {fileID: 2601464257445309563}
+  startPrintButton: {fileID: 6749128044747262887}
+  infoText: {fileID: 8597816546118478055}
+  selectPrinterText: {fileID: 9056765482461874679}
+  importModelText: {fileID: 9092609872106838976}
+  startPrintText: {fileID: 6152361280907534568}
+  previewImage: {fileID: 718801772354570638}
+  printerDeviceType: 4
+  previewResolution: {x: 256, y: 256}
+  previewRotationSpeed: 30
+  previewBackground: {r: 0.1, g: 0.1, b: 0.12, a: 1}
 --- !u!1 &638503064343773743
 GameObject:
   m_ObjectHideFlags: 0
@@ -818,7 +851,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-
 --- !u!1 &2893195251462430567
 GameObject:
   m_ObjectHideFlags: 0
@@ -952,7 +984,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-
 --- !u!1 &3804438411041254014
 GameObject:
   m_ObjectHideFlags: 0
@@ -1229,9 +1260,9 @@ MonoBehaviour:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
     m_FontSize: 30
     m_FontStyle: 0
-    m_BestFit: 0
+    m_BestFit: 1
     m_MinSize: 3
-    m_MaxSize: 40
+    m_MaxSize: 30
     m_Alignment: 0
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -1455,37 +1486,3 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-
---- !u!114 &114300000000000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1857380037399119}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 913e3e8ae06e4a08a65cfe79c0abcf7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  appName: 3D Printer
-  icon: {fileID: 21300000, guid: 96a503055dda6c740a6e0955c72c6fc2, type: 2}
-  fileName: 
-  fileIcon: {fileID: 0}
-  size: 256
-  MenuBar: []
-  maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
-  normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}
-  windowState: {fileID: 3605613799578631203}
-  selectPrinterButton: {fileID: 6356803466772139884}
-  importModelButton: {fileID: 2601464257445309563}
-  startPrintButton: {fileID: 6749128044747262887}
-  infoText: {fileID: 8597816546118478055}
-  selectPrinterText: {fileID: 9056765482461874679}
-  importModelText: {fileID: 9092609872106838976}
-  startPrintText: {fileID: 6152361280907534568}
-  previewImage: {fileID: 718801772354570638}
-  printerDeviceType: 4
-  previewResolution: {x: 256, y: 256}
-  previewRotationSpeed: 30
-  previewBackground: {r: 0.1, g: 0.1, b: 0.12, a: 1}
