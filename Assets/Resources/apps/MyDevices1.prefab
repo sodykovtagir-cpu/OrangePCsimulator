@@ -1174,6 +1174,8 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: c2d5d5a091b8a26478906132315a44fc, type: 2}
   - type: 3
     icon: {fileID: 21300000, guid: b7e7cc273e90af840a82027a0dc50c2f, type: 2}
+  - type: 4
+    icon: {fileID: 21300000, guid: 96a503055dda6c740a6e0955c72c6fc2, type: 2}
   unknownDeviceIcon: {fileID: 21300000, guid: 8b59755cf5fc88740b5e143b3cd0c834, type: 2}
   deviceNameInput: {fileID: 114579209557768191}
 maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}

@@ -26,6 +26,7 @@ TagManager:
   - Glue
   - LiquidNitrogenTank
   - Radiator
+  - Filament
   layers:
   - Default
   - TransparentFX

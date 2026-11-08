@@ -344,6 +344,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7836370000854047131}
   - component: {fileID: 7360987547880140615}
+  - component: {fileID: 7360987547880140616}
   m_Layer: 0
   m_Name: Trigger
   m_TagString: Untagged
@@ -1051,8 +1052,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e4ae573d9eed4f4194d345fa0af705fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stateText: {fileID: 5923795716190395100}
-  modelNameText: {fileID: 0}
+  stateText: {fileID: 0}
+  modelNameText: {fileID: 5923795716190395100}
   timeText: {fileID: 3162453278932710884}
   filamentText: {fileID: 2582214785922105130}
   progressFill: {fileID: 2859272112378532549}
@@ -1091,14 +1092,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   deviceName: 3D Printer
-  deviceType: 0
+  deviceType: 4
   customName: 
-  spoolMount: {fileID: 8416298316344979586}
+  spoolMount: {fileID: 1381611921864309695}
   printBed: {fileID: 1278276766198344027}
   axisX: {fileID: 2197479694878469551}
   axisY: {fileID: 1278276766198344027}
   axisZ: {fileID: 6359469456475595657}
-  screen: {fileID: 0}
+  screen: {fileID: 5162813022938634744}
   loopAudio: {fileID: 0}
   printingClip: {fileID: 0}
   finishedClip: {fileID: 0}
@@ -1171,3 +1172,22 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1338139313663520283, guid: dddce2af335f5e94e8d253cd96d83692, type: 3}
   m_PrefabInstance: {fileID: 7376531321953443481}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7360987547880140616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3454153866903894653}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f35567f78c6622a51b9c18ad8b24fb7e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: Filament
+  matches: []
+  insertPos: {fileID: 1381611921864309695}
+  breakForce: 250
+  setParent: 1
+  plug: {fileID: 0}
+  unplug: {fileID: 0}

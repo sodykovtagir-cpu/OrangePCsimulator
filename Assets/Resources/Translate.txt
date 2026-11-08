@@ -586,3 +586,18 @@ Power Cable	Power cable	Power cable	Power cable	Power cable	Power cable	Power ca
 VGA Cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	Кабель VGA	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable	VGA cable
 HDMI Cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	Кабель HDMI	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable	HDMI cable
 Wall Outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Настенная розетка	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet	Wall outlet
+3D Printer	3D Printer																	3D-принтер																								
+Select Printer	Select Printer																	Выбрать принтер																								
+Import Model	Import Model																	Импорт модели																								
+Start Print	Start Print																	Начать печать																								
+No printer selected	No printer selected																	Принтер не выбран																								
+No model imported	No model imported																	Модель не импортирована																								
+No filament spool	No filament spool																	Нет катушки филамента																								
+Triangles	Triangles																	Треугольники																								
+Required filament	Required filament																	Нужно филамента																								
+Low filament	Low filament																	Мало филамента																								
+Printing	Printing																	Печать																								
+Finished	Finished																	Готово																								
+Model	Model																	Модель																								
+Filament	Filament																	Филамент																								
+White Filament	White Filament																	Белый филамент																								

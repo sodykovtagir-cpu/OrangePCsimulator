@@ -226,7 +226,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 114300000000000001}
         m_TargetAssemblyTypeName: 
         m_MethodName: Close
         m_Mode: 1
@@ -249,6 +249,7 @@ GameObject:
   - component: {fileID: 224250094824461198}
   - component: {fileID: 222320984896422606}
   - component: {fileID: 114959289935758204}
+  - component: {fileID: 114300000000000001}
   m_Layer: 5
   m_Name: 3DPrinter
   m_TagString: Untagged
@@ -672,7 +673,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 114300000000000001}
         m_TargetAssemblyTypeName: 
         m_MethodName: Maximize
         m_Mode: 1
@@ -804,7 +805,20 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 2787384875163796097}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114300000000000001}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: ImportModel
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+
 --- !u!1 &2893195251462430567
 GameObject:
   m_ObjectHideFlags: 0
@@ -925,7 +939,20 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 7558262275917491192}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114300000000000001}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: StartPrint
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+
 --- !u!1 &3804438411041254014
 GameObject:
   m_ObjectHideFlags: 0
@@ -1046,7 +1073,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 114300000000000001}
         m_TargetAssemblyTypeName: 
         m_MethodName: Minimize
         m_Mode: 1
@@ -1415,4 +1442,50 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 3391560720958569453}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 114300000000000001}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: SelectPrinter
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+
+--- !u!114 &114300000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1857380037399119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 913e3e8ae06e4a08a65cfe79c0abcf7e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  appName: 3D Printer
+  icon: {fileID: 21300000, guid: 96a503055dda6c740a6e0955c72c6fc2, type: 2}
+  fileName: 
+  fileIcon: {fileID: 0}
+  size: 256
+  MenuBar: []
+  maximizeSprite: {fileID: 21300000, guid: 8bee6c5e8f8f34343b72503754d62702, type: 2}
+  normalSprite: {fileID: 21300000, guid: c0189c21ff4a19140a624ae91c3dc4f6, type: 2}
+  windowState: {fileID: 3605613799578631203}
+  selectPrinterButton: {fileID: 6356803466772139884}
+  importModelButton: {fileID: 2601464257445309563}
+  startPrintButton: {fileID: 6749128044747262887}
+  infoText: {fileID: 8597816546118478055}
+  selectPrinterText: {fileID: 9056765482461874679}
+  importModelText: {fileID: 9092609872106838976}
+  startPrintText: {fileID: 6152361280907534568}
+  previewImage: {fileID: 718801772354570638}
+  printerDeviceType: 4
+  previewResolution: {x: 256, y: 256}
+  previewRotationSpeed: 30
+  previewBackground: {r: 0.1, g: 0.1, b: 0.12, a: 1}
