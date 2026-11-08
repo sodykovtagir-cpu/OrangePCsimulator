@@ -70,6 +70,16 @@ def test_app_downloader_has_3d_printer_and_fixed_mydevices():
     assert "- type: 4" in MYDEVICES.read_text(encoding="utf-8")
 
 
+def test_filament_no_unity_calls_in_field_initializers():
+    src = SPOOL_SCRIPT.read_text(encoding="utf-8")
+    # UnityException: CreateImpl is not allowed from MonoBehaviour ctor/field init.
+    assert not re.search(r"^\s*(private|protected|public|internal)[^;\n]*=\s*new MaterialPropertyBlock\(\)", src, re.M)
+    assert "private MaterialPropertyBlock block;" in src
+    assert "if (block == null) block = new MaterialPropertyBlock();" in src
+    # Awake and ApplyColor must both be safe if called early.
+    assert src.count("if (block == null) block = new MaterialPropertyBlock();") >= 2
+
+
 def test_app_script_and_nearby_picker():
     src = APP_SCRIPT.read_text(encoding="utf-8")
     for token in ("public void SelectPrinter", "public void ImportModel", "public void StartPrint", "RawImage previewImage", "RenderTexture"):
