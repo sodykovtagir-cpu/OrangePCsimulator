@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -10,6 +11,12 @@ namespace PC.Component
 	/// gradually from an attached spool. The spool is mounted physically through
 	/// Slot/Connector (remove mode or pull force). Importing a model and starting
 	/// a print are separate steps so the desktop app can show a preview first.
+	///
+	/// The toolpath is deterministic: for every layer the nozzle walks the
+	/// perimeter of that layer's footprint and then fills it with a serpentine
+	/// infill. The vertical axis moves as the print grows. If the serialized
+	/// vertical axis is the build plate, the plate moves DOWN so the growing
+	/// model top stays under the nozzle; otherwise the head moves UP.
 	/// </summary>
 	[RequireComponent(typeof(Item))]
 	public class ThreeDPrinter : Device
@@ -27,11 +34,19 @@ namespace PC.Component
 		[SerializeField] private AudioClip printingClip;
 		[SerializeField] private AudioClip finishedClip;
 
-		[Header("Axis animation ranges (local units)")]
+		[Header("Axis animation ranges (local units, fallback only)")]
 		[SerializeField] private Vector2 axisXRange = new Vector2(-0.1f, 0.1f);
 		[SerializeField] private Vector2 axisZRange = new Vector2(-0.1f, 0.1f);
 		[SerializeField] private float axisSpeed = 2f;
 		[SerializeField] private int layerCount = 40;
+
+		[Header("Toolpath")]
+		[SerializeField] private int perimeterPasses = 2;
+		[SerializeField] private int infillLinesPerLayer = 12;
+		[SerializeField] private float nozzleHeightOffset = 0.01f;
+		[Tooltip("0 = auto: build plate moves down, print head moves up. +1/-1 forces direction.")]
+		[SerializeField] private float axisYDirection = 0f;
+		[SerializeField] private float toolpathScale = 1f;
 
 		[Header("Print time / filament model")]
 		[SerializeField] private int referenceTriangles = 10000;
@@ -49,6 +64,13 @@ namespace PC.Component
 		private GameObject printProgressRoot;
 		private float totalSeconds;
 		private float requiredFilament;
+
+		private readonly List<Vector3> toolPath = new List<Vector3>();
+		private float[] toolPathCumulative;
+		private float toolPathLength;
+		private float modelHeight;
+		private float toolCenterX;
+		private float toolCenterZ;
 
 		public PrinterState State { get; private set; } = PrinterState.Idle;
 		public bool IsPrinting => State == PrinterState.Printing;
@@ -116,7 +138,6 @@ namespace PC.Component
 			return true;
 		}
 
-		// Called by FilamentSpool when the physical Slot/Connector attaches it.
 		public void OnSpoolPhysicallyAttached(FilamentSpool spool)
 		{
 			if (spool == null) return;
@@ -125,7 +146,6 @@ namespace PC.Component
 			UpdateScreen();
 		}
 
-		// Called by FilamentSpool when remove mode / pull force / destruction detaches it.
 		public void OnSpoolPhysicallyDetached(FilamentSpool spool)
 		{
 			if (spool == null || AttachedSpool != spool) return;
@@ -180,7 +200,6 @@ namespace PC.Component
 			}
 		}
 
-		// Backwards-compatible helper: import and immediately start.
 		public void OpenImportDialog()
 		{
 			if (IsPrinting)
@@ -252,9 +271,17 @@ namespace PC.Component
 			printProgressRoot.transform.SetParent(bed, false);
 			printProgressRoot.transform.localPosition = Vector3.zero;
 			printProgressRoot.transform.localRotation = Quaternion.identity;
-			printProgressRoot.transform.localScale = new Vector3(1f, 0.001f, 1f);
+			printProgressRoot.transform.localScale = Vector3.one;
 			model.Instance.SetActive(true);
 			model.Instance.transform.SetParent(printProgressRoot.transform, false);
+
+			// Seat the model bottom on the bed without touching its localScale.
+			Bounds seated = GetLocalBounds(model.Instance, printProgressRoot.transform);
+			if (seated.size.sqrMagnitude > 0.000001f)
+				model.Instance.transform.localPosition -= Vector3.up * seated.min.y;
+
+			BuildToolpath(model);
+			printProgressRoot.transform.localScale = new Vector3(1f, 0.001f, 1f);
 
 			if (loopAudio != null && printingClip != null)
 			{
@@ -310,7 +337,7 @@ namespace PC.Component
 
 				Progress01 = progress;
 				RemainingSeconds = Mathf.Max(0f, totalSeconds - elapsed);
-				AnimateAxes(progress, elapsed);
+				AnimateAxes(progress);
 				GrowPrint(progress);
 				UpdateScreen();
 
@@ -327,6 +354,16 @@ namespace PC.Component
 			StopPrintAudio();
 			if (printProgressRoot != null)
 				printProgressRoot.transform.localScale = Vector3.one;
+
+			// Release the finished object into the world so its Rigidbody can
+			// interact with the bed/room instead of fighting the printer hierarchy.
+			if (CurrentModel != null && CurrentModel.Instance != null)
+			{
+				CurrentModel.Instance.transform.SetParent(null, true);
+				CurrentModel.AddFinishedPhysics();
+			}
+			CleanupPrintRoot();
+
 			SetState(PrinterState.Finished);
 			Progress01 = 1f;
 			RemainingSeconds = 0f;
@@ -389,25 +426,143 @@ namespace PC.Component
 			return Mathf.Max(minFilamentMeters, byTriangles + byVolume);
 		}
 
-		// ----- Visual hooks ---------------------------------------------------
+		// ----- Toolpath / visual hooks ----------------------------------------
 
-		private void AnimateAxes(float progress, float elapsed)
+		private float VerticalDirection
 		{
+			get
+			{
+				if (Mathf.Abs(axisYDirection) > 0.0001f) return Mathf.Sign(axisYDirection);
+				// If the vertical axis is the bed, lower the bed as the model grows.
+				return axisY != null && axisY == printBed ? -1f : 1f;
+			}
+		}
+
+		private void BuildToolpath(PrintableModel model)
+		{
+			toolPath.Clear();
+			toolPathCumulative = null;
+			toolPathLength = 0f;
+			modelHeight = 0.1f;
+			toolCenterX = 0f;
+			toolCenterZ = 0f;
+			if (model == null || model.Instance == null) return;
+
+			Transform bed = printBed != null ? printBed : transform;
+			var verts = new List<Vector3>();
+			CollectVerticesInSpace(model.Instance, bed, verts);
+			if (verts.Count == 0) return;
+
+			Vector3 min = verts[0], max = verts[0];
+			for (int i = 1; i < verts.Count; i++)
+			{
+				min = Vector3.Min(min, verts[i]);
+				max = Vector3.Max(max, verts[i]);
+			}
+			modelHeight = Mathf.Max(0.001f, max.y - min.y);
+			toolCenterX = (min.x + max.x) * 0.5f;
+			toolCenterZ = (min.z + max.z) * 0.5f;
+
+			int layers = Mathf.Max(1, layerCount);
+			int lines = Mathf.Max(2, infillLinesPerLayer);
+			int passes = Mathf.Max(1, perimeterPasses);
+			float scale = Mathf.Max(0.0001f, toolpathScale);
+
+			for (int layer = 0; layer < layers; layer++)
+			{
+				float y0 = min.y + modelHeight * layer / layers;
+				float y1 = min.y + modelHeight * (layer + 1) / layers;
+				float y = y0 + nozzleHeightOffset;
+
+				// Footprint of this layer from vertices that lie in the slice.
+				Vector3 lmin = new Vector3(float.MaxValue, 0f, float.MaxValue);
+				Vector3 lmax = new Vector3(float.MinValue, 0f, float.MinValue);
+				bool has = false;
+				for (int i = 0; i < verts.Count; i++)
+				{
+					Vector3 v = verts[i];
+					if (v.y < y0 || v.y > y1) continue;
+					has = true;
+					lmin.x = Mathf.Min(lmin.x, v.x); lmax.x = Mathf.Max(lmax.x, v.x);
+					lmin.z = Mathf.Min(lmin.z, v.z); lmax.z = Mathf.Max(lmax.z, v.z);
+				}
+				if (!has)
+				{
+					lmin = min; lmax = max;
+				}
+				float lx0 = (lmin.x - toolCenterX) * scale;
+				float lx1 = (lmax.x - toolCenterX) * scale;
+				float lz0 = (lmin.z - toolCenterZ) * scale;
+				float lz1 = (lmax.z - toolCenterZ) * scale;
+				if (Mathf.Abs(lx1 - lx0) < 0.0001f) { lx0 -= 0.005f; lx1 += 0.005f; }
+				if (Mathf.Abs(lz1 - lz0) < 0.0001f) { lz0 -= 0.005f; lz1 += 0.005f; }
+
+				// Perimeter passes.
+				for (int p = 0; p < passes; p++)
+				{
+					toolPath.Add(new Vector3(lx0, y, lz0));
+					toolPath.Add(new Vector3(lx1, y, lz0));
+					toolPath.Add(new Vector3(lx1, y, lz1));
+					toolPath.Add(new Vector3(lx0, y, lz1));
+					toolPath.Add(new Vector3(lx0, y, lz0));
+				}
+
+				// Serpentine infill covering the layer area.
+				for (int i = 0; i < lines; i++)
+				{
+					float z = Mathf.Lerp(lz0, lz1, (i + 0.5f) / lines);
+					float xa = (i & 1) == 0 ? lx0 : lx1;
+					float xb = (i & 1) == 0 ? lx1 : lx0;
+					toolPath.Add(new Vector3(xa, y, z));
+					toolPath.Add(new Vector3(xb, y, z));
+				}
+			}
+
+			// Constant-speed travel along the accumulated path length.
+			toolPathCumulative = new float[toolPath.Count];
+			float acc = 0f;
+			for (int i = 0; i < toolPath.Count; i++)
+			{
+				if (i > 0) acc += Vector3.Distance(toolPath[i - 1], toolPath[i]);
+				toolPathCumulative[i] = acc;
+			}
+			toolPathLength = acc;
+		}
+
+		private Vector3 SampleToolpath(float progress)
+		{
+			if (toolPath.Count == 0) return Vector3.zero;
+			if (toolPath.Count == 1 || toolPathLength <= 0.00001f) return toolPath[0];
+			float target = Mathf.Clamp01(progress) * toolPathLength;
+			int lo = 0, hi = toolPathCumulative.Length - 1;
+			while (lo < hi)
+			{
+				int mid = (lo + hi) / 2;
+				if (toolPathCumulative[mid] < target) lo = mid + 1;
+				else hi = mid;
+			}
+			int i = Mathf.Clamp(lo, 1, toolPath.Count - 1);
+			float prev = toolPathCumulative[i - 1];
+			float next = toolPathCumulative[i];
+			float t = next > prev ? Mathf.Clamp01((target - prev) / (next - prev)) : 0f;
+			return Vector3.Lerp(toolPath[i - 1], toolPath[i], t);
+		}
+
+		private void AnimateAxes(float progress)
+		{
+			Vector3 point = SampleToolpath(progress);
+			// If an axis transform is the build plate itself, moving the plate must
+			// be opposite to the nozzle path so the model stays under the nozzle.
+			float xSign = axisX != null && axisX == printBed ? -1f : 1f;
+			float zSign = axisZ != null && axisZ == printBed ? -1f : 1f;
 			if (axisX != null)
-			{
-				float k = Mathf.PingPong(elapsed * axisSpeed, 1f);
-				axisX.localPosition = axisXRest + Vector3.right * Mathf.Lerp(axisXRange.x, axisXRange.y, k);
-			}
+				axisX.localPosition = axisXRest + Vector3.right * (point.x * xSign);
 			if (axisZ != null)
-			{
-				float k = Mathf.PingPong(elapsed * axisSpeed * 0.7f, 1f);
-				axisZ.localPosition = axisZRest + Vector3.forward * Mathf.Lerp(axisZRange.x, axisZRange.y, k);
-			}
+				axisZ.localPosition = axisZRest + Vector3.forward * (point.z * zSign);
 			if (axisY != null)
 			{
-				float height = CurrentModel != null ? Mathf.Max(0.001f, CurrentModel.Bounds.size.y) : 0.1f;
-				int layer = Mathf.Clamp(Mathf.FloorToInt(progress * layerCount), 0, layerCount);
-				axisY.localPosition = axisYRest + Vector3.up * (height * layer / Mathf.Max(1, layerCount));
+				float printedHeight = modelHeight * Mathf.Clamp01(progress);
+				axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * printedHeight);
 			}
 		}
 
@@ -422,6 +577,64 @@ namespace PC.Component
 		{
 			if (printProgressRoot == null) return;
 			printProgressRoot.transform.localScale = new Vector3(1f, Mathf.Max(0.001f, progress), 1f);
+		}
+
+		private static void CollectVerticesInSpace(GameObject root, Transform space, List<Vector3> output)
+		{
+			var filters = root.GetComponentsInChildren<MeshFilter>(true);
+			for (int f = 0; f < filters.Length; f++)
+			{
+				var mesh = filters[f] != null ? filters[f].sharedMesh : null;
+				if (mesh == null) continue;
+				Matrix4x4 toSpace = space.worldToLocalMatrix * filters[f].transform.localToWorldMatrix;
+				var vertices = mesh.vertices;
+				for (int i = 0; i < vertices.Length; i++)
+					output.Add(toSpace.MultiplyPoint3x4(vertices[i]));
+			}
+		}
+
+		private static Bounds GetLocalBounds(GameObject root, Transform space)
+		{
+			Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+			bool has = false;
+			var filters = root.GetComponentsInChildren<MeshFilter>(true);
+			for (int f = 0; f < filters.Length; f++)
+			{
+				var mesh = filters[f] != null ? filters[f].sharedMesh : null;
+				if (mesh == null) continue;
+				Matrix4x4 toSpace = space.worldToLocalMatrix * filters[f].transform.localToWorldMatrix;
+				Bounds mb = mesh.bounds;
+				for (int c = 0; c < 8; c++)
+				{
+					Vector3 corner = mb.center + Vector3.Scale(mb.extents, new Vector3(
+						(c & 1) == 0 ? -1f : 1f,
+						(c & 2) == 0 ? -1f : 1f,
+						(c & 4) == 0 ? -1f : 1f));
+					Vector3 p = toSpace.MultiplyPoint3x4(corner);
+					if (!has) { bounds = new Bounds(p, Vector3.zero); has = true; }
+					else bounds.Encapsulate(p);
+				}
+			}
+			if (!has)
+			{
+				var renderers = root.GetComponentsInChildren<Renderer>(true);
+				for (int r = 0; r < renderers.Length; r++)
+				{
+					if (renderers[r] == null) continue;
+					Bounds wb = renderers[r].bounds;
+					for (int c = 0; c < 8; c++)
+					{
+						Vector3 corner = wb.center + Vector3.Scale(wb.extents, new Vector3(
+							(c & 1) == 0 ? -1f : 1f,
+							(c & 2) == 0 ? -1f : 1f,
+							(c & 4) == 0 ? -1f : 1f));
+						Vector3 p = space.InverseTransformPoint(corner);
+						if (!has) { bounds = new Bounds(p, Vector3.zero); has = true; }
+						else bounds.Encapsulate(p);
+					}
+				}
+			}
+			return bounds;
 		}
 
 		private void UpdateScreen()

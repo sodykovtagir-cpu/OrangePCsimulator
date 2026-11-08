@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace PC.Component
@@ -68,6 +69,165 @@ namespace PC.Component
 			var renderers = Instance.GetComponentsInChildren<Renderer>(true);
 			for (int i = 0; i < renderers.Length; i++)
 				if (renderers[i] != null) renderers[i].SetPropertyBlock(block);
+		}
+
+		/// <summary>
+		/// Give the finished print a Rigidbody and one BoxCollider per disconnected
+		/// mesh island (e.g. chair seat / legs / back get separate colliders).
+		/// Colliders are added on child objects so the visual mesh is untouched.
+		/// </summary>
+		public void AddFinishedPhysics()
+		{
+			if (Instance == null) return;
+			GameObject root = Instance;
+
+			var rb = root.GetComponent<Rigidbody>();
+			if (rb == null) rb = root.AddComponent<Rigidbody>();
+			rb.isKinematic = false;
+			rb.useGravity = true;
+			rb.mass = Mathf.Clamp(BoundsVolume * 50f, 0.05f, 20f);
+			rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+			rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+			bool added = false;
+			var filters = root.GetComponentsInChildren<MeshFilter>(true);
+			for (int f = 0; f < filters.Length; f++)
+			{
+				var filter = filters[f];
+				var mesh = filter != null ? filter.sharedMesh : null;
+				if (mesh == null) continue;
+				added |= AddIslandColliders(root, filter, mesh);
+			}
+
+			if (!added)
+			{
+				// Fallback for skinned / renderer-only models: one box per renderer.
+				var renderers = root.GetComponentsInChildren<Renderer>(true);
+				int index = 0;
+				for (int r = 0; r < renderers.Length; r++)
+				{
+					if (renderers[r] == null) continue;
+					Bounds local = WorldBoundsToLocal(root.transform, renderers[r].bounds);
+					if (local.size.sqrMagnitude < 0.000001f) continue;
+					CreateBox(root, "PrintCollider_" + index++, local);
+					added = true;
+				}
+			}
+
+			if (!added)
+			{
+				Bounds local = WorldBoundsToLocal(root.transform, new Bounds(root.transform.position, Vector3.one * 0.1f));
+				CreateBox(root, "PrintCollider_0", local);
+			}
+		}
+
+		private static bool AddIslandColliders(GameObject root, MeshFilter filter, Mesh mesh)
+		{
+			Vector3[] vertices = mesh.vertices;
+			int[] triangles = mesh.triangles;
+			if (vertices.Length == 0 || triangles.Length < 3) return false;
+
+			Matrix4x4 toRoot = root.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+			var localVerts = new Vector3[vertices.Length];
+			var weldIds = new int[vertices.Length];
+			var weldMap = new Dictionary<Vector3, int>();
+			int weldCount = 0;
+			for (int i = 0; i < vertices.Length; i++)
+			{
+				Vector3 p = toRoot.MultiplyPoint3x4(vertices[i]);
+				localVerts[i] = p;
+				Vector3 key = new Vector3(
+					Mathf.Round(p.x * 10000f) / 10000f,
+					Mathf.Round(p.y * 10000f) / 10000f,
+					Mathf.Round(p.z * 10000f) / 10000f);
+				if (!weldMap.TryGetValue(key, out int id))
+				{
+					id = weldCount++;
+					weldMap[key] = id;
+				}
+				weldIds[i] = id;
+			}
+
+			var parent = new int[weldCount];
+			for (int i = 0; i < weldCount; i++) parent[i] = i;
+			System.Func<int, int> find = null;
+			find = x =>
+			{
+				while (parent[x] != x)
+				{
+					parent[x] = parent[parent[x]];
+					x = parent[x];
+				}
+				return x;
+			};
+			System.Action<int, int> union = (a, b) =>
+			{
+				int ra = find(a), rb2 = find(b);
+				if (ra != rb2) parent[ra] = rb2;
+			};
+
+			for (int t = 0; t + 2 < triangles.Length; t += 3)
+			{
+				int a = weldIds[triangles[t]];
+				int b = weldIds[triangles[t + 1]];
+				int c = weldIds[triangles[t + 2]];
+				union(a, b);
+				union(a, c);
+			}
+
+			var islandBounds = new Dictionary<int, Bounds>();
+			for (int i = 0; i < localVerts.Length; i++)
+			{
+				int island = find(weldIds[i]);
+				if (!islandBounds.TryGetValue(island, out Bounds b))
+					islandBounds[island] = new Bounds(localVerts[i], Vector3.zero);
+				else
+				{
+					b.Encapsulate(localVerts[i]);
+					islandBounds[island] = b;
+				}
+			}
+
+			bool added = false;
+			int index = 0;
+			foreach (var kv in islandBounds)
+			{
+				Bounds b = kv.Value;
+				if (b.size.sqrMagnitude < 0.000001f) continue;
+				CreateBox(root, "PrintCollider_" + filter.name + "_" + index++, b);
+				added = true;
+			}
+			return added;
+		}
+
+		private static Bounds WorldBoundsToLocal(Transform root, Bounds world)
+		{
+			Bounds local = new Bounds(Vector3.zero, Vector3.zero);
+			bool has = false;
+			for (int c = 0; c < 8; c++)
+			{
+				Vector3 corner = world.center + Vector3.Scale(world.extents, new Vector3(
+					(c & 1) == 0 ? -1f : 1f,
+					(c & 2) == 0 ? -1f : 1f,
+					(c & 4) == 0 ? -1f : 1f));
+				Vector3 p = root.InverseTransformPoint(corner);
+				if (!has) { local = new Bounds(p, Vector3.zero); has = true; }
+				else local.Encapsulate(p);
+			}
+			return local;
+		}
+
+		private static void CreateBox(GameObject root, string name, Bounds localBounds)
+		{
+			var go = new GameObject(name);
+			go.transform.SetParent(root.transform, false);
+			go.transform.localPosition = Vector3.zero;
+			go.transform.localRotation = Quaternion.identity;
+			go.transform.localScale = Vector3.one;
+			var box = go.AddComponent<BoxCollider>();
+			box.center = localBounds.center;
+			box.size = localBounds.size;
+			box.isTrigger = false;
 		}
 	}
 }

@@ -41,7 +41,15 @@ namespace PC.Component
 			if (modelNameText != null) modelNameText.text = model;
 			if (timeText != null) timeText.text = time;
 			if (filamentText != null) filamentText.text = filament;
-			if (progressFill != null) progressFill.fillAmount = Mathf.Clamp01(progress);
+			if (progressFill != null)
+			{
+				// The user-authored screen may still have a Sliced image; force a
+				// horizontal filled bar so fillAmount actually shows progress.
+				progressFill.type = Image.Type.Filled;
+				progressFill.fillMethod = Image.FillMethod.Horizontal;
+				progressFill.fillOrigin = (int)Image.OriginHorizontal.Left;
+				progressFill.fillAmount = Mathf.Clamp01(progress);
+			}
 		}
 
 		public static string FormatTime(float seconds)
