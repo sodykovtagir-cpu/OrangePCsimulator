@@ -39,7 +39,9 @@ namespace PC.Component
 		private Quaternion initialVisualRotation = Quaternion.identity;
 		private Vector3 visualCenterLocal;
 		private bool visualCached;
-		private readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
+		// Unity forbids creating MaterialPropertyBlock in a field initializer /
+		// constructor. Create it lazily in Awake/ApplyColor instead.
+		private MaterialPropertyBlock block;
 
 		public float CapacityMeters => Mathf.Max(0.0001f, capacityMeters);
 		public float RemainingMeters => Mathf.Clamp(remainingMeters, 0f, CapacityMeters);
@@ -53,6 +55,7 @@ namespace PC.Component
 
 		private void Awake()
 		{
+			if (block == null) block = new MaterialPropertyBlock();
 			item = GetComponent<Item>();
 			if (item != null)
 			{
@@ -161,6 +164,7 @@ namespace PC.Component
 
 		private void ApplyColor()
 		{
+			if (block == null) block = new MaterialPropertyBlock();
 			Renderer[] targets = colorRenderers;
 			if ((targets == null || targets.Length == 0) && spoolVisual != null)
 				targets = spoolVisual.GetComponentsInChildren<Renderer>(true);
