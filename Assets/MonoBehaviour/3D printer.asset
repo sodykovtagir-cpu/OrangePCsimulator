@@ -17,6 +17,6 @@ MonoBehaviour:
   bitcoin: 0
   sprite: {fileID: 0}
   spawn: {fileID: 7683103540023059400, guid: 03e95ac77c130224690c698078ce5916, type: 3}
-  large: 0
+  large: 1
   translateDescription: 1
   description: 
