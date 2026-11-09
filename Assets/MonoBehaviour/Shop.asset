@@ -20,6 +20,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0a6f558889b54ff9baea594fc2761e2f, type: 2}
     - {fileID: 11400000, guid: c61dbee05a8cb7244ac0af15c709fad9, type: 2}
     - {fileID: 11400000, guid: 0c8ac4837b5219b4ea62f5322974b990, type: 2}
+    - {fileID: 11400000, guid: cab99aa9f726a344fb09552b5eba0aa1, type: 2}
+    - {fileID: 11400000, guid: cad8ef4c05936cc409fa18aa2a84411b, type: 2}
   - pageName: Cables & Power
     item:
     - {fileID: 11400000, guid: b4dc56fd03e844c6b45356bb835c81ba, type: 2}
