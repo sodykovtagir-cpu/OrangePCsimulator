@@ -24,7 +24,8 @@ COLORS = ["White", "Black", "Gray", "Red", "Orange", "Yellow",
 def test_cancel_print_hands_over_partial_model_with_physics():
     text = PRINTER.read_text(encoding="utf-8")
     cancel = text[text.index("public void CancelPrint()"):text.index("private IEnumerator PrintRoutine()")]
-    assert "partial.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);" in cancel
+    assert "partial.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg," in cancel
+    assert "jobMetrics.massKg * Mathf.Max(0.02f, reached)" in cancel
     assert "AttachPrintedItem(partial);" in cancel
     assert "partial.Instance.transform.SetParent(null, true);" in cancel
     assert "ParkCarriage(modelHeight * Mathf.Max(0.02f, reached));" in cancel

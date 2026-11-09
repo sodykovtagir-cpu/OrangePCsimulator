@@ -20,18 +20,36 @@ def test_files_and_meta_exist():
         assert re.search(r"guid: [0-9a-f]{32}", meta.read_text(encoding="utf-8"))
 
 
-def test_print_time_scales_with_polygons_average_ten_minutes():
+def test_print_time_scales_with_printed_plastic_not_just_polygons():
     text = PRINTER.read_text(encoding="utf-8")
-    assert "averagePrintSeconds = 600f" in text
-    assert "referenceTriangles = 10000" in text
-    assert "EstimatePrintSeconds(int triangleCount)" in text
-    assert "Mathf.Clamp(basePrintSeconds + averagePrintSeconds * ratio, minPrintSeconds, maxPrintSeconds)" in text
-    # Mirror the formula: 10k tris -> 600 s, 5k -> 300 s, tiny -> min clamp.
-    def estimate(tris):
-        return max(180.0, min(3600.0, 60.0 + 600.0 * (tris / 10000.0)))
-    assert abs(estimate(10000) - 660.0) < 1e-6
-    assert abs(estimate(5000) - 360.0) < 1e-6
-    assert estimate(1) == 180.0
+    assert "EstimatePrintSeconds(PrintableModel model)" in text
+    assert "metrics.plasticUnits * secondsPerPlasticUnit" in text
+    assert "solid * k * k * k * Mathf.Clamp01(infillFraction) + area * k * k * shellUnits" in text
+    assert "minPrintSeconds = 10f" in text
+    assert "basePrintSeconds = 20f" in text
+    # The scale slider must reach the estimate, not only the visual wrapper.
+    assert "previewMetricsScale = PrintScale01;" in text
+    assert "jobMetrics = ComputeMetrics(model, printFitScale);" in text
+
+    # Same model, different slider values -> different time, filament and mass.
+    solid, area, unit = 4.017, 15.71, 0.18
+    shell = 0.0008 / unit
+
+    def metrics(k):
+        plastic = solid * k ** 3 * 0.15 + area * k * k * shell
+        return (max(10.0, 20.0 + plastic * 900.0),
+                max(0.02, plastic * 6.0),
+                min(25.0, max(0.005, plastic * unit ** 3 * 1240.0)))
+
+    full, half, tiny = metrics(1.0), metrics(0.5), metrics(0.05)
+    assert full[0] > half[0] > tiny[0]
+    assert full[1] > half[1] >= tiny[1]
+    assert full[2] > half[2] > tiny[2]
+    # A 5% print is quick and light, a full-volume print is about ten minutes.
+    assert tiny[0] < 30.0
+    assert tiny[2] <= 0.01
+    assert 500.0 < full[0] < 800.0
+    assert full[2] < 25.0
 
 
 def test_spool_one_meter_and_gradual_consumption():

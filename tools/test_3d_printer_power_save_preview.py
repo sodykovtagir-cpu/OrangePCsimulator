@@ -33,8 +33,8 @@ def test_printer_power_idle_and_job_dependent():
 
 def test_slower_print_and_carriage_parking():
     text = PRINTER.read_text(encoding="utf-8")
-    assert "basePrintSeconds = 60f" in text
-    assert "minPrintSeconds = 180f" in text
+    assert "basePrintSeconds = 20f" in text
+    assert "minPrintSeconds = 10f" in text
     assert "grabClearance" in text
     assert "ParkCarriage()" in text
     assert "VerticalDirection * (printedHeight + grabClearance)" in text
@@ -43,8 +43,8 @@ def test_slower_print_and_carriage_parking():
     assert "SetState(PrinterState.Idle);" in finish
     assert "UpdateScreen();" in finish
     prefab = PRINTER_PREFAB.read_text(encoding="utf-8")
-    assert "minPrintSeconds: 180" in prefab
-    assert "basePrintSeconds: 60" in prefab
+    assert "minPrintSeconds: 10" in prefab
+    assert "basePrintSeconds: 20" in prefab
     assert "grabClearance: 0.08" in prefab
 
 
@@ -66,10 +66,11 @@ def test_lighter_finished_mass():
     model = (COMP / "PrintableModel.cs").read_text(encoding="utf-8")
     assert "AddFinishedPhysics(float densityKgPerCubicMeter, float minMassKg, float maxMassKg)" in model
     assert "GetWorldBoundsVolume(root)" in model
-    assert "rb.mass = Mathf.Clamp(volume * density, minMass, maxMass);" in model
+    assert "float mass = measuredMassKg > 0f ? measuredMassKg : volume * density;" in model
+    assert "rb.mass = Mathf.Clamp(mass, minMass, maxMass);" in model
     printer = PRINTER.read_text(encoding="utf-8")
-    assert "printedDensityKgPerCubicMeter = 180f" in printer
-    assert "maxPrintedMassKg = 5f" in printer
+    assert "printedDensityKgPerCubicMeter = 1240f" in printer
+    assert "maxPrintedMassKg = 25f" in printer
 
 
 def test_app_resets_and_has_3d_scale_preview():

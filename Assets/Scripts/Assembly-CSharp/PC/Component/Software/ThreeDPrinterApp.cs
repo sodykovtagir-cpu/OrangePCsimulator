@@ -218,8 +218,9 @@ namespace PC.Component.Software
 			{
 				sb.AppendLine(Localization.GetText("Model") + ": " + model.Name);
 				sb.AppendLine(Localization.GetText("Triangles") + ": " + model.TriangleCount);
-				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(selectedPrinter.EstimatePrintSeconds(model.TriangleCount)));
+				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(selectedPrinter.EstimatePrintSeconds(model)));
 				sb.AppendLine(Localization.GetText("Required filament") + ": " + selectedPrinter.EstimateFilamentMeters(model).ToString("0.00") + " m");
+				sb.AppendLine(Localization.GetText("Weight") + ": " + FormatMass(selectedPrinter.EstimatePrintedMassKg(model)));
 			}
 			else sb.AppendLine(Localization.GetText("No model imported"));
 
@@ -238,6 +239,13 @@ namespace PC.Component.Software
 				sb.AppendLine(Localization.GetText("Error") + ": " + selectedPrinter.LastError);
 
 			infoText.text = sb.ToString();
+		}
+
+		private static string FormatMass(float kilograms)
+		{
+			return kilograms < 1f
+				? Mathf.RoundToInt(kilograms * 1000f) + " g"
+				: kilograms.ToString("0.00") + " kg";
 		}
 
 		private static string FormatTime(float seconds)

@@ -79,7 +79,7 @@ public class PrintedModelItem : Item, ISave
 		jObject["printedSmoothness"] = smoothness;
 		jObject["printedGlowColor"] = glowHex;
 		jObject["printedGlowIntensity"] = glowIntensity;
-		jObject["printedScale"] = JToken.FromObject(transform.localScale);
+		jObject["printedScale"] = ToJson(transform.localScale);
 		var rb = GetComponent<Rigidbody>();
 		jObject["printedMass"] = rb != null ? rb.mass : savedMass;
 
@@ -92,14 +92,15 @@ public class PrintedModelItem : Item, ISave
 			var part = new JObject
 			{
 				["name"] = filters[i].name,
-				["pos"] = JToken.FromObject(filters[i].transform.localPosition),
-				["rot"] = JToken.FromObject(filters[i].transform.localRotation),
-				["scale"] = JToken.FromObject(filters[i].transform.localScale),
-				["vertices"] = JArray.FromObject(mesh.vertices),
-				["triangles"] = JArray.FromObject(mesh.triangles)
+				["pos"] = ToJson(filters[i].transform.localPosition),
+				["rot"] = ToJson(filters[i].transform.localRotation),
+				["scale"] = ToJson(filters[i].transform.localScale),
+				["vertices"] = ToJson(mesh.vertices),
+				["triangles"] = ToJson(mesh.triangles)
 			};
-			if (mesh.normals != null && mesh.normals.Length == mesh.vertexCount)
-				part["normals"] = JArray.FromObject(mesh.normals);
+			var normals = mesh.normals;
+			if (normals != null && normals.Length == mesh.vertexCount)
+				part["normals"] = ToJson(normals);
 			parts.Add(part);
 		}
 		jObject["printedParts"] = parts;
@@ -113,7 +114,7 @@ public class PrintedModelItem : Item, ISave
 		if (jObject.TryGetValue("printedColor", out var colorToken) && colorToken != null)
 			colorHex = colorToken.Value<string>();
 		if (jObject.TryGetValue("printedScale", out var scaleToken) && scaleToken != null)
-			transform.localScale = scaleToken.ToObject<Vector3>();
+			transform.localScale = ReadVector(scaleToken, transform.localScale);
 		if (jObject.TryGetValue("printedMass", out var massToken) && massToken != null)
 			savedMass = Mathf.Max(0.001f, massToken.Value<float>());
 		if (jObject.TryGetValue("printedFinish", out var finishToken) && finishToken != null)
@@ -135,22 +136,22 @@ public class PrintedModelItem : Item, ISave
 			{
 				var part = parts[i] as JObject;
 				if (part == null) continue;
-				var vertices = part.TryGetValue("vertices", out var vt) && vt != null ? vt.ToObject<Vector3[]>() : null;
-				var triangles = part.TryGetValue("triangles", out var tt) && tt != null ? tt.ToObject<int[]>() : null;
+				var vertices = part.TryGetValue("vertices", out var vt) ? ReadVectors(vt) : null;
+				var triangles = part.TryGetValue("triangles", out var tt) ? ReadInts(tt) : null;
 				if (vertices == null || triangles == null || vertices.Length == 0 || triangles.Length < 3) continue;
 
 				var go = new GameObject(part.TryGetValue("name", out var nt) && nt != null ? nt.Value<string>() : "Part_" + i);
 				go.transform.SetParent(transform, false);
-				if (part.TryGetValue("pos", out var pt) && pt != null) go.transform.localPosition = pt.ToObject<Vector3>();
-				if (part.TryGetValue("rot", out var rt) && rt != null) go.transform.localRotation = rt.ToObject<Quaternion>();
-				if (part.TryGetValue("scale", out var st) && st != null) go.transform.localScale = st.ToObject<Vector3>();
+				if (part.TryGetValue("pos", out var pt)) go.transform.localPosition = ReadVector(pt, Vector3.zero);
+				if (part.TryGetValue("rot", out var rt)) go.transform.localRotation = ReadQuaternion(rt, Quaternion.identity);
+				if (part.TryGetValue("scale", out var st)) go.transform.localScale = ReadVector(st, Vector3.one);
 
 				var mesh = new Mesh { name = modelName + "_" + i };
 				mesh.vertices = vertices;
 				mesh.triangles = triangles;
 				if (part.TryGetValue("normals", out var normalToken) && normalToken != null)
 				{
-					var normals = normalToken.ToObject<Vector3[]>();
+					var normals = ReadVectors(normalToken);
 					if (normals != null && normals.Length == vertices.Length) mesh.normals = normals;
 					else mesh.RecalculateNormals();
 				}
@@ -175,6 +176,70 @@ public class PrintedModelItem : Item, ISave
 		spawnId = PrintedSpawnId;
 		Info = modelName;
 		gameObject.name = modelName;
+	}
+
+	// Newtonsoft reflects over every public property, and Vector3.normalized
+	// returns another Vector3, so serializing a Unity struct directly throws
+	// "Self referencing loop detected for property 'normalized'". Unity values
+	// are therefore stored as plain number arrays.
+	private static JArray ToJson(Vector3 value)
+	{
+		return new JArray(value.x, value.y, value.z);
+	}
+
+	private static JArray ToJson(Quaternion value)
+	{
+		return new JArray(value.x, value.y, value.z, value.w);
+	}
+
+	private static JArray ToJson(Vector3[] values)
+	{
+		var array = new JArray();
+		if (values == null) return array;
+		for (int i = 0; i < values.Length; i++) array.Add(ToJson(values[i]));
+		return array;
+	}
+
+	private static JArray ToJson(int[] values)
+	{
+		var array = new JArray();
+		if (values == null) return array;
+		for (int i = 0; i < values.Length; i++) array.Add(values[i]);
+		return array;
+	}
+
+	private static Vector3 ReadVector(JToken token, Vector3 fallback)
+	{
+		if (token is JArray array && array.Count >= 3)
+			return new Vector3(array[0].Value<float>(), array[1].Value<float>(), array[2].Value<float>());
+		if (token is JObject obj && obj["x"] != null)
+			return new Vector3(obj["x"].Value<float>(), obj["y"].Value<float>(), obj["z"].Value<float>());
+		return fallback;
+	}
+
+	private static Quaternion ReadQuaternion(JToken token, Quaternion fallback)
+	{
+		if (token is JArray array && array.Count >= 4)
+			return new Quaternion(array[0].Value<float>(), array[1].Value<float>(), array[2].Value<float>(), array[3].Value<float>());
+		if (token is JObject obj && obj["x"] != null)
+			return new Quaternion(obj["x"].Value<float>(), obj["y"].Value<float>(), obj["z"].Value<float>(), obj["w"].Value<float>());
+		return fallback;
+	}
+
+	private static Vector3[] ReadVectors(JToken token)
+	{
+		if (!(token is JArray array)) return null;
+		var values = new Vector3[array.Count];
+		for (int i = 0; i < array.Count; i++) values[i] = ReadVector(array[i], Vector3.zero);
+		return values;
+	}
+
+	private static int[] ReadInts(JToken token)
+	{
+		if (!(token is JArray array)) return null;
+		var values = new int[array.Count];
+		for (int i = 0; i < array.Count; i++) values[i] = array[i].Value<int>();
+		return values;
 	}
 
 	private void ClearGeneratedVisuals()

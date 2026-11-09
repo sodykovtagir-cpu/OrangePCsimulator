@@ -41,7 +41,7 @@ def test_finished_model_gets_rigidbody_and_island_box_colliders():
     assert "AddIslandColliders" in text
     assert "weldMap" in text and "union(a, b)" in text
     printer = PRINTER.read_text(encoding="utf-8")
-    assert "finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);" in printer
+    assert "finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg, jobMetrics.massKg);" in printer
     assert "finished.Instance.transform.SetParent(null, true);" in printer
 
 

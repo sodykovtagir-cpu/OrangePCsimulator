@@ -633,3 +633,4 @@ Cancel Print	Cancel Print																	Отменить печать
 Unsupported model format	Unsupported model format																	Неподдерживаемый формат модели																								
 Matte	Matte																	Матовый																								
 Glossy	Glossy																	Глянцевый																								
+Weight	Weight																	Вес																								

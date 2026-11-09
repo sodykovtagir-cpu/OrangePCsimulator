@@ -60,6 +60,103 @@ namespace PC.Component
 			Instance = null;
 		}
 
+		// ----- Real geometry --------------------------------------------------
+		// Renderer.bounds is empty while the imported model is inactive, and the
+		// axis-aligned box hugely overestimates plastic for anything hollow, so
+		// the printer measures the actual triangles instead.
+
+		private float cachedSolidVolume = -1f;
+		private float cachedSurfaceArea;
+		private Vector3 cachedGeometryScale = new Vector3(float.NaN, 0f, 0f);
+
+		/// <summary>Solid volume of the meshes in world units³ (signed tetrahedra).</summary>
+		public float GetWorldSolidVolume()
+		{
+			EnsureGeometryCache();
+			return cachedSolidVolume;
+		}
+
+		/// <summary>Surface area of the meshes in world units².</summary>
+		public float GetWorldSurfaceArea()
+		{
+			EnsureGeometryCache();
+			return cachedSurfaceArea;
+		}
+
+		public void InvalidateGeometryCache()
+		{
+			cachedSolidVolume = -1f;
+		}
+
+		private void EnsureGeometryCache()
+		{
+			if (Instance == null)
+			{
+				cachedSolidVolume = 0f;
+				cachedSurfaceArea = 0f;
+				return;
+			}
+			Vector3 scale = Instance.transform.lossyScale;
+			if (cachedSolidVolume >= 0f && (scale - cachedGeometryScale).sqrMagnitude < 0.0000001f) return;
+			cachedGeometryScale = scale;
+
+			float volume = 0f;
+			float area = 0f;
+			var filters = Instance.GetComponentsInChildren<MeshFilter>(true);
+			for (int i = 0; i < filters.Length; i++)
+			{
+				var mesh = filters[i] != null ? filters[i].sharedMesh : null;
+				if (mesh == null) continue;
+				var vertices = mesh.vertices;
+				var triangles = mesh.triangles;
+				Matrix4x4 toWorld = filters[i].transform.localToWorldMatrix;
+				float signed = 0f;
+				for (int t = 0; t + 2 < triangles.Length; t += 3)
+				{
+					Vector3 a = toWorld.MultiplyPoint3x4(vertices[triangles[t]]);
+					Vector3 b = toWorld.MultiplyPoint3x4(vertices[triangles[t + 1]]);
+					Vector3 c = toWorld.MultiplyPoint3x4(vertices[triangles[t + 2]]);
+					signed += Vector3.Dot(a, Vector3.Cross(b, c)) / 6f;
+					area += Vector3.Cross(b - a, c - a).magnitude * 0.5f;
+				}
+				volume += Mathf.Abs(signed);
+			}
+			cachedSolidVolume = volume;
+			cachedSurfaceArea = area;
+		}
+
+		/// <summary>
+		/// World-space size measured from the meshes, so it also works while the
+		/// imported instance is still disabled (pending print preview).
+		/// </summary>
+		public Vector3 GetWorldBoundsSize()
+		{
+			if (Instance == null) return Vector3.zero;
+			var filters = Instance.GetComponentsInChildren<MeshFilter>(true);
+			Vector3 min = Vector3.zero, max = Vector3.zero;
+			bool has = false;
+			for (int i = 0; i < filters.Length; i++)
+			{
+				var mesh = filters[i] != null ? filters[i].sharedMesh : null;
+				if (mesh == null) continue;
+				Matrix4x4 toWorld = filters[i].transform.localToWorldMatrix;
+				Bounds local = mesh.bounds;
+				Vector3 center = local.center;
+				Vector3 extents = local.extents;
+				for (int corner = 0; corner < 8; corner++)
+				{
+					Vector3 point = center + Vector3.Scale(extents, new Vector3(
+						(corner & 1) == 0 ? -1f : 1f,
+						(corner & 2) == 0 ? -1f : 1f,
+						(corner & 4) == 0 ? -1f : 1f));
+					point = toWorld.MultiplyPoint3x4(point);
+					if (!has) { min = point; max = point; has = true; }
+					else { min = Vector3.Min(min, point); max = Vector3.Max(max, point); }
+				}
+			}
+			return has ? max - min : Vector3.zero;
+		}
+
 		public void ApplyColor(Color color)
 		{
 			ApplyColor(color, 0.6f, Color.black);
@@ -90,6 +187,16 @@ namespace PC.Component
 
 		public void AddFinishedPhysics(float densityKgPerCubicMeter, float minMassKg, float maxMassKg)
 		{
+			AddFinishedPhysics(densityKgPerCubicMeter, minMassKg, maxMassKg, 0f);
+		}
+
+		/// <param name="measuredMassKg">
+		/// Mass already measured by the printer from the extruded plastic volume.
+		/// When positive it wins over the bounding-box estimate, which is only a
+		/// fallback for models restored without a print job.
+		/// </param>
+		public void AddFinishedPhysics(float densityKgPerCubicMeter, float minMassKg, float maxMassKg, float measuredMassKg)
+		{
 			if (Instance == null) return;
 			GameObject root = Instance;
 
@@ -103,7 +210,8 @@ namespace PC.Component
 			float density = Mathf.Max(0f, densityKgPerCubicMeter);
 			float minMass = Mathf.Max(0.001f, minMassKg);
 			float maxMass = Mathf.Max(minMass, maxMassKg);
-			rb.mass = Mathf.Clamp(volume * density, minMass, maxMass);
+			float mass = measuredMassKg > 0f ? measuredMassKg : volume * density;
+			rb.mass = Mathf.Clamp(mass, minMass, maxMass);
 			rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 			rb.interpolation = RigidbodyInterpolation.Interpolate;
 

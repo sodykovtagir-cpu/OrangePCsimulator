@@ -52,10 +52,24 @@ namespace PC.Component
 		[SerializeField, Range(0.01f, 1f)] private float minPrintScaleFraction = 0.05f;
 
 		[Header("Print time / filament")]
+		[Tooltip("Scene units are not meters. 1 unit is about this many meters, " +
+			"measured from the filament spool (1.1 units = 20 cm).")]
+		[SerializeField] private float unitToMeter = 0.18f;
+		[Tooltip("How much of the model volume is actually filled with plastic.")]
+		[SerializeField, Range(0.02f, 1f)] private float infillFraction = 0.15f;
+		[Tooltip("Solid outer wall thickness in millimeters (perimeters x nozzle).")]
+		[SerializeField] private float shellThicknessMm = 0.8f;
+		[Tooltip("Game seconds per cubic unit of extruded plastic. This is the main speed knob.")]
+		[SerializeField] private float secondsPerPlasticUnit = 900f;
+		[Tooltip("Spool meters consumed per cubic unit of extruded plastic.")]
+		[SerializeField] private float filamentMetersPerPlasticUnit = 6f;
+		[Tooltip("Extra seconds for a dense mesh at full scale.")]
+		[SerializeField] private float complexitySeconds = 60f;
 		[SerializeField] private int referenceTriangles = 10000;
-		[SerializeField] private float basePrintSeconds = 60f;
+		[Tooltip("Heat-up / homing time added to every job.")]
+		[SerializeField] private float basePrintSeconds = 20f;
 		[SerializeField] private float averagePrintSeconds = 600f;
-		[SerializeField] private float minPrintSeconds = 180f;
+		[SerializeField] private float minPrintSeconds = 10f;
 		[SerializeField] private float maxPrintSeconds = 3600f;
 		[SerializeField] private float filamentPerTriangle = 0.00008f;
 		[SerializeField] private float filamentPerCubicMeter = 0f;
@@ -68,9 +82,10 @@ namespace PC.Component
 		[SerializeField] private float maxPrintWatts = 350f;
 
 		[Header("Printed object physics")]
-		[SerializeField] private float printedDensityKgPerCubicMeter = 180f;
-		[SerializeField] private float minPrintedMassKg = 0.02f;
-		[SerializeField] private float maxPrintedMassKg = 5f;
+		[Tooltip("PLA is about 1240 kg/m3. Mass uses the extruded plastic volume, not the bounding box.")]
+		[SerializeField] private float printedDensityKgPerCubicMeter = 1240f;
+		[SerializeField] private float minPrintedMassKg = 0.005f;
+		[SerializeField] private float maxPrintedMassKg = 25f;
 
 		private Vector3 axisYRest;
 		private Vector3 axisZRest;
@@ -85,6 +100,11 @@ namespace PC.Component
 		private float printFitScale = 1f;
 		private float modelHeight;
 		private float jobVolume;
+		private PrintMetrics jobMetrics;
+		private bool jobMetricsValid;
+		private PrintableModel previewMetricsModel;
+		private float previewMetricsScale = -1f;
+		private PrintMetrics previewMetrics;
 		private float toolCenterX;
 		private float toolCenterZ;
 		private bool lastPowerState;
@@ -399,17 +419,8 @@ namespace PC.Component
 				return false;
 			}
 
-			requiredFilament = EstimateFilamentMeters(model);
-			if (requiredFilament > AttachedSpool.RemainingMeters + 0.00001f)
-			{
-				Fail("Not enough filament");
-				return false;
-			}
-
 			CurrentModel = model;
 			if (PendingModel == model) PendingModel = null;
-			totalSeconds = EstimatePrintSeconds(model.TriangleCount);
-			RemainingSeconds = totalSeconds;
 			Progress01 = 0f;
 			SetState(PrinterState.Printing);
 			ApplySpoolColor(model);
@@ -436,9 +447,7 @@ namespace PC.Component
 			bool oversized = size.x > max.x || size.y > max.y || size.z > max.z;
 			if (rejectOversizedModels && oversized)
 			{
-				CleanupPrintRoot();
-				CurrentModel = null;
-				Fail("Model too large for print volume");
+				AbortStart(model, "Model too large for print volume");
 				return false;
 			}
 
@@ -453,6 +462,19 @@ namespace PC.Component
 			float minFit = maxFit * Mathf.Clamp(minPrintScaleFraction, 0.01f, 1f);
 			printFitScale = Mathf.Lerp(minFit, maxFit, PrintScale01);
 			jobVolume = Mathf.Max(0f, size.x * size.y * size.z) * printFitScale * printFitScale * printFitScale;
+
+			// Time, filament and mass are measured from the geometry at the scale
+			// the job will really use, so the scale slider changes all three.
+			jobMetrics = ComputeMetrics(model, printFitScale);
+			jobMetricsValid = true;
+			requiredFilament = jobMetrics.filamentMeters;
+			if (requiredFilament > AttachedSpool.RemainingMeters + 0.00001f)
+			{
+				AbortStart(model, "Not enough filament");
+				return false;
+			}
+			totalSeconds = jobMetrics.seconds;
+			RemainingSeconds = totalSeconds;
 
 			EnsureExtruderPivot();
 			CacheExtruderAxis();
@@ -494,13 +516,15 @@ namespace PC.Component
 			if (partial != null && partial.Instance != null)
 			{
 				partial.Instance.transform.SetParent(null, true);
-				partial.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);
+				partial.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg,
+					jobMetrics.massKg * Mathf.Max(0.02f, reached));
 				AttachPrintedItem(partial);
 			}
 			CleanupPrintRoot();
 
 			CurrentModel = null;
 			PendingModel = null;
+			jobMetricsValid = false;
 			SetState(PrinterState.Idle);
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
@@ -560,13 +584,14 @@ namespace PC.Component
 			if (finished != null && finished.Instance != null)
 			{
 				finished.Instance.transform.SetParent(null, true);
-				finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);
+				finished.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg, jobMetrics.massKg);
 				AttachPrintedItem(finished);
 			}
 			CleanupPrintRoot();
 
 			CurrentModel = null;
 			PendingModel = null;
+			jobMetricsValid = false;
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
 			SetState(PrinterState.Idle);
@@ -633,18 +658,118 @@ namespace PC.Component
 
 		// ----- Estimation -----------------------------------------------------
 
-		public float EstimatePrintSeconds(int triangleCount)
+		/// <summary>Everything a job costs, derived from the real printed plastic.</summary>
+		private struct PrintMetrics
 		{
-			float ratio = triangleCount / Mathf.Max(1f, referenceTriangles);
-			return Mathf.Clamp(basePrintSeconds + averagePrintSeconds * ratio, minPrintSeconds, maxPrintSeconds);
+			public float plasticUnits;
+			public float seconds;
+			public float filamentMeters;
+			public float massKg;
+		}
+
+		public float EstimatePrintSeconds(PrintableModel model)
+		{
+			return GetMetrics(model).seconds;
 		}
 
 		public float EstimateFilamentMeters(PrintableModel model)
 		{
-			if (model == null) return minFilamentMeters;
-			float byTriangles = model.TriangleCount * filamentPerTriangle;
-			float byVolume = model.BoundsVolume * filamentPerCubicMeter;
-			return Mathf.Max(minFilamentMeters, byTriangles + byVolume);
+			return GetMetrics(model).filamentMeters;
+		}
+
+		public float EstimatePrintedMassKg(PrintableModel model)
+		{
+			return GetMetrics(model).massKg;
+		}
+
+		private PrintMetrics GetMetrics(PrintableModel model)
+		{
+			if (model == null) return ComputeMetrics(null, 1f);
+			if (jobMetricsValid && model == CurrentModel) return jobMetrics;
+			if (previewMetricsModel == model && Mathf.Abs(previewMetricsScale - PrintScale01) < 0.0001f)
+				return previewMetrics;
+			previewMetricsModel = model;
+			previewMetricsScale = PrintScale01;
+			previewMetrics = ComputeMetrics(model, ComputeFitScale(model));
+			return previewMetrics;
+		}
+
+		/// <summary>
+		/// Fit factor for the current slider value, measured from the meshes so it
+		/// also works while the imported model is still disabled.
+		/// </summary>
+		private float ComputeFitScale(PrintableModel model)
+		{
+			Vector3 size = model != null ? model.GetWorldBoundsSize() : Vector3.zero;
+			Vector3 max = MaxPrintSize;
+			float maxFit = 1f;
+			if (autoFitModel && size.sqrMagnitude > 0.000001f)
+			{
+				float sx = max.x > 0.0001f ? max.x / Mathf.Max(0.0001f, size.x) : 1f;
+				float sy = max.y > 0.0001f ? max.y / Mathf.Max(0.0001f, size.y) : 1f;
+				float sz = max.z > 0.0001f ? max.z / Mathf.Max(0.0001f, size.z) : 1f;
+				maxFit = Mathf.Max(0.0001f, Mathf.Min(sx, Mathf.Min(sy, sz)));
+			}
+			float minFit = maxFit * Mathf.Clamp(minPrintScaleFraction, 0.01f, 1f);
+			return Mathf.Lerp(minFit, maxFit, PrintScale01);
+		}
+
+		private PrintMetrics ComputeMetrics(PrintableModel model, float fitScale)
+		{
+			var metrics = new PrintMetrics();
+			if (model == null || model.Instance == null)
+			{
+				metrics.seconds = Mathf.Clamp(basePrintSeconds, minPrintSeconds, maxPrintSeconds);
+				metrics.filamentMeters = minFilamentMeters;
+				metrics.massKg = minPrintedMassKg;
+				return metrics;
+			}
+
+			float k = Mathf.Max(0.0001f, fitScale);
+			float unit = Mathf.Max(0.001f, unitToMeter);
+			float solid = model.GetWorldSolidVolume();
+			float area = model.GetWorldSurfaceArea();
+			if (solid <= 0.0000001f && area <= 0.0000001f)
+			{
+				Vector3 s = model.GetWorldBoundsSize();
+				solid = Mathf.Max(0f, s.x * s.y * s.z);
+				area = 2f * (s.x * s.y + s.y * s.z + s.x * s.z);
+			}
+
+			// Extruded plastic = filled interior + solid outer walls.
+			float shellUnits = Mathf.Max(0f, shellThicknessMm) * 0.001f / unit;
+			metrics.plasticUnits = solid * k * k * k * Mathf.Clamp01(infillFraction) + area * k * k * shellUnits;
+
+			float slider = Mathf.Clamp01(PrintScale01);
+			float complexity = Mathf.Min(model.TriangleCount / Mathf.Max(1f, referenceTriangles), 5f)
+				* complexitySeconds * slider;
+			metrics.seconds = Mathf.Clamp(
+				basePrintSeconds + metrics.plasticUnits * secondsPerPlasticUnit + complexity,
+				minPrintSeconds, maxPrintSeconds);
+
+			float byTriangles = model.TriangleCount * filamentPerTriangle * slider * slider;
+			float byVolume = model.BoundsVolume * filamentPerCubicMeter * k * k * k;
+			metrics.filamentMeters = Mathf.Max(minFilamentMeters,
+				metrics.plasticUnits * filamentMetersPerPlasticUnit + byTriangles + byVolume);
+
+			metrics.massKg = Mathf.Clamp(
+				metrics.plasticUnits * unit * unit * unit * Mathf.Max(1f, printedDensityKgPerCubicMeter),
+				minPrintedMassKg, maxPrintedMassKg);
+			return metrics;
+		}
+
+		private void AbortStart(PrintableModel model, string message)
+		{
+			if (model != null && model.Instance != null)
+			{
+				model.Instance.transform.SetParent(null, true);
+				model.Instance.SetActive(false);
+				PendingModel = model;
+			}
+			CleanupPrintRoot();
+			CurrentModel = null;
+			jobMetricsValid = false;
+			Fail(message);
 		}
 
 		// ----- Extruder pivot / toolpath --------------------------------------

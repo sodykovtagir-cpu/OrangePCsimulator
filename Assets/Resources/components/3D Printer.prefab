@@ -1562,10 +1562,16 @@ MonoBehaviour:
   autoFitModel: 1
   rejectOversizedModels: 0
   minPrintScaleFraction: 0.05
+  unitToMeter: 0.18
+  infillFraction: 0.15
+  shellThicknessMm: 0.8
+  secondsPerPlasticUnit: 900
+  filamentMetersPerPlasticUnit: 6
+  complexitySeconds: 60
   referenceTriangles: 10000
-  basePrintSeconds: 60
+  basePrintSeconds: 20
   averagePrintSeconds: 600
-  minPrintSeconds: 180
+  minPrintSeconds: 10
   maxPrintSeconds: 3600
   filamentPerTriangle: 0.00008
   filamentPerCubicMeter: 0
@@ -1574,9 +1580,9 @@ MonoBehaviour:
   idleWatts: 12
   minPrintWatts: 80
   maxPrintWatts: 350
-  printedDensityKgPerCubicMeter: 180
-  minPrintedMassKg: 0.02
-  maxPrintedMassKg: 5
+  printedDensityKgPerCubicMeter: 1240
+  minPrintedMassKg: 0.005
+  maxPrintedMassKg: 25
 --- !u!54 &206941935389873938
 Rigidbody:
   m_ObjectHideFlags: 0
