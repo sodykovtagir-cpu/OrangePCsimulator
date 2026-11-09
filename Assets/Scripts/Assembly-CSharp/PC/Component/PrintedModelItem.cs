@@ -16,11 +16,45 @@ public class PrintedModelItem : Item, ISave
 	[SerializeField] private string modelName = "Printed Model";
 	[SerializeField] private string colorHex = "FFFFFF";
 	[SerializeField] private float savedMass = 0.1f;
+	[SerializeField] private PC.Component.FilamentFinish finish = PC.Component.FilamentFinish.Glossy;
+	[SerializeField] private float smoothness = 0.85f;
+	[SerializeField] private string glowHex = "000000";
+	[SerializeField] private float glowIntensity;
 
 	public string ModelName => modelName;
 
+	private Color GlowColor
+	{
+		get
+		{
+			var color = Color.black;
+			if (!string.IsNullOrEmpty(glowHex)) ColorUtility.TryParseHtmlString("#" + glowHex, out color);
+			return color;
+		}
+	}
+
+	private Color EmissionColor
+	{
+		get
+		{
+			if (finish != PC.Component.FilamentFinish.Glow || glowIntensity <= 0f) return Color.black;
+			var c = GlowColor;
+			return new Color(c.r * glowIntensity, c.g * glowIntensity, c.b * glowIntensity, 1f);
+		}
+	}
+
 	public void Initialize(string name, Color color)
 	{
+		Initialize(name, color, PC.Component.FilamentFinish.Glossy, 0.85f, Color.black, 0f);
+	}
+
+	public void Initialize(string name, Color color, PC.Component.FilamentFinish finishType,
+		float surfaceSmoothness, Color glowColor, float emissionIntensity)
+	{
+		finish = finishType;
+		smoothness = Mathf.Clamp01(surfaceSmoothness);
+		glowHex = ColorUtility.ToHtmlStringRGB(glowColor);
+		glowIntensity = Mathf.Max(0f, emissionIntensity);
 		modelName = string.IsNullOrEmpty(name) ? "Printed Model" : name;
 		colorHex = ColorUtility.ToHtmlStringRGB(color);
 		spawnId = PrintedSpawnId;
@@ -41,6 +75,10 @@ public class PrintedModelItem : Item, ISave
 		base.ToData(jObject);
 		jObject["printedName"] = modelName;
 		jObject["printedColor"] = colorHex;
+		jObject["printedFinish"] = (int)finish;
+		jObject["printedSmoothness"] = smoothness;
+		jObject["printedGlowColor"] = glowHex;
+		jObject["printedGlowIntensity"] = glowIntensity;
 		jObject["printedScale"] = JToken.FromObject(transform.localScale);
 		var rb = GetComponent<Rigidbody>();
 		jObject["printedMass"] = rb != null ? rb.mass : savedMass;
@@ -78,6 +116,17 @@ public class PrintedModelItem : Item, ISave
 			transform.localScale = scaleToken.ToObject<Vector3>();
 		if (jObject.TryGetValue("printedMass", out var massToken) && massToken != null)
 			savedMass = Mathf.Max(0.001f, massToken.Value<float>());
+		if (jObject.TryGetValue("printedFinish", out var finishToken) && finishToken != null)
+		{
+			int raw = finishToken.Value<int>();
+			if (raw >= 0 && raw <= 2) finish = (PC.Component.FilamentFinish)raw;
+		}
+		if (jObject.TryGetValue("printedSmoothness", out var smoothToken) && smoothToken != null)
+			smoothness = Mathf.Clamp01(smoothToken.Value<float>());
+		if (jObject.TryGetValue("printedGlowColor", out var glowToken) && glowToken != null)
+			glowHex = glowToken.Value<string>();
+		if (jObject.TryGetValue("printedGlowIntensity", out var glowIntensityToken) && glowIntensityToken != null)
+			glowIntensity = Mathf.Max(0f, glowIntensityToken.Value<float>());
 
 		ClearGeneratedVisuals();
 		if (jObject.TryGetValue("printedParts", out var partsToken) && partsToken is JArray parts)
@@ -118,7 +167,7 @@ public class PrintedModelItem : Item, ISave
 		Color color = Color.white;
 		if (!string.IsNullOrEmpty(colorHex)) ColorUtility.TryParseHtmlString("#" + colorHex, out color);
 		var model = PrintableModel.FromInstance(gameObject, modelName);
-		model.ApplyColor(color);
+		model.ApplyColor(color, smoothness, EmissionColor);
 		model.AddFinishedPhysics(180f, 0.02f, 5f);
 		var rb = GetComponent<Rigidbody>();
 		if (rb != null) rb.mass = savedMass;

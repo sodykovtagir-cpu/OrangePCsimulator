@@ -509,8 +509,11 @@ namespace PC.Component.Software
 
             if (hiddenToggle != null)
             {
-                hiddenToggle.interactable = !file.isFolder &&
-                    (IsAdministrator || !IsProtectedFile(file, false));
+                // Hiding only changes visibility for the current user; it never
+                // edits or deletes the file. Built-in/system apps must be
+                // hideable too, so this toggle does not require administrator
+                // rights and is not blocked by IsProtectedFile.
+                hiddenToggle.interactable = !file.isFolder;
                 hiddenToggle.SetIsOnWithoutNotify(file.hidden);
             }
         }
@@ -520,9 +523,9 @@ namespace PC.Component.Software
             var file = GetSelectedFile();
             if (file == null || file.isFolder) return;
 
-            // A user-hidden file is not a protected system file. Check its
-            // intrinsic permissions only, so the same toggle can unhide it.
-            if (!IsAdministrator && IsProtectedFile(file, false)) return;
+            // Visibility is a per-user flag, so system/built-in apps can be
+            // hidden and unhidden without elevation. Delete/rename/cut keep
+            // their own protection rules.
             file.hidden = hidden;
             if (system != null) system.RefreshDesktopIcon();
 

@@ -23,6 +23,18 @@ namespace PC.Component
 		[Header("Filament color")]
 		[SerializeField] private Color filamentColor = Color.white;
 
+		[Header("Plastic finish")]
+		[Tooltip("Matte, glossy or glow-in-the-dark plastic.")]
+		[SerializeField] private FilamentFinish finish = FilamentFinish.Glossy;
+		[SerializeField, Range(0f, 1f)] private float matteSmoothness = 0.12f;
+		[SerializeField, Range(0f, 1f)] private float glossySmoothness = 0.85f;
+		[SerializeField] private Color glowColor = new Color(0.62f, 1f, 0.35f, 1f);
+		[SerializeField] private float glowIntensity = 2.4f;
+		[Tooltip("Glow plastic also lights the room a little in the dark.")]
+		[SerializeField] private bool glowLight = true;
+		[SerializeField] private float glowLightIntensity = 0.7f;
+		[SerializeField] private float glowLightRange = 1.4f;
+
 		[Header("Visual amount thresholds")]
 		[Tooltip("Visual Y/Z scale at empty spool (core still visible).")]
 		[SerializeField, Range(0.05f, 1f)] private float minVisualScale = 0.35f;
@@ -50,6 +62,14 @@ namespace PC.Component
 		public bool IsLowFilament => RemainingMeters <= Mathf.Max(0f, lowFilamentMeters);
 		public bool IsAttached => attachedPrinter != null;
 		public Color FilamentColor => filamentColor;
+		public FilamentFinish Finish => finish;
+		public bool IsGlow => finish == FilamentFinish.Glow;
+		public Color GlowColor => glowColor;
+		public float GlowIntensity => glowIntensity;
+		public float Smoothness => finish == FilamentFinish.Matte ? matteSmoothness : glossySmoothness;
+		public Color EmissionColor => IsGlow
+			? new Color(glowColor.r * glowIntensity, glowColor.g * glowIntensity, glowColor.b * glowIntensity, 1f)
+			: Color.black;
 		public float MinVisualScale => minVisualScale;
 		public float MaxVisualScale => maxVisualScale;
 
@@ -170,10 +190,11 @@ namespace PC.Component
 				targets = spoolVisual.GetComponentsInChildren<Renderer>(true);
 			if (targets == null) return;
 
-			block.SetColor("_Color", filamentColor);
-			block.SetColor("_BaseColor", filamentColor);
-			for (int i = 0; i < targets.Length; i++)
-				if (targets[i] != null) targets[i].SetPropertyBlock(block);
+			FilamentLook.Apply(targets, filamentColor, Smoothness, EmissionColor);
+			if (IsGlow && glowLight)
+				FilamentLook.EnsureGlowLight(gameObject, filamentColor, glowLightIntensity, glowLightRange);
+			else
+				FilamentLook.RemoveGlowLight(gameObject);
 		}
 
 		public void ToData(JObject jObject)
@@ -181,6 +202,9 @@ namespace PC.Component
 			jObject["filamentCapacity"] = CapacityMeters;
 			jObject["filamentRemaining"] = RemainingMeters;
 			jObject["filamentColor"] = ColorUtility.ToHtmlStringRGB(filamentColor);
+			jObject["filamentFinish"] = (int)finish;
+			jObject["filamentGlowColor"] = ColorUtility.ToHtmlStringRGB(glowColor);
+			jObject["filamentGlowIntensity"] = glowIntensity;
 			jObject["filamentLowWarning"] = lowFilamentMeters;
 		}
 
@@ -192,6 +216,19 @@ namespace PC.Component
 				remainingMeters = rem.Value<float>();
 			if (jObject.TryGetValue("filamentLowWarning", out var low) && low != null)
 				lowFilamentMeters = Mathf.Max(0f, low.Value<float>());
+			if (jObject.TryGetValue("filamentFinish", out var finishToken) && finishToken != null)
+			{
+				int raw = finishToken.Value<int>();
+				if (raw >= 0 && raw <= 2) finish = (FilamentFinish)raw;
+			}
+			if (jObject.TryGetValue("filamentGlowIntensity", out var glowToken) && glowToken != null)
+				glowIntensity = Mathf.Max(0f, glowToken.Value<float>());
+			if (jObject.TryGetValue("filamentGlowColor", out var glowColorToken) && glowColorToken != null)
+			{
+				string hex = glowColorToken.Value<string>();
+				if (!string.IsNullOrEmpty(hex) && ColorUtility.TryParseHtmlString("#" + hex, out var parsedGlow))
+					glowColor = parsedGlow;
+			}
 			if (jObject.TryGetValue("filamentColor", out var colorToken) && colorToken != null)
 			{
 				string hex = colorToken.Value<string>();

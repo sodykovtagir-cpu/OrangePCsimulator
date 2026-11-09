@@ -50,6 +50,32 @@ namespace PC.Component
 			}
 		}
 
+		/// <summary>
+		/// Filters handed to the native file picker. Android's document picker
+		/// matches MIME types, not extensions, and reports fbx/glb/stl as
+		/// application/octet-stream (or nothing at all) — passing ".fbx" there
+		/// greyed out every file so nothing could be selected on a phone.
+		/// iOS needs UTIs for the same reason. The picked path is validated with
+		/// IsSupported afterwards.
+		/// </summary>
+		public static string[] PickerFileTypes
+		{
+			get
+			{
+#if UNITY_ANDROID && !UNITY_EDITOR
+				return new[]
+				{
+					"model/gltf-binary", "model/gltf+json", "model/obj", "model/stl",
+					"application/octet-stream", "*/*"
+				};
+#elif UNITY_IOS && !UNITY_EDITOR
+				return new[] { "public.item", "public.data", "public.content", "public.3d-content" };
+#else
+				return (string[])SupportedExtensions.Clone();
+#endif
+			}
+		}
+
 		public static bool IsSupported(string path)
 		{
 			if (string.IsNullOrEmpty(path)) return false;

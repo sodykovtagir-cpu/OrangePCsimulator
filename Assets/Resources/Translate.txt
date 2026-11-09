@@ -604,3 +604,32 @@ White Filament	White Filament																	Белый филамент
 Power	Power																	Питание																								
 Scale	Scale																	Масштаб																								
 No power	No power																	Нет питания																								
+White Filament Matte	White Filament Matte																	Белый филамент (матовый)																								
+White Filament Glossy	White Filament Glossy																	Белый филамент (глянцевый)																								
+Black Filament Matte	Black Filament Matte																	Чёрный филамент (матовый)																								
+Black Filament Glossy	Black Filament Glossy																	Чёрный филамент (глянцевый)																								
+Gray Filament Matte	Gray Filament Matte																	Серый филамент (матовый)																								
+Gray Filament Glossy	Gray Filament Glossy																	Серый филамент (глянцевый)																								
+Red Filament Matte	Red Filament Matte																	Красный филамент (матовый)																								
+Red Filament Glossy	Red Filament Glossy																	Красный филамент (глянцевый)																								
+Orange Filament Matte	Orange Filament Matte																	Оранжевый филамент (матовый)																								
+Orange Filament Glossy	Orange Filament Glossy																	Оранжевый филамент (глянцевый)																								
+Yellow Filament Matte	Yellow Filament Matte																	Жёлтый филамент (матовый)																								
+Yellow Filament Glossy	Yellow Filament Glossy																	Жёлтый филамент (глянцевый)																								
+Green Filament Matte	Green Filament Matte																	Зелёный филамент (матовый)																								
+Green Filament Glossy	Green Filament Glossy																	Зелёный филамент (глянцевый)																								
+Blue Filament Matte	Blue Filament Matte																	Синий филамент (матовый)																								
+Blue Filament Glossy	Blue Filament Glossy																	Синий филамент (глянцевый)																								
+Cyan Filament Matte	Cyan Filament Matte																	Голубой филамент (матовый)																								
+Cyan Filament Glossy	Cyan Filament Glossy																	Голубой филамент (глянцевый)																								
+Purple Filament Matte	Purple Filament Matte																	Фиолетовый филамент (матовый)																								
+Purple Filament Glossy	Purple Filament Glossy																	Фиолетовый филамент (глянцевый)																								
+Pink Filament Matte	Pink Filament Matte																	Розовый филамент (матовый)																								
+Pink Filament Glossy	Pink Filament Glossy																	Розовый филамент (глянцевый)																								
+Brown Filament Matte	Brown Filament Matte																	Коричневый филамент (матовый)																								
+Brown Filament Glossy	Brown Filament Glossy																	Коричневый филамент (глянцевый)																								
+Glow Filament	Glow Filament																	Светящийся филамент																								
+Cancel Print	Cancel Print																	Отменить печать																								
+Unsupported model format	Unsupported model format																	Неподдерживаемый формат модели																								
+Matte	Matte																	Матовый																								
+Glossy	Glossy																	Глянцевый																								

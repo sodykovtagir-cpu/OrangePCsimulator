@@ -102,6 +102,7 @@ namespace PC.Component.Software
 			if (subscribedPrinter != null)
 			{
 				subscribedPrinter.PrintFinished += OnPrintFinished;
+				subscribedPrinter.PrintCancelled += OnPrintFinished;
 				subscribedPrinter.ModelImported += OnModelImported;
 				subscribedPrinter.StateChanged += OnStateChanged;
 				if (scaleSlider != null) scaleSlider.SetValueWithoutNotify(subscribedPrinter.PrintScale01);
@@ -115,6 +116,7 @@ namespace PC.Component.Software
 		{
 			if (subscribedPrinter == null) return;
 			subscribedPrinter.PrintFinished -= OnPrintFinished;
+			subscribedPrinter.PrintCancelled -= OnPrintFinished;
 			subscribedPrinter.ModelImported -= OnModelImported;
 			subscribedPrinter.StateChanged -= OnStateChanged;
 			subscribedPrinter = null;
@@ -147,6 +149,10 @@ namespace PC.Component.Software
 			selectedPrinter.ImportModelDialog();
 		}
 
+		/// <summary>
+		/// Start / cancel toggle. The prefab button keeps calling this method, so
+		/// the same button cancels a running job and hands over the partial print.
+		/// </summary>
 		public void StartPrint()
 		{
 			if (selectedPrinter == null)
@@ -154,8 +160,20 @@ namespace PC.Component.Software
 				ShowHint("No printer selected");
 				return;
 			}
+			if (selectedPrinter.IsPrinting)
+			{
+				CancelPrint();
+				return;
+			}
 			if (scaleSlider != null) selectedPrinter.SetPrintScale01(scaleSlider.value);
 			selectedPrinter.StartPrint();
+			RefreshUI();
+		}
+
+		public void CancelPrint()
+		{
+			if (selectedPrinter == null) return;
+			selectedPrinter.CancelPrint();
 			RefreshUI();
 		}
 
@@ -175,7 +193,10 @@ namespace PC.Component.Software
 			bool canStart = hasPrinter && !printing && model != null && selectedPrinter.AttachedSpool != null && selectedPrinter.IsPowered;
 
 			if (importModelButton != null) importModelButton.interactable = canImport;
-			if (startPrintButton != null) startPrintButton.interactable = canStart;
+			// While printing the same button cancels the job, so it stays active.
+			if (startPrintButton != null) startPrintButton.interactable = printing || canStart;
+			if (startPrintText != null)
+				startPrintText.text = Localization.GetText(printing ? "Cancel Print" : "Start Print");
 			if (scaleSlider != null) scaleSlider.interactable = hasPrinter && !printing && model != null;
 
 			float scale01 = scaleSlider != null ? scaleSlider.value : (hasPrinter ? selectedPrinter.PrintScale01 : 1f);
@@ -332,24 +353,30 @@ namespace PC.Component.Software
 			foreach (var col in previewClone.GetComponentsInChildren<Collider>(true)) Destroy(col);
 			foreach (var rb in previewClone.GetComponentsInChildren<Rigidbody>(true)) Destroy(rb);
 
-			Color color = selectedPrinter != null && selectedPrinter.AttachedSpool != null
-				? selectedPrinter.AttachedSpool.FilamentColor : Color.white;
-			var block = new MaterialPropertyBlock();
-			block.SetColor("_Color", color);
-			block.SetColor("_BaseColor", color);
-			foreach (var r in previewClone.GetComponentsInChildren<Renderer>(true))
-				if (r != null) r.SetPropertyBlock(block);
+			var spool = selectedPrinter != null ? selectedPrinter.AttachedSpool : null;
+			Color color = spool != null ? spool.FilamentColor : Color.white;
+			float smoothness = spool != null ? spool.Smoothness : 0.6f;
+			Color emission = spool != null ? spool.EmissionColor : Color.black;
+			FilamentLook.Apply(previewClone.GetComponentsInChildren<Renderer>(true), color, smoothness, emission);
 
 			previewBaseScale = previewClone.transform.localScale;
 			previewBaseValid = GetBounds(previewClone).size.sqrMagnitude > 0.000001f;
 			ApplyPreviewScale();
 		}
 
+		/// <summary>
+		/// The printer's own build-volume BoxCollider defines the slider maximum.
+		/// The app prefab does not need any collider reference: it is enough to
+		/// assign Print Volume Collider on the printer prefab.
+		/// </summary>
 		private Vector3 GetPreviewMaxSize()
 		{
+			if (selectedPrinter != null)
+			{
+				Vector3 printerVolume = selectedPrinter.PrintVolumeSize;
+				if (printerVolume.sqrMagnitude > 0.000001f) return printerVolume;
+			}
 			if (previewMaxBounds != null) return previewMaxBounds.size;
-			if (selectedPrinter != null && selectedPrinter.PrintVolumeCollider != null)
-				return selectedPrinter.PrintVolumeCollider.size;
 			return new Vector3(1.6f, 1.6f, 1.6f);
 		}
 

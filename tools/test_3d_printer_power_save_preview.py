@@ -37,7 +37,7 @@ def test_slower_print_and_carriage_parking():
     assert "minPrintSeconds = 180f" in text
     assert "grabClearance" in text
     assert "ParkCarriage()" in text
-    assert "VerticalDirection * (modelHeight + grabClearance)" in text
+    assert "VerticalDirection * (printedHeight + grabClearance)" in text
     # Finish resets the printer/screen instead of leaving a Finished screen up.
     finish = text[text.index("private void FinishPrint()"):text.index("private void AttachPrintedItem")]
     assert "SetState(PrinterState.Idle);" in finish
@@ -59,7 +59,7 @@ def test_finished_prints_are_saved_items_named_like_file():
     assert "protected set => info = value;" in item
     printer = PRINTER.read_text(encoding="utf-8")
     assert "AttachPrintedItem(finished);" in printer
-    assert "item.Initialize(model.Name, color);" in printer
+    assert "item.Initialize(model.Name, color," in printer
 
 
 def test_lighter_finished_mass():
@@ -81,10 +81,13 @@ def test_app_resets_and_has_3d_scale_preview():
     assert "scaleSlider.onValueChanged.AddListener(OnScaleSlider);" in text
     assert "selectedPrinter.SetPrintScale01(scaleSlider.value);" in text
     prefab = APP_PREFAB.read_text(encoding="utf-8")
-    assert "m_Name: ScaleSlider" in prefab
-    assert "scaleSlider: {fileID: 114900000000000001}" in prefab
-    assert "m_FillRect: {fileID: 224900000000000003}" in prefab
-    assert "m_HandleRect: {fileID: 224900000000000005}" in prefab
+    # The slider is authored in Unity by hand; only the wiring is asserted.
+    assert "m_Name: Slider" in prefab
+    ref = re.search(r"scaleSlider: \{fileID: (\d+)\}", prefab)
+    assert ref and ref.group(1) != "0", "scaleSlider must be assigned"
+    slider = re.search(r"--- !u!114 &" + ref.group(1) + r"\nMonoBehaviour:.*?(?=\n--- |\Z)", prefab, re.S)
+    assert slider, "slider component missing"
+    assert "m_FillRect:" in slider.group(0) and "m_HandleRect:" in slider.group(0)
 
 
 def test_extruder_pivot_created():

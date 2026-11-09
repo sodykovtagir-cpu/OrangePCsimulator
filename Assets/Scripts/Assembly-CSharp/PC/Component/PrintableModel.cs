@@ -62,13 +62,20 @@ namespace PC.Component
 
 		public void ApplyColor(Color color)
 		{
+			ApplyColor(color, 0.6f, Color.black);
+		}
+
+		/// <summary>
+		/// Recolor a print and match the plastic it was printed from: matte or
+		/// glossy smoothness, plus emission for glow-in-the-dark filament.
+		/// </summary>
+		public void ApplyColor(Color color, float smoothness, Color emission)
+		{
 			if (Instance == null) return;
-			var block = new MaterialPropertyBlock();
-			block.SetColor("_Color", color);
-			block.SetColor("_BaseColor", color);
 			var renderers = Instance.GetComponentsInChildren<Renderer>(true);
-			for (int i = 0; i < renderers.Length; i++)
-				if (renderers[i] != null) renderers[i].SetPropertyBlock(block);
+			FilamentLook.Apply(renderers, color, smoothness, emission);
+			if (FilamentLook.HasEmission(emission))
+				FilamentLook.EnsureGlowLight(Instance, color, 0.6f, 1.2f);
 		}
 
 		/// <summary>

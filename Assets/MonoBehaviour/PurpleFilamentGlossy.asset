@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: PurpleFilamentGlossy
+  m_EditorClassIdentifier: 
+  itemName: '{Purple Filament Glossy}'
+  price: 60
+  bitcoin: 0
+  sprite: {fileID: 0}
+  spawn: {fileID: 8984346000712170146, guid: a39d7e103bc447e99fa31c3c37356a1a, type: 3}
+  large: 0
+  translateDescription: 1
+  description: 

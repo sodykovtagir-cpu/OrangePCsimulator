@@ -101,11 +101,45 @@ namespace PC.Component
 		public float RemainingSeconds { get; private set; }
 		public string LastError { get; private set; }
 		public float PrintScale01 { get; private set; } = 1f;
-		public Vector3 MaxPrintSize => printVolumeCollider != null ? printVolumeCollider.size : maxPrintSize;
+		public Vector3 MaxPrintSize => PrintVolumeSize;
 		public BoxCollider PrintVolumeCollider => printVolumeCollider;
+
+		/// <summary>
+		/// Build volume in world units. The BoxCollider assigned on the printer is
+		/// the single source of truth, so the desktop app never needs its own
+		/// collider reference in the app prefab.
+		/// </summary>
+		public Vector3 PrintVolumeSize
+		{
+			get
+			{
+				if (printVolumeCollider == null) printVolumeCollider = FindVolumeCollider();
+				if (printVolumeCollider == null) return maxPrintSize;
+				Vector3 size = printVolumeCollider.size;
+				Vector3 scale = printVolumeCollider.transform.lossyScale;
+				return new Vector3(
+					Mathf.Abs(size.x * scale.x),
+					Mathf.Abs(size.y * scale.y),
+					Mathf.Abs(size.z * scale.z));
+			}
+		}
+
+		private BoxCollider FindVolumeCollider()
+		{
+			var candidates = GetComponentsInChildren<BoxCollider>(true);
+			for (int i = 0; i < candidates.Length; i++)
+			{
+				if (candidates[i] == null) continue;
+				string n = candidates[i].name.Replace(" ", "").Replace("_", "").ToLowerInvariant();
+				if (n.Contains("printvolume") || n.Contains("buildvolume") || n.Contains("printarea"))
+					return candidates[i];
+			}
+			return null;
+		}
 
 		public event Action<PrintableModel> PrintFinished;
 		public event Action<PrintableModel> ModelImported;
+		public event Action<PrintableModel> PrintCancelled;
 		public event Action StateChanged;
 
 		public bool IsPowered
@@ -157,6 +191,7 @@ namespace PC.Component
 			base.Awake();
 			if (screen == null) screen = GetComponentInChildren<ThreeDPrinterScreen>(true);
 			if (loopAudio == null) loopAudio = GetComponent<AudioSource>();
+			if (printVolumeCollider == null) printVolumeCollider = FindVolumeCollider();
 			EnsureExtruderPivot();
 			motionX = extruderPivot != null ? extruderPivot : axisX;
 			if (motionX != null) motionXRest = motionX.localPosition;
@@ -281,13 +316,18 @@ namespace PC.Component
 				NativeFilePicker.PickFile(path =>
 				{
 					if (!string.IsNullOrEmpty(path)) ImportModel(path);
-				}, ThreeDModelImporter.SupportedExtensions);
+				}, ThreeDModelImporter.PickerFileTypes);
 			});
 		}
 
 		public bool ImportModel(string path)
 		{
 			if (IsPrinting) return false;
+			if (!ThreeDModelImporter.IsSupported(path))
+			{
+				Fail("Unsupported model format");
+				return false;
+			}
 			try
 			{
 				var model = ThreeDModelImporter.Import(path, null);
@@ -323,7 +363,7 @@ namespace PC.Component
 				NativeFilePicker.PickFile(path =>
 				{
 					if (!string.IsNullOrEmpty(path)) ImportAndStartPrint(path);
-				}, ThreeDModelImporter.SupportedExtensions);
+				}, ThreeDModelImporter.PickerFileTypes);
 			});
 		}
 
@@ -432,20 +472,41 @@ namespace PC.Component
 			return true;
 		}
 
+		/// <summary>
+		/// Stop the job and hand the unfinished print to the player. The model
+		/// keeps the height it already reached and gets the same Rigidbody and
+		/// per-island BoxColliders as a finished print, so it can be picked up.
+		/// </summary>
 		public void CancelPrint()
 		{
 			if (!IsPrinting) return;
 			if (printCoroutine != null) StopCoroutine(printCoroutine);
 			printCoroutine = null;
 			StopPrintAudio();
+
+			float reached = Mathf.Clamp01(Progress01);
+			if (printProgressRoot != null)
+				printProgressRoot.transform.localScale = new Vector3(
+					printFitScale, Mathf.Max(0.001f, reached) * printFitScale, printFitScale);
+
+			var partial = CurrentModel;
+			ParkCarriage(modelHeight * Mathf.Max(0.02f, reached));
+			if (partial != null && partial.Instance != null)
+			{
+				partial.Instance.transform.SetParent(null, true);
+				partial.AddFinishedPhysics(printedDensityKgPerCubicMeter, minPrintedMassKg, maxPrintedMassKg);
+				AttachPrintedItem(partial);
+			}
 			CleanupPrintRoot();
+
 			CurrentModel = null;
+			PendingModel = null;
 			SetState(PrinterState.Idle);
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
-			ResetAxes();
 			ElectricityGrid.Instance?.NotifyLoadChanged();
 			UpdateScreen();
+			PrintCancelled?.Invoke(partial);
 		}
 
 		private IEnumerator PrintRoutine()
@@ -521,8 +582,13 @@ namespace PC.Component
 			if (model == null || model.Instance == null) return;
 			var item = model.Instance.GetComponent<PrintedModelItem>();
 			if (item == null) item = model.Instance.AddComponent<PrintedModelItem>();
-			Color color = AttachedSpool != null ? AttachedSpool.FilamentColor : Color.white;
-			item.Initialize(model.Name, color);
+			var spool = AttachedSpool;
+			Color color = spool != null ? spool.FilamentColor : Color.white;
+			item.Initialize(model.Name, color,
+				spool != null ? spool.Finish : FilamentFinish.Glossy,
+				spool != null ? spool.Smoothness : 0.85f,
+				spool != null ? spool.GlowColor : Color.black,
+				spool != null && spool.IsGlow ? spool.GlowIntensity : 0f);
 		}
 
 		private void Fail(string message)
@@ -558,8 +624,11 @@ namespace PC.Component
 		private void ApplySpoolColor(PrintableModel model)
 		{
 			if (model == null) return;
-			Color color = AttachedSpool != null ? AttachedSpool.FilamentColor : Color.white;
-			model.ApplyColor(color);
+			var spool = AttachedSpool;
+			Color color = spool != null ? spool.FilamentColor : Color.white;
+			float smoothness = spool != null ? spool.Smoothness : 0.6f;
+			Color emission = spool != null ? spool.EmissionColor : Color.black;
+			model.ApplyColor(color, smoothness, emission);
 		}
 
 		// ----- Estimation -----------------------------------------------------
@@ -732,10 +801,15 @@ namespace PC.Component
 
 		private void ParkCarriage()
 		{
+			ParkCarriage(modelHeight);
+		}
+
+		private void ParkCarriage(float printedHeight)
+		{
 			if (motionX != null) motionX.localPosition = motionXRest;
 			if (axisZ != null) axisZ.localPosition = axisZRest;
 			if (axisY != null)
-				axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * (modelHeight + grabClearance));
+				axisY.localPosition = axisYRest + Vector3.up * (VerticalDirection * (printedHeight + grabClearance));
 		}
 
 		private void ResetAxes()
