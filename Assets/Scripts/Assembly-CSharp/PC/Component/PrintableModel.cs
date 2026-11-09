@@ -211,7 +211,7 @@ namespace PC.Component
 			return added;
 		}
 
-		private static float GetWorldBoundsVolume(GameObject root)
+		private float GetWorldBoundsVolume(GameObject root)
 		{
 			var renderers = root.GetComponentsInChildren<Renderer>(true);
 			Bounds bounds = new Bounds(root.transform.position, Vector3.zero);
