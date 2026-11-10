@@ -211,15 +211,12 @@ namespace PC.Component.Software
 
 			var sb = new System.Text.StringBuilder();
 			sb.AppendLine(selectedPrinter.DeviceName);
-			sb.AppendLine(Localization.GetText("Power") + ": " + (selectedPrinter.IsPowered
-				? selectedPrinter.CurrentWatts.ToString("0") + " W"
-				: Localization.GetText("No power")));
+			sb.AppendLine(Localization.GetText(selectedPrinter.IsPowered ? "Powered" : "No power"));
 			if (model != null)
 			{
 				sb.AppendLine(Localization.GetText("Model") + ": " + model.Name);
 				sb.AppendLine(Localization.GetText("Triangles") + ": " + model.TriangleCount);
 				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(selectedPrinter.EstimatePrintSeconds(model)));
-				sb.AppendLine(Localization.GetText("Required filament") + ": " + selectedPrinter.EstimateFilamentMeters(model).ToString("0.00") + " m");
 				sb.AppendLine(Localization.GetText("Weight") + ": " + FormatMass(selectedPrinter.EstimatePrintedMassKg(model)));
 			}
 			else sb.AppendLine(Localization.GetText("No model imported"));
@@ -227,12 +224,12 @@ namespace PC.Component.Software
 			var spool = selectedPrinter.AttachedSpool;
 			if (spool != null)
 			{
-				sb.AppendLine(Localization.GetText("Filament") + ": " + spool.RemainingMeters.ToString("0.00") +
-					" / " + spool.CapacityMeters.ToString("0.00") + " m");
 				if (spool.IsLowFilament) sb.AppendLine(Localization.GetText("Low filament"));
 			}
 			else sb.AppendLine(Localization.GetText("No filament spool"));
 
+			if (hasPrinter && selectedPrinter.WaitingForFilament)
+				sb.AppendLine(Localization.GetText("Replace filament spool"));
 			if (printing)
 				sb.AppendLine(Localization.GetText("Printing") + " " + Mathf.RoundToInt(selectedPrinter.Progress01 * 100f) + "%");
 			else if (selectedPrinter.State == ThreeDPrinter.PrinterState.Error)

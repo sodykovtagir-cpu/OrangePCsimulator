@@ -58,19 +58,20 @@ def test_spool_one_meter_and_gradual_consumption():
     assert "remainingMeters = 1f" in spool
     assert "TryConsume(float meters)" in spool
     printer = PRINTER.read_text(encoding="utf-8")
-    assert "AttachedSpool.Consume(consumed)" in printer
-    assert "deltaFilament = (progress - lastProgress) * requiredFilament" in printer
+    assert "AttachedSpool.Consume(step * requiredFilament)" in printer
+    assert "step = Mathf.Min(step, AttachedSpool.RemainingMeters / Mathf.Max(0.000001f, requiredFilament))" in printer
     assert "filamentPerTriangle = 0.00008f" in printer
-    # 10k triangles uses 0.8 m, leaving filament on a 1 m spool.
-    assert 10000 * 0.00008 <= 1.0
+    # Consumption is based on deposited plastic, not mesh tessellation.
+    assert "metrics.plasticUnits * filamentMetersPerPlasticUnit);" in printer
+    assert "+ byTriangles + byVolume" not in printer
 
 
 def test_spool_swap_blocked_while_printing():
     text = PRINTER.read_text(encoding="utf-8")
     attach = text[text.index("public bool AttachSpool"):text.index("public bool DetachSpool")]
     detach = text[text.index("public bool DetachSpool"):text.index("// ----- Import / scale")]
-    assert "if (IsPrinting || spool == null) return false;" in attach
-    assert "if (IsPrinting || AttachedSpool == null) return false;" in detach
+    assert "if (!CanSwapSpool || spool == null) return false;" in attach
+    assert "if (!CanSwapSpool || AttachedSpool == null) return false;" in detach
 
 
 def test_screen_shows_time_model_filament():

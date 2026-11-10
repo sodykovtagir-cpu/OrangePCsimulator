@@ -634,3 +634,5 @@ Unsupported model format	Unsupported model format																	Неподде
 Matte	Matte																	Матовый																								
 Glossy	Glossy																	Глянцевый																								
 Weight	Weight																	Вес																								
+Replace filament spool	Replace filament spool to continue																	Замените катушку для продолжения
+Powered	Powered																	Питание подключено

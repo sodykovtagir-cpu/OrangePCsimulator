@@ -62,7 +62,7 @@ public class PrintedModelItem : Item, ISave
 		gameObject.name = modelName;
 		var rb = GetComponent<Rigidbody>();
 		if (rb != null) savedMass = rb.mass;
-		if (Id == 0 && Main.Instance != null) Main.Instance.GetNewId(this);
+		if (Id == 0 && Main.Instance != null) Id = Main.Instance.GetNewId(this);
 	}
 
 	public override string GetInfo()
@@ -79,29 +79,44 @@ public class PrintedModelItem : Item, ISave
 		jObject["printedSmoothness"] = smoothness;
 		jObject["printedGlowColor"] = glowHex;
 		jObject["printedGlowIntensity"] = glowIntensity;
-		jObject["printedScale"] = ToJson(transform.localScale);
 		var rb = GetComponent<Rigidbody>();
 		jObject["printedMass"] = rb != null ? rb.mass : savedMass;
+		WriteGeometry(gameObject, jObject);
+		// SaveManager stores a world pose, including when the item is held.
+		jObject["printedScale"] = ToJson(transform.lossyScale);
+	}
 
+	// All part vertices are baked into the saved root's coordinate system.
+	// Saving a root MeshFilter's localPosition/localScale as a child applied
+	// the print's world position and scale AGAIN on load (often underground).
+	public static void WriteGeometry(GameObject root, JObject jObject)
+	{
+		jObject["printedGeometryVersion"] = 2;
+		jObject["printedScale"] = ToJson(root.transform.localScale);
 		var parts = new JArray();
-		var filters = GetComponentsInChildren<MeshFilter>(true);
+		var filters = root.GetComponentsInChildren<MeshFilter>(true);
 		for (int i = 0; i < filters.Length; i++)
 		{
 			var mesh = filters[i] != null ? filters[i].sharedMesh : null;
 			if (mesh == null) continue;
-			var part = new JObject
+			Matrix4x4 toRoot = root.transform.worldToLocalMatrix * filters[i].transform.localToWorldMatrix;
+			var vertices = mesh.vertices;
+			for (int v = 0; v < vertices.Length; v++) vertices[v] = toRoot.MultiplyPoint3x4(vertices[v]);
+			var triangles = mesh.triangles;
+			if (toRoot.determinant < 0f)
+				for (int t = 0; t + 2 < triangles.Length; t += 3)
+				{
+					int swap = triangles[t + 1]; triangles[t + 1] = triangles[t + 2]; triangles[t + 2] = swap;
+				}
+			parts.Add(new JObject
 			{
 				["name"] = filters[i].name,
-				["pos"] = ToJson(filters[i].transform.localPosition),
-				["rot"] = ToJson(filters[i].transform.localRotation),
-				["scale"] = ToJson(filters[i].transform.localScale),
-				["vertices"] = ToJson(mesh.vertices),
-				["triangles"] = ToJson(mesh.triangles)
-			};
-			var normals = mesh.normals;
-			if (normals != null && normals.Length == mesh.vertexCount)
-				part["normals"] = ToJson(normals);
-			parts.Add(part);
+				["pos"] = ToJson(Vector3.zero),
+				["rot"] = ToJson(Quaternion.identity),
+				["scale"] = ToJson(Vector3.one),
+				["vertices"] = ToJson(vertices),
+				["triangles"] = ToJson(triangles)
+			});
 		}
 		jObject["printedParts"] = parts;
 	}
@@ -129,7 +144,27 @@ public class PrintedModelItem : Item, ISave
 		if (jObject.TryGetValue("printedGlowIntensity", out var glowIntensityToken) && glowIntensityToken != null)
 			glowIntensity = Mathf.Max(0f, glowIntensityToken.Value<float>());
 
-		ClearGeneratedVisuals();
+		ReadGeometry(gameObject, jObject);
+
+		Color color = Color.white;
+		if (!string.IsNullOrEmpty(colorHex)) ColorUtility.TryParseHtmlString("#" + colorHex, out color);
+		var model = PrintableModel.FromInstance(gameObject, modelName);
+		model.ApplyColor(color, smoothness, EmissionColor);
+		model.AddFinishedPhysics(180f, 0.02f, 5f);
+		var rb = GetComponent<Rigidbody>();
+		if (rb != null) rb.mass = savedMass;
+
+		spawnId = PrintedSpawnId;
+		Info = modelName;
+		gameObject.name = modelName;
+	}
+
+
+	public static void ReadGeometry(GameObject root, JObject jObject)
+	{
+		if (jObject.TryGetValue("printedScale", out var scaleToken))
+			root.transform.localScale = ReadVector(scaleToken, Vector3.one);
+		ClearGeneratedVisuals(root);
 		if (jObject.TryGetValue("printedParts", out var partsToken) && partsToken is JArray parts)
 		{
 			for (int i = 0; i < parts.Count; i++)
@@ -141,12 +176,23 @@ public class PrintedModelItem : Item, ISave
 				if (vertices == null || triangles == null || vertices.Length == 0 || triangles.Length < 3) continue;
 
 				var go = new GameObject(part.TryGetValue("name", out var nt) && nt != null ? nt.Value<string>() : "Part_" + i);
-				go.transform.SetParent(transform, false);
+				go.transform.SetParent(root.transform, false);
 				if (part.TryGetValue("pos", out var pt)) go.transform.localPosition = ReadVector(pt, Vector3.zero);
 				if (part.TryGetValue("rot", out var rt)) go.transform.localRotation = ReadQuaternion(rt, Quaternion.identity);
 				if (part.TryGetValue("scale", out var st)) go.transform.localScale = ReadVector(st, Vector3.one);
 
-				var mesh = new Mesh { name = modelName + "_" + i };
+				// Version 1 saved the root MeshFilter as if it were a child.
+				// The importer uses a single root mesh, so remove that duplicated
+				// root transform when reading existing saves as well.
+				if (jObject["printedGeometryVersion"] == null && parts.Count == 1)
+				{
+					go.transform.localPosition = Vector3.zero;
+					go.transform.localRotation = Quaternion.identity;
+					go.transform.localScale = Vector3.one;
+				}
+
+				var mesh = new Mesh { name = root.name + "_" + i };
+				if (vertices.Length > 65535) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
 				mesh.vertices = vertices;
 				mesh.triangles = triangles;
 				if (part.TryGetValue("normals", out var normalToken) && normalToken != null)
@@ -165,17 +211,6 @@ public class PrintedModelItem : Item, ISave
 			}
 		}
 
-		Color color = Color.white;
-		if (!string.IsNullOrEmpty(colorHex)) ColorUtility.TryParseHtmlString("#" + colorHex, out color);
-		var model = PrintableModel.FromInstance(gameObject, modelName);
-		model.ApplyColor(color, smoothness, EmissionColor);
-		model.AddFinishedPhysics(180f, 0.02f, 5f);
-		var rb = GetComponent<Rigidbody>();
-		if (rb != null) rb.mass = savedMass;
-
-		spawnId = PrintedSpawnId;
-		Info = modelName;
-		gameObject.name = modelName;
 	}
 
 	// Newtonsoft reflects over every public property, and Vector3.normalized
@@ -242,16 +277,21 @@ public class PrintedModelItem : Item, ISave
 		return values;
 	}
 
-	private void ClearGeneratedVisuals()
+	private static void ClearGeneratedVisuals(GameObject root)
 	{
 		var children = new List<Transform>();
-		foreach (Transform child in transform) children.Add(child);
+		foreach (Transform child in root.transform) children.Add(child);
 		for (int i = 0; i < children.Count; i++)
-			if (children[i] != null) Destroy(children[i].gameObject);
-		var filter = GetComponent<MeshFilter>();
-		if (filter != null) Destroy(filter);
-		var renderer = GetComponent<MeshRenderer>();
-		if (renderer != null) Destroy(renderer);
+			if (children[i] != null)
+			{
+				children[i].gameObject.SetActive(false);
+				children[i].SetParent(null, true);
+				Destroy(children[i].gameObject);
+			}
+		var filter = root.GetComponent<MeshFilter>();
+		if (filter != null) { filter.sharedMesh = null; Destroy(filter); }
+		var renderer = root.GetComponent<MeshRenderer>();
+		if (renderer != null) { renderer.enabled = false; Destroy(renderer); }
 	}
 
 	private static Material CreateMaterial()
