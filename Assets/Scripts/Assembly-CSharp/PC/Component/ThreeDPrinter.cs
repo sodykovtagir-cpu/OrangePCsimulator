@@ -1098,7 +1098,7 @@ namespace PC.Component
 			switch (State)
 			{
 				case PrinterState.Printing:
-					if (WaitingForFilament) screen.ShowWaitingForFilament(modelName, RemainingSeconds, Progress01);
+					if (WaitingForFilament) screen.ShowWaitingForFilament(modelName, RemainingSeconds, Progress01, filament);
 					else screen.ShowPrinting(modelName, RemainingSeconds, filament, Progress01);
 					break;
 				case PrinterState.Finished:

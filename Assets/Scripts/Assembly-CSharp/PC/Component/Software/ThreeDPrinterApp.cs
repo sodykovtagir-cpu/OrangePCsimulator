@@ -217,6 +217,7 @@ namespace PC.Component.Software
 				sb.AppendLine(Localization.GetText("Model") + ": " + model.Name);
 				sb.AppendLine(Localization.GetText("Triangles") + ": " + model.TriangleCount);
 				sb.AppendLine(Localization.GetText("Time") + ": " + FormatTime(selectedPrinter.EstimatePrintSeconds(model)));
+				sb.AppendLine(Localization.GetText("Required filament") + ": " + selectedPrinter.EstimateFilamentMeters(model).ToString("0.00") + " m");
 				sb.AppendLine(Localization.GetText("Weight") + ": " + FormatMass(selectedPrinter.EstimatePrintedMassKg(model)));
 			}
 			else sb.AppendLine(Localization.GetText("No model imported"));
@@ -224,6 +225,8 @@ namespace PC.Component.Software
 			var spool = selectedPrinter.AttachedSpool;
 			if (spool != null)
 			{
+				sb.AppendLine(Localization.GetText("Filament") + ": " + spool.RemainingMeters.ToString("0.00") +
+					" / " + spool.CapacityMeters.ToString("0.00") + " m");
 				if (spool.IsLowFilament) sb.AppendLine(Localization.GetText("Low filament"));
 			}
 			else sb.AppendLine(Localization.GetText("No filament spool"));

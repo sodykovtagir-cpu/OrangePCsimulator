@@ -6,11 +6,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 $cfgPath = __DIR__ . '/config.php';
 if (is_file($cfgPath)) require $cfgPath;
-if (!defined('MAX_BYTES')) define('MAX_BYTES', 10485760); // 10 MB
+if (!defined('MAX_BYTES')) define('MAX_BYTES', 31457280); // 30 MiB
 if (!defined('MAX_COVER')) define('MAX_COVER', 300000);
 if (!defined('RATE_PER_HOUR')) define('RATE_PER_HOUR', 8);
 if (!defined('UPLOAD_KEY')) define('UPLOAD_KEY', '');
 if (!defined('UPLOADS_DIR')) define('UPLOADS_DIR', __DIR__ . '/uploads');
+require_once __DIR__ . '/upload_limits.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') workshop_validate_request_size();
 if (!is_dir(UPLOADS_DIR)) @mkdir(UPLOADS_DIR, 0755, true);
 
 $INDEX = UPLOADS_DIR . '/index.json';
@@ -111,6 +113,12 @@ if ($action === 'like' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     json_out(['ok' => true, 'likes' => $items[$i]['likes']]);
 }
 
+if ($action === 'upload_chunk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $gate = isset($_SERVER['HTTP_X_UPLOAD_KEY']) ? $_SERVER['HTTP_X_UPLOAD_KEY'] : (isset($_POST['key']) ? $_POST['key'] : '');
+    if (UPLOAD_KEY !== '' && $gate !== UPLOAD_KEY) json_out(['ok' => false, 'error' => 'bad key'], 403);
+    workshop_handle_chunk(0);
+}
+
 if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $gate = isset($_SERVER['HTTP_X_UPLOAD_KEY']) ? $_SERVER['HTTP_X_UPLOAD_KEY'] : (isset($_POST['key']) ? $_POST['key'] : '');
     if (UPLOAD_KEY !== '' && $gate !== UPLOAD_KEY) json_out(['ok' => false, 'error' => 'bad key'], 403);
@@ -121,11 +129,7 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (is_file($rateFile) && filemtime($rateFile) > time() - 3600) $hits = (int)file_get_contents($rateFile);
     if ($hits >= RATE_PER_HOUR) json_out(['ok' => false, 'error' => 'rate limit'], 429);
 
-    if (!isset($_FILES['file'])) json_out(['ok' => false, 'error' => 'no file'], 400);
-    $ferr = $_FILES['file']['error'];
-    if ($ferr === UPLOAD_ERR_INI_SIZE || $ferr === UPLOAD_ERR_FORM_SIZE) json_out(['ok' => false, 'error' => 'too big'], 400);
-    if ($ferr !== UPLOAD_ERR_OK) json_out(['ok' => false, 'error' => 'no file'], 400);
-    if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
+    workshop_validate_save_upload(true);
 
     $title = clean(isset($_POST['title']) ? $_POST['title'] : 'Save', 80);
     $author = clean(isset($_POST['author']) ? $_POST['author'] : 'Player', 40);
@@ -133,7 +137,7 @@ if ($action === 'upload' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = 's' . time() . '_' . bin2hex(random_bytes(3)) . '.opc';
     $dest = UPLOADS_DIR . '/' . $name;
-    if (!move_uploaded_file($_FILES['file']['tmp_name'], $dest)) json_out(['ok' => false, 'error' => 'save fail'], 500);
+    if (!workshop_move_save_upload($dest)) json_out(['ok' => false, 'error' => 'save fail'], 500);
 
     $items = load_index($INDEX);
     $id = 1;
@@ -169,10 +173,10 @@ if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['title'])) $items[$i]['title'] = clean($_POST['title'], 80);
     if (isset($_POST['author'])) $items[$i]['author'] = clean($_POST['author'], 40);
     if (isset($_POST['description'])) $items[$i]['description'] = clean($_POST['description'], 280);
-    if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-        if ($_FILES['file']['size'] > MAX_BYTES) json_out(['ok' => false, 'error' => 'too big'], 400);
+    if (workshop_validate_save_upload(false)) {
         $dest = UPLOADS_DIR . '/' . basename($items[$i]['filename']);
-        move_uploaded_file($_FILES['file']['tmp_name'], $dest);
+        if (!workshop_move_save_upload($dest)) json_out(['ok' => false, 'error' => 'save fail'], 500);
+        clearstatcache(true, $dest);
         $items[$i]['size_bytes'] = filesize($dest);
     }
     $c = save_cover($id);

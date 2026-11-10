@@ -1,6 +1,18 @@
 <IfModule mod_php.c>
-php_value upload_max_filesize 12M
-php_value post_max_size 14M
+php_value upload_max_filesize 30M
+php_value post_max_size 40M
+</IfModule>
+<IfModule php_module>
+php_value upload_max_filesize 30M
+php_value post_max_size 40M
+</IfModule>
+<IfModule php7_module>
+php_value upload_max_filesize 30M
+php_value post_max_size 40M
+</IfModule>
+<IfModule php8_module>
+php_value upload_max_filesize 30M
+php_value post_max_size 40M
 </IfModule>
 
 # Server-side account/role state is not a public download.

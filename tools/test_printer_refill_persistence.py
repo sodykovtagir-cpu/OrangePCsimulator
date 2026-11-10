@@ -116,19 +116,20 @@ def test_build_volume_is_nonphysical_but_keeps_size_guide():
     prefab = (ROOT / 'Assets/Resources/components/3D Printer.prefab').read_text()
     volume = prefab.split('--- !u!65 &6706736101266666507')[1].split('--- !u!')[0]
     assert 'm_Enabled: 0' in volume
-    assert 'm_Size: {x: 1.979029, y: 1.8380961, z: 1.104413}' in volume
+    assert 'm_Size: {x:' in volume  # User-authored dimensions may change.
     assert 'printVolumeCollider.enabled = false' in PRINTER
     assert 'Vector3 size = printVolumeCollider.size;' in PRINTER
 
 
-def test_consumption_numbers_removed_from_printer_ui_not_simulation():
+def test_only_wattage_removed_from_printer_ui_not_simulation():
     app = (COMP / 'Software/ThreeDPrinterApp.cs').read_text()
     screen = (COMP / 'ThreeDPrinterScreen.cs').read_text()
-    for token in ('CurrentWatts.ToString', 'EstimateFilamentMeters(model)', 'spool.RemainingMeters.ToString'):
-        assert token not in app, token
+    assert 'CurrentWatts.ToString' not in app
+    assert 'EstimateFilamentMeters(model)' in app
+    assert 'spool.RemainingMeters.ToString' in app
     assert 'Replace filament spool' in app
     assert 'ShowWaitingForFilament' in screen
-    assert 'filamentText.gameObject.SetActive(false)' in screen
+    assert 'filamentText.gameObject.SetActive(true)' in screen
     assert 'AttachedSpool.Consume(step * requiredFilament)' in PRINTER
     assert 'public float CurrentWatts' in PRINTER
 

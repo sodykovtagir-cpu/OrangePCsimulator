@@ -17,27 +17,27 @@ namespace PC.Component
 
 		public void ShowIdle(float filamentMeters)
 		{
-			Set("Idle", "No model", "--:--", string.Empty, 0f);
+			Set("Idle", "No model", "--:--", FormatFilament(filamentMeters), 0f);
 		}
 
 		public void ShowPrinting(string modelName, float remainingSeconds, float filamentMeters, float progress)
 		{
-			Set("Printing", modelName, FormatTime(remainingSeconds), string.Empty, progress);
+			Set("Printing", modelName, FormatTime(remainingSeconds), FormatFilament(filamentMeters), progress);
 		}
 
-		public void ShowWaitingForFilament(string modelName, float remainingSeconds, float progress)
+		public void ShowWaitingForFilament(string modelName, float remainingSeconds, float progress, float filamentMeters)
 		{
-			Set(Localization.GetText("Replace filament spool"), modelName, FormatTime(remainingSeconds), string.Empty, progress);
+			Set(Localization.GetText("Replace filament spool"), modelName, FormatTime(remainingSeconds), FormatFilament(filamentMeters), progress);
 		}
 
 		public void ShowFinished(string modelName, float filamentMeters)
 		{
-			Set("Finished", modelName, "00:00", string.Empty, 1f);
+			Set("Finished", modelName, "00:00", FormatFilament(filamentMeters), 1f);
 		}
 
 		public void ShowError(string message, float filamentMeters)
 		{
-			Set("Error", message, "--:--", string.Empty, 0f);
+			Set("Error", message, "--:--", FormatFilament(filamentMeters), 0f);
 		}
 
 		private void Set(string state, string model, string time, string filament, float progress)
@@ -47,8 +47,8 @@ namespace PC.Component
 			if (timeText != null) timeText.text = time;
 			if (filamentText != null)
 			{
-				filamentText.text = string.Empty;
-				filamentText.gameObject.SetActive(false);
+				filamentText.text = filament;
+				filamentText.gameObject.SetActive(true);
 			}
 			if (progressFill != null)
 			{

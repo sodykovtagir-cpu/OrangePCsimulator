@@ -44,6 +44,16 @@ public class WorkshopUploadResponse
 }
 
 [Serializable]
+public class WorkshopChunkResponse
+{
+	public bool ok;
+	public string error;
+	public string upload_id;
+	public string upload_key;
+	public int received_bytes;
+}
+
+[Serializable]
 public class WorkshopQuizResponse
 {
 	public bool ok;
@@ -121,7 +131,7 @@ public class WorkshopClient : MonoBehaviour
 	};
 
 	public static string UploadKey = "f52aa253f7ee050a6069d858473880982acb4c5de7a929e3";
-	public const int MaxSaveBytes = 10 * 1024 * 1024;
+	public const int MaxSaveBytes = 30 * 1024 * 1024;
 	private static string byetCookie;
 	private static string workingUrl;
 
@@ -571,6 +581,41 @@ public class WorkshopClient : MonoBehaviour
 		done(body, err);
 	}
 
+	private const int SaveChunkBytes = 8 * 1024 * 1024;
+
+	private IEnumerator UploadSaveChunks(byte[] bytes, Action<string, string, string> done)
+	{
+		string uploadId = "", uploadKey = "";
+		for (int offset = 0; offset < bytes.Length; offset += SaveChunkBytes)
+		{
+			int length = Math.Min(SaveChunkBytes, bytes.Length - offset);
+			var chunk = new byte[length];
+			Buffer.BlockCopy(bytes, offset, chunk, 0, length);
+			var form = new List<IMultipartFormSection>
+			{
+				Field("total_bytes", bytes.Length.ToString()), Field("offset", offset.ToString()),
+				Field("upload_id", uploadId), Field("upload_key", uploadKey),
+				new MultipartFormFileSection("chunk", chunk, "part.bin", "application/octet-stream")
+			};
+			if (ServerAccounts.LoggedIn && !string.IsNullOrEmpty(ServerAccounts.Token)) form.Add(Field("token", ServerAccounts.Token));
+			if (!string.IsNullOrEmpty(UploadKey)) form.Add(Field("key", UploadKey));
+			string body = null, error = null;
+			yield return RequestPost("?action=upload_chunk&i=1", form, (b, e) => { body = b; error = e; });
+			if (error != null) { done(null, null, error); yield break; }
+			WorkshopChunkResponse reply = null;
+			try { reply = JsonUtility.FromJson<WorkshopChunkResponse>(StripJunk(body)); }
+			catch (Exception e) { error = e.Message; }
+			if (reply == null || !reply.ok || reply.received_bytes != offset + length ||
+				string.IsNullOrEmpty(reply.upload_id) || string.IsNullOrEmpty(reply.upload_key))
+			{
+				done(null, null, error ?? (reply != null ? reply.error : "chunk upload failed") ?? "chunk upload failed");
+				yield break;
+			}
+			uploadId = reply.upload_id; uploadKey = reply.upload_key;
+		}
+		done(uploadId, uploadKey, null);
+	}
+
 	private IEnumerator PostSave(string action, int id, string ownerKey, string localPath, string title, string author, string description, byte[] coverJpg, Action<int, string, string> done)
 	{
 		if (action == "upload" && (string.IsNullOrEmpty(localPath) || !File.Exists(localPath)))
@@ -594,9 +639,20 @@ public class WorkshopClient : MonoBehaviour
 			form.Add(Field("token", ServerAccounts.Token));
 		if (!string.IsNullOrEmpty(localPath) && File.Exists(localPath))
 		{
+			if (new FileInfo(localPath).Length > MaxSaveBytes) { done(0, null, "file > 30MB"); yield break; }
 			var bytes = File.ReadAllBytes(localPath);
-			if (bytes.Length > MaxSaveBytes) { done(0, null, "file > 10MB"); yield break; }
-			form.Add(new MultipartFormFileSection("file", bytes, Path.GetFileName(localPath), "application/octet-stream"));
+			if (bytes.Length > MaxSaveBytes) { done(0, null, "file > 30MB"); yield break; }
+			// Byethost enforces a smaller PHP per-file cap than our save limit.
+			// Send large saves in bounded parts, then publish the assembled file.
+			if (bytes.Length > SaveChunkBytes)
+			{
+				string stagedId = null, stagedKey = null, chunkError = null;
+				yield return UploadSaveChunks(bytes, (i, k, e) => { stagedId = i; stagedKey = k; chunkError = e; });
+				if (chunkError != null) { done(0, null, chunkError); yield break; }
+				form.Add(Field("staged_upload", stagedId));
+				form.Add(Field("staged_key", stagedKey));
+			}
+			else form.Add(new MultipartFormFileSection("file", bytes, Path.GetFileName(localPath), "application/octet-stream"));
 		}
 		if (coverJpg != null && coverJpg.Length > 0)
 			form.Add(new MultipartFormFileSection("cover", coverJpg, "cover.jpg", "image/jpeg"));
