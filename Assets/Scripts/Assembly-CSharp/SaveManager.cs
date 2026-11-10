@@ -253,11 +253,14 @@ public class SaveManager : MonoBehaviour
 
                 var exists = FindItemPrefab(it.spawnId);
 
-                if (exists)
+                bool runtimePrint = it.spawnId == PrintedModelItem.PrintedSpawnId;
+                if (exists || runtimePrint)
                 {
                     placed.Add(Tuple.Create(it.spawnId, (Vector3)it.pos));
 
-                    var prefab = Instantiate(exists);
+                    var prefab = exists ? Instantiate(exists) : new GameObject("PrintedModel");
+                    if (runtimePrint && prefab.GetComponent<PrintedModelItem>() == null)
+                        prefab.AddComponent<PrintedModelItem>();
                     prefab.transform.position = it.pos;
                     prefab.transform.rotation = it.rot;
 
@@ -568,6 +571,9 @@ public class SaveManager : MonoBehaviour
     private static bool IsEmbedded(Item item)
     {
         if (item == null) return false;
+        // Runtime prints remain independent items even when placed inside or
+        // held under another Item's hierarchy; they are never prefab internals.
+        if (item is PrintedModelItem) return false;
         if (item.GetComponent<Connector>() != null) return false;
 
         var parent = item.transform.parent;
@@ -629,6 +635,10 @@ public class SaveManager : MonoBehaviour
             it.spawnId.StartsWith("VGA Cable ", StringComparison.Ordinal) ||
             it.spawnId.StartsWith("HDMI Cable ", StringComparison.Ordinal) ||
             it.spawnId.StartsWith("LAN Cable ", StringComparison.Ordinal)) return false;
+
+        // Different meshes all share the placeholder spawn ID. Two prints at
+        // the same position must not be deduplicated as identical prefabs.
+        if (it.spawnId == PrintedModelItem.PrintedSpawnId) return false;
 
         Vector3 pos = it.pos;
 

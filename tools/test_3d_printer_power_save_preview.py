@@ -21,7 +21,7 @@ def test_printer_power_idle_and_job_dependent():
     for token in ("idleWatts", "minPrintWatts", "maxPrintWatts", "public float CurrentWatts",
                   "public bool IsPowered", "JobLoad01", "PortKind.PrinterPower", "Printer AC input"):
         assert token in text, token
-    assert "if (!IsPrinting) return Mathf.Max(0f, idleWatts);" in text
+    assert "if (!IsPrinting || WaitingForFilament) return Mathf.Max(0f, idleWatts);" in text
     assert "Mathf.Lerp(Mathf.Max(0f, minPrintWatts), Mathf.Max(minPrintWatts, maxPrintWatts), JobLoad01)" in text
     grid = GRID.read_text(encoding="utf-8")
     assert "FindObjectsOfType<PC.Component.ThreeDPrinter>()" in grid

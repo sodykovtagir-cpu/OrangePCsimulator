@@ -100,6 +100,11 @@ namespace PC.Component
 		private float printFitScale = 1f;
 		private float modelHeight;
 		private float jobVolume;
+		private Color jobColor = Color.white;
+		private FilamentFinish jobFinish = FilamentFinish.Glossy;
+		private float jobSmoothness = 0.85f;
+		private Color jobGlowColor = Color.black;
+		private float jobGlowIntensity;
 		private PrintMetrics jobMetrics;
 		private bool jobMetricsValid;
 		private PrintableModel previewMetricsModel;
@@ -114,6 +119,8 @@ namespace PC.Component
 
 		public PrinterState State { get; private set; } = PrinterState.Idle;
 		public bool IsPrinting => State == PrinterState.Printing;
+		public bool WaitingForFilament { get; private set; }
+		public bool CanSwapSpool => !IsPrinting || WaitingForFilament || AttachedSpool == null || AttachedSpool.IsEmpty;
 		public FilamentSpool AttachedSpool { get; private set; }
 		public PrintableModel CurrentModel { get; private set; }
 		public PrintableModel PendingModel { get; private set; }
@@ -178,7 +185,7 @@ namespace PC.Component
 			get
 			{
 				if (!IsPowered) return 0f;
-				if (!IsPrinting) return Mathf.Max(0f, idleWatts);
+				if (!IsPrinting || WaitingForFilament) return Mathf.Max(0f, idleWatts);
 				return Mathf.Lerp(Mathf.Max(0f, minPrintWatts), Mathf.Max(minPrintWatts, maxPrintWatts), JobLoad01);
 			}
 		}
@@ -212,6 +219,8 @@ namespace PC.Component
 			if (screen == null) screen = GetComponentInChildren<ThreeDPrinterScreen>(true);
 			if (loopAudio == null) loopAudio = GetComponent<AudioSource>();
 			if (printVolumeCollider == null) printVolumeCollider = FindVolumeCollider();
+			// Editor sizing guide only; never a raycast target or physical wall.
+			if (printVolumeCollider != null) printVolumeCollider.enabled = false;
 			EnsureExtruderPivot();
 			motionX = extruderPivot != null ? extruderPivot : axisX;
 			if (motionX != null) motionXRest = motionX.localPosition;
@@ -269,7 +278,7 @@ namespace PC.Component
 
 		public bool AttachSpool(FilamentSpool spool)
 		{
-			if (IsPrinting || spool == null) return false;
+			if (!CanSwapSpool || spool == null) return false;
 			if (AttachedSpool != null) DetachSpool();
 			AttachedSpool = spool;
 			spool.SetPrinter(this);
@@ -285,7 +294,7 @@ namespace PC.Component
 
 		public bool DetachSpool()
 		{
-			if (IsPrinting || AttachedSpool == null) return false;
+			if (!CanSwapSpool || AttachedSpool == null) return false;
 			var spool = AttachedSpool;
 			AttachedSpool = null;
 			spool.SetPrinter(null);
@@ -307,7 +316,7 @@ namespace PC.Component
 			if (spool == null || AttachedSpool != spool) return;
 			AttachedSpool = null;
 			spool.SetPrinter(null);
-			if (IsPrinting) Fail("Spool removed");
+			if (IsPrinting) SetWaitingForFilament(true);
 			UpdateScreen();
 		}
 
@@ -422,8 +431,10 @@ namespace PC.Component
 			CurrentModel = model;
 			if (PendingModel == model) PendingModel = null;
 			Progress01 = 0f;
+			WaitingForFilament = false;
 			SetState(PrinterState.Printing);
-			ApplySpoolColor(model);
+			CaptureJobLook();
+			ApplyJobLook(model);
 
 			printProgressRoot = new GameObject("PrintProgress");
 			var bed = printBed != null ? printBed : transform;
@@ -468,11 +479,6 @@ namespace PC.Component
 			jobMetrics = ComputeMetrics(model, printFitScale);
 			jobMetricsValid = true;
 			requiredFilament = jobMetrics.filamentMeters;
-			if (requiredFilament > AttachedSpool.RemainingMeters + 0.00001f)
-			{
-				AbortStart(model, "Not enough filament");
-				return false;
-			}
 			totalSeconds = jobMetrics.seconds;
 			RemainingSeconds = totalSeconds;
 
@@ -525,6 +531,7 @@ namespace PC.Component
 			CurrentModel = null;
 			PendingModel = null;
 			jobMetricsValid = false;
+			WaitingForFilament = false;
 			SetState(PrinterState.Idle);
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
@@ -533,37 +540,47 @@ namespace PC.Component
 			PrintCancelled?.Invoke(partial);
 		}
 
+		private void SetWaitingForFilament(bool waiting)
+		{
+			if (WaitingForFilament == waiting) return;
+			WaitingForFilament = waiting;
+			if (waiting) StopPrintAudio();
+			else if (loopAudio != null && printingClip != null)
+			{
+				loopAudio.clip = printingClip;
+				loopAudio.loop = true;
+				loopAudio.Play();
+			}
+			ElectricityGrid.Instance?.NotifyLoadChanged();
+			StateChanged?.Invoke();
+			UpdateScreen();
+		}
+
 		private IEnumerator PrintRoutine()
 		{
-			float elapsed = 0f;
-			float lastProgress = 0f;
 			while (State == PrinterState.Printing)
 			{
-				elapsed += Time.deltaTime;
-				float progress = totalSeconds <= 0f ? 1f : Mathf.Clamp01(elapsed / totalSeconds);
-				float deltaFilament = (progress - lastProgress) * requiredFilament;
-				lastProgress = progress;
-
-				if (AttachedSpool == null)
+				if (Progress01 >= 1f) break;
+				// Stay in the same job with axes and geometry at their last position.
+				// A replacement spool resumes this coroutine automatically.
+				if (AttachedSpool == null || AttachedSpool.IsEmpty)
 				{
-					Fail("Spool removed");
-					yield break;
+					SetWaitingForFilament(true);
+					yield return null;
+					continue;
 				}
-				float consumed = Mathf.Min(deltaFilament, AttachedSpool.RemainingMeters);
-				AttachedSpool.Consume(consumed);
-				if (AttachedSpool.IsEmpty && progress < 1f)
-				{
-					Fail("Filament ran out");
-					yield break;
-				}
-
-				Progress01 = progress;
-				RemainingSeconds = Mathf.Max(0f, totalSeconds - elapsed);
-				AnimateAxes(progress);
-				GrowPrint(progress);
+				SetWaitingForFilament(false);
+				float step = Mathf.Min(1f - Progress01, Time.deltaTime / Mathf.Max(0.001f, totalSeconds));
+				// Never advance farther than the plastic actually available this frame.
+				step = Mathf.Min(step, AttachedSpool.RemainingMeters / Mathf.Max(0.000001f, requiredFilament));
+				AttachedSpool.Consume(step * requiredFilament);
+				Progress01 = Mathf.Clamp01(Progress01 + step);
+				RemainingSeconds = Mathf.Max(0f, totalSeconds * (1f - Progress01));
+				AnimateAxes(Progress01);
+				GrowPrint(Progress01);
 				UpdateScreen();
 
-				if (progress >= 1f) break;
+				if (Progress01 >= 1f) break;
 				yield return null;
 			}
 			if (State == PrinterState.Printing) FinishPrint();
@@ -592,6 +609,7 @@ namespace PC.Component
 			CurrentModel = null;
 			PendingModel = null;
 			jobMetricsValid = false;
+			WaitingForFilament = false;
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
 			SetState(PrinterState.Idle);
@@ -607,13 +625,8 @@ namespace PC.Component
 			if (model == null || model.Instance == null) return;
 			var item = model.Instance.GetComponent<PrintedModelItem>();
 			if (item == null) item = model.Instance.AddComponent<PrintedModelItem>();
-			var spool = AttachedSpool;
-			Color color = spool != null ? spool.FilamentColor : Color.white;
-			item.Initialize(model.Name, color,
-				spool != null ? spool.Finish : FilamentFinish.Glossy,
-				spool != null ? spool.Smoothness : 0.85f,
-				spool != null ? spool.GlowColor : Color.black,
-				spool != null && spool.IsGlow ? spool.GlowIntensity : 0f);
+			Color color = jobColor;
+			item.Initialize(model.Name, color, jobFinish, jobSmoothness, jobGlowColor, jobGlowIntensity);
 		}
 
 		private void Fail(string message)
@@ -644,6 +657,23 @@ namespace PC.Component
 			if (State == state) return;
 			State = state;
 			StateChanged?.Invoke();
+		}
+
+		private void CaptureJobLook()
+		{
+			var spool = AttachedSpool;
+			jobColor = spool != null ? spool.FilamentColor : Color.white;
+			jobFinish = spool != null ? spool.Finish : FilamentFinish.Glossy;
+			jobSmoothness = spool != null ? spool.Smoothness : 0.85f;
+			jobGlowColor = spool != null ? spool.GlowColor : Color.black;
+			jobGlowIntensity = spool != null && spool.IsGlow ? spool.GlowIntensity : 0f;
+		}
+
+		private void ApplyJobLook(PrintableModel model)
+		{
+			Color emission = new Color(jobGlowColor.r * jobGlowIntensity,
+				jobGlowColor.g * jobGlowIntensity, jobGlowColor.b * jobGlowIntensity, 1f);
+			model.ApplyColor(jobColor, jobSmoothness, emission);
 		}
 
 		private void ApplySpoolColor(PrintableModel model)
@@ -747,10 +777,9 @@ namespace PC.Component
 				basePrintSeconds + metrics.plasticUnits * secondsPerPlasticUnit + complexity,
 				minPrintSeconds, maxPrintSeconds);
 
-			float byTriangles = model.TriangleCount * filamentPerTriangle * slider * slider;
-			float byVolume = model.BoundsVolume * filamentPerCubicMeter * k * k * k;
+			// Retessellating the same shape must not inflate spool consumption.
 			metrics.filamentMeters = Mathf.Max(minFilamentMeters,
-				metrics.plasticUnits * filamentMetersPerPlasticUnit + byTriangles + byVolume);
+				metrics.plasticUnits * filamentMetersPerPlasticUnit);
 
 			metrics.massKg = Mathf.Clamp(
 				metrics.plasticUnits * unit * unit * unit * Mathf.Max(1f, printedDensityKgPerCubicMeter),
@@ -769,6 +798,7 @@ namespace PC.Component
 			CleanupPrintRoot();
 			CurrentModel = null;
 			jobMetricsValid = false;
+			WaitingForFilament = false;
 			Fail(message);
 		}
 
@@ -1068,7 +1098,8 @@ namespace PC.Component
 			switch (State)
 			{
 				case PrinterState.Printing:
-					screen.ShowPrinting(modelName, RemainingSeconds, filament, Progress01);
+					if (WaitingForFilament) screen.ShowWaitingForFilament(modelName, RemainingSeconds, Progress01);
+					else screen.ShowPrinting(modelName, RemainingSeconds, filament, Progress01);
 					break;
 				case PrinterState.Finished:
 					screen.ShowFinished(modelName, filament);
@@ -1092,6 +1123,27 @@ namespace PC.Component
 			jObject["tdpProgress"] = Progress01;
 			jObject["tdpScale"] = PrintScale01;
 			if (AttachedSpool != null) jObject["tdpSpoolRemaining"] = AttachedSpool.RemainingMeters;
+			var model = CurrentModel ?? PendingModel;
+			if (model != null && model.Instance != null)
+			{
+				var snapshot = new JObject { ["name"] = model.Name };
+				if (!IsPrinting) CaptureJobLook();
+				snapshot["color"] = ColorUtility.ToHtmlStringRGB(jobColor);
+				snapshot["finish"] = (int)jobFinish;
+				snapshot["smoothness"] = jobSmoothness;
+				snapshot["glowColor"] = ColorUtility.ToHtmlStringRGB(jobGlowColor);
+				snapshot["glowIntensity"] = jobGlowIntensity;
+				PrintedModelItem.WriteGeometry(model.Instance, snapshot);
+				jObject["tdpGeometry"] = snapshot;
+			}
+			if (IsPrinting)
+			{
+				jObject["tdpFitScale"] = printFitScale;
+				jObject["tdpTotalSeconds"] = totalSeconds;
+				jObject["tdpRequiredFilament"] = requiredFilament;
+				jObject["tdpMassKg"] = jobMetrics.massKg;
+				jObject["tdpJobVolume"] = jobVolume;
+			}
 		}
 
 		public override void FromData(JObject jObject)
@@ -1101,11 +1153,76 @@ namespace PC.Component
 				AttachedSpool.SetRemaining(rem.Value<float>());
 			if (jObject.TryGetValue("tdpScale", out var scale) && scale != null)
 				PrintScale01 = Mathf.Clamp01(scale.Value<float>());
+			if (printCoroutine != null) StopCoroutine(printCoroutine);
+			printCoroutine = null;
+			if (CurrentModel != null) CurrentModel.DestroyInstance();
+			if (PendingModel != null) PendingModel.DestroyInstance();
+			CleanupPrintRoot();
 			SetState(PrinterState.Idle);
 			CurrentModel = null;
+			PendingModel = null;
+			jobMetricsValid = false;
+			WaitingForFilament = false;
 			Progress01 = 0f;
 			RemainingSeconds = 0f;
+			previewMetricsModel = null;
+			if (jObject["tdpGeometry"] is JObject snapshot)
+			{
+				string modelName = snapshot.Value<string>("name") ?? "Model";
+				var go = new GameObject(modelName);
+				PrintedModelItem.ReadGeometry(go, snapshot);
+				var model = PrintableModel.FromInstance(go, modelName);
+				ColorUtility.TryParseHtmlString("#" + (snapshot.Value<string>("color") ?? "FFFFFF"), out jobColor);
+				jobFinish = (FilamentFinish)Mathf.Clamp(snapshot.Value<int?>("finish") ?? 1, 0, 2);
+				jobSmoothness = snapshot.Value<float?>("smoothness") ?? 0.85f;
+				ColorUtility.TryParseHtmlString("#" + (snapshot.Value<string>("glowColor") ?? "000000"), out jobGlowColor);
+				jobGlowIntensity = snapshot.Value<float?>("glowIntensity") ?? 0f;
+				ApplyJobLook(model);
+				bool wasPrinting = jObject.Value<int?>("tdpState") == (int)PrinterState.Printing;
+				if (wasPrinting)
+				{
+					CurrentModel = model;
+					printFitScale = Mathf.Max(0.0001f, jObject.Value<float?>("tdpFitScale") ?? 1f);
+					totalSeconds = Mathf.Max(0.001f, jObject.Value<float?>("tdpTotalSeconds") ?? basePrintSeconds);
+					requiredFilament = Mathf.Max(0.000001f, jObject.Value<float?>("tdpRequiredFilament") ?? minFilamentMeters);
+					jobMetrics = new PrintMetrics
+					{
+						seconds = totalSeconds,
+						filamentMeters = requiredFilament,
+						massKg = jObject.Value<float?>("tdpMassKg") ?? minPrintedMassKg
+					};
+					jobMetricsValid = true;
+					jobVolume = jObject.Value<float?>("tdpJobVolume") ?? 0f;
+					Progress01 = Mathf.Clamp01(jObject.Value<float?>("tdpProgress") ?? 0f);
+					RemainingSeconds = totalSeconds * (1f - Progress01);
+					printProgressRoot = new GameObject("PrintProgress");
+					printProgressRoot.transform.SetParent(printBed != null ? printBed : transform, false);
+					go.transform.SetParent(printProgressRoot.transform, false);
+					// Geometry snapshots are root-relative, with the root seated on
+					// the build plate again instead of reapplying a saved world pose.
+					Bounds seated = GetLocalBounds(go, printProgressRoot.transform);
+					go.transform.localPosition -= new Vector3(seated.center.x, seated.min.y, seated.center.z);
+					BuildToolpath(model);
+					GrowPrint(Progress01);
+					AnimateAxes(Progress01);
+					SetState(PrinterState.Printing);
+					SetWaitingForFilament(true);
+					printCoroutine = StartCoroutine(ResumeLoadedPrint());
+				}
+				else
+				{
+					go.SetActive(false);
+					PendingModel = model;
+				}
+			}
 			UpdateScreen();
+		}
+
+		private IEnumerator ResumeLoadedPrint()
+		{
+			// Let SaveManager rebuild physical slots and attach the saved spool first.
+			yield return null;
+			yield return PrintRoutine();
 		}
 	}
 }

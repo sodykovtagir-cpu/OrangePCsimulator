@@ -120,6 +120,7 @@ namespace PC.Component
 		private static GameObject BuildGameObject(MeshData data, string name)
 		{
 			var mesh = new Mesh { name = name };
+			if (data.Vertices.Count > 65535) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
 			mesh.SetVertices(data.Vertices);
 			mesh.SetTriangles(data.Triangles, 0);
 			mesh.RecalculateNormals();
