@@ -1,0 +1,251 @@
+{
+  "source": "Assets/Models/Filament.fbx",
+  "geometry": {
+    "Filament": {
+      "vertices": 64,
+      "faces": 34
+    },
+    "Reel": {
+      "vertices": 192,
+      "faces": 102
+    }
+  },
+  "camera_direction": [
+    5.8,
+    -7.6,
+    5.6
+  ],
+  "projection": "orthographic",
+  "background": "white",
+  "render_size": 512,
+  "covers": [
+    {
+      "name": "BlackFilamentGlossy",
+      "color_srgb": [
+        0.12549,
+        0.12549,
+        0.12549
+      ],
+      "finish": 1
+    },
+    {
+      "name": "BlackFilamentMatte",
+      "color_srgb": [
+        0.12549,
+        0.12549,
+        0.12549
+      ],
+      "finish": 0
+    },
+    {
+      "name": "BlueFilamentGlossy",
+      "color_srgb": [
+        0.133333,
+        0.4,
+        0.878431
+      ],
+      "finish": 1
+    },
+    {
+      "name": "BlueFilamentMatte",
+      "color_srgb": [
+        0.133333,
+        0.4,
+        0.878431
+      ],
+      "finish": 0
+    },
+    {
+      "name": "BrownFilamentGlossy",
+      "color_srgb": [
+        0.541176,
+        0.352941,
+        0.180392
+      ],
+      "finish": 1
+    },
+    {
+      "name": "BrownFilamentMatte",
+      "color_srgb": [
+        0.541176,
+        0.352941,
+        0.180392
+      ],
+      "finish": 0
+    },
+    {
+      "name": "CyanFilamentGlossy",
+      "color_srgb": [
+        0.133333,
+        0.776471,
+        0.847059
+      ],
+      "finish": 1
+    },
+    {
+      "name": "CyanFilamentMatte",
+      "color_srgb": [
+        0.133333,
+        0.776471,
+        0.847059
+      ],
+      "finish": 0
+    },
+    {
+      "name": "GlowFilament",
+      "color_srgb": [
+        0.721569,
+        1.0,
+        0.34902
+      ],
+      "finish": 2
+    },
+    {
+      "name": "GrayFilamentGlossy",
+      "color_srgb": [
+        0.54902,
+        0.568627,
+        0.588235
+      ],
+      "finish": 1
+    },
+    {
+      "name": "GrayFilamentMatte",
+      "color_srgb": [
+        0.54902,
+        0.568627,
+        0.588235
+      ],
+      "finish": 0
+    },
+    {
+      "name": "GreenFilamentGlossy",
+      "color_srgb": [
+        0.2,
+        0.709804,
+        0.290196
+      ],
+      "finish": 1
+    },
+    {
+      "name": "GreenFilamentMatte",
+      "color_srgb": [
+        0.2,
+        0.709804,
+        0.290196
+      ],
+      "finish": 0
+    },
+    {
+      "name": "OrangeFilamentGlossy",
+      "color_srgb": [
+        0.960784,
+        0.509804,
+        0.12549
+      ],
+      "finish": 1
+    },
+    {
+      "name": "OrangeFilamentMatte",
+      "color_srgb": [
+        0.960784,
+        0.509804,
+        0.12549
+      ],
+      "finish": 0
+    },
+    {
+      "name": "PinkFilamentGlossy",
+      "color_srgb": [
+        0.94902,
+        0.447059,
+        0.658824
+      ],
+      "finish": 1
+    },
+    {
+      "name": "PinkFilamentMatte",
+      "color_srgb": [
+        0.94902,
+        0.447059,
+        0.658824
+      ],
+      "finish": 0
+    },
+    {
+      "name": "PurpleFilamentGlossy",
+      "color_srgb": [
+        0.545098,
+        0.309804,
+        0.831373
+      ],
+      "finish": 1
+    },
+    {
+      "name": "PurpleFilamentMatte",
+      "color_srgb": [
+        0.545098,
+        0.309804,
+        0.831373
+      ],
+      "finish": 0
+    },
+    {
+      "name": "RedFilamentGlossy",
+      "color_srgb": [
+        0.886275,
+        0.231373,
+        0.180392
+      ],
+      "finish": 1
+    },
+    {
+      "name": "RedFilamentMatte",
+      "color_srgb": [
+        0.886275,
+        0.231373,
+        0.180392
+      ],
+      "finish": 0
+    },
+    {
+      "name": "WhiteFilamentGlossy",
+      "color_srgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "finish": 1
+    },
+    {
+      "name": "WhiteFilamentMatte",
+      "color_srgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "finish": 0
+    },
+    {
+      "name": "YellowFilamentGlossy",
+      "color_srgb": [
+        0.960784,
+        0.823529,
+        0.117647
+      ],
+      "finish": 1
+    },
+    {
+      "name": "YellowFilamentMatte",
+      "color_srgb": [
+        0.960784,
+        0.823529,
+        0.117647
+      ],
+      "finish": 0
+    }
+  ],
+  "source_sha256": "83be4e9641bb92f3af4de794610d4fdcd34c734efc7911f18db9be51b7c76ebd",
+  "final_size": 256,
+  "framing": "same silhouette crop, centered, 90 percent occupancy"
+}

@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: '{Orange Filament Matte}'
   price: 45
   bitcoin: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 3b159261b12f518e85f9dad0e3ca89ed, type: 3}
   spawn: {fileID: 8984346000712170146, guid: dbe3cddf19934697a2c40a59d0841d01, type: 3}
   large: 0
   translateDescription: 1

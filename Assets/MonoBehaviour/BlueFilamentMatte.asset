@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: '{Blue Filament Matte}'
   price: 45
   bitcoin: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 20a26be5a04d577cbbcc3243c1344179, type: 3}
   spawn: {fileID: 8984346000712170146, guid: fec671b725804652986bc9c5635074fa, type: 3}
   large: 0
   translateDescription: 1

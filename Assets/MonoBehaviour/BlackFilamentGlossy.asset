@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: '{Black Filament Glossy}'
   price: 60
   bitcoin: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 012ea9dc72fb5fddbcf69e7a59bf2744, type: 3}
   spawn: {fileID: 8984346000712170146, guid: db428a4686ac4ef89e2ce11aa48b303a, type: 3}
   large: 0
   translateDescription: 1

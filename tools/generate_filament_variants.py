@@ -106,13 +106,16 @@ def write_prefab(template, variant):
     text = re.sub(r"  filamentColor: \{[^}]*\}\n", finish_block, text, count=1)
     path = COMPONENTS / (variant["prefab"] + ".prefab")
     path.write_text(text, encoding="utf-8")
-    guid = uuid.uuid4().hex
+    meta_path = Path(str(path) + ".meta")
+    guid = re.search(r"^guid: (\w+)", meta_path.read_text(), re.M).group(1) if meta_path.exists() else uuid.uuid4().hex
     write_meta(path, guid, PREFAB_IMPORTER)
     return guid
 
 
 def write_shop_item(variant, prefab_guid):
     path = SHOP_ITEMS / (variant["prefab"] + ".asset")
+    # Preserve the authored/rendered cover when regenerating prices/variants.
+    existing_sprite = re.search(r"^  sprite: (.+)$", path.read_text(), re.M) if path.exists() else None
     path.write_text("""%%YAML 1.1
 %%TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
@@ -136,7 +139,11 @@ MonoBehaviour:
   translateDescription: 1
   description: 
 """ % (SHOP_ITEM_SCRIPT_GUID, variant["prefab"], variant["key"], variant["price"], prefab_guid), encoding="utf-8")
-    guid = uuid.uuid4().hex
+    if existing_sprite:
+        text = path.read_text().replace("  sprite: {fileID: 0}", "  sprite: " + existing_sprite.group(1), 1)
+        path.write_text(text, encoding="utf-8")
+    meta_path = Path(str(path) + ".meta")
+    guid = re.search(r"^guid: (\w+)", meta_path.read_text(), re.M).group(1) if meta_path.exists() else uuid.uuid4().hex
     write_meta(path, guid, ASSET_IMPORTER)
     return guid
 
