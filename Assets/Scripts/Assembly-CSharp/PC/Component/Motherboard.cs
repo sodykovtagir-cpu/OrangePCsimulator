@@ -529,10 +529,8 @@ namespace PC.Component
 
 		public void AddExternal(Motherboard.External e)
 		{
-			if (e == null) return;
-
-			if (externals != null)
-				externals.Add(e);
+			if (e == null || externals == null || externals.Contains(e)) return;
+            externals.Add(e);
 
 			if (e.CPU != null)
 			{
@@ -581,14 +579,26 @@ namespace PC.Component
 					s.HardwareDisconnected += RemoveHardware;
 				}
 			}
+            foreach (var slot in ExternalSlots(e))
+            {
+                slot.Switch(running);
+                if (slot.Ready && (ContainsSlot(e.drive, slot) || ContainsSlot(e.usb, slot)))
+                    AddHardware(slot.Hardware);
+            }
+
 		}
 
 		public void RemoveExternal(External e)
 		{
-			if (e == null) return;
-
-			if (externals != null)
-				externals.Remove(e);
+			if (e == null || externals == null || !externals.Remove(e)) return;
+            // Remove from the topology before notifying the OS: a disk removal
+            // may fault/power off the computer, which enumerates the remaining slots.
+            foreach (var slot in ExternalSlots(e))
+            {
+                slot.Switch(false);
+                if (slot.Ready && (ContainsSlot(e.drive, slot) || ContainsSlot(e.usb, slot)))
+                    RemoveHardware(slot.Hardware);
+            }
 
 			if (e.CPU != null)
 			{
@@ -638,6 +648,21 @@ namespace PC.Component
 				}
 			}
 		}
+
+        private static bool ContainsSlot(HardwareSlot[] slots, HardwareSlot slot)
+        {
+            return slots != null && global::System.Array.IndexOf(slots, slot) >= 0;
+        }
+
+        private static IEnumerable<HardwareSlot> ExternalSlots(External e)
+        {
+            var seen = new HashSet<HardwareSlot>();
+            var groups = new[] { e.CPU, e.CPU_fan, e.GPU, e.RAM, e.drive, e.output, e.supply, e.usb };
+            foreach (var group in groups)
+                if (group != null)
+                    foreach (var slot in group)
+                        if (slot != null && seen.Add(slot)) yield return slot;
+        }
 
 		public void ConnectMonitor(Display m)
 		{

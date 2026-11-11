@@ -18,6 +18,9 @@ namespace PC.Component
 
 		private Material oldMat;
 
+        public Motherboard ActiveBoard { get; private set; }
+        public event System.Action<Motherboard> BoardChanged;
+
 		public HardwareSlot Motherboard
 		{
 			get
@@ -44,41 +47,46 @@ namespace PC.Component
 
 		private void Awake()
 		{
-			motherboard.onChanged.AddListener(MotherboardChanged);
+            if (button != null) oldMat = button.sharedMaterial;
+			if (motherboard != null) motherboard.onChanged.AddListener(MotherboardChanged);
 		}
 
 		private void Start()
         {
-			oldMat = button.sharedMaterial;
+            MotherboardChanged();
         }
 
-		private void MotherboardChanged()
-		{
-			if (motherboard == null)
-				return;
+        private void OnDestroy()
+        {
+            if (motherboard != null) motherboard.onChanged.RemoveListener(MotherboardChanged);
+            DisconnectBoard();
+        }
 
-			var mb = motherboard.Hardware as Motherboard;
+        private void DisconnectBoard()
+        {
+            var previous = ActiveBoard;
+            ActiveBoard = null;
+            BoardChanged?.Invoke(null);
+            if (previous == null) return;
+            previous.PowerChanged -= UpdatePower;
+            if (previous.Running) previous.PowerOff(false);
+            previous.RemoveExternal(external);
+            UpdatePower(false);
+        }
 
-			if (!motherboard.Ready)
-			{
-				if (mb != null)
-				{
-					if (mb.Running)
-						mb.PowerOff(false);
-
-					mb.RemoveExternal(external);
-					mb.PowerChanged -= UpdatePower;
-				}
-			}
-			else
-			{
-				if (mb != null)
-				{
-					mb.AddExternal(external);
-					mb.PowerChanged += UpdatePower;
-				}
-			}
-		}
+        private void MotherboardChanged()
+        {
+            var next = motherboard != null && motherboard.Ready
+                ? motherboard.Hardware as Motherboard : null;
+            if (next == ActiveBoard) return;
+            DisconnectBoard();
+            ActiveBoard = next;
+            if (next == null) return;
+            next.AddExternal(external);
+            next.PowerChanged += UpdatePower;
+            UpdatePower(next.Running);
+            BoardChanged?.Invoke(next);
+        }
 
 		public void Switch()
 		{
@@ -111,7 +119,8 @@ namespace PC.Component
 
 		public void UpdatePower(bool on)
 		{
-			if (on) button.material = onMaterial;
+			if (button == null) return;
+			if (on && onMaterial != null) button.material = onMaterial;
 			else button.material = oldMat;
 		}
 	}

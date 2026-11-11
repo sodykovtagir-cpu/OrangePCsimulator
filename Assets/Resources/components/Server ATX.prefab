@@ -1452,7 +1452,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   spawnId: Server ATX
   info: Server ATX
-  match: 1
+  match: 2
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 0
@@ -1468,16 +1468,26 @@ MonoBehaviour:
   external:
     CPU:
     - {fileID: 114465105165357604}
+    - {fileID: 5389898508682069788}
     CPU_fan:
     - {fileID: 114397592656132187}
-    GPU:
-    - {fileID: 0}
-    - {fileID: 0}
+    - {fileID: 8610290160705985158}
+    GPU: []
     RAM:
-    - {fileID: 114402820744650875}
+    - {fileID: 114593954130030367}
     - {fileID: 114005227143960097}
     - {fileID: 114487585000664492}
-    - {fileID: 114593954130030367}
+    - {fileID: 114402820744650875}
+    - {fileID: 471979611958776093}
+    - {fileID: 8241126419947458518}
+    - {fileID: 6857913033143222325}
+    - {fileID: 6395033534138252096}
+    - {fileID: 588271725190265421}
+    - {fileID: 5594208301101485622}
+    - {fileID: 7952482910020917772}
+    - {fileID: 7808524122518934406}
+    - {fileID: 7968038258829758918}
+    - {fileID: 7279827963174756525}
     drive: []
     output: []
     supply: []

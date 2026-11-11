@@ -60,7 +60,11 @@ namespace PC.Component.Software.OS
 		public void AddHardware(Hardware hardware)
 		{
 			if (AllStorage == null) return;
-			if (hardware is Storage s) AllStorage.Add(s);
+			if (hardware is Storage s)
+            {
+                if (AllStorage.Contains(s)) return;
+                AllStorage.Add(s);
+            }
             OnHardwareAdded(hardware);
 		}
 

@@ -99,6 +99,8 @@ public class Slot : MonoBehaviour
 	/// </summary>
 	public bool IsUsing => isUsing;
 
+	public Item AttachedItem => attachedItem;
+
 	/// <summary>Точная поза установки для восстановления старых сохранений.</summary>
 	public Transform InsertPosition => insertPos;
 
