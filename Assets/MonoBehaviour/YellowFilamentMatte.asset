@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: '{Yellow Filament Matte}'
   price: 45
   bitcoin: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: d20d3b151d7e5bdc8844b528ebe370a5, type: 3}
   spawn: {fileID: 8984346000712170146, guid: 9bd554cc6f7443a4b471a48d948122d8, type: 3}
   large: 0
   translateDescription: 1

@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: '{Orange Filament Glossy}'
   price: 60
   bitcoin: 0
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: f12cfcc45fa6569a9d594686791efc06, type: 3}
   spawn: {fileID: 8984346000712170146, guid: a433e4fdcb094b769c0837c011783b1d, type: 3}
   large: 0
   translateDescription: 1
