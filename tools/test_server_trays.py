@@ -34,6 +34,8 @@ for n in ['Server','Server ATX','PSUThin_2000kW','Server Cover','Server HDD Tray
         if k==1:
             for ref in v.get('m_Component',[]):
                 cid=ref['component']['fileID'];assert d[cid][1]['m_GameObject']['fileID']==i,(n,i,cid)
+    rigidbody_owners=[v['m_GameObject']['fileID'] for k,v in d.values() if k==54]
+    assert len(rigidbody_owners)==len(set(rigidbody_owners)), (n, 'duplicate Rigidbody on one object')
     roots=[v for k,v in d.values() if k==4 and v.get('m_Father',{}).get('fileID')==0]
     assert len(roots)==1,n
     rootgo=roots[0]['m_GameObject']['fileID']
@@ -41,6 +43,8 @@ for n in ['Server','Server ATX','PSUThin_2000kW','Server Cover','Server HDD Tray
     assert any(k==54 and v['m_GameObject']['fileID']==rootgo for k,v in d.values()),n
 server=docs(C/'Server.prefab');board=docs(C/'Server ATX.prefab');psu=docs(C/'PSUThin_2000kW.prefab')
 assert len(monos(server,'DriveTray'))==4
+assert server[4184298381719458778][1]['m_Name']=='Chassis Mesh'
+assert len(monos(server,'Case'))==1
 case=monos(server,'Case')[0][1]
 assert case['external']['drive']==[], 'tray drives must NOT be permanent case externals'
 assert len(case['external']['supply'])==1
@@ -59,6 +63,7 @@ for n,tag in [('Server','Case'),('Server Cover','Cover'),('Server HDD Tray','Dri
     assert d[roottr['m_GameObject']['fileID']][1]['m_TagString']==tag
 assert len([1 for k,v in server.values() if k==1001])==1, 'keep authored sample HDD'
 chassis=(S/'PC/Component/ServerChassis.cs').read_text();save=(S/'SaveManager.cs').read_text()
+assert 'Instantiate(' not in chassis and 'AddComponent<' not in chassis, 'server geometry must be authored in prefab'
 assert 'loading = SaveManager.RestoringSave;' in chassis and 'if (loading) return;' in chassis
 assert 'part.gameObject.SetActive(false)' in chassis
 assert 'hostId = hostId' in save and 'FindSavedSlot(host, saved.slotPath)' in save
