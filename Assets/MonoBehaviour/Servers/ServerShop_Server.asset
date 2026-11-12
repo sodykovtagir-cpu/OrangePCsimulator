@@ -16,7 +16,7 @@ MonoBehaviour:
   price: 350
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
-  spawn: {fileID: 4421575409606221039, guid: 043ebba1b9607364eb89fe88a8b84a78, type: 3}
+  spawn: {fileID: 6057933833245220503, guid: 2efb2eb44dd740b8e59b8df9e9f6938a, type: 3}
   large: 1
   translateDescription: 0
   description: '4 removable HDD trays + removable cover included. Server ATX / thin PSU. Empty chassis.'

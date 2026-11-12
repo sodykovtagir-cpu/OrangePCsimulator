@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: ReadyServer_Entry
   m_EditorClassIdentifier: 
   itemName: 'Orange Rack S1'
-  price: 3615
+  price: 3530
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
-  spawn: {fileID: 4421575409606221039, guid: c8210a0f6738c861374d131428f94c8d, type: 3}
+  spawn: {fileID: 5025535221571397849, guid: bf3923a08826b2e7a64f7f3f1e390a04, type: 3}
   large: 1
   translateDescription: 0
-  description: '1x RMD Ryzen Threadripper 1920X / 2x 32 GB ECC (64 GB) / 2x HDD 2TB / 2000 W / PCOS'
+  description: '1x RMD Ryzen Threadripper 1920X / 2x 32 GB (64 GB) / 2x HDD 2TB / 2000 W / PCOS'

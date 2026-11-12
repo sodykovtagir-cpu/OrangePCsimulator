@@ -6,7 +6,7 @@ The user's geometry, transforms and existing component GUIDs are preserved.
 from pathlib import Path
 import json, math, re
 from server_assets import ROOT, COMP, Prefab, guid, read_guid, meta, ref
-from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, render_os_files
+from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, render_os_files, write_crate_prefab, prefab_bounds
 
 CPU_SOURCE='CPU RMD Ryzen Threadripper 3960X'
 CPUS=[
@@ -44,16 +44,30 @@ def clone(source,name,values):
 
 def cover_guid(icon):
     if icon=='RMD':return read_guid(ROOT/'Assets/Texture2D/RmdServer.png')
+    if icon=='Cooler':return read_guid(ROOT/'Assets/Sprite/Cooler.asset')
     return guid('cover:'+icon)
+
+def delivery(name,content):
+    """The closed crate contains no live server; hammer reveals one full prefab."""
+    crate_name='Crate_'+name
+    path=READY/(crate_name+'.prefab')
+    bounds=prefab_bounds(str(content),str(ROOT))
+    # Box position is at the crate centre: keep the lowest server collider
+    # above the bottom of the standard 4.5-high crate, even on floor opening.
+    lift=round(-2.25+.15-bounds[0][1],3) if bounds else 0
+    g,root=write_crate_prefab(str(path),crate_name,
+        str(COMP/'Crate_Case_ATX 2(Black).prefab'),read_guid(content),Prefab(content).root()[0],lift=lift)
+    return g,root,str(path.relative_to(ROOT))
 
 def add(name,price,page,icon,description,large=0):
     p=Prefab(COMP/(name+'.prefab'));root,_=p.root()
+    spawn_guid,spawn_root,crate=delivery(name,COMP/(name+'.prefab')) if name=='Server' else (read_guid(COMP/(name+'.prefab')),root,None)
     entry=ShopItemAsset(name='ServerShop_'+name.replace('/','_'),item_name=name.removeprefix('CPU '),price=price,
-        spawn_guid=read_guid(COMP/(name+'.prefab')),spawn_file_id=root,sprite_guid=cover_guid(icon),sprite_type=3,
+        spawn_guid=spawn_guid,spawn_file_id=spawn_root,sprite_guid=cover_guid(icon),sprite_type=2 if icon=='Cooler' else 3,
         bitcoin=0,large=large,description=description,translate_description=0)
     path=ASSETS/(entry.name+'.asset');g=entry.write(str(path),guid('shop:'+name))
     RECORDS.append(dict(name=name,price=price,page=page,icon=icon,asset=str(path.relative_to(ROOT)),shop_guid=g,
-        prefab=str((COMP/(name+'.prefab')).relative_to(ROOT)),description=description))
+        prefab=str((COMP/(name+'.prefab')).relative_to(ROOT)),description=description,crate=crate))
 
 for short,price,score,watts,clock,heat in CPUS:
     name='CPU '+short
@@ -67,18 +81,8 @@ add('PSUThin_2000kW',350,'Power Supply','PSU','Thin server PSU / 2000 W / Server
 add('Server Cover',40,'Case','Cover','Replacement removable cover / Server chassis')
 add('Server HDD Tray',25,'Storage','Tray','Replacement removable HDD tray / one 3.5-inch HDD / Server chassis')
 
-COOLERS=[('ServerCooler',85,85,15),('ServerCooler Pro',110,105,18),('ServerCooler Max',145,130,22)]
-for name,price,cooling,watts in COOLERS:
-    if name!='ServerCooler':clone('ServerCooler',name,dict(cooling=cooling,wattage=watts,info=name,score=1))
-    add(name,price,'Cooler','Cooler',f'Server socket cooler / cooling {cooling} / {watts} W')
-for gb,price in [(32,420),(64,840),(128,1680)]:
-    name=f'RAM Server ECC {gb}GB'
-    clone('RAM 64GB',name,dict(capacity=gb*1000,score=int(gb*156.25),wattage=4 if gb<128 else 6,info=f'Server ECC {gb}GB'))
-    add(name,price,'Memory','Memory',f'{gb} GB / server DIMM / ECC product line / removable module')
-for tb,price in [(8,230),(16,410),(20,540)]:
-    name=f'HDD Enterprise {tb}TB'
-    clone(f'HDD {tb}TB',name,dict(info=name,storageName=f'Enterprise {tb}TB',score={8:1700,16:1900,20:2100}[tb]))
-    add(name,price,'Storage','Disk',f'{tb} TB / 3.5-inch HDD / removable server tray / no preinstalled OS')
+# Only the user's original cooler. No server-only RAM/HDD/cooler tiers.
+add('ServerCooler',85,'Cooler','Cooler','Server socket cooler / cooling 85 / 15 W')
 
 # Existing RMD processor uses the user's standard RMD icon too. Do not use
 # the shop icon as a UV texture; keep the authored Threadripper material.
@@ -87,11 +91,14 @@ s=re.sub(r'^  sprite: .*$',f'  sprite: {{fileID: 21300000, guid: {cover_guid("RM
 
 BUILD_SPECS=[
  dict(id='ReadyServer_Entry',title='Orange Rack S1',cpu=CPUS[0][0],cpus=1,ram=32,dimms=2,disk='HDD 2TB',disks=2,cooler='ServerCooler'),
- dict(id='ReadyServer_Storage',title='Orange Rack Storage',cpu=CPUS[2][0],cpus=1,ram=32,dimms=4,disk='HDD Enterprise 8TB',disks=4,cooler='ServerCooler'),
- dict(id='ReadyServer_Compute',title='Orange Rack Compute',cpu=CPUS[3][0],cpus=2,ram=64,dimms=8,disk='HDD Enterprise 16TB',disks=2,cooler='ServerCooler Pro'),
- dict(id='ReadyServer_Ultra',title='Orange Rack Ultra',cpu=CPUS[6][0],cpus=2,ram=128,dimms=14,disk='HDD Enterprise 20TB',disks=4,cooler='ServerCooler Max'),
+ dict(id='ReadyServer_Storage',title='Orange Rack Storage',cpu=CPUS[2][0],cpus=1,ram=32,dimms=4,disk='HDD 8TB',disks=4,cooler='ServerCooler'),
+ dict(id='ReadyServer_Compute',title='Orange Rack Compute',cpu=CPUS[3][0],cpus=2,ram=64,dimms=8,disk='HDD 16TB',disks=2,cooler='ServerCooler'),
+ dict(id='ReadyServer_Ultra',title='Orange Rack Ultra',cpu=CPUS[6][0],cpus=2,ram=64,dimms=14,disk='HDD 20TB',disks=4,cooler='ServerCooler'),
 ]
-price_by_name={x['name']:x['price'] for x in RECORDS};price_by_name['HDD 2TB']=80
+price_by_name={x['name']:x['price'] for x in RECORDS}
+# Exact existing shop prices, not parallel 'server' products.
+for name,asset in [('RAM 32GB','32GB'),('RAM 64GB','64GB')]+[(f'HDD {tb}TB',f'HDD {tb}TB') for tb in [2,8,16,20]]:
+    price_by_name[name]=next(v['price'] for _,v in Prefab(ROOT/'Assets/MonoBehaviour'/(asset+'.asset')).objects(114))
 OS_APPS=['Info','Disk','Downloader','Browser','Benchmark']
 for spec in BUILD_SPECS:
     p=Prefab(COMP/'Server.prefab');root,tr=p.root();item,_=p.item()
@@ -112,7 +119,7 @@ for spec in BUILD_SPECS:
     for i in range(spec['cpus']):
         put('CPU '+spec['cpu'],board_map[external['CPU'][i]['fileID']])
         put(spec['cooler'],board_map[external['CPU_fan'][i]['fileID']])
-    for r in external['RAM'][:spec['dimms']]:put(f'RAM Server ECC {spec["ram"]}GB',board_map[r['fileID']])
+    for r in external['RAM'][:spec['dimms']]:put(f'RAM {spec["ram"]}GB',board_map[r['fileID']])
     # Order drive bays physically left to right. This is also boot disk order.
     trays=[]
     for trayid,tv in p.mono('DriveTray'):
@@ -120,19 +127,32 @@ for spec in BUILD_SPECS:
         trays.append((tt['m_LocalPosition']['x'],tv['driveSlot']['fileID']))
     for i,(_,slot) in enumerate(sorted(trays)[:spec['disks']]):put(spec['disk'],slot,os=i==0)
     text=''.join(f'  - item: {ref(it)}\n    slot: {ref(sl)}\n' for it,sl in entries)
-    p.blocks[chassis]+='  factoryParts:\n'+text
+    if 'factoryParts' in ch:p.set(chassis,'factoryParts',text)
+    else:p.blocks[chassis]+='  factoryParts:\n'+text
     p.save(READY/(name+'.prefab'));meta(READY/(name+'.prefab'))
     total=350+sum(v['price'] for v in bill);price=math.ceil(total*1.10/5)*5
-    desc=f'{spec["cpus"]}x {spec["cpu"]} / {spec["dimms"]}x {spec["ram"]} GB ECC ({spec["dimms"]*spec["ram"]} GB) / {spec["disks"]}x {spec["disk"]} / 2000 W / PCOS'
-    entry=ShopItemAsset(name=name,item_name=spec['title'],price=price,spawn_guid=read_guid(READY/(name+'.prefab')),
-        spawn_file_id=root,sprite_guid=cover_guid('Chassis'),sprite_type=3,large=1,description=desc,translate_description=0)
+    desc=f'{spec["cpus"]}x {spec["cpu"]} / {spec["dimms"]}x {spec["ram"]} GB ({spec["dimms"]*spec["ram"]} GB) / {spec["disks"]}x {spec["disk"]} / 2000 W / PCOS'
+    spawn_guid,spawn_root,crate=delivery(name,READY/(name+'.prefab'))
+    entry=ShopItemAsset(name=name,item_name=spec['title'],price=price,spawn_guid=spawn_guid,
+        spawn_file_id=spawn_root,sprite_guid=cover_guid('Chassis'),sprite_type=3,large=1,description=desc,translate_description=0)
     path=ASSETS/(name+'.asset');g=entry.write(str(path),guid('shop:'+name))
     spec.update(prefab=str((READY/(name+'.prefab')).relative_to(ROOT)),asset=str(path.relative_to(ROOT)),shop_guid=g,
-        parts_cost=total,price=price,assembly=assembly,bill_of_materials=[dict(name='Server',price=350)]+bill,description=desc)
+        parts_cost=total,price=price,crate=crate,assembly=assembly,bill_of_materials=[dict(name='Server',price=350)]+bill,description=desc)
 
 # Append only our entries to the existing standard pages. Never reorder/remove
 # the user's current shop or re-run the old PC/miner generator.
 shop=ROOT/'Assets/MonoBehaviour/Shop.asset'
+# Unwanted experimental variants from the first catalog revision.
+removed_names=['ServerCooler Pro','ServerCooler Max']+[f'RAM Server ECC {n}GB' for n in [32,64,128]]+[f'HDD Enterprise {n}TB' for n in [8,16,20]]
+removed_shop_guids={guid('shop:'+name) for name in removed_names}
+for page,items in shop_pages(str(shop)):
+    if any(g in removed_shop_guids for g in items):
+        shop_add_page(str(shop),page,[g for g in items if g not in removed_shop_guids])
+for name in removed_names:
+    for path in [COMP/(name+'.prefab'),ASSETS/('ServerShop_'+name+'.asset')]:
+        path.unlink(missing_ok=True);Path(str(path)+'.meta').unlink(missing_ok=True)
+for name in ['Memory','Disk','Cooler']:
+    path=IMAGES/(name+'.png');path.unlink(missing_ok=True);Path(str(path)+'.meta').unlink(missing_ok=True)
 existing=dict(shop_pages(str(shop)))
 for page in sorted({r['page'] for r in RECORDS}):
     merged=list(dict.fromkeys(existing.get(page,[])+[r['shop_guid'] for r in RECORDS if r['page']==page]))
@@ -145,7 +165,7 @@ assert len(translations)==42
 p=ROOT/'Assets/Resources/Translate.txt';lines=p.read_text().splitlines();lines=[l for l in lines if not l.startswith('Ready Server\t')];lines.append('Ready Server\t'+'\t'.join(translations));p.write_text('\n'.join(lines)+'\n')
 
 manifest=dict(base_commit='ed3df93b5a7536e65c2325531af263f64c1ad853',markup=1.10,round_up_to=5,records=RECORDS,builds=BUILD_SPECS,
-    covers={key:dict(guid=cover_guid(key),source=source) for key,source in [('Chassis','Server'),('Board','Server ATX'),('PSU','PSUThin_2000kW'),('Cover','Server Cover'),('Tray','Server HDD Tray'),('Cooler','ServerCooler'),('Memory','RAM Server ECC 64GB'),('Disk','HDD Enterprise 16TB')]})
+    covers={key:dict(guid=cover_guid(key),source=source) for key,source in [('Chassis','Server'),('Board','Server ATX'),('PSU','PSUThin_2000kW'),('Cover','Server Cover'),('Tray','Server HDD Tray')]})
 (ROOT/'tools/server_catalog_manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
 print(f'Generated {len(RECORDS)} component shop entries, {len(CPUS)} server CPUs and {len(BUILD_SPECS)} authored ready-server prefabs.')
 for b in BUILD_SPECS:print(f'{b["title"]}: parts {b["parts_cost"]} + 10%, rounded up to 5 => {b["price"]}')

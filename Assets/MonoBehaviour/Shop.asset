@@ -80,9 +80,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 193a02ac16a550b49a7499be1dfcb5f2, type: 2}
     - {fileID: 11400000, guid: ed87333db41556842998900a7d1189d7, type: 2}
     - {fileID: 11400000, guid: 737c91e3e288c124f90fc729a149c681, type: 2}
-    - {fileID: 11400000, guid: 992fe9f37c3a4f7734a5de990cbdc692, type: 2}
-    - {fileID: 11400000, guid: d811626f5266e405b60d1023b7d33fbf, type: 2}
-    - {fileID: 11400000, guid: a8661a22d6bcfdc73c6c6040a7af0be3, type: 2}
   - pageName: Cooler
     item:
     - {fileID: 11400000, guid: ad5ac894c80199a4d80a31d96e46ad6b, type: 2}
@@ -94,8 +91,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 719b67a8d08f29e418a63b263fca7292, type: 2}
     - {fileID: 11400000, guid: 3aa22ebe1a52e6b4f868e933d361473e, type: 2}
     - {fileID: 11400000, guid: 586ec2b5dbbfef4a4d7d20ef93e60425, type: 2}
-    - {fileID: 11400000, guid: 346db143c7120647a323d2a7c9aa6998, type: 2}
-    - {fileID: 11400000, guid: 288af72b305189c78423d288842c4338, type: 2}
   - pageName: Graphics Card
     item:
     - {fileID: 11400000, guid: cf4cb2407e3fb754abbe20de35eef99e, type: 2}
@@ -148,9 +143,6 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 6ec24eb32df34607e58913dc7fd34571, type: 2}
     - {fileID: 11400000, guid: 29b25adad79bab182d1a318a60a1636d, type: 2}
     - {fileID: 11400000, guid: 2f658bdf3d9777c2fbc91731deec44b0, type: 2}
-    - {fileID: 11400000, guid: 09a0e96303ae1f71bbe33bbd69016be5, type: 2}
-    - {fileID: 11400000, guid: a3bc5e8f2a7fcc32aa1452417b8b5b7f, type: 2}
-    - {fileID: 11400000, guid: eb9df19746741fe54a739e3a729a742d, type: 2}
   - pageName: Motherboard
     item:
     - {fileID: 11400000, guid: cbab8ee0fc5321a448bf49b3864b08be, type: 2}

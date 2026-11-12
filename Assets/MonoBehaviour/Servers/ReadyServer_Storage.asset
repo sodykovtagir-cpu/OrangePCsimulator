@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: ReadyServer_Storage
   m_EditorClassIdentifier: 
   itemName: 'Orange Rack Storage'
-  price: 5815
+  price: 5465
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
-  spawn: {fileID: 4421575409606221039, guid: 06bc6b4185a39a89032994491c264772, type: 3}
+  spawn: {fileID: 3436273227825470550, guid: cd57c7fabd23a82edc5fc4adb3f63a77, type: 3}
   large: 1
   translateDescription: 0
-  description: '1x RMD Ryzen Threadripper 3960X / 4x 32 GB ECC (128 GB) / 4x HDD Enterprise 8TB / 2000 W / PCOS'
+  description: '1x RMD Ryzen Threadripper 3960X / 4x 32 GB (128 GB) / 4x HDD 8TB / 2000 W / PCOS'

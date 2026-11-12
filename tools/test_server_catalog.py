@@ -7,7 +7,7 @@ import hashlib,json,math,re,subprocess,sys,tempfile
 import numpy as np
 from PIL import Image
 from server_assets import ROOT,COMP,Prefab,read_guid
-from unity_asset_tool import shop_pages
+from unity_asset_tool import shop_pages, prefab_bounds
 from export_server_cover_scenes import matrix
 
 manifest=json.loads((ROOT/'tools/server_catalog_manifest.json').read_text())
@@ -47,8 +47,8 @@ def world(p,tr):
     return world(p,par)@out if par else out
 
 pages=dict(shop_pages(str(ROOT/'Assets/MonoBehaviour/Shop.asset')))
-assert len(manifest['records'])==21 and len(manifest['builds'])==4
-expected_pages={'Processor','Case','Motherboard','Power Supply','Cooler','Memory','Storage'}
+assert len(manifest['records'])==13 and len(manifest['builds'])==4
+expected_pages={'Processor','Case','Motherboard','Power Supply','Cooler','Storage'}
 assert {x['page'] for x in manifest['records']}==expected_pages
 assert len(pages['Ready Server'])==4
 # The old catalog must remain intact, in the same order within every page.
@@ -62,12 +62,14 @@ for record in manifest['records']:
     path=ROOT/record['prefab'];p=validate(path);asset=Prefab(ROOT/record['asset']);entry=next(v for _,v in asset.objects(114))
     assert record['shop_guid'] in pages[record['page']]
     assert entry['price']==record['price'] and entry['price']>0 and entry['bitcoin']==0
-    assert entry['spawn']['fileID']==p.root()[0] and entry['spawn']['guid']==read_guid(path)
+    spawn=ROOT/record['crate'] if record.get('crate') else path
+    assert entry['spawn']['fileID']==Prefab(spawn).root()[0] and entry['spawn']['guid']==read_guid(spawn)
     assert entry['sprite']['guid'] in index
     if record['name'].startswith('CPU RMD'):
         assert entry['sprite']['guid']==rmd_guid
         assert p.item()[1]['match']==1 and tag(p,p.root()[0])=='CPU'
     if record['name'].startswith('ServerCooler'):
+        assert entry['sprite']=={'fileID':21300000,'guid':read_guid(ROOT/'Assets/Sprite/Cooler.asset'),'type':2}
         assert tag(p,p.root()[0])=='Cooler'
         assert any(v['m_GameObject']['fileID']==p.root()[0] for _,v in p.objects(65)), 'manual cooler insertion needs collider on root Item'
     for _,v in p.objects(114):
@@ -109,7 +111,8 @@ for spec in manifest['builds']:
     cpus=[a for a in spec['assembly'] if a['name'].startswith('CPU ')];coolers=[a for a in spec['assembly'] if a['name'].startswith('ServerCooler')]
     for cpu,cooler in zip(cpus,coolers):
         distance=np.linalg.norm(world(p,cpu['transform'])[:3,3]-world(p,cooler['transform'])[:3,3])
-        assert distance<.10,(spec['id'],'cooler out of CPU search range',distance)
+        radius=float(re.search(r'CoolerSearchRadius = ([.\d]+)f',(ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/CPU.cs').read_text())[1])
+        assert distance<radius,(spec['id'],'cooler out of CPU search range',distance,radius)
     assert sum(x['price'] for x in spec['bill_of_materials'])==spec['parts_cost']
     assert spec['price']==math.ceil(spec['parts_cost']*1.10/5)*5
     assert spec['shop_guid'] in pages['Ready Server']
@@ -137,10 +140,43 @@ for name,record in renders['covers'].items():
     assert (pixels[0,0]==255).all() and (pixels[-1,-1]==255).all()
     meta=Path(str(path)+'.meta').read_text();assert 'textureType: 8' in meta and 'spriteMode: 1' in meta
     assert read_guid(path)==manifest['covers'][name]['guid']
-assert len({v['sha256'] for v in renders['covers'].values()})==8
+assert len({v['sha256'] for v in renders['covers'].values()})==5
+assert set(renders['covers'])=={'Chassis','Board','PSU','Cover','Tray'}
+# No duplicate RAM/HDD/cooler product families, even as hidden resource files.
+for pattern in ['RAM Server ECC*','HDD Enterprise*','ServerCooler Pro*','ServerCooler Max*']:
+    assert not list(COMP.glob(pattern)),('unwanted new family',pattern)
+for spec in manifest['builds']:
+    assert all(not any(t in a['name'] for t in ['Enterprise','ECC','Cooler Pro','Cooler Max']) for a in spec['assembly'])
+    assert all(a['name'] in ['RAM 32GB','RAM 64GB'] for a in spec['assembly'] if a['name'].startswith('RAM '))
+    for part in spec['bill_of_materials']:
+        if part['name'].startswith('RAM '):asset=part['name'].removeprefix('RAM ')
+        elif part['name'].startswith('HDD '):asset=part['name']
+        else:continue
+        assert part['price']==Prefab(ROOT/'Assets/MonoBehaviour'/(asset+'.asset')).objects(114)[0][1]['price']
+
+# Shop -> closed crate -> inactive broken part -> a single fully authored prefab.
+# The live server cannot be damaged by delivery physics before hammer opening.
+crate_paths=[]
+for record in [r for r in manifest['records'] if r.get('crate')]+manifest['builds']:
+    content=ROOT/record['prefab'];crate=ROOT/record['crate'];crate_paths.append(crate)
+    cp=validate(crate);asset=Prefab(ROOT/record['asset']).objects(114)[0][1]
+    assert asset['spawn']['guid']==read_guid(crate) and asset['spawn']['fileID']==cp.root()[0]
+    assert asset['large']==1
+    assert len(cp.mono('Crate'))==1 and len(cp.mono('ReadyBuildBox'))==1
+    assert not cp.mono('ServerChassis') and not cp.mono('Case') and not cp.mono('Motherboard')
+    box=cp.mono('ReadyBuildBox')[0][1]
+    assert box['prefab']['guid']==read_guid(content) and box['prefab']['fileID']==Prefab(content).root()[0]
+    go=box['m_GameObject']['fileID'];assert cp.data(go)['m_IsActive']==0
+    assert cp.mono('Crate')[0][1]['broken']['fileID']==go
+    assert cp.data(cp.root()[1])['m_LocalScale']==dict(x=1,y=1,z=1)
+    lo,hi=prefab_bounds(str(content),str(ROOT))
+    # Content emerges near the floor instead of falling from the crate centre.
+    bottom=box['position']['y']+lo[1]
+    assert abs(bottom-(-2.25+.15))<.002,(crate,'wrong floor clearance',bottom)
+assert len(crate_paths)==5
 # Repeat generation must not delete old products or change any generated bytes.
-files=[ROOT/r['prefab'] for r in manifest['records']]+[ROOT/r['asset'] for r in manifest['records']]+[ROOT/b['prefab'] for b in manifest['builds']]+[ROOT/b['asset'] for b in manifest['builds']]+[ROOT/'Assets/MonoBehaviour/Shop.asset',ROOT/'tools/server_catalog_manifest.json']
+files=[ROOT/r['prefab'] for r in manifest['records']]+[ROOT/r['asset'] for r in manifest['records']]+[ROOT/b['prefab'] for b in manifest['builds']]+[ROOT/b['asset'] for b in manifest['builds']]+crate_paths+[ROOT/'Assets/MonoBehaviour/Shop.asset',ROOT/'tools/server_catalog_manifest.json']
 before={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
 subprocess.run([sys.executable,str(ROOT/'tools/generate_server_catalog.py')],check=True,stdout=subprocess.PIPE)
 assert all(hashlib.sha256(p.read_bytes()).hexdigest()==sha for p,sha in before.items()),'non-idempotent generation'
-print('PASS: 21 components + 4 authored ready servers; all original shop products retained; valid GUID/fileID/physics; compatible tags/sockets; both CPUs cooled; one PCOS disk; exact BOM + 10% prices; 8 checked real-model sprites; idempotent generation.')
+print('PASS: 13 components + 4 authored ready servers; all original shop products retained; valid GUID/fileID/physics; compatible tags/sockets; both CPUs cooled; one PCOS disk; exact BOM + 10% prices; 5 real-model sprites + reused original cooler sprite; no duplicate RAM/HDD/cooler tiers; 5 protected delivery crates; idempotent generation.')

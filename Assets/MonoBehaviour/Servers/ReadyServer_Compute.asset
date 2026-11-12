@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: ReadyServer_Compute
   m_EditorClassIdentifier: 
   itemName: 'Orange Rack Compute'
-  price: 13765
+  price: 12850
   bitcoin: 0
   sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
-  spawn: {fileID: 4421575409606221039, guid: 2abb967faefc8521466d8f20324ce7c6, type: 3}
+  spawn: {fileID: 2139559418823955121, guid: af5316111f9773df792ed22f00c718d4, type: 3}
   large: 1
   translateDescription: 0
-  description: '2x RMD Ryzen Threadripper 3970X / 8x 64 GB ECC (512 GB) / 2x HDD Enterprise 16TB / 2000 W / PCOS'
+  description: '2x RMD Ryzen Threadripper 3970X / 8x 64 GB (512 GB) / 2x HDD 16TB / 2000 W / PCOS'

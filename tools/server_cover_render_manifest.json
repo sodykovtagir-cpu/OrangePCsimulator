@@ -2,12 +2,12 @@
   "method": "Blender Cycles, actual prefab meshes/UVs/materials, orthographic studio view; no replacement geometry",
   "size": 256,
   "sources": {
-    "Assets/Resources/components/Server.prefab": "bfc522edc42dcb09f4a9e9916c398ac78c2a78734f08e2443216a261dfcf657d",
+    "Assets/Resources/components/Server.prefab": "d662c2ed5d3a0a3c76646156cf89599af7a543a8c43667b80b707d2ae73aea13",
     "Assets/Models/Server.fbx": "dbb98763331da742071f182c69999c63842f3482c1b427e70f8563fac114363f",
     "Assets/Mesh/Button_7.asset": "7c26c72ccd719074409b713a3b1dedac1079f3ae061842653ab4e7a2bf744d54",
     "Assets/Material/ColorPalette.mat": "48802b0448bdcbaa0062f1437b183a7ad0c1436b5ef07ba3f070e26a9c17ce52",
     "Assets/Texture2D/ColorPalette.png": "02c12d2620652ff9188d79d0260bb9804fdc6801803f5bcc2022c7e62a37a035",
-    "Assets/Resources/components/Server ATX.prefab": "6cff15ee98ede91ac8676c951c969ab5c8670e919b97cbe2e79a8e96a8e860c8",
+    "Assets/Resources/components/Server ATX.prefab": "05d49abd593b36a699d4e8d996abada9341091305f296d8627823746402b7154",
     "Assets/Mesh/Ports.asset": "9d5805366aa75bc81fa6839440070d13784e4809bcae9783c8385c9293602c8a",
     "Assets/Material/Motherboard.mat": "45fdc6b2ec849026d1387f3df94c3ae5f210a31bb81be1f371881bb2067a891b",
     "Assets/Texture2D/Motherboard.png": "3045cdef0109b21c3ecf1d1333bd6341fb48f73a9ab85962aff50938180c4715",
@@ -27,21 +27,7 @@
     "Assets/Texture2D/Materials/thinpsu2kw.mat": "2852452a9adf6ffcd0f1e0363b9a083538297697ede7371e0af0291355efc8c7",
     "Assets/Texture2D/thinpsu2kw.png": "c70de72430285ca5add82348401856665da18b5a396eda0937fb19884a48600a",
     "Assets/Resources/components/Server Cover.prefab": "82a7763bf5873f298a3554a94bbbe2bad5790106e03dc84ee6dd35b1138e7875",
-    "Assets/Resources/components/Server HDD Tray.prefab": "620377143322631bb2d06651f1d024619d077d255256247597b9cfdf88592a38",
-    "Assets/Resources/components/ServerCooler.prefab": "b0e7c4fed03df24e81a6da5588d20391f0f119c0bbdca8a206c0e3b7697af6d9",
-    "Assets/Material/Gray.mat": "1dca6b5bf5e1d64491ba9c1e27c2293fc7caeaf6aba35f53392efc288241a0f5",
-    "Assets/Material/Blade.mat": "c64601c3ca1679228a71dbc0de8a7ee6a25ad37e74b0fadcf17039d00114b3ba",
-    "Assets/Texture2D/Blade.png": "23ca35559c8fb2a68b392ded03616b468f2a47045fafcfff43741ddf5786db02",
-    "Assets/Models/ServerFan.fbx": "c790c2c06a0ddc358e83a63015011627b6b4b97b00a1727cad781c9b8d9cca11",
-    "Assets/Texture2D/Cooler.png": "d00830d366d94768d96218b0596a37eb3cd85e7dd39c1dd367e5a6a4d1679d6e",
-    "Assets/Resources/components/RAM Server ECC 64GB.prefab": "6eaa1bc201771836b10c1fe5a0f32f146bcb5a2329a1953419d04c42127fe255",
-    "Assets/Mesh/RAM.asset": "2b8cdad9dbdf4c864c2e9e813f3fab3ab2327ff0f22e25d4f4237f75b43ca1be",
-    "Assets/Material/RAM.mat": "81a3eb9d43e8b23b16ba9ca7d69cd807de42b75c1a9eb891d2d13f57777536e7",
-    "Assets/Texture2D/RAM_0.png": "92273183471adcd0a313ceb9737a2ff1d5428ce3ff07ad60fe87bcc258214870",
-    "Assets/Resources/components/HDD Enterprise 16TB.prefab": "bf5ac5a2716e5b8643fcb0119caf3b5624dac63a121482487e95033fd3339774",
-    "Assets/Mesh/HDD.asset": "1e4432867c36728bcc325b0419603bbb038e1da1ead2c464a48b75b3ac3be209",
-    "Assets/Material/HDD.mat": "c44eb8d50df9d572d71d27ebae2756b521dc64a1c120b06f4fda1cfaaed1882f",
-    "Assets/Texture2D/HDD.png": "eb06a5634a6af5242bd251b29d02ef89ba55fad55b07d83c69c38850f9288b73"
+    "Assets/Resources/components/Server HDD Tray.prefab": "620377143322631bb2d06651f1d024619d077d255256247597b9cfdf88592a38"
   },
   "covers": {
     "Chassis": {
@@ -68,21 +54,6 @@
       "file": "Assets/Texture2D/Servers/Tray.png",
       "source": "Server HDD Tray",
       "sha256": "5af9cd5b186f2cc061dbe87ac2dbe40b1d1073f4c18e2234bb62d51c4d702d73"
-    },
-    "Cooler": {
-      "file": "Assets/Texture2D/Servers/Cooler.png",
-      "source": "ServerCooler",
-      "sha256": "5aacebeec9807f126eca3cd57570e9fbe07a9f8690d6b54db65d6eb54b4349d8"
-    },
-    "Memory": {
-      "file": "Assets/Texture2D/Servers/Memory.png",
-      "source": "RAM Server ECC 64GB",
-      "sha256": "8e1085b3f1c316dfa405b9a56eff950a370b45281e9180a58c944f6c4dbd5a49"
-    },
-    "Disk": {
-      "file": "Assets/Texture2D/Servers/Disk.png",
-      "source": "HDD Enterprise 16TB",
-      "sha256": "fd6697895abb756283287b0a89a360755d81f546d2b41af817baf9e5bcdd457f"
     }
   }
 }

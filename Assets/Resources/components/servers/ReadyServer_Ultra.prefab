@@ -94,7 +94,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1623775076325028444
 Transform:
   m_ObjectHideFlags: 0
@@ -2105,7 +2105,7 @@ Transform:
   m_GameObject: {fileID: 5978205433294594462}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -1, z: -0, w: 0.0000029504295}
-  m_LocalPosition: {x: -0.348, y: -0.143, z: 3.175}
+  m_LocalPosition: {x: -0.348, y: -0.168, z: 3.175}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3133,7 +3133,7 @@ Transform:
   m_GameObject: {fileID: 920000000000000022}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.037, z: 0}
+  m_LocalPosition: {x: 0, y: 0.024, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -3272,14 +3272,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 920000000000000029}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.000001475215, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.134, z: 0}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0.03, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 920000000000000369}
   m_Father: {fileID: 920000000000000093}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &920000000000000031
 GameObject:
   m_ObjectHideFlags: 0
@@ -4705,7 +4705,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   target: Cooler
-  matches:
+  matches: 01
   insertPos: {fileID: 920000000000000030}
   breakForce: 400
   setParent: 1
@@ -5825,7 +5825,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   target: Cooler
-  matches:
+  matches: 01
   insertPos: {fileID: 920000000000000306}
   breakForce: 400
   setParent: 1
@@ -8043,7 +8043,7 @@ Transform:
   m_GameObject: {fileID: 920000000000000260}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.026, z: 0}
+  m_LocalPosition: {x: 0, y: 0.024, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -8925,14 +8925,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 920000000000000305}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 1.475215e-06, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.134, z: 0}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0.03, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 920000000000000387}
   m_Father: {fileID: 920000000000000148}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &920000000000000307
 GameObject:
   m_ObjectHideFlags: 0
@@ -9998,10 +9998,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 920000000000000030}
     m_Modifications:
-    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      propertyPath: m_TagString
-      value: Cooler
-      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -10052,7 +10048,11 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: a92f345967eeac94680b7361ca9cb09e, type: 2}
     - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Name
-      value: ServerCooler Max
+      value: ServerCooler
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_TagString
+      value: Cooler
       objectReference: {fileID: 0}
     - target: {fileID: 4226133384550400255, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -10072,14 +10072,26 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -10092,6 +10104,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000367}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 920000000000000368}
     - targetCorrespondingSourceObject: {fileID: -888447324491273448, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000360}
@@ -10101,9 +10116,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1338907542292945799, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000364}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 920000000000000368}
   m_SourcePrefab: {fileID: 100100000, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
 --- !u!1 &920000000000000359 stripped
 GameObject:
@@ -10223,15 +10235,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4d9c1111aa378c62faa0374c3ec3284, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: ServerCooler Max
-  info: ServerCooler Max
+  spawnId: ServerCooler
+  info: Server Cooler
   match: 1
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 0
   score: 1
-  wattage: 22
-  cooling: 130
+  wattage: 15
+  cooling: 85
   coolingWithoutPower: 25
   temperature: 20
   burnTemp: 150
@@ -10243,11 +10255,19 @@ BoxCollider:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 920000000000000365}
   m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
   m_IsTrigger: 1
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 0.55, y: 0.55, z: 0.23}
-  m_Center: {x: 0, y: 0, z: 0.06}
+  serializedVersion: 3
+  m_Size: {x: 0.48927256, y: 0.49099988, z: 0.20393747}
+  m_Center: {x: -0.009288445, y: -0.0039987564, z: 0.045895107}
 --- !u!4 &920000000000000369 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
@@ -10424,10 +10444,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 920000000000000306}
     m_Modifications:
-    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      propertyPath: m_TagString
-      value: Cooler
-      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -10478,7 +10494,11 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: a92f345967eeac94680b7361ca9cb09e, type: 2}
     - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Name
-      value: ServerCooler Max
+      value: ServerCooler
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_TagString
+      value: Cooler
       objectReference: {fileID: 0}
     - target: {fileID: 4226133384550400255, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -10498,14 +10518,26 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -10518,6 +10550,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000385}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 920000000000000386}
     - targetCorrespondingSourceObject: {fileID: -888447324491273448, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000378}
@@ -10527,9 +10562,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1338907542292945799, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 920000000000000382}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 920000000000000386}
   m_SourcePrefab: {fileID: 100100000, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
 --- !u!1 &920000000000000377 stripped
 GameObject:
@@ -10649,15 +10681,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4d9c1111aa378c62faa0374c3ec3284, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: ServerCooler Max
-  info: ServerCooler Max
+  spawnId: ServerCooler
+  info: Server Cooler
   match: 1
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 0
   score: 1
-  wattage: 22
-  cooling: 130
+  wattage: 15
+  cooling: 85
   coolingWithoutPower: 25
   temperature: 20
   burnTemp: 150
@@ -10669,11 +10701,19 @@ BoxCollider:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 920000000000000383}
   m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
   m_IsTrigger: 1
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 0.55, y: 0.55, z: 0.23}
-  m_Center: {x: 0, y: 0, z: 0.06}
+  serializedVersion: 3
+  m_Size: {x: 0.48927256, y: 0.49099988, z: 0.20393747}
+  m_Center: {x: -0.009288445, y: -0.0039987564, z: 0.045895107}
 --- !u!4 &920000000000000387 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
@@ -10694,7 +10734,7 @@ GameObject:
   - component: {fileID: 920000000000000393}
   - component: {fileID: 920000000000000394}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10825,14 +10865,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000395
 GameObject:
   m_ObjectHideFlags: 0
@@ -10848,7 +10888,7 @@ GameObject:
   - component: {fileID: 920000000000000400}
   - component: {fileID: 920000000000000401}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10979,14 +11019,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000402
 GameObject:
   m_ObjectHideFlags: 0
@@ -11002,7 +11042,7 @@ GameObject:
   - component: {fileID: 920000000000000407}
   - component: {fileID: 920000000000000408}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11133,14 +11173,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000409
 GameObject:
   m_ObjectHideFlags: 0
@@ -11156,7 +11196,7 @@ GameObject:
   - component: {fileID: 920000000000000414}
   - component: {fileID: 920000000000000415}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11287,14 +11327,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000416
 GameObject:
   m_ObjectHideFlags: 0
@@ -11310,7 +11350,7 @@ GameObject:
   - component: {fileID: 920000000000000421}
   - component: {fileID: 920000000000000422}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11441,14 +11481,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000423
 GameObject:
   m_ObjectHideFlags: 0
@@ -11464,7 +11504,7 @@ GameObject:
   - component: {fileID: 920000000000000428}
   - component: {fileID: 920000000000000429}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11595,14 +11635,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000430
 GameObject:
   m_ObjectHideFlags: 0
@@ -11618,7 +11658,7 @@ GameObject:
   - component: {fileID: 920000000000000435}
   - component: {fileID: 920000000000000436}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11749,14 +11789,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000437
 GameObject:
   m_ObjectHideFlags: 0
@@ -11772,7 +11812,7 @@ GameObject:
   - component: {fileID: 920000000000000442}
   - component: {fileID: 920000000000000443}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11903,14 +11943,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000444
 GameObject:
   m_ObjectHideFlags: 0
@@ -11926,7 +11966,7 @@ GameObject:
   - component: {fileID: 920000000000000449}
   - component: {fileID: 920000000000000450}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12057,14 +12097,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000451
 GameObject:
   m_ObjectHideFlags: 0
@@ -12080,7 +12120,7 @@ GameObject:
   - component: {fileID: 920000000000000456}
   - component: {fileID: 920000000000000457}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12211,14 +12251,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000458
 GameObject:
   m_ObjectHideFlags: 0
@@ -12234,7 +12274,7 @@ GameObject:
   - component: {fileID: 920000000000000463}
   - component: {fileID: 920000000000000464}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12365,14 +12405,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000465
 GameObject:
   m_ObjectHideFlags: 0
@@ -12388,7 +12428,7 @@ GameObject:
   - component: {fileID: 920000000000000470}
   - component: {fileID: 920000000000000471}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12519,14 +12559,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000472
 GameObject:
   m_ObjectHideFlags: 0
@@ -12542,7 +12582,7 @@ GameObject:
   - component: {fileID: 920000000000000477}
   - component: {fileID: 920000000000000478}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12673,14 +12713,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000479
 GameObject:
   m_ObjectHideFlags: 0
@@ -12696,7 +12736,7 @@ GameObject:
   - component: {fileID: 920000000000000484}
   - component: {fileID: 920000000000000485}
   m_Layer: 0
-  m_Name: RAM Server ECC 128GB
+  m_Name: RAM 64GB
   m_TagString: RAM
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12827,14 +12867,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 70e72fb67de540421a847e30aa16938e, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: RAM Server ECC 128GB
-  info: Server ECC 128GB
+  spawnId: RAM 64GB
+  info: RAM
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
-  capacity: 128000
-  score: 20000
-  wattage: 6
+  capacity: 64000
+  score: 10000
+  wattage: 3
 --- !u!1 &920000000000000486
 GameObject:
   serializedVersion: 6
@@ -12850,7 +12890,7 @@ GameObject:
   - component: {fileID: 920000000000000492}
   - component: {fileID: 920000000000000493}
   m_Layer: 0
-  m_Name: HDD Enterprise 20TB
+  m_Name: HDD 20TB
   m_TagString: Drive
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12981,19 +13021,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: HDD Enterprise 20TB
-  info: HDD Enterprise 20TB
+  spawnId: HDD 20TB
+  info: HDD
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 20000000
-  score: 2100
+  score: 2800
   wattage: 16
   health: 100
   breakable: 1
   explode: {fileID: 1251062408638681, guid: 0866e4333e29aa444a83328fb3d67afa, type: 2}
   uptime: 0
-  storageName: Enterprise 20TB
+  storageName: Local Disk
   password:
   files:
   - path: System/boot.bin
@@ -13114,7 +13154,7 @@ GameObject:
   - component: {fileID: 920000000000000503}
   - component: {fileID: 920000000000000504}
   m_Layer: 0
-  m_Name: HDD Enterprise 20TB
+  m_Name: HDD 20TB
   m_TagString: Drive
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13245,19 +13285,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: HDD Enterprise 20TB
-  info: HDD Enterprise 20TB
+  spawnId: HDD 20TB
+  info: HDD
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 20000000
-  score: 2100
+  score: 2800
   wattage: 16
   health: 100
   breakable: 1
   explode: {fileID: 1251062408638681, guid: 0866e4333e29aa444a83328fb3d67afa, type: 2}
   uptime: 0
-  storageName: Enterprise 20TB
+  storageName: Local Disk
   password:
   files: []
 --- !u!4 &920000000000000505
@@ -13354,7 +13394,7 @@ GameObject:
   - component: {fileID: 920000000000000514}
   - component: {fileID: 920000000000000515}
   m_Layer: 0
-  m_Name: HDD Enterprise 20TB
+  m_Name: HDD 20TB
   m_TagString: Drive
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13485,19 +13525,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: HDD Enterprise 20TB
-  info: HDD Enterprise 20TB
+  spawnId: HDD 20TB
+  info: HDD
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 20000000
-  score: 2100
+  score: 2800
   wattage: 16
   health: 100
   breakable: 1
   explode: {fileID: 1251062408638681, guid: 0866e4333e29aa444a83328fb3d67afa, type: 2}
   uptime: 0
-  storageName: Enterprise 20TB
+  storageName: Local Disk
   password:
   files: []
 --- !u!4 &920000000000000516
@@ -13594,7 +13634,7 @@ GameObject:
   - component: {fileID: 920000000000000525}
   - component: {fileID: 920000000000000526}
   m_Layer: 0
-  m_Name: HDD Enterprise 20TB
+  m_Name: HDD 20TB
   m_TagString: Drive
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13725,19 +13765,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ca4d3b39160636c3cbe3a2a6fff99e9, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  spawnId: HDD Enterprise 20TB
-  info: HDD Enterprise 20TB
+  spawnId: HDD 20TB
+  info: HDD
   match: 0
   slotOffset: {x: 0, y: 0, z: 0}
   glue: 0
   capacity: 20000000
-  score: 2100
+  score: 2800
   wattage: 16
   health: 100
   breakable: 1
   explode: {fileID: 1251062408638681, guid: 0866e4333e29aa444a83328fb3d67afa, type: 2}
   uptime: 0
-  storageName: Enterprise 20TB
+  storageName: Local Disk
   password:
   files: []
 --- !u!4 &920000000000000527
