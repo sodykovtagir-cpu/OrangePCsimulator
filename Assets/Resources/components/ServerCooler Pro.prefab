@@ -8,10 +8,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      propertyPath: m_TagString
-      value: Cooler
-      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -58,15 +54,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -261092084840383615, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Materials.Array.data[0]
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: a92f345967eeac94680b7361ca9cb09e, type: 2}
     - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Name
       value: ServerCooler Pro
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_TagString
+      value: Cooler
+      objectReference: {fileID: 0}
     - target: {fileID: 4226133384550400255, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Materials.Array.data[0]
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: 706c61e1336dc88439ba98d1d42b4447, type: 2}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalScale.x
@@ -82,15 +82,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 90
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -102,6 +106,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8365950965468593394}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 910000000000000400}
     - targetCorrespondingSourceObject: {fileID: -888447324491273448, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5416774457497778041}
@@ -111,9 +118,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1338907542292945799, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5590010485648503111}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 910000000000000400}
   m_SourcePrefab: {fileID: 100100000, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
 --- !u!1 &3288175937796198020 stripped
 GameObject:
@@ -156,8 +160,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ce2429efb50401b27ce3c68d904ea018, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   speed: 800
   maxSpeed: 1000
   damping: 400
@@ -231,8 +235,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d4d9c1111aa378c62faa0374c3ec3284, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   spawnId: ServerCooler Pro
   info: ServerCooler Pro
   match: 1
@@ -253,8 +257,16 @@ BoxCollider:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5965864968096340173}
   m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
   m_IsTrigger: 1
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
+  serializedVersion: 3
   m_Size: {x: 0.55, y: 0.55, z: 0.23}
   m_Center: {x: 0, y: 0, z: 0.06}

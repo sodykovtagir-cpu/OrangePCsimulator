@@ -8,10 +8,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      propertyPath: m_TagString
-      value: Cooler
-      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -64,6 +60,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: ServerCooler
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_TagString
+      value: Cooler
+      objectReference: {fileID: 0}
     - target: {fileID: 4226133384550400255, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
@@ -82,14 +82,26 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.x
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 5483168532447698597, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -102,6 +114,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8365950965468593394}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 605115444711232197}
     - targetCorrespondingSourceObject: {fileID: -888447324491273448, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5416774457497778041}
@@ -111,9 +126,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1338907542292945799, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5590010485648503111}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 910000000000000400}
   m_SourcePrefab: {fileID: 100100000, guid: 42ebee43372bd09469f66f72a4b9d573, type: 3}
 --- !u!1 &3288175937796198020 stripped
 GameObject:
@@ -245,7 +257,7 @@ MonoBehaviour:
   coolingWithoutPower: 25
   temperature: 20
   burnTemp: 150
---- !u!65 &910000000000000400
+--- !u!65 &605115444711232197
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -253,8 +265,16 @@ BoxCollider:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5965864968096340173}
   m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
   m_IsTrigger: 1
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 0.55, y: 0.55, z: 0.23}
-  m_Center: {x: 0, y: 0, z: 0.06}
+  serializedVersion: 3
+  m_Size: {x: 0.48927256, y: 0.49099988, z: 0.20393747}
+  m_Center: {x: -0.009288445, y: -0.0039987564, z: 0.045895107}
