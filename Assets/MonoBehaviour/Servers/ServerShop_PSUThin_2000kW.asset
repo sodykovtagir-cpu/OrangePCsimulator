@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: ServerShop_PSUThin_2000kW
+  m_EditorClassIdentifier: 
+  itemName: 'PSUThin_2000kW'
+  price: 350
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: ae7e53448ac1a48e4bf7deb621540f9a, type: 3}
+  spawn: {fileID: 1293115898365789638, guid: 3c6875f5e9ffcc14586f273b0c38e20c, type: 3}
+  large: 0
+  translateDescription: 0
+  description: 'Thin server PSU / 2000 W / Server chassis'

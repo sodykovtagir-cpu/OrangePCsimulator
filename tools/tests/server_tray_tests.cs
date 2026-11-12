@@ -57,6 +57,20 @@ public static class ServerTrayTests {
   var loadingDrive=Part<Storage>();Field(restoredFactory,"factoryDrive",loadingDrive);Field(restoredFactory,"factoryDriveSlot",fd);
   SaveManager.RestoringSave=true;Call(restoredFactory,"Awake");SaveManager.RestoringSave=false;Call(restoredFactory,"Start");
   Check(!loadingDrive.gameObject.active&&!loadingLid.gameObject.active&&!loadingTray.gameObject.active&&loadingTray.GetComponent<Connector>()==null,"save load respawned factory parts");
+  // Ready servers serialize all parts directly into the prefab. FactoryPart
+  // only latches those existing items, and suppresses them on save restore.
+  HardwareSlot readyBoardSlot,readyDrive;Slot readyBay;var readyCase=Chassis(out readyBoardSlot,out readyBay);
+  var readyTray=Tray(out readyDrive);var readyBoard=Part<Motherboard>();var readyCpu=Part<Hardware>();var readyCpuSlot=Part<HardwareSlot>(readyBoard.gameObject);readyCpuSlot.onChanged=new UnityEngine.Events.UnityEvent();
+  var readyDisk=Part<Storage>();var readyBinder=readyCase.gameObject.Add<ServerChassis>();
+  Field(readyBinder,"factoryTrays",new[]{readyTray});Field(readyBinder,"trayBays",new[]{readyBay});
+  Field(readyBinder,"factoryParts",new[]{
+   new ServerChassis.FactoryPart{item=readyBoard,slot=readyBoardSlot},
+   new ServerChassis.FactoryPart{item=readyCpu,slot=readyCpuSlot},
+   new ServerChassis.FactoryPart{item=readyDisk,slot=readyDrive}});
+  Call(readyBinder,"Awake");Call(readyBinder,"Start");
+  Check(readyBoardSlot.AttachedItem==readyBoard&&readyCpuSlot.AttachedItem==readyCpu&&readyDrive.AttachedItem==readyDisk&&Count(readyBoard)==1,"serialized ready server did not latch existing parts");
+  SaveManager.RestoringSave=true;Call(readyBinder,"Awake");SaveManager.RestoringSave=false;
+  Check(!readyBoard.gameObject.active&&!readyCpu.gameObject.active&&!readyDisk.gameObject.active,"ready save load retained factory copies");
   Console.WriteLine("PASS: real tray/case/slot event code; both insertion orders, live power/OS sync, stale connectors, motherboard replacement, multiple trays, idempotent externals");return 0;
  }
 }

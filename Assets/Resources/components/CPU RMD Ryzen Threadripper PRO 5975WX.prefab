@@ -1,0 +1,160 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &3533330845422484195
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value:
+      objectReference: {fileID: 2100000, guid: e28967e7920d6d34e99960475c95ff4c, type: 2}
+    - target: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_Name
+      value: CPU RMD Ryzen Threadripper PRO 5975WX
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      propertyPath: m_TagString
+      value: CPU
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5008169020280956949}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2135976713891446862}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7059861262426488963}
+  m_SourcePrefab: {fileID: 100100000, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+--- !u!1 &4452230990107723698 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 77f268a9444057044ad5efcc22314a48, type: 3}
+  m_PrefabInstance: {fileID: 3533330845422484195}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &5008169020280956949
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4452230990107723698}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.5650393, y: 0.046157338, z: 0.45674193}
+  m_Center: {x: 0, y: 0.015429512, z: 0}
+--- !u!54 &2135976713891446862
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4452230990107723698}
+  serializedVersion: 4
+  m_Mass: 0.5
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 1
+--- !u!114 &7059861262426488963
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4452230990107723698}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89245f8fb2fd3b8aedbfa546bef6c1fa, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  spawnId: CPU RMD Ryzen Threadripper PRO 5975WX
+  info: RMD Ryzen Threadripper PRO 5975WX
+  match: 1
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+  capacity: 0
+  score: 8200
+  wattage: 280
+  layer:
+    serializedVersion: 2
+    m_Bits: 257
+  burnedColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+  integratedGraphics: 1
+  defaultFrequency: 3.6
+  frequency: 3.6
+  heat: 60
+  temperature: 20
+  burnTemp: 150
+  particle: {fileID: 1110576726967799, guid: 9fe34d6be09f849439e6b5f061816e5d, type: 3}

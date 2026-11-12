@@ -59,6 +59,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 871f093df2e3b0c4db4f47167f2ff8df, type: 2}
     - {fileID: 11400000, guid: 38aa861eb196ebd459e5a088c920a416, type: 2}
     - {fileID: 11400000, guid: 89f370528af6ae248ac14ad9ba24f1e3, type: 2}
+    - {fileID: 11400000, guid: 173a051692c0c839c9ea1cad998b9ea5, type: 2}
+    - {fileID: 11400000, guid: d18d26b00fa12467004d986774556a26, type: 2}
+    - {fileID: 11400000, guid: 7650efc0ade249e6d66f011acbdd30b5, type: 2}
+    - {fileID: 11400000, guid: 0552e6386f4a09f4904d3b1c22d9fd6f, type: 2}
+    - {fileID: 11400000, guid: 285347452b1fa569ea02636c31c599d8, type: 2}
+    - {fileID: 11400000, guid: 2921a1f79c8064d8962f3579cb708608, type: 2}
+    - {fileID: 11400000, guid: 1b3e1797a0f693dd9f85a4df0c2f8c91, type: 2}
   - pageName: Memory
     item:
     - {fileID: 11400000, guid: a7ad191887589ee4bb8ed06dc5881242, type: 2}
@@ -73,6 +80,9 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 193a02ac16a550b49a7499be1dfcb5f2, type: 2}
     - {fileID: 11400000, guid: ed87333db41556842998900a7d1189d7, type: 2}
     - {fileID: 11400000, guid: 737c91e3e288c124f90fc729a149c681, type: 2}
+    - {fileID: 11400000, guid: 992fe9f37c3a4f7734a5de990cbdc692, type: 2}
+    - {fileID: 11400000, guid: d811626f5266e405b60d1023b7d33fbf, type: 2}
+    - {fileID: 11400000, guid: a8661a22d6bcfdc73c6c6040a7af0be3, type: 2}
   - pageName: Cooler
     item:
     - {fileID: 11400000, guid: ad5ac894c80199a4d80a31d96e46ad6b, type: 2}
@@ -83,6 +93,9 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 21a131b51c018ec429c60211c8a1dc36, type: 2}
     - {fileID: 11400000, guid: 719b67a8d08f29e418a63b263fca7292, type: 2}
     - {fileID: 11400000, guid: 3aa22ebe1a52e6b4f868e933d361473e, type: 2}
+    - {fileID: 11400000, guid: 586ec2b5dbbfef4a4d7d20ef93e60425, type: 2}
+    - {fileID: 11400000, guid: 346db143c7120647a323d2a7c9aa6998, type: 2}
+    - {fileID: 11400000, guid: 288af72b305189c78423d288842c4338, type: 2}
   - pageName: Graphics Card
     item:
     - {fileID: 11400000, guid: cf4cb2407e3fb754abbe20de35eef99e, type: 2}
@@ -108,6 +121,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: ea181a7689f6725409ed831fad52c606, type: 2}
     - {fileID: 11400000, guid: 125cb1dbc658114428219bdb967e70ea, type: 2}
     - {fileID: 11400000, guid: 2a39aa7c3570c31459a669a2ba5a226a, type: 2}
+    - {fileID: 11400000, guid: b504c20f817f7c6ffdd1cfb8603c5f2c, type: 2}
   - pageName: Storage
     item:
     - {fileID: 11400000, guid: 2d7b30979ba5e8d4e9f7727a158c54b1, type: 2}
@@ -133,6 +147,10 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 84d408aaf74d91024da19993ebb0cfd7, type: 2}
     - {fileID: 11400000, guid: 6ec24eb32df34607e58913dc7fd34571, type: 2}
     - {fileID: 11400000, guid: 29b25adad79bab182d1a318a60a1636d, type: 2}
+    - {fileID: 11400000, guid: 2f658bdf3d9777c2fbc91731deec44b0, type: 2}
+    - {fileID: 11400000, guid: 09a0e96303ae1f71bbe33bbd69016be5, type: 2}
+    - {fileID: 11400000, guid: a3bc5e8f2a7fcc32aa1452417b8b5b7f, type: 2}
+    - {fileID: 11400000, guid: eb9df19746741fe54a739e3a729a742d, type: 2}
   - pageName: Motherboard
     item:
     - {fileID: 11400000, guid: cbab8ee0fc5321a448bf49b3864b08be, type: 2}
@@ -143,6 +161,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 50add003af1603a48a6f53914617f39c, type: 2}
     - {fileID: 11400000, guid: 3cb585507272a788da4b73e9b55c03e6, type: 2}
     - {fileID: 11400000, guid: ca13932357fd4108e70929baed762b43, type: 2}
+    - {fileID: 11400000, guid: 953ce4efb6a8d81959ac18774a5f2acb, type: 2}
   - pageName: Monitor
     item:
     - {fileID: 11400000, guid: d995c4bad809dcd42a704d02bbc59c91, type: 2}
@@ -188,6 +207,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 140454d517a8f434698d43f7d2502215, type: 2}
     - {fileID: 11400000, guid: 7a6741183785ad247804e0e149783254, type: 2}
     - {fileID: 11400000, guid: 1e54200e79cd31447ad89975d85b7530, type: 2}
+    - {fileID: 11400000, guid: 6d5c08222cc57e3abd2dddb396be3d04, type: 2}
+    - {fileID: 11400000, guid: 56e075798283ee9b7a1c7a82c3cab477, type: 2}
   - pageName: Ready PC
     item:
     - {fileID: 11400000, guid: 78348b2c142bcb88381354c04ae3fce7, type: 2}
@@ -240,3 +261,9 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 2b6f623c8d394bc389be6579c96d3830, type: 2}
     - {fileID: 11400000, guid: 45c98ddd9fa648b390c53a2dca207f1f, type: 2}
     - {fileID: 11400000, guid: 750e54b5ed3f43318ef49ad835e3307f, type: 2}
+  - pageName: Ready Server
+    item:
+    - {fileID: 11400000, guid: e3887331b5a569101676c8b54494e2c2, type: 2}
+    - {fileID: 11400000, guid: 409f6067b08381a2e464478678544bbb, type: 2}
+    - {fileID: 11400000, guid: 3e98e251488b46c68ebd00508df2e339, type: 2}
+    - {fileID: 11400000, guid: e4d6b75ef9df6b5e3183d0eabbefaf19, type: 2}

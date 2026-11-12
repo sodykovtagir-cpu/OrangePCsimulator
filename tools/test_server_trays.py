@@ -61,7 +61,7 @@ for target,key,count in [('RAM','RAM',14),('CPU','CPU',2),('Cooler','CPU_fan',2)
 for n,tag in [('Server','Case'),('Server Cover','Cover'),('Server HDD Tray','DriveTray'),('PSUThin_2000kW','Supply')]:
     d=docs(C/(n+'.prefab'));roottr=next(v for k,v in d.values() if k==4 and v.get('m_Father',{}).get('fileID')==0)
     assert d[roottr['m_GameObject']['fileID']][1]['m_TagString']==tag
-assert len([1 for k,v in server.values() if k==1001])==1, 'keep authored sample HDD'
+assert monos(server,'ServerChassis')[0][1]['factoryDrive']['fileID']==0, 'respect user removal of the sample HDD'
 chassis=(S/'PC/Component/ServerChassis.cs').read_text();save=(S/'SaveManager.cs').read_text()
 assert 'Instantiate(' not in chassis and 'AddComponent<' not in chassis, 'server geometry must be authored in prefab'
 assert 'loading = SaveManager.RestoringSave;' in chassis and 'if (loading) return;' in chassis

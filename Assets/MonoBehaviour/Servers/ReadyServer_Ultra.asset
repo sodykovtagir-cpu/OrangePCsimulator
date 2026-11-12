@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: ReadyServer_Ultra
+  m_EditorClassIdentifier: 
+  itemName: 'Orange Rack Ultra'
+  price: 37315
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
+  spawn: {fileID: 4421575409606221039, guid: ae0da8d8cbcd96c98b80c48a3c4c378d, type: 3}
+  large: 1
+  translateDescription: 0
+  description: '2x RMD Ryzen Threadripper PRO 5995WX / 14x 128 GB ECC (1792 GB) / 4x HDD Enterprise 20TB / 2000 W / PCOS'

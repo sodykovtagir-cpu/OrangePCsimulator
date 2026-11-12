@@ -1,0 +1,88 @@
+{
+  "method": "Blender Cycles, actual prefab meshes/UVs/materials, orthographic studio view; no replacement geometry",
+  "size": 256,
+  "sources": {
+    "Assets/Resources/components/Server.prefab": "bfc522edc42dcb09f4a9e9916c398ac78c2a78734f08e2443216a261dfcf657d",
+    "Assets/Models/Server.fbx": "dbb98763331da742071f182c69999c63842f3482c1b427e70f8563fac114363f",
+    "Assets/Mesh/Button_7.asset": "7c26c72ccd719074409b713a3b1dedac1079f3ae061842653ab4e7a2bf744d54",
+    "Assets/Material/ColorPalette.mat": "48802b0448bdcbaa0062f1437b183a7ad0c1436b5ef07ba3f070e26a9c17ce52",
+    "Assets/Texture2D/ColorPalette.png": "02c12d2620652ff9188d79d0260bb9804fdc6801803f5bcc2022c7e62a37a035",
+    "Assets/Resources/components/Server ATX.prefab": "6cff15ee98ede91ac8676c951c969ab5c8670e919b97cbe2e79a8e96a8e860c8",
+    "Assets/Mesh/Ports.asset": "9d5805366aa75bc81fa6839440070d13784e4809bcae9783c8385c9293602c8a",
+    "Assets/Material/Motherboard.mat": "45fdc6b2ec849026d1387f3df94c3ae5f210a31bb81be1f371881bb2067a891b",
+    "Assets/Texture2D/Motherboard.png": "3045cdef0109b21c3ecf1d1333bd6341fb48f73a9ab85962aff50938180c4715",
+    "Assets/Mesh/Holder_1_4.asset": "8cf01b89c766d97640f60cfff790920701ea5698e1920afbf71a82ee9e4101bf",
+    "Assets/Mesh/Holder_3.asset": "2f921ef8dc6e4d16200eeb6788993021ae84df895510f718308798a2bee680c7",
+    "Assets/Mesh/Slot.asset": "e385a9e1d6ccc05c16761598d60d9b2de94dead37824966603531a5657c7f66a",
+    "Assets/Mesh/Slot_3.asset": "7071e594cc4b068fe1ab5b88085e84cf56850da017078ec05d3c0f375ba7fb76",
+    "Assets/Mesh/Holder_1_2.asset": "56a146e45d5941ad25f44d008558fa652a884f43dcd6d7d2db2dcbe60a72df91",
+    "Assets/Mesh/Holder_4.asset": "69d45977d9a67716fed3b4260ddb1c51eba8404e8363f66f183d1536bbf2d057",
+    "Assets/Mesh/Holder.asset": "1fa5821efff88b5c9f6ed7a8dee2e4802f848cf5f9c61254c2b9d8926ac2d68b",
+    "Assets/Mesh/Holder_1.asset": "c87b305025688ef63f7b88d3e34de3b09372ed3322aed77e7b6d81392b572f46",
+    "Assets/Mesh/Slot_1.asset": "5f11ce743cd435bdb18934bcc9cef54adf79a8ad57d539863867b58b6e86d53d",
+    "Assets/Mesh/Slot_2.asset": "5cf0d257efbfa26ccbd291dff41ef92f6277c9544e31854bcc42ceef7cc64cae",
+    "Assets/Mesh/Holder_2.asset": "d17a9b21c045f9b14377170e4e16cbf23f9a392d9c91b762445a28b67f2b9c88",
+    "Assets/Mesh/Holder_1_3.asset": "722c61e8627865be2f3908b776e742fbc6973c2a5e29ce6f1b25d1b288a18d61",
+    "Assets/Resources/components/PSUThin_2000kW.prefab": "91b6c701569673af27d5dc134d3a78ccf50c3fcecee2f696b9977d4bf6846b62",
+    "Assets/Texture2D/Materials/thinpsu2kw.mat": "2852452a9adf6ffcd0f1e0363b9a083538297697ede7371e0af0291355efc8c7",
+    "Assets/Texture2D/thinpsu2kw.png": "c70de72430285ca5add82348401856665da18b5a396eda0937fb19884a48600a",
+    "Assets/Resources/components/Server Cover.prefab": "82a7763bf5873f298a3554a94bbbe2bad5790106e03dc84ee6dd35b1138e7875",
+    "Assets/Resources/components/Server HDD Tray.prefab": "620377143322631bb2d06651f1d024619d077d255256247597b9cfdf88592a38",
+    "Assets/Resources/components/ServerCooler.prefab": "b0e7c4fed03df24e81a6da5588d20391f0f119c0bbdca8a206c0e3b7697af6d9",
+    "Assets/Material/Gray.mat": "1dca6b5bf5e1d64491ba9c1e27c2293fc7caeaf6aba35f53392efc288241a0f5",
+    "Assets/Material/Blade.mat": "c64601c3ca1679228a71dbc0de8a7ee6a25ad37e74b0fadcf17039d00114b3ba",
+    "Assets/Texture2D/Blade.png": "23ca35559c8fb2a68b392ded03616b468f2a47045fafcfff43741ddf5786db02",
+    "Assets/Models/ServerFan.fbx": "c790c2c06a0ddc358e83a63015011627b6b4b97b00a1727cad781c9b8d9cca11",
+    "Assets/Texture2D/Cooler.png": "d00830d366d94768d96218b0596a37eb3cd85e7dd39c1dd367e5a6a4d1679d6e",
+    "Assets/Resources/components/RAM Server ECC 64GB.prefab": "6eaa1bc201771836b10c1fe5a0f32f146bcb5a2329a1953419d04c42127fe255",
+    "Assets/Mesh/RAM.asset": "2b8cdad9dbdf4c864c2e9e813f3fab3ab2327ff0f22e25d4f4237f75b43ca1be",
+    "Assets/Material/RAM.mat": "81a3eb9d43e8b23b16ba9ca7d69cd807de42b75c1a9eb891d2d13f57777536e7",
+    "Assets/Texture2D/RAM_0.png": "92273183471adcd0a313ceb9737a2ff1d5428ce3ff07ad60fe87bcc258214870",
+    "Assets/Resources/components/HDD Enterprise 16TB.prefab": "bf5ac5a2716e5b8643fcb0119caf3b5624dac63a121482487e95033fd3339774",
+    "Assets/Mesh/HDD.asset": "1e4432867c36728bcc325b0419603bbb038e1da1ead2c464a48b75b3ac3be209",
+    "Assets/Material/HDD.mat": "c44eb8d50df9d572d71d27ebae2756b521dc64a1c120b06f4fda1cfaaed1882f",
+    "Assets/Texture2D/HDD.png": "eb06a5634a6af5242bd251b29d02ef89ba55fad55b07d83c69c38850f9288b73"
+  },
+  "covers": {
+    "Chassis": {
+      "file": "Assets/Texture2D/Servers/Chassis.png",
+      "source": "Server",
+      "sha256": "e5f11f5eb6f2467c0ab9a0d38c050f1101f2563382600761c005d69557bd4fb3"
+    },
+    "Board": {
+      "file": "Assets/Texture2D/Servers/Board.png",
+      "source": "Server ATX",
+      "sha256": "25d503eb4842ddbc0550ff26cdeae7fabb1f71b75cbdf21ae65e7f132135a8f4"
+    },
+    "PSU": {
+      "file": "Assets/Texture2D/Servers/PSU.png",
+      "source": "PSUThin_2000kW",
+      "sha256": "82d768dd3c943afbef7facee8f24fc1506e8d804e8f17ac68e6feb858b3e9542"
+    },
+    "Cover": {
+      "file": "Assets/Texture2D/Servers/Cover.png",
+      "source": "Server Cover",
+      "sha256": "69266b02437f526f3295c1d5d8fb3076fb775e2010210bfcac2f5ffa4e7975f5"
+    },
+    "Tray": {
+      "file": "Assets/Texture2D/Servers/Tray.png",
+      "source": "Server HDD Tray",
+      "sha256": "5af9cd5b186f2cc061dbe87ac2dbe40b1d1073f4c18e2234bb62d51c4d702d73"
+    },
+    "Cooler": {
+      "file": "Assets/Texture2D/Servers/Cooler.png",
+      "source": "ServerCooler",
+      "sha256": "5aacebeec9807f126eca3cd57570e9fbe07a9f8690d6b54db65d6eb54b4349d8"
+    },
+    "Memory": {
+      "file": "Assets/Texture2D/Servers/Memory.png",
+      "source": "RAM Server ECC 64GB",
+      "sha256": "8e1085b3f1c316dfa405b9a56eff950a370b45281e9180a58c944f6c4dbd5a49"
+    },
+    "Disk": {
+      "file": "Assets/Texture2D/Servers/Disk.png",
+      "source": "HDD Enterprise 16TB",
+      "sha256": "fd6697895abb756283287b0a89a360755d81f546d2b41af817baf9e5bcdd457f"
+    }
+  }
+}

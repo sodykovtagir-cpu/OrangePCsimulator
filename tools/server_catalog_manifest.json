@@ -1,0 +1,953 @@
+{
+  "base_commit": "ed3df93b5a7536e65c2325531af263f64c1ad853",
+  "markup": 1.1,
+  "round_up_to": 5,
+  "records": [
+    {
+      "name": "CPU RMD Ryzen Threadripper 1920X",
+      "price": 850,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper 1920X.asset",
+      "shop_guid": "173a051692c0c839c9ea1cad998b9ea5",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper 1920X.prefab",
+      "description": "Server socket 1 / score 3900 / 3.5 GHz / 180 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper 2920X",
+      "price": 1000,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper 2920X.asset",
+      "shop_guid": "d18d26b00fa12467004d986774556a26",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper 2920X.prefab",
+      "description": "Server socket 1 / score 4400 / 3.5 GHz / 180 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper 3960X",
+      "price": 1250,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper 3960X.asset",
+      "shop_guid": "7650efc0ade249e6d66f011acbdd30b5",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3960X.prefab",
+      "description": "Server socket 1 / score 5200 / 3.8 GHz / 280 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper 3970X",
+      "price": 1700,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper 3970X.asset",
+      "shop_guid": "0552e6386f4a09f4904d3b1c22d9fd6f",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3970X.prefab",
+      "description": "Server socket 1 / score 6800 / 3.7 GHz / 280 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper 3990X",
+      "price": 2500,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper 3990X.asset",
+      "shop_guid": "285347452b1fa569ea02636c31c599d8",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3990X.prefab",
+      "description": "Server socket 1 / score 9500 / 2.9 GHz / 280 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper PRO 5975WX",
+      "price": 2100,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper PRO 5975WX.asset",
+      "shop_guid": "2921a1f79c8064d8962f3579cb708608",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper PRO 5975WX.prefab",
+      "description": "Server socket 1 / score 8200 / 3.6 GHz / 280 W / Server ATX"
+    },
+    {
+      "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
+      "price": 3300,
+      "page": "Processor",
+      "icon": "RMD",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_CPU RMD Ryzen Threadripper PRO 5995WX.asset",
+      "shop_guid": "1b3e1797a0f693dd9f85a4df0c2f8c91",
+      "prefab": "Assets/Resources/components/CPU RMD Ryzen Threadripper PRO 5995WX.prefab",
+      "description": "Server socket 1 / score 12200 / 2.7 GHz / 280 W / Server ATX"
+    },
+    {
+      "name": "Server",
+      "price": 350,
+      "page": "Case",
+      "icon": "Chassis",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_Server.asset",
+      "shop_guid": "6d5c08222cc57e3abd2dddb396be3d04",
+      "prefab": "Assets/Resources/components/Server.prefab",
+      "description": "4 removable HDD trays + removable cover included. Server ATX / thin PSU. Empty chassis."
+    },
+    {
+      "name": "Server ATX",
+      "price": 650,
+      "page": "Motherboard",
+      "icon": "Board",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_Server ATX.asset",
+      "shop_guid": "953ce4efb6a8d81959ac18774a5f2acb",
+      "prefab": "Assets/Resources/components/Server ATX.prefab",
+      "description": "2 server CPU sockets / 14 DIMM slots / 2 cooler slots / USB / Server chassis"
+    },
+    {
+      "name": "PSUThin_2000kW",
+      "price": 350,
+      "page": "Power Supply",
+      "icon": "PSU",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_PSUThin_2000kW.asset",
+      "shop_guid": "b504c20f817f7c6ffdd1cfb8603c5f2c",
+      "prefab": "Assets/Resources/components/PSUThin_2000kW.prefab",
+      "description": "Thin server PSU / 2000 W / Server chassis"
+    },
+    {
+      "name": "Server Cover",
+      "price": 40,
+      "page": "Case",
+      "icon": "Cover",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_Server Cover.asset",
+      "shop_guid": "56e075798283ee9b7a1c7a82c3cab477",
+      "prefab": "Assets/Resources/components/Server Cover.prefab",
+      "description": "Replacement removable cover / Server chassis"
+    },
+    {
+      "name": "Server HDD Tray",
+      "price": 25,
+      "page": "Storage",
+      "icon": "Tray",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_Server HDD Tray.asset",
+      "shop_guid": "2f658bdf3d9777c2fbc91731deec44b0",
+      "prefab": "Assets/Resources/components/Server HDD Tray.prefab",
+      "description": "Replacement removable HDD tray / one 3.5-inch HDD / Server chassis"
+    },
+    {
+      "name": "ServerCooler",
+      "price": 85,
+      "page": "Cooler",
+      "icon": "Cooler",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_ServerCooler.asset",
+      "shop_guid": "586ec2b5dbbfef4a4d7d20ef93e60425",
+      "prefab": "Assets/Resources/components/ServerCooler.prefab",
+      "description": "Server socket cooler / cooling 85 / 15 W"
+    },
+    {
+      "name": "ServerCooler Pro",
+      "price": 110,
+      "page": "Cooler",
+      "icon": "Cooler",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_ServerCooler Pro.asset",
+      "shop_guid": "346db143c7120647a323d2a7c9aa6998",
+      "prefab": "Assets/Resources/components/ServerCooler Pro.prefab",
+      "description": "Server socket cooler / cooling 105 / 18 W"
+    },
+    {
+      "name": "ServerCooler Max",
+      "price": 145,
+      "page": "Cooler",
+      "icon": "Cooler",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_ServerCooler Max.asset",
+      "shop_guid": "288af72b305189c78423d288842c4338",
+      "prefab": "Assets/Resources/components/ServerCooler Max.prefab",
+      "description": "Server socket cooler / cooling 130 / 22 W"
+    },
+    {
+      "name": "RAM Server ECC 32GB",
+      "price": 420,
+      "page": "Memory",
+      "icon": "Memory",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_RAM Server ECC 32GB.asset",
+      "shop_guid": "992fe9f37c3a4f7734a5de990cbdc692",
+      "prefab": "Assets/Resources/components/RAM Server ECC 32GB.prefab",
+      "description": "32 GB / server DIMM / ECC product line / removable module"
+    },
+    {
+      "name": "RAM Server ECC 64GB",
+      "price": 840,
+      "page": "Memory",
+      "icon": "Memory",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_RAM Server ECC 64GB.asset",
+      "shop_guid": "d811626f5266e405b60d1023b7d33fbf",
+      "prefab": "Assets/Resources/components/RAM Server ECC 64GB.prefab",
+      "description": "64 GB / server DIMM / ECC product line / removable module"
+    },
+    {
+      "name": "RAM Server ECC 128GB",
+      "price": 1680,
+      "page": "Memory",
+      "icon": "Memory",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_RAM Server ECC 128GB.asset",
+      "shop_guid": "a8661a22d6bcfdc73c6c6040a7af0be3",
+      "prefab": "Assets/Resources/components/RAM Server ECC 128GB.prefab",
+      "description": "128 GB / server DIMM / ECC product line / removable module"
+    },
+    {
+      "name": "HDD Enterprise 8TB",
+      "price": 230,
+      "page": "Storage",
+      "icon": "Disk",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_HDD Enterprise 8TB.asset",
+      "shop_guid": "09a0e96303ae1f71bbe33bbd69016be5",
+      "prefab": "Assets/Resources/components/HDD Enterprise 8TB.prefab",
+      "description": "8 TB / 3.5-inch HDD / removable server tray / no preinstalled OS"
+    },
+    {
+      "name": "HDD Enterprise 16TB",
+      "price": 410,
+      "page": "Storage",
+      "icon": "Disk",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_HDD Enterprise 16TB.asset",
+      "shop_guid": "a3bc5e8f2a7fcc32aa1452417b8b5b7f",
+      "prefab": "Assets/Resources/components/HDD Enterprise 16TB.prefab",
+      "description": "16 TB / 3.5-inch HDD / removable server tray / no preinstalled OS"
+    },
+    {
+      "name": "HDD Enterprise 20TB",
+      "price": 540,
+      "page": "Storage",
+      "icon": "Disk",
+      "asset": "Assets/MonoBehaviour/Servers/ServerShop_HDD Enterprise 20TB.asset",
+      "shop_guid": "eb9df19746741fe54a739e3a729a742d",
+      "prefab": "Assets/Resources/components/HDD Enterprise 20TB.prefab",
+      "description": "20 TB / 3.5-inch HDD / removable server tray / no preinstalled OS"
+    }
+  ],
+  "builds": [
+    {
+      "id": "ReadyServer_Entry",
+      "title": "Orange Rack S1",
+      "cpu": "RMD Ryzen Threadripper 1920X",
+      "cpus": 1,
+      "ram": 32,
+      "dimms": 2,
+      "disk": "HDD 2TB",
+      "disks": 2,
+      "cooler": "ServerCooler",
+      "prefab": "Assets/Resources/components/servers/ReadyServer_Entry.prefab",
+      "asset": "Assets/MonoBehaviour/Servers/ReadyServer_Entry.asset",
+      "shop_guid": "e3887331b5a569101676c8b54494e2c2",
+      "parts_cost": 3285,
+      "price": 3615,
+      "assembly": [
+        {
+          "name": "Server ATX",
+          "item": 920000000000000072,
+          "slot": 1887198691543364434,
+          "transform": 920000000000000067
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "item": 920000000000000339,
+          "slot": 3293848899740396294,
+          "transform": 920000000000000336
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 1920X",
+          "item": 920000000000000356,
+          "slot": 920000000000000057,
+          "transform": 920000000000000357
+        },
+        {
+          "name": "ServerCooler",
+          "item": 920000000000000367,
+          "slot": 920000000000000095,
+          "transform": 920000000000000369
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000376,
+          "slot": 920000000000000017,
+          "transform": 920000000000000371
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000383,
+          "slot": 920000000000000049,
+          "transform": 920000000000000378
+        },
+        {
+          "name": "HDD 2TB",
+          "item": 920000000000000391,
+          "slot": 8747979016913882028,
+          "transform": 920000000000000386
+        },
+        {
+          "name": "HDD 2TB",
+          "item": 920000000000000402,
+          "slot": 1999956629830989127,
+          "transform": 920000000000000397
+        }
+      ],
+      "bill_of_materials": [
+        {
+          "name": "Server",
+          "price": 350
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "price": 350
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 1920X",
+          "price": 850
+        },
+        {
+          "name": "ServerCooler",
+          "price": 85
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "HDD 2TB",
+          "price": 80
+        },
+        {
+          "name": "HDD 2TB",
+          "price": 80
+        }
+      ],
+      "description": "1x RMD Ryzen Threadripper 1920X / 2x 32 GB ECC (64 GB) / 2x HDD 2TB / 2000 W / PCOS"
+    },
+    {
+      "id": "ReadyServer_Storage",
+      "title": "Orange Rack Storage",
+      "cpu": "RMD Ryzen Threadripper 3960X",
+      "cpus": 1,
+      "ram": 32,
+      "dimms": 4,
+      "disk": "HDD Enterprise 8TB",
+      "disks": 4,
+      "cooler": "ServerCooler",
+      "prefab": "Assets/Resources/components/servers/ReadyServer_Storage.prefab",
+      "asset": "Assets/MonoBehaviour/Servers/ReadyServer_Storage.asset",
+      "shop_guid": "409f6067b08381a2e464478678544bbb",
+      "parts_cost": 5285,
+      "price": 5815,
+      "assembly": [
+        {
+          "name": "Server ATX",
+          "item": 920000000000000072,
+          "slot": 1887198691543364434,
+          "transform": 920000000000000067
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "item": 920000000000000339,
+          "slot": 3293848899740396294,
+          "transform": 920000000000000336
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3960X",
+          "item": 920000000000000356,
+          "slot": 920000000000000057,
+          "transform": 920000000000000357
+        },
+        {
+          "name": "ServerCooler",
+          "item": 920000000000000367,
+          "slot": 920000000000000095,
+          "transform": 920000000000000369
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000376,
+          "slot": 920000000000000017,
+          "transform": 920000000000000371
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000383,
+          "slot": 920000000000000049,
+          "transform": 920000000000000378
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000390,
+          "slot": 920000000000000077,
+          "transform": 920000000000000385
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "item": 920000000000000397,
+          "slot": 920000000000000114,
+          "transform": 920000000000000392
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "item": 920000000000000405,
+          "slot": 8747979016913882028,
+          "transform": 920000000000000400
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "item": 920000000000000416,
+          "slot": 1999956629830989127,
+          "transform": 920000000000000411
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "item": 920000000000000427,
+          "slot": 3313003207086647571,
+          "transform": 920000000000000422
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "item": 920000000000000438,
+          "slot": 3984495429285781804,
+          "transform": 920000000000000433
+        }
+      ],
+      "bill_of_materials": [
+        {
+          "name": "Server",
+          "price": 350
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "price": 350
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3960X",
+          "price": 1250
+        },
+        {
+          "name": "ServerCooler",
+          "price": 85
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "RAM Server ECC 32GB",
+          "price": 420
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "price": 230
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "price": 230
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "price": 230
+        },
+        {
+          "name": "HDD Enterprise 8TB",
+          "price": 230
+        }
+      ],
+      "description": "1x RMD Ryzen Threadripper 3960X / 4x 32 GB ECC (128 GB) / 4x HDD Enterprise 8TB / 2000 W / PCOS"
+    },
+    {
+      "id": "ReadyServer_Compute",
+      "title": "Orange Rack Compute",
+      "cpu": "RMD Ryzen Threadripper 3970X",
+      "cpus": 2,
+      "ram": 64,
+      "dimms": 8,
+      "disk": "HDD Enterprise 16TB",
+      "disks": 2,
+      "cooler": "ServerCooler Pro",
+      "prefab": "Assets/Resources/components/servers/ReadyServer_Compute.prefab",
+      "asset": "Assets/MonoBehaviour/Servers/ReadyServer_Compute.asset",
+      "shop_guid": "3e98e251488b46c68ebd00508df2e339",
+      "parts_cost": 12510,
+      "price": 13765,
+      "assembly": [
+        {
+          "name": "Server ATX",
+          "item": 920000000000000072,
+          "slot": 1887198691543364434,
+          "transform": 920000000000000067
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "item": 920000000000000339,
+          "slot": 3293848899740396294,
+          "transform": 920000000000000336
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "item": 920000000000000356,
+          "slot": 920000000000000057,
+          "transform": 920000000000000357
+        },
+        {
+          "name": "ServerCooler Pro",
+          "item": 920000000000000367,
+          "slot": 920000000000000095,
+          "transform": 920000000000000369
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "item": 920000000000000374,
+          "slot": 920000000000000217,
+          "transform": 920000000000000375
+        },
+        {
+          "name": "ServerCooler Pro",
+          "item": 920000000000000385,
+          "slot": 920000000000000150,
+          "transform": 920000000000000387
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000394,
+          "slot": 920000000000000017,
+          "transform": 920000000000000389
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000401,
+          "slot": 920000000000000049,
+          "transform": 920000000000000396
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000408,
+          "slot": 920000000000000077,
+          "transform": 920000000000000403
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000415,
+          "slot": 920000000000000114,
+          "transform": 920000000000000410
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000422,
+          "slot": 920000000000000159,
+          "transform": 920000000000000417
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000429,
+          "slot": 920000000000000163,
+          "transform": 920000000000000424
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000436,
+          "slot": 920000000000000171,
+          "transform": 920000000000000431
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "item": 920000000000000443,
+          "slot": 920000000000000181,
+          "transform": 920000000000000438
+        },
+        {
+          "name": "HDD Enterprise 16TB",
+          "item": 920000000000000451,
+          "slot": 8747979016913882028,
+          "transform": 920000000000000446
+        },
+        {
+          "name": "HDD Enterprise 16TB",
+          "item": 920000000000000462,
+          "slot": 1999956629830989127,
+          "transform": 920000000000000457
+        }
+      ],
+      "bill_of_materials": [
+        {
+          "name": "Server",
+          "price": 350
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "price": 350
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "price": 1700
+        },
+        {
+          "name": "ServerCooler Pro",
+          "price": 110
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "price": 1700
+        },
+        {
+          "name": "ServerCooler Pro",
+          "price": 110
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "RAM Server ECC 64GB",
+          "price": 840
+        },
+        {
+          "name": "HDD Enterprise 16TB",
+          "price": 410
+        },
+        {
+          "name": "HDD Enterprise 16TB",
+          "price": 410
+        }
+      ],
+      "description": "2x RMD Ryzen Threadripper 3970X / 8x 64 GB ECC (512 GB) / 2x HDD Enterprise 16TB / 2000 W / PCOS"
+    },
+    {
+      "id": "ReadyServer_Ultra",
+      "title": "Orange Rack Ultra",
+      "cpu": "RMD Ryzen Threadripper PRO 5995WX",
+      "cpus": 2,
+      "ram": 128,
+      "dimms": 14,
+      "disk": "HDD Enterprise 20TB",
+      "disks": 4,
+      "cooler": "ServerCooler Max",
+      "prefab": "Assets/Resources/components/servers/ReadyServer_Ultra.prefab",
+      "asset": "Assets/MonoBehaviour/Servers/ReadyServer_Ultra.asset",
+      "shop_guid": "e4d6b75ef9df6b5e3183d0eabbefaf19",
+      "parts_cost": 33920,
+      "price": 37315,
+      "assembly": [
+        {
+          "name": "Server ATX",
+          "item": 920000000000000072,
+          "slot": 1887198691543364434,
+          "transform": 920000000000000067
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "item": 920000000000000339,
+          "slot": 3293848899740396294,
+          "transform": 920000000000000336
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
+          "item": 920000000000000356,
+          "slot": 920000000000000057,
+          "transform": 920000000000000357
+        },
+        {
+          "name": "ServerCooler Max",
+          "item": 920000000000000367,
+          "slot": 920000000000000095,
+          "transform": 920000000000000369
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
+          "item": 920000000000000374,
+          "slot": 920000000000000217,
+          "transform": 920000000000000375
+        },
+        {
+          "name": "ServerCooler Max",
+          "item": 920000000000000385,
+          "slot": 920000000000000150,
+          "transform": 920000000000000387
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000394,
+          "slot": 920000000000000017,
+          "transform": 920000000000000389
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000401,
+          "slot": 920000000000000049,
+          "transform": 920000000000000396
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000408,
+          "slot": 920000000000000077,
+          "transform": 920000000000000403
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000415,
+          "slot": 920000000000000114,
+          "transform": 920000000000000410
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000422,
+          "slot": 920000000000000159,
+          "transform": 920000000000000417
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000429,
+          "slot": 920000000000000163,
+          "transform": 920000000000000424
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000436,
+          "slot": 920000000000000171,
+          "transform": 920000000000000431
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000443,
+          "slot": 920000000000000181,
+          "transform": 920000000000000438
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000450,
+          "slot": 920000000000000193,
+          "transform": 920000000000000445
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000457,
+          "slot": 920000000000000235,
+          "transform": 920000000000000452
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000464,
+          "slot": 920000000000000252,
+          "transform": 920000000000000459
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000471,
+          "slot": 920000000000000314,
+          "transform": 920000000000000466
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000478,
+          "slot": 920000000000000326,
+          "transform": 920000000000000473
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "item": 920000000000000485,
+          "slot": 920000000000000330,
+          "transform": 920000000000000480
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "item": 920000000000000493,
+          "slot": 8747979016913882028,
+          "transform": 920000000000000488
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "item": 920000000000000504,
+          "slot": 1999956629830989127,
+          "transform": 920000000000000499
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "item": 920000000000000515,
+          "slot": 3313003207086647571,
+          "transform": 920000000000000510
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "item": 920000000000000526,
+          "slot": 3984495429285781804,
+          "transform": 920000000000000521
+        }
+      ],
+      "bill_of_materials": [
+        {
+          "name": "Server",
+          "price": 350
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
+          "name": "PSUThin_2000kW",
+          "price": 350
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
+          "price": 3300
+        },
+        {
+          "name": "ServerCooler Max",
+          "price": 145
+        },
+        {
+          "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
+          "price": 3300
+        },
+        {
+          "name": "ServerCooler Max",
+          "price": 145
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "RAM Server ECC 128GB",
+          "price": 1680
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "price": 540
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "price": 540
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "price": 540
+        },
+        {
+          "name": "HDD Enterprise 20TB",
+          "price": 540
+        }
+      ],
+      "description": "2x RMD Ryzen Threadripper PRO 5995WX / 14x 128 GB ECC (1792 GB) / 4x HDD Enterprise 20TB / 2000 W / PCOS"
+    }
+  ],
+  "covers": {
+    "Chassis": {
+      "guid": "1937f011a2e1fc6d8ec04467c6d76f94",
+      "source": "Server"
+    },
+    "Board": {
+      "guid": "366d2bcae9e40b8bf47c9bfba247bd6a",
+      "source": "Server ATX"
+    },
+    "PSU": {
+      "guid": "ae7e53448ac1a48e4bf7deb621540f9a",
+      "source": "PSUThin_2000kW"
+    },
+    "Cover": {
+      "guid": "356e3b8fc7b50707c03b3f0c81aca3e2",
+      "source": "Server Cover"
+    },
+    "Tray": {
+      "guid": "0b8d6e4bd3bcf9bc8c54c03f38362bd5",
+      "source": "Server HDD Tray"
+    },
+    "Cooler": {
+      "guid": "11b85a856be7fe2a8330b285d6db9f8a",
+      "source": "ServerCooler"
+    },
+    "Memory": {
+      "guid": "7a93ee00d905abd2842f7692d7a24ec4",
+      "source": "RAM Server ECC 64GB"
+    },
+    "Disk": {
+      "guid": "5ea2d76fa675e00a1f32d788941b875d",
+      "source": "HDD Enterprise 16TB"
+    }
+  }
+}

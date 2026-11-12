@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
+  m_Name: ReadyServer_Compute
+  m_EditorClassIdentifier: 
+  itemName: 'Orange Rack Compute'
+  price: 13765
+  bitcoin: 0
+  sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
+  spawn: {fileID: 4421575409606221039, guid: 2abb967faefc8521466d8f20324ce7c6, type: 3}
+  large: 1
+  translateDescription: 0
+  description: '2x RMD Ryzen Threadripper 3970X / 8x 64 GB ECC (512 GB) / 2x HDD Enterprise 16TB / 2000 W / PCOS'

@@ -636,3 +636,4 @@ Glossy	Glossy																	Глянцевый
 Weight	Weight																	Вес																								
 Replace filament spool	Replace filament spool to continue																	Замените катушку для продолжения
 Powered	Powered																	Питание подключено
+Ready Server	Ready Servers	Kész szerverek	Kant-en-klare servers	Servidores montados	Servere gata	Gotowe serwery	Hotové servery	Gotovi serveri	Servidores prontos	Servidores prontos	Valmis serverid	Serveurs prêts	Serveurs prêts	완제품 서버	整机服务器	整機伺服器	Готови сервери	Готовые серверы	Hazır sunucular	Valmiit palvelimet	Готови сървъри	Готові сервери	Fertige Server	Servidors muntats	Server pronti	完成品サーバー	Paruošti serveriai	خوادم جاهزة	Дайын серверлер	Ferdige servere	Handang server	तैयार सर्वर	เซิร์ฟเวอร์สำเร็จรูป	Server siap pakai	მზა სერვერები	Gatavi serveri	Máy chủ dựng sẵn	Έτοιμοι διακομιστές	Гатовыя серверы	Hotové servery	Färdiga servrar	سرورهای آماده

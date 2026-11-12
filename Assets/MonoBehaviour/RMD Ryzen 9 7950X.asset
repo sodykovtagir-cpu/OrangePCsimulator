@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: RMD Ryzen 9 7950X
   price: 800
   bitcoin: 5
-  sprite: {fileID: 21300000, guid: 3497f601b449c084487a3a5894f2d919, type: 2}
+  sprite: {fileID: 21300000, guid: e9132c947dff13147872cbffa2361031, type: 3}
   spawn: {fileID: 1057177327475531, guid: 470c0c8ffba2cd8458011243420eef7a, type: 2}
   large: 0
   translateDescription: 1
