@@ -47,7 +47,15 @@ namespace PC
 			tr.Translate(position);
 			tr.Rotate(rotation);
 
-			StartCoroutine(FreeFromDebris(obj));
+			// A ready-PC plan spawns its case/parts as independent roots.
+            // Scanning the plan's children never sees those colliders. Hand
+            // the debris to the shared builder before its Start can run, so
+            // every new part is protected immediately, before physics.
+            var builder = obj.GetComponent<ReadyBuildSpawner>();
+            if (builder != null)
+                builder.DeliveryDebris = GetComponentsInChildren<Collider>(true);
+            else
+                StartCoroutine(FreeFromDebris(obj));
 		}
 
 		/// <summary>

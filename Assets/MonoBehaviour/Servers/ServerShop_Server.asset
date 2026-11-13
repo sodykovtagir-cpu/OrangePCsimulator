@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: 'Server'
   price: 350
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
+  sprite: {fileID: 21300000, guid: 2e34ecd8ab6c16645a91f8f140fa8ca7, type: 3}
   spawn: {fileID: 6057933833245220503, guid: 2efb2eb44dd740b8e59b8df9e9f6938a, type: 3}
   large: 1
   translateDescription: 0

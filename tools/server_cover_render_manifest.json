@@ -2,11 +2,6 @@
   "method": "Blender Cycles, actual prefab meshes/UVs/materials, orthographic studio view; no replacement geometry",
   "size": 256,
   "sources": {
-    "Assets/Resources/components/Server.prefab": "d662c2ed5d3a0a3c76646156cf89599af7a543a8c43667b80b707d2ae73aea13",
-    "Assets/Models/Server.fbx": "dbb98763331da742071f182c69999c63842f3482c1b427e70f8563fac114363f",
-    "Assets/Mesh/Button_7.asset": "7c26c72ccd719074409b713a3b1dedac1079f3ae061842653ab4e7a2bf744d54",
-    "Assets/Material/ColorPalette.mat": "48802b0448bdcbaa0062f1437b183a7ad0c1436b5ef07ba3f070e26a9c17ce52",
-    "Assets/Texture2D/ColorPalette.png": "02c12d2620652ff9188d79d0260bb9804fdc6801803f5bcc2022c7e62a37a035",
     "Assets/Resources/components/Server ATX.prefab": "05d49abd593b36a699d4e8d996abada9341091305f296d8627823746402b7154",
     "Assets/Mesh/Ports.asset": "9d5805366aa75bc81fa6839440070d13784e4809bcae9783c8385c9293602c8a",
     "Assets/Material/Motherboard.mat": "45fdc6b2ec849026d1387f3df94c3ae5f210a31bb81be1f371881bb2067a891b",
@@ -19,6 +14,7 @@
     "Assets/Mesh/Holder_4.asset": "69d45977d9a67716fed3b4260ddb1c51eba8404e8363f66f183d1536bbf2d057",
     "Assets/Mesh/Holder.asset": "1fa5821efff88b5c9f6ed7a8dee2e4802f848cf5f9c61254c2b9d8926ac2d68b",
     "Assets/Mesh/Holder_1.asset": "c87b305025688ef63f7b88d3e34de3b09372ed3322aed77e7b6d81392b572f46",
+    "Assets/Models/Server.fbx": "dbb98763331da742071f182c69999c63842f3482c1b427e70f8563fac114363f",
     "Assets/Mesh/Slot_1.asset": "5f11ce743cd435bdb18934bcc9cef54adf79a8ad57d539863867b58b6e86d53d",
     "Assets/Mesh/Slot_2.asset": "5cf0d257efbfa26ccbd291dff41ef92f6277c9544e31854bcc42ceef7cc64cae",
     "Assets/Mesh/Holder_2.asset": "d17a9b21c045f9b14377170e4e16cbf23f9a392d9c91b762445a28b67f2b9c88",
@@ -30,11 +26,6 @@
     "Assets/Resources/components/Server HDD Tray.prefab": "620377143322631bb2d06651f1d024619d077d255256247597b9cfdf88592a38"
   },
   "covers": {
-    "Chassis": {
-      "file": "Assets/Texture2D/Servers/Chassis.png",
-      "source": "Server",
-      "sha256": "e5f11f5eb6f2467c0ab9a0d38c050f1101f2563382600761c005d69557bd4fb3"
-    },
     "Board": {
       "file": "Assets/Texture2D/Servers/Board.png",
       "source": "Server ATX",

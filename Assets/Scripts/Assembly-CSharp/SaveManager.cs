@@ -682,6 +682,20 @@ public class SaveManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(spawnId)) return null;
 
+        // Earlier server-shop builds saved a fully authored chassis under
+        // these names. They now name purchase-only ReadyBuildSpawner plans.
+        // Restore only the empty chassis: saved CPU/RAM/HDD records and slot
+        // links restore the actual (possibly disassembled) configuration.
+        // Never run a purchase plan while loading an existing save.
+        switch (spawnId)
+        {
+            case "ReadyServer_Entry":
+            case "ReadyServer_Storage":
+            case "ReadyServer_Compute":
+            case "ReadyServer_Ultra":
+                return FindItemPrefab("Server");
+        }
+
         if (prefabCache.TryGetValue(spawnId, out var cached)) return cached;
 
         GameObject found = null;

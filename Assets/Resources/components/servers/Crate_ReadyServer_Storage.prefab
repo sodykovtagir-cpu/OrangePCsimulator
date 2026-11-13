@@ -352,7 +352,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08b3f721008a46960d450c8ae0ba1816, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  prefab: {fileID: 4421575409606221039, guid: 06bc6b4185a39a89032994491c264772, type: 3}
+  prefab: {fileID: 3843302442573364285, guid: 06bc6b4185a39a89032994491c264772, type: 3}
   position: {x: 0, y: -1.855, z: 0}
   rotation: {x: 0, y: 0, z: 0}
 --- !u!82 &5934705264403162420
