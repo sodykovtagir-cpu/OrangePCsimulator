@@ -745,13 +745,12 @@ _if_at = _base_block.find("if (baseBody.mass < wanted)")
 check(_add_at != -1 and _if_at != -1 and _add_at < _if_at,
       "бэкап основы пишется ДО проверки массы, а не внутри неё")
 
-# Готовый ПК должен засыпать: спящие тела PhysX не считает. У флагмана это
-# 28 Rigidbody, которые иначе крутятся в расчёте до самоуспокоения.
+# Не усыплять связку принудительно в позе после удара обломком.
 _restore = _sp_perf.split("private void RestoreMasses()")[1].split("private void")[0]
-check(".Sleep()" in _restore,
-      "после сборки тела усыпляются, а не будятся")
-check(".WakeUp()" not in _restore,
-      "WakeUp в RestoreMasses больше нет — он мешал связке заснуть")
+check(".Sleep()" not in _restore,
+      "после сборки не замораживается ошибка положения платы")
+check(".WakeUp()" in _restore,
+      "после возврата параметров PhysX может осадить соединённую связку")
 
 # Магазин: карточки строятся по требованию, а не все разом.
 _panel = (ROOT / "Assets/Scripts/Assembly-CSharp/PC/Shop/ShopPanel.cs").read_text(

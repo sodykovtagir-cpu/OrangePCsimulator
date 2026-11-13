@@ -139,6 +139,10 @@ public class Slot : MonoBehaviour
 		if (setParent)
 			itrans.SetParent(insertPos, true);
 
+		// autoSyncTransforms is disabled in this project. Flush the snapped
+		// transforms BEFORE PhysX computes the fixed joint's rest pose;
+		// otherwise a freshly spawned board can be anchored at its old pose.
+		Physics.SyncTransforms();
 		FixedJoint addj = item.gameObject.AddComponent<FixedJoint>();
 		if (!item.glue)
 			addj.breakForce = breakForce;
