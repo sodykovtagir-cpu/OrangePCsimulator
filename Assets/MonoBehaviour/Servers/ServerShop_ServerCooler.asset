@@ -15,7 +15,7 @@ MonoBehaviour:
   itemName: 'ServerCooler'
   price: 85
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 2af9ca3d8bc41954b86a8d30cd2aedcf, type: 2}
+  sprite: {fileID: 21300000, guid: d9c38051a0e4eff40ba0eb875e675e79, type: 3}
   spawn: {fileID: 5965864968096340173, guid: 98972b86d62125743bd82a292569501f, type: 3}
   large: 0
   translateDescription: 0

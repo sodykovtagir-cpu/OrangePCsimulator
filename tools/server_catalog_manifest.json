@@ -166,52 +166,172 @@
       "crate": "Assets/Resources/components/servers/Crate_ReadyServer_Entry.prefab",
       "assembly": [
         {
-          "name": "Server ATX",
-          "item": 920000000000000072,
-          "slot": 1887198691543364434,
-          "transform": 920000000000000067
-        },
-        {
+          "path": "Assets/Resources/components/PSUThin_2000kW.prefab",
           "name": "PSUThin_2000kW",
-          "item": 920000000000000339,
-          "slot": 3293848899740396294,
-          "transform": 920000000000000336
+          "guid": "3c6875f5e9ffcc14586f273b0c38e20c",
+          "root_file_id": 1293115898365789638,
+          "target": "Supply",
+          "index": 0,
+          "host": "Server",
+          "order": 0,
+          "pos": [
+            1.585,
+            0.044,
+            3.085
+          ],
+          "rot": [
+            0.0,
+            -5.915759999896486e-06,
+            0.0,
+            -0.999999999982502
+          ]
         },
         {
+          "path": "Assets/Resources/components/HDD 2TB.prefab",
+          "name": "HDD 2TB",
+          "guid": "db407a6a200621e40bcce818e9ac9164",
+          "root_file_id": 1213583155627727,
+          "target": "Drive",
+          "index": 0,
+          "host": "Server",
+          "order": 1,
+          "pos": [
+            -1.7326547,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 2TB.prefab",
+          "name": "HDD 2TB",
+          "guid": "db407a6a200621e40bcce818e9ac9164",
+          "root_file_id": 1213583155627727,
+          "target": "Drive",
+          "index": 1,
+          "host": "Server",
+          "order": 2,
+          "pos": [
+            -0.58246,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/Server ATX.prefab",
+          "name": "Server ATX",
+          "guid": "633cb2f63d3ab4b40bcb2bce13706a85",
+          "root_file_id": 1654099020045134,
+          "target": "Motherboard",
+          "index": 0,
+          "host": "Server",
+          "order": 3,
+          "pos": [
+            -0.348,
+            -0.168,
+            3.175
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999956475,
+            0.0,
+            2.950429499987158e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper 1920X.prefab",
           "name": "CPU RMD Ryzen Threadripper 1920X",
-          "item": 920000000000000356,
-          "slot": 920000000000000057,
-          "transform": 920000000000000357
+          "guid": "2c2fda2613633cb0c53e9f185d85bfd1",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 4,
+          "pos": [
+            -1.714001622712443,
+            -0.10800000000000001,
+            2.9000080605781813
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901156999919254e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
           "name": "ServerCooler",
-          "item": 920000000000000367,
-          "slot": 920000000000000095,
-          "transform": 920000000000000369
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 5,
+          "pos": [
+            -1.714001622712443,
+            0.057999999999999996,
+            2.9000080605781813
+          ],
+          "rot": [
+            1.0536709162168293e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536709162168293e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000376,
-          "slot": 920000000000000017,
-          "transform": 920000000000000371
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 6,
+          "pos": [
+            -1.3160079366385027,
+            0.10200000000000001,
+            1.8300057120549285
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000383,
-          "slot": 920000000000000049,
-          "transform": 920000000000000378
-        },
-        {
-          "name": "HDD 2TB",
-          "item": 920000000000000391,
-          "slot": 8747979016913882028,
-          "transform": 920000000000000386
-        },
-        {
-          "name": "HDD 2TB",
-          "item": 920000000000000402,
-          "slot": 1999956629830989127,
-          "transform": 920000000000000397
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 7,
+          "pos": [
+            -1.3160073406517434,
+            0.10200000000000001,
+            1.9310057120531696
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         }
       ],
       "bill_of_materials": [
@@ -220,12 +340,20 @@
           "price": 350
         },
         {
-          "name": "Server ATX",
-          "price": 650
-        },
-        {
           "name": "PSUThin_2000kW",
           "price": 350
+        },
+        {
+          "name": "HDD 2TB",
+          "price": 80
+        },
+        {
+          "name": "HDD 2TB",
+          "price": 80
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
         },
         {
           "name": "CPU RMD Ryzen Threadripper 1920X",
@@ -242,14 +370,6 @@
         {
           "name": "RAM 32GB",
           "price": 380
-        },
-        {
-          "name": "HDD 2TB",
-          "price": 80
-        },
-        {
-          "name": "HDD 2TB",
-          "price": 80
         }
       ],
       "description": "1x RMD Ryzen Threadripper 1920X / 2x 32 GB (64 GB) / 2x HDD 2TB / 2000 W / PCOS"
@@ -272,76 +392,256 @@
       "crate": "Assets/Resources/components/servers/Crate_ReadyServer_Storage.prefab",
       "assembly": [
         {
-          "name": "Server ATX",
-          "item": 920000000000000072,
-          "slot": 1887198691543364434,
-          "transform": 920000000000000067
-        },
-        {
+          "path": "Assets/Resources/components/PSUThin_2000kW.prefab",
           "name": "PSUThin_2000kW",
-          "item": 920000000000000339,
-          "slot": 3293848899740396294,
-          "transform": 920000000000000336
+          "guid": "3c6875f5e9ffcc14586f273b0c38e20c",
+          "root_file_id": 1293115898365789638,
+          "target": "Supply",
+          "index": 0,
+          "host": "Server",
+          "order": 0,
+          "pos": [
+            1.585,
+            0.044,
+            3.085
+          ],
+          "rot": [
+            0.0,
+            -5.915759999896486e-06,
+            0.0,
+            -0.999999999982502
+          ]
         },
         {
+          "path": "Assets/Resources/components/HDD 8TB.prefab",
+          "name": "HDD 8TB",
+          "guid": "5a72020e36d7f0dc337679415467ca72",
+          "root_file_id": 3257082537186304821,
+          "target": "Drive",
+          "index": 0,
+          "host": "Server",
+          "order": 1,
+          "pos": [
+            -1.7326547,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 8TB.prefab",
+          "name": "HDD 8TB",
+          "guid": "5a72020e36d7f0dc337679415467ca72",
+          "root_file_id": 3257082537186304821,
+          "target": "Drive",
+          "index": 1,
+          "host": "Server",
+          "order": 2,
+          "pos": [
+            -0.58246,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 8TB.prefab",
+          "name": "HDD 8TB",
+          "guid": "5a72020e36d7f0dc337679415467ca72",
+          "root_file_id": 3257082537186304821,
+          "target": "Drive",
+          "index": 2,
+          "host": "Server",
+          "order": 3,
+          "pos": [
+            0.56773,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 8TB.prefab",
+          "name": "HDD 8TB",
+          "guid": "5a72020e36d7f0dc337679415467ca72",
+          "root_file_id": 3257082537186304821,
+          "target": "Drive",
+          "index": 3,
+          "host": "Server",
+          "order": 4,
+          "pos": [
+            1.7179198,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/Server ATX.prefab",
+          "name": "Server ATX",
+          "guid": "633cb2f63d3ab4b40bcb2bce13706a85",
+          "root_file_id": 1654099020045134,
+          "target": "Motherboard",
+          "index": 0,
+          "host": "Server",
+          "order": 5,
+          "pos": [
+            -0.348,
+            -0.168,
+            3.175
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999956475,
+            0.0,
+            2.950429499987158e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3960X.prefab",
           "name": "CPU RMD Ryzen Threadripper 3960X",
-          "item": 920000000000000356,
-          "slot": 920000000000000057,
-          "transform": 920000000000000357
+          "guid": "b4b163220d3ce8b45b3ca633398f1e6c",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 6,
+          "pos": [
+            -1.714001622712443,
+            -0.10800000000000001,
+            2.9000080605781813
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901156999919254e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
           "name": "ServerCooler",
-          "item": 920000000000000367,
-          "slot": 920000000000000095,
-          "transform": 920000000000000369
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 7,
+          "pos": [
+            -1.714001622712443,
+            0.057999999999999996,
+            2.9000080605781813
+          ],
+          "rot": [
+            1.0536709162168293e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536709162168293e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000376,
-          "slot": 920000000000000017,
-          "transform": 920000000000000371
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 8,
+          "pos": [
+            -1.3160079366385027,
+            0.10200000000000001,
+            1.8300057120549285
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000383,
-          "slot": 920000000000000049,
-          "transform": 920000000000000378
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 9,
+          "pos": [
+            -1.3160073406517434,
+            0.10200000000000001,
+            1.9310057120531696
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000390,
-          "slot": 920000000000000077,
-          "transform": 920000000000000385
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 2,
+          "host": "Server ATX",
+          "order": 10,
+          "pos": [
+            -1.3160064850271882,
+            0.10200000000000001,
+            2.0760057120506454
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 32GB.prefab",
           "name": "RAM 32GB",
-          "item": 920000000000000397,
-          "slot": 920000000000000114,
-          "transform": 920000000000000392
-        },
-        {
-          "name": "HDD 8TB",
-          "item": 920000000000000405,
-          "slot": 8747979016913882028,
-          "transform": 920000000000000400
-        },
-        {
-          "name": "HDD 8TB",
-          "item": 920000000000000416,
-          "slot": 1999956629830989127,
-          "transform": 920000000000000411
-        },
-        {
-          "name": "HDD 8TB",
-          "item": 920000000000000427,
-          "slot": 3313003207086647571,
-          "transform": 920000000000000422
-        },
-        {
-          "name": "HDD 8TB",
-          "item": 920000000000000438,
-          "slot": 3984495429285781804,
-          "transform": 920000000000000433
+          "guid": "78be67e5e9a3b6f48a854915159742db",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 3,
+          "host": "Server ATX",
+          "order": 11,
+          "pos": [
+            -1.316005889040429,
+            0.10200000000000001,
+            2.177005712048887
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         }
       ],
       "bill_of_materials": [
@@ -350,12 +650,28 @@
           "price": 350
         },
         {
-          "name": "Server ATX",
-          "price": 650
-        },
-        {
           "name": "PSUThin_2000kW",
           "price": 350
+        },
+        {
+          "name": "HDD 8TB",
+          "price": 190
+        },
+        {
+          "name": "HDD 8TB",
+          "price": 190
+        },
+        {
+          "name": "HDD 8TB",
+          "price": 190
+        },
+        {
+          "name": "HDD 8TB",
+          "price": 190
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
         },
         {
           "name": "CPU RMD Ryzen Threadripper 3960X",
@@ -380,22 +696,6 @@
         {
           "name": "RAM 32GB",
           "price": 380
-        },
-        {
-          "name": "HDD 8TB",
-          "price": 190
-        },
-        {
-          "name": "HDD 8TB",
-          "price": 190
-        },
-        {
-          "name": "HDD 8TB",
-          "price": 190
-        },
-        {
-          "name": "HDD 8TB",
-          "price": 190
         }
       ],
       "description": "1x RMD Ryzen Threadripper 3960X / 4x 32 GB (128 GB) / 4x HDD 8TB / 2000 W / PCOS"
@@ -418,100 +718,340 @@
       "crate": "Assets/Resources/components/servers/Crate_ReadyServer_Compute.prefab",
       "assembly": [
         {
-          "name": "Server ATX",
-          "item": 920000000000000072,
-          "slot": 1887198691543364434,
-          "transform": 920000000000000067
-        },
-        {
+          "path": "Assets/Resources/components/PSUThin_2000kW.prefab",
           "name": "PSUThin_2000kW",
-          "item": 920000000000000339,
-          "slot": 3293848899740396294,
-          "transform": 920000000000000336
+          "guid": "3c6875f5e9ffcc14586f273b0c38e20c",
+          "root_file_id": 1293115898365789638,
+          "target": "Supply",
+          "index": 0,
+          "host": "Server",
+          "order": 0,
+          "pos": [
+            1.585,
+            0.044,
+            3.085
+          ],
+          "rot": [
+            0.0,
+            -5.915759999896486e-06,
+            0.0,
+            -0.999999999982502
+          ]
         },
         {
-          "name": "CPU RMD Ryzen Threadripper 3970X",
-          "item": 920000000000000356,
-          "slot": 920000000000000057,
-          "transform": 920000000000000357
-        },
-        {
-          "name": "ServerCooler",
-          "item": 920000000000000367,
-          "slot": 920000000000000095,
-          "transform": 920000000000000369
-        },
-        {
-          "name": "CPU RMD Ryzen Threadripper 3970X",
-          "item": 920000000000000374,
-          "slot": 920000000000000217,
-          "transform": 920000000000000375
-        },
-        {
-          "name": "ServerCooler",
-          "item": 920000000000000385,
-          "slot": 920000000000000150,
-          "transform": 920000000000000387
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000394,
-          "slot": 920000000000000017,
-          "transform": 920000000000000389
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000401,
-          "slot": 920000000000000049,
-          "transform": 920000000000000396
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000408,
-          "slot": 920000000000000077,
-          "transform": 920000000000000403
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000415,
-          "slot": 920000000000000114,
-          "transform": 920000000000000410
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000422,
-          "slot": 920000000000000159,
-          "transform": 920000000000000417
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000429,
-          "slot": 920000000000000163,
-          "transform": 920000000000000424
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000436,
-          "slot": 920000000000000171,
-          "transform": 920000000000000431
-        },
-        {
-          "name": "RAM 64GB",
-          "item": 920000000000000443,
-          "slot": 920000000000000181,
-          "transform": 920000000000000438
-        },
-        {
+          "path": "Assets/Resources/components/HDD 16TB.prefab",
           "name": "HDD 16TB",
-          "item": 920000000000000451,
-          "slot": 8747979016913882028,
-          "transform": 920000000000000446
+          "guid": "e236a520b6a9546ce3425778355e413a",
+          "root_file_id": 2189401289381961999,
+          "target": "Drive",
+          "index": 0,
+          "host": "Server",
+          "order": 1,
+          "pos": [
+            -1.7326547,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
         },
         {
+          "path": "Assets/Resources/components/HDD 16TB.prefab",
           "name": "HDD 16TB",
-          "item": 920000000000000462,
-          "slot": 1999956629830989127,
-          "transform": 920000000000000457
+          "guid": "e236a520b6a9546ce3425778355e413a",
+          "root_file_id": 2189401289381961999,
+          "target": "Drive",
+          "index": 1,
+          "host": "Server",
+          "order": 2,
+          "pos": [
+            -0.58246,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/Server ATX.prefab",
+          "name": "Server ATX",
+          "guid": "633cb2f63d3ab4b40bcb2bce13706a85",
+          "root_file_id": 1654099020045134,
+          "target": "Motherboard",
+          "index": 0,
+          "host": "Server",
+          "order": 3,
+          "pos": [
+            -0.348,
+            -0.168,
+            3.175
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999956475,
+            0.0,
+            2.950429499987158e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3970X.prefab",
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "guid": "1fc9be2981cfd20c32d0ac115af807e9",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 4,
+          "pos": [
+            -1.714001622712443,
+            -0.10800000000000001,
+            2.9000080605781813
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901156999919254e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
+          "name": "ServerCooler",
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 5,
+          "pos": [
+            -1.714001622712443,
+            0.057999999999999996,
+            2.9000080605781813
+          ],
+          "rot": [
+            1.0536709162168293e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536709162168293e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper 3970X.prefab",
+          "name": "CPU RMD Ryzen Threadripper 3970X",
+          "guid": "1fc9be2981cfd20c32d0ac115af807e9",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 6,
+          "pos": [
+            -0.8460016227275549,
+            -0.10800000000000001,
+            2.9000029386325696
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901158999919255e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
+          "name": "ServerCooler",
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 7,
+          "pos": [
+            -0.8460016227275549,
+            0.057999999999999996,
+            2.9000029386325696
+          ],
+          "rot": [
+            1.0536710576381857e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536710576381857e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 8,
+          "pos": [
+            -1.3160079366385027,
+            0.10200000000000001,
+            1.8300057120549285
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 9,
+          "pos": [
+            -1.3160073406517434,
+            0.10200000000000001,
+            1.9310057120531696
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 2,
+          "host": "Server ATX",
+          "order": 10,
+          "pos": [
+            -1.3160064850271882,
+            0.10200000000000001,
+            2.0760057120506454
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 3,
+          "host": "Server ATX",
+          "order": 11,
+          "pos": [
+            -1.316005889040429,
+            0.10200000000000001,
+            2.177005712048887
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 4,
+          "host": "Server ATX",
+          "order": 12,
+          "pos": [
+            -1.3160049980107202,
+            0.10200000000000001,
+            2.3280057120462576
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 5,
+          "host": "Server ATX",
+          "order": 13,
+          "pos": [
+            -1.3160044020239612,
+            0.10200000000000001,
+            2.429005712044499
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 6,
+          "host": "Server ATX",
+          "order": 14,
+          "pos": [
+            -0.3000021479135116,
+            0.10200000000000001,
+            2.810999716765105
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
+          "name": "RAM 64GB",
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 7,
+          "host": "Server ATX",
+          "order": 15,
+          "pos": [
+            -0.19900214791527007,
+            0.10200000000000001,
+            2.8109991207783462
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         }
       ],
       "bill_of_materials": [
@@ -520,14 +1060,22 @@
           "price": 350
         },
         {
-          "name": "Server ATX",
-          "price": 650
-        },
-        {
           "name": "PSUThin_2000kW",
           "price": 350
         },
         {
+          "name": "HDD 16TB",
+          "price": 340
+        },
+        {
+          "name": "HDD 16TB",
+          "price": 340
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
           "name": "CPU RMD Ryzen Threadripper 3970X",
           "price": 1700
         },
@@ -574,14 +1122,6 @@
         {
           "name": "RAM 64GB",
           "price": 760
-        },
-        {
-          "name": "HDD 16TB",
-          "price": 340
-        },
-        {
-          "name": "HDD 16TB",
-          "price": 340
         }
       ],
       "description": "2x RMD Ryzen Threadripper 3970X / 8x 64 GB (512 GB) / 2x HDD 16TB / 2000 W / PCOS"
@@ -604,148 +1144,508 @@
       "crate": "Assets/Resources/components/servers/Crate_ReadyServer_Ultra.prefab",
       "assembly": [
         {
-          "name": "Server ATX",
-          "item": 920000000000000072,
-          "slot": 1887198691543364434,
-          "transform": 920000000000000067
-        },
-        {
+          "path": "Assets/Resources/components/PSUThin_2000kW.prefab",
           "name": "PSUThin_2000kW",
-          "item": 920000000000000339,
-          "slot": 3293848899740396294,
-          "transform": 920000000000000336
+          "guid": "3c6875f5e9ffcc14586f273b0c38e20c",
+          "root_file_id": 1293115898365789638,
+          "target": "Supply",
+          "index": 0,
+          "host": "Server",
+          "order": 0,
+          "pos": [
+            1.585,
+            0.044,
+            3.085
+          ],
+          "rot": [
+            0.0,
+            -5.915759999896486e-06,
+            0.0,
+            -0.999999999982502
+          ]
         },
         {
+          "path": "Assets/Resources/components/HDD 20TB.prefab",
+          "name": "HDD 20TB",
+          "guid": "d89b010a12f233c92c4d24de2bff74a7",
+          "root_file_id": 8182304837959977883,
+          "target": "Drive",
+          "index": 0,
+          "host": "Server",
+          "order": 1,
+          "pos": [
+            -1.7326547,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 20TB.prefab",
+          "name": "HDD 20TB",
+          "guid": "d89b010a12f233c92c4d24de2bff74a7",
+          "root_file_id": 8182304837959977883,
+          "target": "Drive",
+          "index": 1,
+          "host": "Server",
+          "order": 2,
+          "pos": [
+            -0.58246,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 20TB.prefab",
+          "name": "HDD 20TB",
+          "guid": "d89b010a12f233c92c4d24de2bff74a7",
+          "root_file_id": 8182304837959977883,
+          "target": "Drive",
+          "index": 2,
+          "host": "Server",
+          "order": 3,
+          "pos": [
+            0.56773,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/HDD 20TB.prefab",
+          "name": "HDD 20TB",
+          "guid": "d89b010a12f233c92c4d24de2bff74a7",
+          "root_file_id": 8182304837959977883,
+          "target": "Drive",
+          "index": 3,
+          "host": "Server",
+          "order": 4,
+          "pos": [
+            1.7179198,
+            0.017992001,
+            0.37690154
+          ],
+          "rot": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/Server ATX.prefab",
+          "name": "Server ATX",
+          "guid": "633cb2f63d3ab4b40bcb2bce13706a85",
+          "root_file_id": 1654099020045134,
+          "target": "Motherboard",
+          "index": 0,
+          "host": "Server",
+          "order": 5,
+          "pos": [
+            -0.348,
+            -0.168,
+            3.175
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999956475,
+            0.0,
+            2.950429499987158e-06
+          ]
+        },
+        {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper PRO 5995WX.prefab",
           "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
-          "item": 920000000000000356,
-          "slot": 920000000000000057,
-          "transform": 920000000000000357
+          "guid": "9ce88358be569226de871341c3e0e66c",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 6,
+          "pos": [
+            -1.714001622712443,
+            -0.10800000000000001,
+            2.9000080605781813
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901156999919254e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
           "name": "ServerCooler",
-          "item": 920000000000000367,
-          "slot": 920000000000000095,
-          "transform": 920000000000000369
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 7,
+          "pos": [
+            -1.714001622712443,
+            0.057999999999999996,
+            2.9000080605781813
+          ],
+          "rot": [
+            1.0536709162168293e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536709162168293e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/CPU RMD Ryzen Threadripper PRO 5995WX.prefab",
           "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
-          "item": 920000000000000374,
-          "slot": 920000000000000217,
-          "transform": 920000000000000375
+          "guid": "9ce88358be569226de871341c3e0e66c",
+          "root_file_id": 4452230990107723698,
+          "target": "CPU",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 8,
+          "pos": [
+            -0.8460016227275549,
+            -0.10800000000000001,
+            2.9000029386325696
+          ],
+          "rot": [
+            0.0,
+            -0.9999999999988898,
+            0.0,
+            1.4901158999919255e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/ServerCooler.prefab",
           "name": "ServerCooler",
-          "item": 920000000000000385,
-          "slot": 920000000000000150,
-          "transform": 920000000000000387
+          "guid": "98972b86d62125743bd82a292569501f",
+          "root_file_id": 5965864968096340173,
+          "target": "Cooler",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 9,
+          "pos": [
+            -0.8460016227275549,
+            0.057999999999999996,
+            2.9000029386325696
+          ],
+          "rot": [
+            1.0536710576381857e-06,
+            -0.7071067811857625,
+            0.7071067811857625,
+            1.0536710576381857e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000394,
-          "slot": 920000000000000017,
-          "transform": 920000000000000389
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 0,
+          "host": "Server ATX",
+          "order": 10,
+          "pos": [
+            -1.3160079366385027,
+            0.10200000000000001,
+            1.8300057120549285
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000401,
-          "slot": 920000000000000049,
-          "transform": 920000000000000396
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 1,
+          "host": "Server ATX",
+          "order": 11,
+          "pos": [
+            -1.3160073406517434,
+            0.10200000000000001,
+            1.9310057120531696
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000408,
-          "slot": 920000000000000077,
-          "transform": 920000000000000403
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 2,
+          "host": "Server ATX",
+          "order": 12,
+          "pos": [
+            -1.3160064850271882,
+            0.10200000000000001,
+            2.0760057120506454
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000415,
-          "slot": 920000000000000114,
-          "transform": 920000000000000410
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 3,
+          "host": "Server ATX",
+          "order": 13,
+          "pos": [
+            -1.316005889040429,
+            0.10200000000000001,
+            2.177005712048887
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000422,
-          "slot": 920000000000000159,
-          "transform": 920000000000000417
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 4,
+          "host": "Server ATX",
+          "order": 14,
+          "pos": [
+            -1.3160049980107202,
+            0.10200000000000001,
+            2.3280057120462576
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000429,
-          "slot": 920000000000000163,
-          "transform": 920000000000000424
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 5,
+          "host": "Server ATX",
+          "order": 15,
+          "pos": [
+            -1.3160044020239612,
+            0.10200000000000001,
+            2.429005712044499
+          ],
+          "rot": [
+            1.0662687628653488e-06,
+            -0.7071067811857437,
+            0.7071067811857437,
+            1.0662687628653488e-06
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000436,
-          "slot": 920000000000000171,
-          "transform": 920000000000000431
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 6,
+          "host": "Server ATX",
+          "order": 16,
+          "pos": [
+            -0.3000021479135116,
+            0.10200000000000001,
+            2.810999716765105
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000443,
-          "slot": 920000000000000181,
-          "transform": 920000000000000438
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 7,
+          "host": "Server ATX",
+          "order": 17,
+          "pos": [
+            -0.19900214791527007,
+            0.10200000000000001,
+            2.8109991207783462
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000450,
-          "slot": 920000000000000193,
-          "transform": 920000000000000445
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 8,
+          "host": "Server ATX",
+          "order": 18,
+          "pos": [
+            -0.048002147917899085,
+            0.10200000000000001,
+            2.810998229748637
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000457,
-          "slot": 920000000000000235,
-          "transform": 920000000000000452
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 9,
+          "host": "Server ATX",
+          "order": 19,
+          "pos": [
+            0.05299785208034252,
+            0.10200000000000001,
+            2.810997633761878
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000464,
-          "slot": 920000000000000252,
-          "transform": 920000000000000459
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 10,
+          "host": "Server ATX",
+          "order": 20,
+          "pos": [
+            0.1979978520778184,
+            0.10200000000000001,
+            2.8109967781373233
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000471,
-          "slot": 920000000000000314,
-          "transform": 920000000000000466
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 11,
+          "host": "Server ATX",
+          "order": 21,
+          "pos": [
+            0.2989978520760598,
+            0.10200000000000001,
+            2.8109961821505642
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000478,
-          "slot": 920000000000000326,
-          "transform": 920000000000000473
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 12,
+          "host": "Server ATX",
+          "order": 22,
+          "pos": [
+            0.4499978520734308,
+            0.10200000000000001,
+            2.810995291120855
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         },
         {
+          "path": "Assets/Resources/components/RAM 64GB.prefab",
           "name": "RAM 64GB",
-          "item": 920000000000000485,
-          "slot": 920000000000000330,
-          "transform": 920000000000000480
-        },
-        {
-          "name": "HDD 20TB",
-          "item": 920000000000000493,
-          "slot": 8747979016913882028,
-          "transform": 920000000000000488
-        },
-        {
-          "name": "HDD 20TB",
-          "item": 920000000000000504,
-          "slot": 1999956629830989127,
-          "transform": 920000000000000499
-        },
-        {
-          "name": "HDD 20TB",
-          "item": 920000000000000515,
-          "slot": 3313003207086647571,
-          "transform": 920000000000000510
-        },
-        {
-          "name": "HDD 20TB",
-          "item": 920000000000000526,
-          "slot": 3984495429285781804,
-          "transform": 920000000000000521
+          "guid": "926cbbfdaca5fb54fbcaf6e23b684d8f",
+          "root_file_id": 1816431867968842,
+          "target": "RAM",
+          "index": 13,
+          "host": "Server ATX",
+          "order": 23,
+          "pos": [
+            0.5509978520716726,
+            0.10200000000000001,
+            2.810994695134096
+          ],
+          "rot": [
+            -0.49999852478307377,
+            -0.5000014752125738,
+            0.5000014752125738,
+            -0.49999852478307377
+          ]
         }
       ],
       "bill_of_materials": [
@@ -754,14 +1654,30 @@
           "price": 350
         },
         {
-          "name": "Server ATX",
-          "price": 650
-        },
-        {
           "name": "PSUThin_2000kW",
           "price": 350
         },
         {
+          "name": "HDD 20TB",
+          "price": 450
+        },
+        {
+          "name": "HDD 20TB",
+          "price": 450
+        },
+        {
+          "name": "HDD 20TB",
+          "price": 450
+        },
+        {
+          "name": "HDD 20TB",
+          "price": 450
+        },
+        {
+          "name": "Server ATX",
+          "price": 650
+        },
+        {
           "name": "CPU RMD Ryzen Threadripper PRO 5995WX",
           "price": 3300
         },
@@ -832,32 +1748,12 @@
         {
           "name": "RAM 64GB",
           "price": 760
-        },
-        {
-          "name": "HDD 20TB",
-          "price": 450
-        },
-        {
-          "name": "HDD 20TB",
-          "price": 450
-        },
-        {
-          "name": "HDD 20TB",
-          "price": 450
-        },
-        {
-          "name": "HDD 20TB",
-          "price": 450
         }
       ],
       "description": "2x RMD Ryzen Threadripper PRO 5995WX / 14x 64 GB (896 GB) / 4x HDD 20TB / 2000 W / PCOS"
     }
   ],
   "covers": {
-    "Chassis": {
-      "guid": "1937f011a2e1fc6d8ec04467c6d76f94",
-      "source": "Server"
-    },
     "Board": {
       "guid": "366d2bcae9e40b8bf47c9bfba247bd6a",
       "source": "Server ATX"

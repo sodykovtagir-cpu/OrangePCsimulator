@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate shop assets and fully authored ready-server PREFABS, not spawners.
+"""Generate shop assets and ReadyBuildSpawner plans, like ordinary ready PCs.
 Run from any cwd. Images are rendered separately by render_server_covers.py.
 The user's geometry, transforms and existing component GUIDs are preserved.
 """
 from pathlib import Path
 import json, math, re
 from server_assets import ROOT, COMP, Prefab, guid, read_guid, meta, ref
-from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, render_os_files, write_crate_prefab, prefab_bounds
+from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, write_crate_prefab, prefab_bounds, write_spawner_prefab, ReadyBuild, PartRef
 
 CPU_SOURCE='CPU RMD Ryzen Threadripper 3960X'
 CPUS=[
@@ -44,14 +44,15 @@ def clone(source,name,values):
 
 def cover_guid(icon):
     if icon=='RMD':return read_guid(ROOT/'Assets/Texture2D/RmdServer.png')
-    if icon=='Cooler':return read_guid(ROOT/'Assets/Sprite/Cooler.asset')
+    if icon=='Cooler':return read_guid(ROOT/'Assets/Texture2D/servercooler.png')
+    if icon=='Chassis':return read_guid(ROOT/'Assets/Texture2D/server.png')
     return guid('cover:'+icon)
 
 def delivery(name,content):
-    """The closed crate contains no live server; hammer reveals one full prefab."""
+    """The closed crate contains no live server; hammer activates the standard ready-PC spawner."""
     crate_name='Crate_'+name
     path=READY/(crate_name+'.prefab')
-    bounds=prefab_bounds(str(content),str(ROOT))
+    bounds=prefab_bounds(str(COMP/'Server.prefab'),str(ROOT))
     # Box position is at the crate centre: keep the lowest server collider
     # above the bottom of the standard 4.5-high crate, even on floor opening.
     lift=round(-2.25+.15-bounds[0][1],3) if bounds else 0
@@ -63,7 +64,7 @@ def add(name,price,page,icon,description,large=0):
     p=Prefab(COMP/(name+'.prefab'));root,_=p.root()
     spawn_guid,spawn_root,crate=delivery(name,COMP/(name+'.prefab')) if name=='Server' else (read_guid(COMP/(name+'.prefab')),root,None)
     entry=ShopItemAsset(name='ServerShop_'+name.replace('/','_'),item_name=name.removeprefix('CPU '),price=price,
-        spawn_guid=spawn_guid,spawn_file_id=spawn_root,sprite_guid=cover_guid(icon),sprite_type=2 if icon=='Cooler' else 3,
+        spawn_guid=spawn_guid,spawn_file_id=spawn_root,sprite_guid=cover_guid(icon),sprite_type=3,
         bitcoin=0,large=large,description=description,translate_description=0)
     path=ASSETS/(entry.name+'.asset');g=entry.write(str(path),guid('shop:'+name))
     RECORDS.append(dict(name=name,price=price,page=page,icon=icon,asset=str(path.relative_to(ROOT)),shop_guid=g,
@@ -101,35 +102,22 @@ for name,asset in [('RAM 32GB','32GB'),('RAM 64GB','64GB')]+[(f'HDD {tb}TB',f'HD
     price_by_name[name]=next(v['price'] for _,v in Prefab(ROOT/'Assets/MonoBehaviour'/(asset+'.asset')).objects(114))
 OS_APPS=['Info','Disk','Downloader','Browser','Benchmark']
 for spec in BUILD_SPECS:
-    p=Prefab(COMP/'Server.prefab');root,tr=p.root();item,_=p.item()
-    name=spec['id'];p.set(root,'m_Name',name);p.set(item,'spawnId',name);p.set(item,'info',spec['title'])
-    chassis,ch=p.mono('ServerChassis')[0];case=p.mono('Case')[0][1];entries=[];bill=[];assembly=[]
-    def put(source,slot,os=False):
-        dest=p.data(slot)['insertPos']['fileID']
-        it,mapping,part_tr=p.clone_into(COMP/(source+'.prefab'),dest)
-        entries.append((it,slot));bill.append(dict(name=source,price=price_by_name[source]))
-        assembly.append(dict(name=source,item=it,slot=slot,transform=part_tr))
-        if os:
-            block,total=render_os_files(OS_APPS,str(ROOT))
-            p.set(it,'files',block);assert total<p.data(it)['capacity']
-        return mapping
-    board_map=put('Server ATX',case['motherboard']['fileID'])
-    put('PSUThin_2000kW',case['external']['supply'][0]['fileID'])
-    b=Prefab(COMP/'Server ATX.prefab');external=b.mono('Motherboard')[0][1]['external']
+    name=spec['id'];parts=[]
+    def put(source,target,host=None):
+        parts.append(PartRef(str((COMP/(source+'.prefab')).relative_to(ROOT)),target,host=host))
+    put('PSUThin_2000kW','Supply')
+    for i in range(spec['disks']):put(spec['disk'],'Drive')
+    put('Server ATX','Motherboard')
     for i in range(spec['cpus']):
-        put('CPU '+spec['cpu'],board_map[external['CPU'][i]['fileID']])
-        put(spec['cooler'],board_map[external['CPU_fan'][i]['fileID']])
-    for r in external['RAM'][:spec['dimms']]:put(f'RAM {spec["ram"]}GB',board_map[r['fileID']])
-    # Order drive bays physically left to right. This is also boot disk order.
-    trays=[]
-    for trayid,tv in p.mono('DriveTray'):
-        go=tv['m_GameObject']['fileID'];tt=next(v for _,v in p.objects(4) if v.get('m_GameObject',{}).get('fileID')==go)
-        trays.append((tt['m_LocalPosition']['x'],tv['driveSlot']['fileID']))
-    for i,(_,slot) in enumerate(sorted(trays)[:spec['disks']]):put(spec['disk'],slot,os=i==0)
-    text=''.join(f'  - item: {ref(it)}\n    slot: {ref(sl)}\n' for it,sl in entries)
-    if 'factoryParts' in ch:p.set(chassis,'factoryParts',text)
-    else:p.blocks[chassis]+='  factoryParts:\n'+text
-    p.save(READY/(name+'.prefab'));meta(READY/(name+'.prefab'))
+        put('CPU '+spec['cpu'],'CPU','Server ATX')
+        put(spec['cooler'],'Cooler','Server ATX')
+    for i in range(spec['dimms']):put(f'RAM {spec["ram"]}GB','RAM','Server ATX')
+    # Same resolver and runtime script used by ordinary ready PCs/miners.
+    # Existing four factory caddies expose their Drive slots under the case.
+    assembly=ReadyBuild(name,str((COMP/'Server.prefab').relative_to(ROOT)),parts).resolve(str(ROOT))
+    bill=[dict(name=p['name'],price=price_by_name[p['name']]) for p in assembly]
+    prefab_guid,prefab_root=write_spawner_prefab(str(READY/(name+'.prefab')),name,
+        read_guid(COMP/'Server.prefab'),Prefab(COMP/'Server.prefab').root()[0],assembly,apps=OS_APPS,root_dir=str(ROOT))
     total=350+sum(v['price'] for v in bill);price=math.ceil(total*1.10/5)*5
     desc=f'{spec["cpus"]}x {spec["cpu"]} / {spec["dimms"]}x {spec["ram"]} GB ({spec["dimms"]*spec["ram"]} GB) / {spec["disks"]}x {spec["disk"]} / 2000 W / PCOS'
     spawn_guid,spawn_root,crate=delivery(name,READY/(name+'.prefab'))
@@ -151,7 +139,7 @@ for page,items in shop_pages(str(shop)):
 for name in removed_names:
     for path in [COMP/(name+'.prefab'),ASSETS/('ServerShop_'+name+'.asset')]:
         path.unlink(missing_ok=True);Path(str(path)+'.meta').unlink(missing_ok=True)
-for name in ['Memory','Disk','Cooler']:
+for name in ['Memory','Disk','Cooler','Chassis']:
     path=IMAGES/(name+'.png');path.unlink(missing_ok=True);Path(str(path)+'.meta').unlink(missing_ok=True)
 existing=dict(shop_pages(str(shop)))
 for page in sorted({r['page'] for r in RECORDS}):
@@ -165,7 +153,7 @@ assert len(translations)==42
 p=ROOT/'Assets/Resources/Translate.txt';lines=p.read_text().splitlines();lines=[l for l in lines if not l.startswith('Ready Server\t')];lines.append('Ready Server\t'+'\t'.join(translations));p.write_text('\n'.join(lines)+'\n')
 
 manifest=dict(base_commit='ed3df93b5a7536e65c2325531af263f64c1ad853',markup=1.10,round_up_to=5,records=RECORDS,builds=BUILD_SPECS,
-    covers={key:dict(guid=cover_guid(key),source=source) for key,source in [('Chassis','Server'),('Board','Server ATX'),('PSU','PSUThin_2000kW'),('Cover','Server Cover'),('Tray','Server HDD Tray')]})
+    covers={key:dict(guid=cover_guid(key),source=source) for key,source in [('Board','Server ATX'),('PSU','PSUThin_2000kW'),('Cover','Server Cover'),('Tray','Server HDD Tray')]})
 (ROOT/'tools/server_catalog_manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
-print(f'Generated {len(RECORDS)} component shop entries, {len(CPUS)} server CPUs and {len(BUILD_SPECS)} authored ready-server prefabs.')
+print(f'Generated {len(RECORDS)} component shop entries, {len(CPUS)} server CPUs and {len(BUILD_SPECS)} standard ready-PC server plans.')
 for b in BUILD_SPECS:print(f'{b["title"]}: parts {b["parts_cost"]} + 10%, rounded up to 5 => {b["price"]}')
