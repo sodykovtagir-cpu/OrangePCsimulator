@@ -27,7 +27,7 @@ Transform:
   m_GameObject: {fileID: 18800401280114319}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.4180967, z: 0}
+  m_LocalPosition: {x: 0, y: -0.339, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -86,8 +86,8 @@ GameObject:
   - component: {fileID: 2208837080011046828}
   - component: {fileID: 5798566747502176646}
   - component: {fileID: 1513332037144357054}
-  - component: {fileID: 8987619514509510822}
   - component: {fileID: 910000000000000003}
+  - component: {fileID: 5313526314994950606}
   m_Layer: 0
   m_Name: Cover
   m_TagString: Cover
@@ -179,9 +179,26 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 4.7693424, y: 0.01999998, z: 4.4294443}
-  m_Center: {x: 0, y: 0.6708685, z: 1.7373152}
---- !u!54 &8987619514509510822
+  m_Size: {x: 4.7693424, y: 0.049598277, z: 4.4294443}
+  m_Center: {x: 0, y: 0.68566763, z: 1.7373152}
+--- !u!114 &910000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 167143201712850185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnId: Server Cover
+  info: Server cover
+  match: 2
+  slotOffset: {x: 0, y: 0, z: 0}
+  glue: 0
+--- !u!54 &5313526314994950606
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -207,24 +224,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
---- !u!114 &910000000000000003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 167143201712850185}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c30496d6ae6d6f907456e10a94e01ec6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnId: Server Cover
-  info: Server cover
-  match: 2
-  slotOffset: {x: 0, y: 0, z: 0}
-  glue: 0
+  m_CollisionDetection: 1
 --- !u!1 &339624472197439278
 GameObject:
   m_ObjectHideFlags: 0
@@ -1669,8 +1669,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.09074521, y: 0.4896809, z: 4.4294434}
-  m_Center: {x: 2.5819893, y: 0, z: 0.17299032}
+  m_Size: {x: 0.09074497, y: 0.5655845, z: 4.4294434}
+  m_Center: {x: 2.5819893, y: 0.03795179, z: 0.17299032}
 --- !u!65 &3446325012925203314
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1690,8 +1690,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.08524346, y: 0.4896809, z: 4.4294434}
-  m_Center: {x: -2.099359, y: 0, z: 0.17299032}
+  m_Size: {x: 0.085243225, y: 0.5695425, z: 4.4294434}
+  m_Center: {x: -2.099359, y: 0.039930865, z: 0.17299032}
 --- !u!65 &1717142244753108146
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1711,8 +1711,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.14232469, y: 0.3938894, z: 0.0933907}
-  m_Center: {x: 2.5552187, y: 0.018855408, z: -1.995036}
+  m_Size: {x: 0.14232445, y: 0.5000061, z: 0.0933907}
+  m_Center: {x: 2.5552187, y: 0.07191375, z: -1.995036}
 --- !u!65 &6080814781070785173
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1753,8 +1753,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.15318847, y: 0.4896809, z: 0.097809315}
-  m_Center: {x: -2.0653863, y: 0, z: 2.3388073}
+  m_Size: {x: 0.1531887, y: 0.5667202, z: 0.097809315}
+  m_Center: {x: -2.0653863, y: 0.03851959, z: 2.3388073}
 --- !u!65 &2327136381497204539
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1774,8 +1774,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.6748915, y: 0.4896809, z: 0.097809315}
-  m_Center: {x: 0.35040453, y: 0, z: 2.3388073}
+  m_Size: {x: 1.6748915, y: 0.5663886, z: 0.097809315}
+  m_Center: {x: 0.3504045, y: 0.038353756, z: 2.3388073}
 --- !u!65 &5163808589623116952
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1795,8 +1795,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.6447277, y: 0.05648029, z: 0.097809315}
-  m_Center: {x: -1.1901155, y: 0.2166003, z: 2.3388073}
+  m_Size: {x: 1.6447277, y: 0.13209817, z: 0.097809315}
+  m_Center: {x: -1.1901155, y: 0.25440925, z: 2.3388073}
 --- !u!65 &6710263049724941999
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1816,8 +1816,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 3.149777, y: 0.1128732, z: 0.097809315}
-  m_Center: {x: -0.4483139, y: -0.18840384, z: 2.3388073}
+  m_Size: {x: 3.2112308, y: 0.1128732, z: 0.097809315}
+  m_Center: {x: -0.41758704, y: -0.18840384, z: 2.3388073}
 --- !u!65 &9164479218094207538
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1858,8 +1858,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.1348753, y: 0.4896809, z: 0.097809315}
-  m_Center: {x: 2.5152164, y: 0, z: 2.3388073}
+  m_Size: {x: 0.1348753, y: 0.56548774, z: 0.097809315}
+  m_Center: {x: 2.5152164, y: 0.037903428, z: 2.3388073}
 --- !u!65 &156696928505246867
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1879,8 +1879,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.3377318, y: 0.06505048, z: 0.097809315}
-  m_Center: {x: 1.8343406, y: 0.2123152, z: 2.3388073}
+  m_Size: {x: 1.3377318, y: 0.14128974, z: 0.097809315}
+  m_Center: {x: 1.8343406, y: 0.25043482, z: 2.3388073}
 --- !u!1 &4421575409606221039
 GameObject:
   m_ObjectHideFlags: 0
@@ -2052,7 +2052,7 @@ Transform:
   m_GameObject: {fileID: 5978205433294594462}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -1, z: -0, w: 0.0000029504295}
-  m_LocalPosition: {x: -0.348, y: -0.2, z: 3.175}
+  m_LocalPosition: {x: -0.348, y: -0.17, z: 3.175}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
