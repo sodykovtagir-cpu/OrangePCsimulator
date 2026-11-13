@@ -9,14 +9,25 @@ namespace PC.Component.Software
     /// <summary>Native PCOS visual site editor. Content is orange-site JSON, not HTML.</summary>
     public sealed class SiteEditor : App
     {
+        [Serializable]
+        public sealed class InspectorField
+        {
+            public string key;
+            public InputField input;
+        }
+        [SerializeField] private SiteCanvas view;
+        [SerializeField] private RectTransform inspector;
+        [SerializeField] private GameObject sitePanel, elementPanel, previewPanel;
+        [SerializeField] private Text status, iconInfo, elementId;
+        [SerializeField] private InputField assetList, assetToRemove;
+        [SerializeField] private Button undoButton, redoButton;
+        [SerializeField] private InspectorField[] fields;
         SiteHistory project;
-        SiteCanvas view;
-        RectTransform inspector, palette;
-        Text status;
         string selected = "", filePath = "";
         int fileDisk = -1;
-        bool preview, confirmNew;
-        float fieldY;
+        bool preview, confirmNew, bound;
+        Vector2 fittedHost;
+        float fittedInset = -1;
         public override bool SingleInstance => true;
         protected override bool ShowMenuBar => false;
         public override bool CanOpenExtension(string ext) { return string.Equals(ext, ".osite", StringComparison.OrdinalIgnoreCase); }
@@ -29,68 +40,88 @@ namespace PC.Component.Software
                 try { project.Reset(SiteDocument.Parse(content)); selected = ""; filePath = ""; fileDisk = -1; }
                 catch (Exception ex) { system?.ShowMessageBox("Site Editor", ex.Message); }
             }
-            if (view == null) BuildUI();
+            if (!BindUI()) return;
+            FitWindow();
             Redraw();
         }
-        void BuildUI()
+        bool BindUI()
         {
-            var body = SiteWidgets.Panel("Site editor", transform, new Color(.94f, .94f, .94f));
-            SiteWidgets.Fill((RectTransform)body.transform, 6, 6, 6, 42);
-            var toolbar = SiteWidgets.Node("Toolbar", body.transform);
-            var tr = (RectTransform)toolbar.transform; tr.anchorMin = new Vector2(0, 1); tr.anchorMax = Vector2.one;
-            tr.pivot = new Vector2(0, 1); tr.sizeDelta = new Vector2(0, 34);
-            var layout = toolbar.AddComponent<HorizontalLayoutGroup>(); layout.spacing = 4; layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = true;
-            Tool(toolbar.transform, "New", () =>
+            if (bound) return true;
+            if (view == null || inspector == null || sitePanel == null || elementPanel == null || previewPanel == null || fields == null)
             {
-                // Two-click confirmation avoids discarding a working project.
-                if (!confirmNew && (project.Document.elements.Count > 0 || project.Document.assets.Count > 0))
-                { confirmNew = true; Report("Сохрани проект или нажми New ещё раз, чтобы очистить его."); return; }
-                confirmNew = false; project.Reset(new SiteDocument()); selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
-            });
-            Tool(toolbar.transform, "Open", OpenFile); Tool(toolbar.transform, "Save", Save);
-            Tool(toolbar.transform, "Undo", () => { project.Undo(); Redraw(); });
-            Tool(toolbar.transform, "Redo", () => { project.Redo(); Redraw(); });
-            Tool(toolbar.transform, "Preview", () => { preview = !preview; Redraw(); });
-            Tool(toolbar.transform, "Host", () =>
+                system?.ShowMessageBox("Site Editor", "Неполный префаб SiteEditor: проверь ссылки интерфейса.");
+                return false;
+            }
+            foreach (var field in fields)
             {
-                Save();
-                Report("Сохрани .osite. Публикация и тариф будут подключены на следующем этапе; сейчас сайт не отправлен.");
-            });
-            var workspace = SiteWidgets.Node("Workspace", body.transform); SiteWidgets.Fill((RectTransform)workspace.transform, 0, 24, 0, 40);
-            var left = SiteWidgets.Panel("Palette", workspace.transform, new Color(.74f, .74f, .74f));
-            var lr = (RectTransform)left.transform; lr.anchorMax = new Vector2(.2f, 1); lr.offsetMax = new Vector2(-6, 0);
-            palette = (RectTransform)left.transform;
-            PaletteButton("Button", 12, () => Add("button")); PaletteButton("Text", 50, () => Add("text"));
-            PaletteButton("Image", 88, () => Add("image")); PaletteButton("Site settings", 138, () => { selected = ""; BuildInspector(); });
-            PaletteButton("Import file", 176, ImportDownload);
-            var center = SiteWidgets.Panel("Canvas border", workspace.transform, new Color(.18f, .18f, .18f));
-            var cr = (RectTransform)center.transform; cr.anchorMin = new Vector2(.2f, 0); cr.anchorMax = new Vector2(.72f, 1);
-            cr.offsetMin = Vector2.zero; cr.offsetMax = new Vector2(-6, 0);
-            view = SiteCanvas.Create(center.transform); SiteWidgets.Fill((RectTransform)view.transform, 2, 2, 2, 2);
+                if (field == null || field.input == null) continue;
+                string key = field.key;
+                field.input.onEndEdit.AddListener(value => SetField(key, value));
+            }
             view.Selected = id => { if (selected != id) inspector.anchoredPosition = Vector2.zero; selected = id; BuildInspector(); };
             view.Moved = (id, x, y) => Change(d => { var e = d.Find(id); e.x = x; e.y = y; });
             view.TextEdited = (id, text) => Change(d => d.Find(id).text = text);
             view.Message = Report;
-            // Preview never leaves the editor or downloads/executes anything.
             view.Redirect = url => Report("Preview redirect: " + url);
             view.Download = asset => Report("Preview download: " + asset.name + " (файл не записан)");
-            var right = SiteWidgets.Panel("Inspector", workspace.transform, new Color(.74f, .74f, .74f));
-            var rr = (RectTransform)right.transform; rr.anchorMin = new Vector2(.72f, 0); rr.offsetMin = Vector2.zero;
-            inspector = SiteWidgets.Scroll(right.transform);
-            status = SiteWidgets.Label(body.transform, "", 12); var sr = status.rectTransform;
-            sr.anchorMin = Vector2.zero; sr.anchorMax = new Vector2(1, 0); sr.pivot = Vector2.zero;
-            sr.sizeDelta = new Vector2(0, 22); sr.anchoredPosition = Vector2.zero;
+            bound = true;
+            return true;
         }
-        void Tool(Transform parent, string title, Action action) { SiteWidgets.Button(parent, title, action); }
-        void PaletteButton(string title, float y, Action action)
+        // Window coordinates are LOCAL PCOS app-parent units, not screen pixels.
+        // The prefab owns all internal layout; only the top-level window is fitted.
+        void FitWindow()
         {
-            var button = SiteWidgets.Button(palette, title, action); StretchRow((RectTransform)button.transform, y, 30);
+            var window = transform as RectTransform;
+            var host = transform.parent as RectTransform;
+            if (window == null || host == null || host.rect.width <= 0 || host.rect.height <= 0) return;
+            float inset = system != null ? system.GetTaskbarInsetLocalHeight() : 48f;
+            fittedHost = new Vector2(host.rect.width, host.rect.height); fittedInset = inset;
+            if (maximized) return;
+            window.anchorMin = window.anchorMax = new Vector2(.5f, .5f);
+            window.pivot = new Vector2(.5f, .5f);
+            window.sizeDelta = Sites.SiteWindowLayout.FittedSize(host.rect.width, host.rect.height, inset);
+            window.anchoredPosition = new Vector2(0, SiteWindowLayout.BottomInset(host.rect.height, inset) * .5f);
         }
-        static void StretchRow(RectTransform r, float y, float h)
+        void LateUpdate()
         {
-            r.anchorMin = new Vector2(0, 1); r.anchorMax = Vector2.one; r.pivot = new Vector2(0, 1);
-            r.offsetMin = new Vector2(8, -y - h); r.offsetMax = new Vector2(-8, -y);
+            var host = transform.parent as RectTransform;
+            if (host == null) return;
+            float inset = system != null ? system.GetTaskbarInsetLocalHeight() : 48f;
+            if (host.rect.width != fittedHost.x || host.rect.height != fittedHost.y || inset != fittedInset) FitWindow();
+        }
+        public override void Maximize() { base.Maximize(); if (!maximized) FitWindow(); }
+        public void NewProject()
+        {
+            if (!confirmNew && (project.Document.elements.Count > 0 || project.Document.assets.Count > 0))
+            { confirmNew = true; Report("Сохрани проект или нажми New ещё раз, чтобы очистить его."); return; }
+            confirmNew = false; project.Reset(new SiteDocument()); selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
+        }
+        public void Undo() { project.Undo(); Redraw(); }
+        public void Redo() { project.Redo(); Redraw(); }
+        public void TogglePreview() { preview = !preview; Redraw(); }
+        public void Host()
+        {
+            Report("Публикация на Byethost ещё не подключена; сейчас сайт не отправлен.");
+        }
+        public void AddButton() { Add("button"); }
+        public void AddText() { Add("text"); }
+        public void AddImage() { Add("image"); }
+        public void SiteSettings() { selected = ""; inspector.anchoredPosition = Vector2.zero; BuildInspector(); }
+        public void ImportIcon() { ImportImage("", true); }
+        public void ImportFill() { if (!string.IsNullOrEmpty(selected)) ImportImage(selected, false); }
+        public void ClearImage() { if (!string.IsNullOrEmpty(selected)) Change(d => d.Find(selected).image = ""); }
+        public void DeleteElement() { if (!string.IsNullOrEmpty(selected)) Change(d => d.elements.Remove(d.Find(selected))); }
+        public void PivotTopLeft() { SetPivot(0, 0); }
+        public void PivotCenter() { SetPivot(.5f, .5f); }
+        void SetPivot(float x, float y) { if (!string.IsNullOrEmpty(selected)) Change(d => { d.Find(selected).pivotX = x; d.Find(selected).pivotY = y; }); }
+        public void FontDefault() { SetField("font", "default"); }
+        public void FontMono() { SetField("font", "mono"); }
+        public void FontMedium() { SetField("font", "medium"); }
+        public void RemoveAsset()
+        {
+            string name = assetToRemove != null ? assetToRemove.text.Trim() : "";
+            if (project.Document.Asset(name) == null) { Report("Укажи имя файла из корня сайта"); return; }
+            Change(d => { if (d.icon == name) d.icon = ""; foreach (var e in d.elements) if (e.image == name) e.image = ""; d.assets.Remove(d.Asset(name)); });
         }
         void Add(string kind)
         {
@@ -117,94 +148,79 @@ namespace PC.Component.Software
         }
         void BuildInspector()
         {
-            if (inspector == null) return;
-            SiteWidgets.Clear(inspector); fieldY = 8;
-            var element = project.Document.Find(selected);
-            if (preview) { Info("Preview — Lua сайта, без записи файлов и перехода из редактора."); EndInspector(); return; }
-            if (element == null)
+            if (!bound) return;
+            var doc = project.Document; var element = doc.Find(selected);
+            sitePanel.SetActive(!preview && element == null);
+            elementPanel.SetActive(!preview && element != null);
+            previewPanel.SetActive(preview);
+            var active = (RectTransform)(preview ? previewPanel : element == null ? sitePanel : elementPanel).transform;
+            inspector.sizeDelta = new Vector2(inspector.sizeDelta.x, active.rect.height);
+            foreach (var field in fields)
             {
-                Field("Title", project.Document.title, s => Change(d => d.title = s));
-                Field("Description", project.Document.description, s => Change(d => d.description = s), true);
-                Field("Keywords", project.Document.keywords, s => Change(d => d.keywords = s));
-                Number("Page width", project.Document.width, n => Change(d => d.width = n));
-                Number("Page height", project.Document.height, n => Change(d => d.height = n));
-                Field("Background #RRGGBB", project.Document.background, s => Change(d => d.background = s));
-                ActionRow("Import site icon", () => ImportImage("", true));
-                Info("Icon: " + project.Document.icon);
-                Info("Site root: " + project.Document.assets.Count + " files");
-                foreach (var asset in project.Document.assets)
+                if (field == null || field.input == null) continue;
+                field.input.SetTextWithoutNotify(FieldValue(field.key, doc, element));
+                bool text = field.key == "text" || field.key == "textColor" || field.key == "font" || field.key == "fontSize";
+                bool image = field.key == "fill";
+                field.input.interactable = element == null || ((!text || element.kind != "image") && (!image || element.kind != "text") && (field.key != "onClick" || element.kind == "button"));
+            }
+            if (iconInfo != null) iconInfo.text = "Icon: " + doc.icon;
+            if (elementId != null) elementId.text = element == null ? "" : "ID: " + element.id + " | " + element.kind;
+            if (assetList != null)
+            {
+                var list = new System.Text.StringBuilder();
+                foreach (var asset in doc.assets) list.Append(asset.name).Append(" (").Append(asset.Bytes().Length).Append(" B)\n");
+                assetList.SetTextWithoutNotify(list.ToString());
+            }
+            if (undoButton != null) undoButton.interactable = project.CanUndo;
+            if (redoButton != null) redoButton.interactable = project.CanRedo;
+        }
+        static string Number(float value) { return value.ToString("0.###", CultureInfo.InvariantCulture); }
+        static string FieldValue(string key, SiteDocument d, SiteElement e)
+        {
+            switch (key)
+            {
+                case "title": return d.title; case "description": return d.description; case "keywords": return d.keywords;
+                case "pageWidth": return Number(d.width); case "pageHeight": return Number(d.height); case "background": return d.background;
+            }
+            if (e == null) return "";
+            switch (key)
+            {
+                case "name": return e.name; case "x": return Number(e.x); case "y": return Number(e.y);
+                case "width": return Number(e.width); case "height": return Number(e.height);
+                case "pivotX": return Number(e.pivotX); case "pivotY": return Number(e.pivotY);
+                case "text": return e.text; case "textColor": return e.textColor; case "fontSize": return Number(e.fontSize);
+                case "font": return e.font; case "fill": return e.fill; case "onClick": return e.onClick;
+                default: return "";
+            }
+        }
+        void SetField(string key, string value)
+        {
+            Change(d =>
+            {
+                switch (key)
                 {
-                    string name = asset.name;
-                    Info(name + " (" + asset.Bytes().Length + " B)");
-                    ActionRow("Remove " + name, () => Change(d =>
-                    {
-                        if (d.icon == name) d.icon = "";
-                        foreach (var e in d.elements) if (e.image == name) e.image = "";
-                        d.assets.Remove(d.Asset(name));
-                    }));
+                    case "title": d.title = value; return; case "description": d.description = value; return;
+                    case "keywords": d.keywords = value; return; case "background": d.background = value; return;
+                    case "pageWidth": d.width = ParseNumber(value); return; case "pageHeight": d.height = ParseNumber(value); return;
                 }
-                Info("Обычный текст: удерживай для редактирования. Перетаскивай элементы по холсту.");
-                EndInspector(); return;
-            }
-            string id = selected;
-            Field("Name", element.name, s => Change(d => d.Find(id).name = s));
-            Info("ID: " + id);
-            Number("Position X", element.x, n => Change(d => d.Find(id).x = n));
-            Number("Position Y", element.y, n => Change(d => d.Find(id).y = n));
-            Number("Width", element.width, n => Change(d => d.Find(id).width = n));
-            Number("Height", element.height, n => Change(d => d.Find(id).height = n));
-            Number("Pivot X (0..1)", element.pivotX, n => Change(d => d.Find(id).pivotX = n));
-            Number("Pivot Y (0..1)", element.pivotY, n => Change(d => d.Find(id).pivotY = n));
-            ActionRow("Pivot: top left", () => Change(d => { d.Find(id).pivotX = 0; d.Find(id).pivotY = 0; }));
-            ActionRow("Pivot: center", () => Change(d => { d.Find(id).pivotX = .5f; d.Find(id).pivotY = .5f; }));
-            if (element.kind != "image")
-            {
-                Field("Text", element.text, s => Change(d => d.Find(id).text = s), true);
-                Field("Text color #RRGGBB", element.textColor, s => Change(d => d.Find(id).textColor = s));
-                Number("Text size", element.fontSize, n => Change(d => d.Find(id).fontSize = (int)n));
-                foreach (string font in new[] { "default", "mono", "medium" })
-                { string captured = font; ActionRow("Font: " + font + (element.font == font ? " *" : ""), () => Change(d => d.Find(id).font = captured)); }
-            }
-            if (element.kind != "text")
-            {
-                Field("Fill #RRGGBB / #RRGGBBAA", element.fill, s => Change(d => d.Find(id).fill = s));
-                ActionRow("Import fill image", () => ImportImage(id, false));
-                Info("Image: " + element.image);
-                ActionRow("Clear image", () => Change(d => d.Find(id).image = ""));
-            }
-            if (element.kind == "button")
-            {
-                Field("OnClick — Lua", element.onClick, s => Change(d => d.Find(id).onClick = s), true, 150);
-                Info("RedirectURL(\"www.modforge.com\")\nStartDownload(\"site/myapp.exe\")\nSetText(\"element_id\", \"Hello\")\nAlert(\"Hello!\")");
-            }
-            ActionRow("Delete element", () => Change(d => d.elements.Remove(d.Find(id))));
-            EndInspector();
-        }
-        void Field(string title, string value, Action<string> changed, bool multi = false, float h = 52)
-        {
-            var label = SiteWidgets.Label(inspector, title, 12); StretchRow(label.rectTransform, fieldY, 22); fieldY += 22;
-            var input = SiteWidgets.Input(inspector, value, changed, multi);
-            StretchRow((RectTransform)input.transform, fieldY, multi ? h : 28); fieldY += (multi ? h : 28) + 9;
-        }
-        void Number(string title, float value, Action<float> changed)
-        {
-            Field(title, value.ToString("0.###", CultureInfo.InvariantCulture), s =>
-            {
-                float n;
-                if (!float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out n)) { Report("Введите число с точкой"); return; }
-                changed(n);
+                var e = d.Find(selected); if (e == null) return;
+                switch (key)
+                {
+                    case "name": e.name = value; break; case "x": e.x = ParseNumber(value); break; case "y": e.y = ParseNumber(value); break;
+                    case "width": e.width = ParseNumber(value); break; case "height": e.height = ParseNumber(value); break;
+                    case "pivotX": e.pivotX = ParseNumber(value); break; case "pivotY": e.pivotY = ParseNumber(value); break;
+                    case "text": e.text = value; break; case "textColor": e.textColor = value; break;
+                    case "fontSize": e.fontSize = (int)ParseNumber(value); break; case "font": e.font = value; break;
+                    case "fill": e.fill = value; break; case "onClick": e.onClick = value; break;
+                }
             });
         }
-        void ActionRow(string title, Action action)
+        static float ParseNumber(string value)
         {
-            var button = SiteWidgets.Button(inspector, title, action); StretchRow((RectTransform)button.transform, fieldY, 28); fieldY += 36;
+            float n;
+            if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out n)) throw new ArgumentException("Введите число с точкой");
+            return n;
         }
-        void Info(string text)
-        {
-            var label = SiteWidgets.Label(inspector, text, 12); label.alignment = TextAnchor.UpperLeft;
-            float height = Mathf.Max(42, (text.Length / 24 + 1) * 17); StretchRow(label.rectTransform, fieldY, height); fieldY += height + 7;
-        }
-        void EndInspector() { inspector.sizeDelta = new Vector2(0, fieldY + 12); }
         void Report(string message) { if (status != null) status.text = message; }
         public void OpenFile()
         {
@@ -256,7 +272,7 @@ namespace PC.Component.Software
                 catch (Exception ex) { Report(ex.Message); }
             });
         }
-        void ImportDownload()
+        public void ImportDownload()
         {
             if (system == null) return;
             system.SelectFile("*", file =>

@@ -11,7 +11,9 @@ apps=p.mono('SiteEditor');assert len(apps)==1
 app,v=apps[0];assert v['appName']=='Site Editor' and v['fileName']=='.osite'
 for m in re.finditer(r'\{fileID: (-?\d+)\}',p.render()):assert int(m[1])==0 or int(m[1]) in p.blocks,m[0]
 assert not p.mono('TextEditor')
-assert not re.search(r'm_MethodName: (OpenFile|Save)$',p.render(),re.M), 'obsolete titlebar text-editor callbacks'
+assert len(v['fields'])==19
+for key in ['view','inspector','sitePanel','elementPanel','previewPanel','status','assetList','assetToRemove','undoButton','redoButton']:
+    assert v[key]['fileID'] in p.blocks,key
 guid=read_guid(ROOT/'Assets/Resources/apps/SiteEditor.prefab')
 downloader=(ROOT/'Assets/Resources/apps/Downloader.prefab').read_text()
 assert downloader.count('guid: '+guid)==1
@@ -19,10 +21,10 @@ assert 'fileID: '+str(app)+', guid: '+guid in downloader
 for name in ['default','medium','mono']:
     assert (ROOT/'Assets/Resources/SiteFonts'/(name+'.ttf')).exists()
 source=(C/'SiteEditor.cs').read_text()
-for required in ['ShowDialog(', '".osite"', 'SiteHistory', 'SiteCanvas.Create', 'SiteDocument.Parse', 'onClick =', 'ImportImage']:
-    # Initial handlers are empty on purpose; code is entered by the author.
-    if required=='onClick =':assert 'd.Find(id).onClick = s' in source
-    else:assert required in source,required
+for required in ['ShowDialog(', '".osite"', 'SiteHistory', 'SiteDocument.Parse', 'ImportImage', 'BindUI', 'SetTextWithoutNotify', 'GetTaskbarInsetLocalHeight']:
+    assert required in source,required
+assert 'SiteWidgets.' not in source and 'BuildUI' not in source
+assert 'new GameObject' not in source and 'AddComponent<' not in source
 assert 'StartCoroutine' not in source and 'UnityWebRequest' not in source, 'first stage must not pretend to publish'
 assert 'сейчас сайт не отправлен' in source
 # Re-run generation and ensure it is idempotent and does not modify old apps/icons.

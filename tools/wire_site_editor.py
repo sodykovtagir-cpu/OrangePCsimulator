@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Add a native PCOS site editor shell, keeping existing apps and authored icons.
-Content UI is built by SiteEditor; only familiar window chrome is reused.
+All editor controls are serialized by the offline UI authoring helper.
 """
 from pathlib import Path
 import hashlib,re,shutil,sys
@@ -37,12 +37,14 @@ for i,v in p.objects(224):
     children=[c['fileID'] for c in v.get('m_Children',[]) if c['fileID'] not in remove]
     p.set(i,'m_Children','\n'.join('  - '+ref(c) for c in children)+'\n' if children else '[]')
 app=p.mono('TextEditor')[0][0]
-p.set(rootgo,'m_Name','SiteEditor');p.set(root,'m_SizeDelta','{x: 1000, y: 680}')
+p.set(rootgo,'m_Name','SiteEditor');p.set(root,'m_SizeDelta','{x: 900, y: 560}')
 p.set(app,'m_Script','{fileID: 11500000, guid: '+read_guid(C/'SiteEditor.cs')+', type: 3}')
 p.set(app,'appName','Site Editor');p.set(app,'fileName','.osite');p.set(app,'size','512')
 p.blocks[app]=re.sub(r'^  input:.*\n','',p.blocks[app],flags=re.M)
 for i in p.blocks:
     p.blocks[i]=p.blocks[i].replace('PC.Component.Software.TextEditor, Assembly-CSharp','PC.Component.Software.SiteEditor, Assembly-CSharp').replace('m_Text: Text Editor','m_Text: Site Editor')
+from build_site_editor_ui import populate
+populate(p,root,app)
 target=ROOT/'Assets/Resources/apps/SiteEditor.prefab';p.save(target);guid=meta(target)
 downloader=ROOT/'Assets/Resources/apps/Downloader.prefab';text=downloader.read_text()
 if 'guid: '+guid not in text:
