@@ -4,7 +4,9 @@ using UnityEngine;
 namespace PC
 {
 	/// <summary>
-	/// Выдать готовую сборку из вскрытого ящика, не столкнув её с обломками.
+	/// Выдать готовую сборку из вскрытого ящика. Серверные ящики
+    /// сохраняют столкновения с обломками; старым ПК/майнерам оставлена
+    /// опциональная защита для их прежних тесных ящиков.
 	///
 	/// Штатный Box создаёт предмет ровно в точке ящика. Для обычных товаров
 	/// это работает, но рама BigMiner — 2.92 x 10.54 x 2.35, а вскрытый ящик
@@ -36,6 +38,10 @@ namespace PC
 		[Tooltip("Доворот относительно ящика")]
 		private Vector3 rotation;
 
+        [SerializeField]
+        [Tooltip("Отключать столкновения с содержимым. Для серверных ящиков подходящего размера — выключено.")]
+        private bool ignoreDebrisCollisions = true;
+
 		private void Start()
 		{
 			if (prefab == null) return;
@@ -46,6 +52,10 @@ namespace PC
 			var tr = obj.transform;
 			tr.Translate(position);
 			tr.Rotate(rotation);
+
+            // Server crates are authored to fit the payload. Keep normal
+            // debris contacts, for both a bare chassis and a ready-PC plan.
+            if (!ignoreDebrisCollisions) return;
 
 			// A ready-PC plan spawns its case/parts as independent roots.
             // Scanning the plan's children never sees those colliders. Hand

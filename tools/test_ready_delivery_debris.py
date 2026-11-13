@@ -60,7 +60,10 @@ class Test {
  Check(UnityEngine.Physics.pairs.Count==6);foreach(var p in UnityEngine.Physics.pairs)Check(p.Item2==box.gameObject.cols[0]||p.Item2==box.gameObject.cols[1]);
  UnityEngine.Physics.pairs.Clear();var bare=new PC.ReadyBuildSpawner();bare.Spawned(root);Check(UnityEngine.Physics.pairs.Count==0);
  var full=new UnityEngine.GameObject();full.cols=new[]{new UnityEngine.Collider()};var oldBox=Box(full);Start(oldBox);Check(UnityEngine.Physics.pairs.Count==2);
- Console.WriteLine("PASS: real ReadyBuildBox routes debris to independent builder objects; immediate root/part protection; full-prefab fallback; old server save aliases");
+ UnityEngine.Physics.pairs.Clear();var serverPlan=new UnityEngine.GameObject();var serverBuilder=new PC.ReadyBuildSpawner();serverBuilder.gameObject=serverPlan;serverPlan.script=serverBuilder;
+ var serverBox=Box(serverPlan);Set(serverBox,"ignoreDebrisCollisions",false);Start(serverBox);serverBuilder.Spawned(root);serverBuilder.Spawned(part);Check(UnityEngine.Physics.pairs.Count==0);
+ var chassisBox=Box(full);Set(chassisBox,"ignoreDebrisCollisions",false);Start(chassisBox);Check(UnityEngine.Physics.pairs.Count==0);
+ Console.WriteLine("PASS: server plans and bare chassis keep debris collisions; ordinary PC/miner protection unchanged; old server save aliases");
  }
 }
 '''.replace('BUILDER_METHOD',method(source,'private void IgnoreDeliveryDebris('))

@@ -6,7 +6,8 @@ The user's geometry, transforms and existing component GUIDs are preserved.
 from pathlib import Path
 import json, math, re
 from server_assets import ROOT, COMP, Prefab, guid, read_guid, meta, ref
-from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, write_crate_prefab, prefab_bounds, write_spawner_prefab, ReadyBuild, PartRef
+from sync_server_crates import sync_crate
+from unity_asset_tool import ShopItemAsset, shop_add_page, shop_pages, write_spawner_prefab, ReadyBuild, PartRef
 
 CPU_SOURCE='CPU RMD Ryzen Threadripper 3960X'
 CPUS=[
@@ -52,12 +53,9 @@ def delivery(name,content):
     """The closed crate contains no live server; hammer activates the standard ready-PC spawner."""
     crate_name='Crate_'+name
     path=READY/(crate_name+'.prefab')
-    bounds=prefab_bounds(str(COMP/'Server.prefab'),str(ROOT))
-    # Box position is at the crate centre: keep the lowest server collider
-    # above the bottom of the standard 4.5-high crate, even on floor opening.
-    lift=round(-2.25+.15-bounds[0][1],3) if bounds else 0
-    g,root=write_crate_prefab(str(path),crate_name,
-        str(COMP/'Crate_Case_ATX 2(Black).prefab'),read_guid(content),Prefab(content).root()[0],lift=lift)
+    # Preserve the artist's fitted Compute mesh, debris geometry, offsets,
+    # colliders and materials. Never regenerate these from a generic PC box.
+    g,root,_=sync_crate(path,content)
     return g,root,str(path.relative_to(ROOT))
 
 def add(name,price,page,icon,description,large=0):
