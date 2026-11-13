@@ -1743,11 +1743,8 @@ def write_crate_prefab(
             count=1,
         )
 
-    # Штатный Box заменяем на ReadyBuildBox: он гасит столкновение груза с
-    # обломками вскрытого ящика. Рама BigMiner (10.54 в высоту) рождается
-    # внутри шести обломков Part, и они выпихивают её вместе с видеокартами.
-    # Увеличить ящик до вмещающего нельзя — нужен масштаб x2.45, это 11.03
-    # в высоту, а портал висит на 8.
+    # Use the common ready-build delivery component. It issues the plan
+    # without disabling physics contacts between the contents and debris.
     tail = tail.replace(
         f"m_Script: {{fileID: 11500000, guid: {SCRIPT_GUIDS['Box']}, type: 3}}",
         f"m_Script: {{fileID: 11500000, guid: {READY_BOX_SCRIPT_GUID}, type: 3}}",

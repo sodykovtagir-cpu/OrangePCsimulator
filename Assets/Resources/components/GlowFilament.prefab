@@ -105,10 +105,7 @@ MonoBehaviour:
   matteSmoothness: 0.12
   glossySmoothness: 0.85
   glowColor: {r: 0.721569, g: 1, b: 0.34902, a: 1}
-  glowIntensity: 2.4
-  glowLight: 1
-  glowLightIntensity: 0.7
-  glowLightRange: 1.4
+  glowIntensity: 0.65
   minVisualScale: 0.35
   maxVisualScale: 1
   lowFilamentMeters: 0.25

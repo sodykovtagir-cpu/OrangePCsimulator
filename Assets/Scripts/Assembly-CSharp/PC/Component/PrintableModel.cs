@@ -171,8 +171,7 @@ namespace PC.Component
 			if (Instance == null) return;
 			var renderers = Instance.GetComponentsInChildren<Renderer>(true);
 			FilamentLook.Apply(renderers, color, smoothness, emission);
-			if (FilamentLook.HasEmission(emission))
-				FilamentLook.EnsureGlowLight(Instance, color, 0.6f, 1.2f);
+			FilamentLook.RemoveGlowLight(Instance);
 		}
 
 		/// <summary>

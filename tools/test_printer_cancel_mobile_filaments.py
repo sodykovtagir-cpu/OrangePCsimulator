@@ -89,7 +89,9 @@ def test_filament_finish_and_glow_support():
     assert "public enum FilamentFinish" in look
     assert "Matte = 0" in look and "Glossy = 1" in look and "Glow = 2" in look
     assert 'EnableKeyword("_EMISSION")' in look
-    assert "public static void EnsureGlowLight(" in look
+    assert "EnsureGlowLight" not in look
+    assert "MaterialGlobalIlluminationFlags.None" in look
+    assert "public static Color SurfaceEmission(" in look
     assert Path(str(LOOK) + ".meta").exists()
     spool = SPOOL.read_text(encoding="utf-8")
     assert "private FilamentFinish finish = FilamentFinish.Glossy;" in spool
@@ -110,7 +112,7 @@ def test_filament_range_prefabs_and_shop_entries():
     assert len(expected) == 25
     shop = SHOP.read_text(encoding="utf-8")
     assert "pageName: Filament" in shop
-    page = shop[shop.index("  - pageName: Filament"):]
+    page = shop[shop.index("  - pageName: Filament"):].split("\n  - pageName:", 1)[0]
     entries = re.findall(r"guid: ([0-9a-f]{32})", page)
     assert len(entries) == 25, len(entries)
     translate = TRANSLATE.read_text(encoding="utf-8")
@@ -128,8 +130,8 @@ def test_filament_range_prefabs_and_shop_entries():
         assert Path(str(item) + ".meta").exists(), name
         assert "price:" in item.read_text(encoding="utf-8")
     glow = (COMPONENTS / "GlowFilament.prefab").read_text(encoding="utf-8")
-    assert "glowIntensity: 2.4" in glow
-    assert "glowLight: 1" in glow
+    assert "glowIntensity: 0.65" in glow
+    assert "glowLight:" not in glow
     assert "Glow Filament\t" in translate
     assert "White Filament Matte\t" in translate
     assert "Black Filament Glossy\t" in translate

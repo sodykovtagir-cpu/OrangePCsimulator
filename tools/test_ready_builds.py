@@ -257,9 +257,9 @@ for spec in gen.BUILDS:
     spawner_guid = read_meta_guid(str(ROOT / gen.OUT_PREFABS / f"{spec.key}.prefab"))
     box_at = crate.find(f"guid: {uat.READY_BOX_SCRIPT_GUID}")
     check(box_at != -1,
-          f"{spec.key}: в ящике стоит ReadyBuildBox (разводит груз и обломки)")
+          f"{spec.key}: в ящике стоит ReadyBuildBox (нормальные столкновения с обломками)")
     check(SCRIPT_GUIDS["Box"] not in crate,
-          f"{spec.key}: штатный Box заменён — он ронял раму внутрь обломков")
+          f"{spec.key}: ящик использует общий компонент выдачи готовой сборки")
     if box_at != -1:
         content = re.search(r"prefab: \{fileID: \d+, guid: (\w+)", crate[box_at:])
         check(content is not None and content.group(1) == spawner_guid,
@@ -898,7 +898,7 @@ check("сборка неполная" in _sp,
       "спавнер сообщает, если часть деталей не встала")
 
 # ---------------------------------------------------------------------------
-print("\nГруз не сталкивается с обломками вскрытого ящика")
+print("\nГруз сталкивается с обломками вскрытого ящика")
 
 _box_cs_path = ROOT / "Assets/Scripts/Assembly-CSharp/PC/ReadyBuildBox.cs"
 check(_box_cs_path.exists(), "ReadyBuildBox.cs на месте")
@@ -910,16 +910,11 @@ check("MonoImporter" in _box_meta.read_text(encoding="utf-8"),
 check(read_meta_guid(str(_box_cs_path)) == uat.READY_BOX_SCRIPT_GUID,
       "guid ReadyBuildBox совпадает с тем, что тулза пишет в ящики")
 
-# Ящик к моменту выдачи груза — шесть обломков Part с Rigidbody. Рама
-# BigMiner (10.54 в высоту) рождается внутри них, и без развода коллизий
-# обломки выпихивают её вместе с видеокартами.
-check("Physics.IgnoreCollision" in _box_cs,
-      "ReadyBuildBox разводит коллизии груза и обломков")
-
-# Сборка появляется не мгновенно — спавнер ставит детали по одной за
-# несколько кадров. Разовый проход пропустил бы видеокарты, приехавшие позже.
-check("for (int pass" in _box_cs and "WaitForSeconds" in _box_cs,
-      "развод коллизий повторяется, пока спавнер доставляет детали")
+# User requests normal contacts for every crate, including ready PCs/miners.
+check("IgnoreCollision" not in _box_cs and "IgnoreCollision" not in _sp,
+      "все готовые сборки взаимодействуют с обломками")
+check("FreeFromDebris" not in _box_cs and "DeliveryDebris" not in _sp,
+      "нет отложенной или переданной сборщику защиты от коллизий")
 
 # Штатный Box общий для 31 ванильного ящика — его трогать нельзя.
 _vanilla_box = (ROOT / "Assets/Scripts/Assembly-CSharp/Box.cs").read_text(encoding="utf-8")

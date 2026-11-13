@@ -46,19 +46,6 @@ namespace PC
 	/// </summary>
 	public class ReadyBuildSpawner : MonoBehaviour
 	{
-        // Passed by the delivery box before Start. The assembled root and
-        // parts are independent objects, not children of this plan object.
-        public Collider[] DeliveryDebris { private get; set; }
-
-        private void IgnoreDeliveryDebris(GameObject spawned)
-        {
-            if (spawned == null || DeliveryDebris == null) return;
-            foreach (var own in spawned.GetComponentsInChildren<Collider>(true))
-                foreach (var debris in DeliveryDebris)
-                    if (own != null && debris != null)
-                        Physics.IgnoreCollision(own, debris, true);
-        }
-
 		[System.Serializable]
 		public class Part
 		{
@@ -173,7 +160,6 @@ namespace PC
 			}
 
 			var root = Instantiate(basePrefab, transform.position, transform.rotation);
-            IgnoreDeliveryDebris(root);
 
 			// Физика основы.
 			//
@@ -270,7 +256,6 @@ namespace PC
 					// её всё равно задаст слот из своего insertPos.
 					var spawned = Instantiate(part.prefab, root.transform.position,
 						root.transform.rotation);
-                    IgnoreDeliveryDebris(spawned);
 
 					// Пока деталь не подключена, она обычное физическое тело:
 					// падает, отскакивает, сталкивается с обломками ящика и

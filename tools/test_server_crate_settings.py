@@ -30,7 +30,7 @@ def settings(p):
     return result
 
 master=Prefab(MASTER);expected=settings(master)
-assert master.mono('ReadyBuildBox')[0][1]['ignoreDebrisCollisions']==0
+assert 'ignoreDebrisCollisions' not in master.mono('ReadyBuildBox')[0][1]
 assert master.mono('ReadyBuildBox')[0][1]['position']==dict(x=0,y=0,z=-1.67)
 asset_guids=set()
 for meta in (ROOT/'Assets').rglob('*.meta'):

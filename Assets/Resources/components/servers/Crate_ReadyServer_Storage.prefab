@@ -54,7 +54,6 @@ MonoBehaviour:
   prefab: {fileID: 3843302442573364285, guid: 06bc6b4185a39a89032994491c264772, type: 3}
   position: {x: 0, y: 0, z: -1.67}
   rotation: {x: 0, y: 0, z: 0}
-  ignoreDebrisCollisions: 0
 --- !u!82 &5934705264403162420
 AudioSource:
   m_ObjectHideFlags: 0

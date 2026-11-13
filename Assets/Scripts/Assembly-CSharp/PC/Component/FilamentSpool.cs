@@ -29,11 +29,8 @@ namespace PC.Component
 		[SerializeField, Range(0f, 1f)] private float matteSmoothness = 0.12f;
 		[SerializeField, Range(0f, 1f)] private float glossySmoothness = 0.85f;
 		[SerializeField] private Color glowColor = new Color(0.62f, 1f, 0.35f, 1f);
-		[SerializeField] private float glowIntensity = 2.4f;
-		[Tooltip("Glow plastic also lights the room a little in the dark.")]
-		[SerializeField] private bool glowLight = true;
-		[SerializeField] private float glowLightIntensity = 0.7f;
-		[SerializeField] private float glowLightRange = 1.4f;
+		[SerializeField] private float glowIntensity = 0.65f;
+
 
 		[Header("Visual amount thresholds")]
 		[Tooltip("Visual Y/Z scale at empty spool (core still visible).")]
@@ -191,10 +188,7 @@ namespace PC.Component
 			if (targets == null) return;
 
 			FilamentLook.Apply(targets, filamentColor, Smoothness, EmissionColor);
-			if (IsGlow && glowLight)
-				FilamentLook.EnsureGlowLight(gameObject, filamentColor, glowLightIntensity, glowLightRange);
-			else
-				FilamentLook.RemoveGlowLight(gameObject);
+			FilamentLook.RemoveGlowLight(gameObject);
 		}
 
 		public void ToData(JObject jObject)

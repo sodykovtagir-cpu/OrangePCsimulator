@@ -46,9 +46,8 @@ def sync_crate(path,content=None):
     dest.set(root,'m_Name',path.stem)
     dest.set(dest.item()[0],'spawnId',path.stem)
     dest.set(box_id,'prefab','{fileID: %(fileID)s, guid: %(guid)s, type: %(type)s}' % content_ref)
-    # The server-sized crate fits its payload: debris must collide normally.
-    if 'ignoreDebrisCollisions' in dest.data(box_id):dest.set(box_id,'ignoreDebrisCollisions','0')
-    else:dest.append_field(box_id,'ignoreDebrisCollisions','0')
+    # Obsolete serialized switches must not reintroduce collision immunity.
+    dest.blocks[box_id]=re.sub(r'^  ignoreDebrisCollisions:.*\n','',dest.blocks[box_id],flags=re.M)
     path.write_text(dest.render())
     return read_guid(path),root,str(path.relative_to(COMP.parents[2]))
 

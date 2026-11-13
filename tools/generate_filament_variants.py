@@ -80,7 +80,7 @@ def build_variants():
         "hex": GLOW[1],
         "finish": 2,
         "glow_hex": GLOW[1],
-        "glow_intensity": 2.4,
+        "glow_intensity": 0.65,
         "price": 180,
     })
     return template, variants
@@ -99,9 +99,6 @@ def write_prefab(template, variant):
         "  glossySmoothness: 0.85\n"
         "  glowColor: {r: %.6g, g: %.6g, b: %.6g, a: 1}\n"
         "  glowIntensity: %.6g\n"
-        "  glowLight: 1\n"
-        "  glowLightIntensity: 0.7\n"
-        "  glowLightRange: 1.4\n"
     ) % (color_yaml(variant["hex"]), variant["finish"], glow_r, glow_g, glow_b, variant["glow_intensity"])
     text = re.sub(r"  filamentColor: \{[^}]*\}\n", finish_block, text, count=1)
     path = COMPONENTS / (variant["prefab"] + ".prefab")
