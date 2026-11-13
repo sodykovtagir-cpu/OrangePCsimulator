@@ -330,21 +330,16 @@ namespace PC
 				}
 			}
 
-			// Даём физике один кадр на осадку уже соединённой связки, пока
-			// основа ещё кинематическая и ничего не может разъехаться.
-			yield return new WaitForFixedUpdate();
-
-			// Основу отпускаем только когда все детали на месте: дальше
-			// связка живёт обычной физикой и разбирается как всегда.
+			// Restore the real mass/solver state BEFORE the final settling step.
+			// Never force-sleep a constrained assembly here: debris can have
+			// displaced the board, and sleeping freezes that error until grabbed.
+			RestoreMasses();
 			if (baseBody != null)
 			{
 				baseBody.isKinematic = baseWasKinematic;
 				baseBody.WakeUp();
 			}
-
-			// Сборка закончена — возвращаем настоящие массы, иначе готовый
-			// майнер невозможно будет поднять и перенести.
-			RestoreMasses();
+			yield return new WaitForFixedUpdate();
 
 			if (failed > 0)
 			{
@@ -479,17 +474,13 @@ namespace PC
 				backup.body.solverIterations = backup.solver;
 				backup.body.solverVelocityIterations = backup.solverVelocity;
 				backup.body.collisionDetectionMode = backup.collision;
-
-				// Раньше здесь стоял WakeUp(). Он нужен был, чтобы тело
-				// заметило новую массу, но заодно поднимал всю связку на
-				// ноги: разбуженный Rigidbody считается физикой до тех пор,
-				// пока сам не успокоится. У флагмана это 28 тел сразу.
-				//
-				// Скорости уже обнулены строкой выше, деталь стоит в слоте и
-				// держится FixedJoint — будить её незачем. Пусть засыпает:
-				// спящие тела PhysX не считает вовсе.
-				backup.body.Sleep();
 			}
+
+			// Wake only after every body's normal parameters have been restored.
+			// Let PhysX settle connected bodies and sleep naturally afterwards.
+			foreach (var backup in restoreMass)
+				if (backup.body != null) backup.body.WakeUp();
+
 			restoreMass.Clear();
 		}
 
