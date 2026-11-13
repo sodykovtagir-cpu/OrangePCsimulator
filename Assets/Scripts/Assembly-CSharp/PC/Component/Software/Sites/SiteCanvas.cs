@@ -17,7 +17,8 @@ namespace PC.Component.Software.Sites
         readonly Dictionary<string, Text> labels = new Dictionary<string, Text>();
         readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
         public Action<string> Selected, Redirect, Message;
-        public Action<SiteAsset> Download;
+        public Action<SiteAsset> Download, OpenFile;
+        public string URL = "";
         public Action<string, float, float> Moved;
         public Action<string, string> TextEdited;
         public bool Editing { get; private set; }
@@ -40,9 +41,13 @@ namespace PC.Component.Software.Sites
             scroll.viewport = (RectTransform)transform; scroll.content = content;
             scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.StopMovement(); scroll.verticalNormalizedPosition = 1;
-            lua = new SiteLua(doc);
+            lua = new SiteLua(doc) { URL = URL };
             lua.Redirect = url => Redirect?.Invoke(url); lua.Download = asset => Download?.Invoke(asset);
             lua.Message = text => Message?.Invoke(text);
+            lua.OpenFile = asset => OpenFile?.Invoke(asset);
+            lua.ElementChanged = ApplyElement;
+            lua.BackgroundChanged = color => design.GetComponent<Image>().color = SiteWidgets.ColorValue(color);
+            lua.EnabledChanged = (id, enabled) => { RectTransform node; if (nodes.TryGetValue(id, out node)) { var button = node.GetComponent<Button>(); if (button != null) button.interactable = enabled; } };
             lua.TextChanged = (id, text) => { Text label; if (labels.TryGetValue(id, out label)) label.text = text; };
             lua.VisibilityChanged = (id, visible) => { RectTransform node; if (nodes.TryGetValue(id, out node)) node.gameObject.SetActive(visible); };
             foreach (var element in doc.elements) Draw(element);
@@ -58,7 +63,7 @@ namespace PC.Component.Software.Sites
             {
                 var image = go.AddComponent<Image>(); image.color = SiteWidgets.ColorValue(element.fill);
                 if (!string.IsNullOrEmpty(element.image)) image.sprite = Image(element.image);
-                image.preserveAspect = element.kind == "image";
+                image.preserveAspect = false;
             }
             if (element.kind != "image")
             {
@@ -83,6 +88,16 @@ namespace PC.Component.Software.Sites
                     catch (Exception ex) { Message?.Invoke("Lua: " + ex.Message); }
                 });
             }
+        }
+        void ApplyElement(string id)
+        {
+            RectTransform node; if (!nodes.TryGetValue(id, out node)) return;
+            var e = document.Find(id); if (e == null) return;
+            node.anchoredPosition = new Vector2(e.x, -e.y); node.sizeDelta = new Vector2(e.width, e.height); node.pivot = new Vector2(e.pivotX, 1 - e.pivotY);
+            Text label;
+            if (labels.TryGetValue(id, out label)) { label.text = e.text; label.color = SiteWidgets.ColorValue(e.textColor); label.font = SiteWidgets.Font(e.font); label.fontSize = e.fontSize; }
+            var image = node.GetComponent<Image>();
+            if (image != null) { image.color = SiteWidgets.ColorValue(e.fill); image.sprite = string.IsNullOrEmpty(e.image) ? null : Image(e.image); image.preserveAspect = false; }
         }
         Sprite Image(string name)
         {

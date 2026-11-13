@@ -22,6 +22,13 @@ namespace PC.Component.Software
         [SerializeField] private InputField assetList, assetToRemove;
         [SerializeField] private Button undoButton, redoButton;
         [SerializeField] private InspectorField[] fields;
+        [SerializeField] private GameObject addMenu;
+        [SerializeField] private RectTransform hierarchyRoot, actionRoot;
+        [SerializeField] private Button rowTemplate;
+        [SerializeField] private Dropdown commandDropdown;
+        [SerializeField] private InputField commandArguments;
+        [SerializeField] private Text argumentHint;
+        int selectedAction = -1;
         SiteHistory project;
         string selected = "", filePath = "";
         int fileDisk = -1;
@@ -47,7 +54,7 @@ namespace PC.Component.Software
         bool BindUI()
         {
             if (bound) return true;
-            if (view == null || inspector == null || sitePanel == null || elementPanel == null || previewPanel == null || fields == null)
+            if (view == null || inspector == null || sitePanel == null || elementPanel == null || previewPanel == null || fields == null || hierarchyRoot == null || actionRoot == null || rowTemplate == null || commandDropdown == null || commandArguments == null || addMenu == null)
             {
                 system?.ShowMessageBox("Site Editor", "Неполный префаб SiteEditor: проверь ссылки интерфейса.");
                 return false;
@@ -58,12 +65,17 @@ namespace PC.Component.Software
                 string key = field.key;
                 field.input.onEndEdit.AddListener(value => SetField(key, value));
             }
-            view.Selected = id => { if (selected != id) inspector.anchoredPosition = Vector2.zero; selected = id; BuildInspector(); };
+            commandDropdown.ClearOptions();
+            var commands = new System.Collections.Generic.List<string>();
+            foreach (var command in SiteCommands.All) commands.Add(command.Name);
+            commandDropdown.AddOptions(commands); commandDropdown.onValueChanged.AddListener(index => UpdateArgumentHint());
+            view.Selected = SelectElement;
             view.Moved = (id, x, y) => Change(d => { var e = d.Find(id); e.x = x; e.y = y; });
             view.TextEdited = (id, text) => Change(d => d.Find(id).text = text);
             view.Message = Report;
             view.Redirect = url => Report("Preview redirect: " + url);
             view.Download = asset => Report("Preview download: " + asset.name + " (файл не записан)");
+            view.OpenFile = asset => Report("Preview OpenFile: " + asset.name + " (корень сайта)");
             bound = true;
             return true;
         }
@@ -106,7 +118,101 @@ namespace PC.Component.Software
         public void AddButton() { Add("button"); }
         public void AddText() { Add("text"); }
         public void AddImage() { Add("image"); }
-        public void SiteSettings() { selected = ""; inspector.anchoredPosition = Vector2.zero; BuildInspector(); }
+        public void SiteSettings() { SelectElement(""); }
+        public void ToggleAddMenu() { addMenu.SetActive(!addMenu.activeSelf); if (addMenu.activeSelf) addMenu.transform.SetAsLastSibling(); }
+        void SelectElement(string id)
+        {
+            if (selected != id) { inspector.anchoredPosition = Vector2.zero; selectedAction = -1; }
+            selected = id; RefreshHierarchy(); BuildInspector();
+        }
+        public void OpenDocument(File file) { if (file != null) { filePath = file.path; fileDisk = DiskFor(file); } }
+        public void OpenInBrowser()
+        {
+            if (system == null) return;
+            if (!string.IsNullOrEmpty(filePath) && fileDisk >= 0 && !OS.OperatingSystem.IsSystemPath(filePath))
+            {
+                try
+                {
+                    string content = project.Document.ToJson();
+                    var file = system.FileManager.Write(fileDisk, filePath, content);
+                    if (file == null || file.content != content) { Report("Не удалось сохранить сайт на диск"); return; }
+                    if (!system.OpenSiteFile(file)) Report("Не удалось открыть .osite в браузере");
+                }
+                catch (Exception ex) { Report(ex.Message); }
+            }
+            else SaveProject(file => { if (!system.OpenSiteFile(file)) Report("Не удалось открыть .osite в браузере"); });
+        }
+        void ClearRows(Transform parent)
+        {
+            for (int i = parent.childCount - 1; i >= 0; i--) { var go = parent.GetChild(i).gameObject; go.SetActive(false); Destroy(go); }
+        }
+        void ListRow(RectTransform parent, string title, int index, bool active, Action action)
+        {
+            var row = Instantiate(rowTemplate, parent); row.gameObject.SetActive(true);
+            var rect = (RectTransform)row.transform; rect.anchoredPosition = new Vector2(6, -index * 32); rect.sizeDelta = new Vector2(-12, 28);
+            row.GetComponentInChildren<Text>().text = title;
+            row.GetComponent<Image>().color = active ? new Color(1f, .72f, .35f) : new Color(.83f, .83f, .83f);
+            row.onClick.AddListener(() => action());
+        }
+        void RefreshHierarchy()
+        {
+            if (hierarchyRoot == null || rowTemplate == null) return;
+            ClearRows(hierarchyRoot); int index = 0;
+            foreach (var e in project.Document.elements)
+            {
+                string id = e.id;
+                ListRow(hierarchyRoot, e.name + " [" + e.kind + "]", index++, id == selected, () => { selectedAction = -1; view.Select(id); });
+            }
+            hierarchyRoot.sizeDelta = new Vector2(0, Mathf.Max(32, index * 32));
+        }
+        void RefreshActions(SiteElement element)
+        {
+            ClearRows(actionRoot);
+            if (element == null) { selectedAction = -1; return; }
+            if (selectedAction >= element.actions.Count) selectedAction = -1;
+            for (int i = 0; i < element.actions.Count; i++)
+            {
+                int index = i; var action = element.actions[i];
+                ListRow(actionRoot, (i + 1) + ". " + action.command, i, i == selectedAction, () => LoadAction(index));
+            }
+            actionRoot.sizeDelta = new Vector2(0, Mathf.Max(32, element.actions.Count * 32));
+            UpdateArgumentHint();
+        }
+        void UpdateArgumentHint()
+        {
+            if (argumentHint != null && commandDropdown.value < SiteCommands.All.Length) argumentHint.text = SiteCommands.All[commandDropdown.value].Hint;
+        }
+        void LoadAction(int index)
+        {
+            var e = project.Document.Find(selected); if (e == null || index < 0 || index >= e.actions.Count) return;
+            selectedAction = index; var action = e.actions[index];
+            commandDropdown.SetValueWithoutNotify(Array.FindIndex(SiteCommands.All, c => c.Name == action.command));
+            commandArguments.SetTextWithoutNotify(string.Join("\n", action.arguments));
+            RefreshActions(e);
+        }
+        SiteAction ReadAction()
+        {
+            var command = SiteCommands.All[commandDropdown.value];
+            var action = new SiteAction { command = command.Name, arguments = SiteCommands.ReadArgumentLines(commandArguments.text, command.Arguments.Length) };
+            SiteCommands.Validate(action); return action;
+        }
+        public void AddAction()
+        {
+            var e = project.Document.Find(selected); if (e == null || e.kind != "button") { Report("Выбери Button в Hierarchy"); return; }
+            try { var action = ReadAction(); selectedAction = e.actions.Count; Change(d => d.Find(selected).actions.Add(action)); }
+            catch (Exception ex) { Report(ex.Message); }
+        }
+        public void UpdateAction()
+        {
+            var e = project.Document.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) { Report("Выбери действие из списка"); return; }
+            try { var action = ReadAction(); Change(d => d.Find(selected).actions[selectedAction] = action); }
+            catch (Exception ex) { Report(ex.Message); }
+        }
+        public void RemoveAction()
+        {
+            var e = project.Document.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) return;
+            int index = selectedAction; selectedAction = -1; Change(d => d.Find(selected).actions.RemoveAt(index));
+        }
         public void ImportIcon() { ImportImage("", true); }
         public void ImportFill() { if (!string.IsNullOrEmpty(selected)) ImportImage(selected, false); }
         public void ClearImage() { if (!string.IsNullOrEmpty(selected)) Change(d => d.Find(selected).image = ""); }
@@ -125,6 +231,7 @@ namespace PC.Component.Software
         }
         void Add(string kind)
         {
+            addMenu.SetActive(false); selectedAction = -1;
             string id = "el_" + Guid.NewGuid().ToString("N").Substring(0, 12);
             Change(d => d.elements.Add(new SiteElement { id = id, kind = kind, name = kind,
                 text = kind == "button" ? "Cool button" : "Hello World!", x = d.width / 2, y = 150 + d.elements.Count * 12,
@@ -140,6 +247,7 @@ namespace PC.Component.Software
         void Redraw()
         {
             if (view == null) return;
+            RefreshHierarchy();
             if (project.Document.Find(selected) == null) selected = "";
             // Lua preview uses an isolated copy, never the authored project.
             try { view.Render(SiteDocument.Parse(project.Document.ToJson()), !preview); }
@@ -150,6 +258,7 @@ namespace PC.Component.Software
         {
             if (!bound) return;
             var doc = project.Document; var element = doc.Find(selected);
+            RefreshActions(element);
             sitePanel.SetActive(!preview && element == null);
             elementPanel.SetActive(!preview && element != null);
             previewPanel.SetActive(preview);
@@ -232,13 +341,14 @@ namespace PC.Component.Software
                 catch (Exception ex) { Report(ex.Message); }
             });
         }
-        public void Save()
+        public void Save() { SaveProject(null); }
+        void SaveProject(Action<File> completed)
         {
             if (system == null || system.SaveDialog == null) return;
             try
             {
                 system.SaveDialog.ShowDialog("MySite", project.Document.ToJson(), new[] { ".osite" },
-                    string.IsNullOrEmpty(filePath) ? null : filePath, fileDisk, file => { filePath = file.path; fileDisk = DiskFor(file); Report("Сохранено: " + file.path); }, IsAdministrator);
+                    string.IsNullOrEmpty(filePath) ? null : filePath, fileDisk, file => { filePath = file.path; fileDisk = DiskFor(file); Report("Сохранено: " + file.path); completed?.Invoke(file); }, IsAdministrator);
             }
             catch (Exception ex) { Report(ex.Message); }
         }

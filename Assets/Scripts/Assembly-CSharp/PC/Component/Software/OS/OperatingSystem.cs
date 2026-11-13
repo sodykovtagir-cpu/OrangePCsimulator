@@ -1817,10 +1817,12 @@ namespace PC.Component.Software.OS
             if (file.isFolder)
                 return OpenFolder(file, elevated);
 
+            var ext = file.Extension();
+            if (string.Equals(ext, ".osite", StringComparison.OrdinalIgnoreCase)) return OpenSiteFile(file);
+
             if (LuaAppPackage.IsPackage(file.content))
                 return RunLua(file.content, null, elevated);
 
-            var ext = file.Extension();
             if (elevated && string.Equals(ext, ".lua", StringComparison.OrdinalIgnoreCase))
                 return RunLua(file.content, null, true);
             App prefab = null;
@@ -1865,6 +1867,8 @@ namespace PC.Component.Software.OS
                     var viewer = opened as PC.Component.Software.Viewer;
                     if (viewer != null) viewer.OpenDocument(file);
                 }
+                var siteEditor = opened as PC.Component.Software.SiteEditor;
+                if (siteEditor != null) siteEditor.OpenDocument(file);
                 return true;
             }
 
@@ -1898,6 +1902,19 @@ namespace PC.Component.Software.OS
             return true;
         }
 
+        public bool OpenSiteFile(File file)
+        {
+            if (!Ready || file == null || file.isFolder || IsSystemPath(file.path) || !PC.Component.Software.Sites.SiteLocalAddress.SafePath(file.path)) return false;
+            var disks = AllStorage; int diskIndex = -1;
+            if (disks != null) for (int i = 0; i < disks.Count; i++)
+                if (disks[i] != null && disks[i].files != null && disks[i].files.Contains(file)) { diskIndex = i; break; }
+            if (diskIndex < 0) return false;
+            App prefab;
+            if (!IsAppInstalled("Browser", out prefab) || prefab == null) { ShowRequires("Browser"); return false; }
+            var browser = LaunchApp(prefab, "") as PC.Component.Software.Browser;
+            return browser != null && browser.OpenLocalSite(file, diskIndex);
+        }
+
         public bool OpenFileWith(File file, App app)
         {
             if (file == null || app == null || IsSystemPath(file.path)) return false;
@@ -1910,6 +1927,7 @@ namespace PC.Component.Software.OS
                 return false;
             }
 
+            if (app is PC.Component.Software.Browser && string.Equals(file.Extension(), ".osite", StringComparison.OrdinalIgnoreCase)) return OpenSiteFile(file);
             var opened = LaunchApp(app, file.content ?? "");
             if (app.AppName == "Text Editor")
             {
@@ -1921,6 +1939,8 @@ namespace PC.Component.Software.OS
                 var viewer = opened as PC.Component.Software.Viewer;
                 if (viewer != null) viewer.OpenDocument(file);
             }
+            var siteEditor = opened as PC.Component.Software.SiteEditor;
+            if (siteEditor != null) siteEditor.OpenDocument(file);
             return true;
         }
 

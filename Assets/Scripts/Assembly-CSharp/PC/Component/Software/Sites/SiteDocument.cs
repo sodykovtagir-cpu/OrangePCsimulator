@@ -79,7 +79,7 @@ namespace PC.Component.Software.Sites
         {
             if (format != "orange-site" || version != 1) throw new ArgumentException("Unsupported site format/version");
             Text(title, 120, "Title"); Text(description, 1024, "Description"); Text(keywords, 512, "Keywords");
-            Range(width, 128, 4096); Range(height, 128, 16384); Color(background);
+            Range(width, 128, 4096); Range(height, 128, 16384); ValidateColor(background);
             if (elements == null || elements.Count > MaxElements || assets == null || assets.Count > MaxAssets)
                 throw new ArgumentException("Too many elements/assets");
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -107,9 +107,12 @@ namespace PC.Component.Software.Sites
                 Range(element.width, 1, 4096); Range(element.height, 1, 16384);
                 Range(element.pivotX, 0, 1); Range(element.pivotY, 0, 1); Range(element.fontSize, 6, 256);
                 if (element.font != "default" && element.font != "mono" && element.font != "medium") throw new ArgumentException("Unknown font");
-                Color(element.fill); Color(element.textColor);
+                ValidateColor(element.fill); ValidateColor(element.textColor);
                 if (!string.IsNullOrEmpty(element.image)) ImageAsset(element.image);
-                if (element.kind != "button" && !string.IsNullOrEmpty(element.onClick)) throw new ArgumentException("OnClick belongs to a button");
+                if (element.actions == null) element.actions = new List<SiteAction>(); // legacy v1 files
+                if (element.actions.Count > 32) throw new ArgumentException("Too many button actions");
+                foreach (var action in element.actions) SiteCommands.Validate(action);
+                if (element.kind != "button" && (!string.IsNullOrEmpty(element.onClick) || element.actions.Count > 0)) throw new ArgumentException("OnClick belongs to a button");
             }
             if (!string.IsNullOrEmpty(icon)) ImageAsset(icon);
         }
@@ -145,7 +148,7 @@ namespace PC.Component.Software.Sites
         {
             if (float.IsNaN(n) || float.IsInfinity(n) || n < min || n > max) throw new ArgumentException("Value outside site limits");
         }
-        static void Color(string value)
+        public static void ValidateColor(string value)
         {
             if (value == null || !Regex.IsMatch(value, "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")) throw new ArgumentException("Use #RRGGBB or #RRGGBBAA");
         }
@@ -190,6 +193,7 @@ namespace PC.Component.Software.Sites
         public float x = 100, y = 100, width = 240, height = 48, pivotX = .5f, pivotY = .5f;
         public string fill = "#BEBEBE", textColor = "#000000", image = "", font = "default", onClick = "";
         public int fontSize = 24;
+        public List<SiteAction> actions = new List<SiteAction>();
     }
     [Serializable]
     public sealed class SiteAsset

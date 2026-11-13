@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace PC.Component.Software
 {
-    public class Browser : App
+    public partial class Browser : App
     {
         [Serializable]
         public class WebsiteItem
@@ -83,7 +83,7 @@ namespace PC.Component.Software
         protected override void Start()
         {
             base.Start();
-            ShowHome();
+            if (!localNavigationStarted) ShowHome();
         }
 
         // ================= HOME =================
@@ -320,6 +320,7 @@ namespace PC.Component.Software
             if (addressBar == null) return;
             string query = addressBar.text.Trim();
             if (string.IsNullOrEmpty(query)) return;
+            if (query.StartsWith("file:", StringComparison.OrdinalIgnoreCase)) { OpenLocalAddress(query); return; }
             var url = NormalizeUrl(query);
             // An authored Website prefab wins over the temporary UI when the
             // user later builds their own router/provider pages.
@@ -503,15 +504,17 @@ namespace PC.Component.Software
 
         private void ClearPage()
         {
+            ClearLocalContext();
             CloseAddSiteDialog();
             if (loadingPage != null) loadingPage.SetActive(false);
             if (errorPage != null) errorPage.SetActive(false);
             if (pendingLoad != null) { StopCoroutine(pendingLoad); pendingLoad = null; }
-            if (networkPage != null) { Destroy(networkPage); networkPage = null; }
+            if (networkPage != null) { networkPage.SetActive(false); Destroy(networkPage); networkPage = null; }
             resultsPage.SetActive(false);
 
             if (currentPage != null)
             {
+                currentPage.gameObject.SetActive(false);
                 Destroy(currentPage.gameObject);
                 currentPage = null;
             }

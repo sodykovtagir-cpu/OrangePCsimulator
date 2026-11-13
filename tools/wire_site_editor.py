@@ -9,7 +9,7 @@ from server_assets import ROOT,Prefab,read_guid,meta,ref
 C=ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/Software'
 for folder in [C/'Sites',ROOT/'Assets/Resources/SiteFonts']:
     folder.mkdir(parents=True,exist_ok=True);meta(folder,'DefaultImporter')
-for p in [C/'SiteEditor.cs',*(C/'Sites').glob('*.cs')]:
+for p in [C/'SiteEditor.cs',C/'BrowserSites.cs',*(C/'Sites').glob('*.cs')]:
     path=Path(str(p)+'.meta')
     if not path.exists():
         guid=hashlib.md5(('orange-sites:'+str(p.relative_to(ROOT))).encode()).hexdigest()

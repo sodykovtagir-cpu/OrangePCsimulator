@@ -9,6 +9,7 @@ C=R/'Assets/Scripts/Assembly-CSharp/PC/Component/Software'
 assert 'PcosLuaHost.Bind' not in (C/'Sites/SiteLua.cs').read_text()
 if not(shutil.which('mcs') and shutil.which('mono')):raise SystemExit('Mono/mcs required')
 with tempfile.TemporaryDirectory() as td:
-    exe=Path(td)/'test.exe'
-    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(exe),str(R/'tools/tests/site_core_stubs.cs'),str(R/'tools/tests/site_core_tests.cs'),str(C/'Lua/PcosLua.cs'),*[str(C/'Sites'/n) for n in ['SiteDocument.cs','SiteHistory.cs','SiteLua.cs']]],check=True)
-    subprocess.run(['mono',str(exe)],check=True,timeout=20)
+    for test in ['site_core_tests.cs','site_actions_tests.cs']:
+        exe=Path(td)/'test.exe'
+        subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(exe),str(R/'tools/tests/site_core_stubs.cs'),str(R/'tools/tests'/test),str(C/'Lua/PcosLua.cs'),*[str(C/'Sites'/n) for n in ['SiteDocument.cs','SiteHistory.cs','SiteLua.cs','SiteCommands.cs','SiteLocalAddress.cs']]],check=True)
+        subprocess.run(['mono',str(exe)],check=True,timeout=20)

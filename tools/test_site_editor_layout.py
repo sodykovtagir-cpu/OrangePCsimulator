@@ -22,7 +22,7 @@ for _,d in p.objects(114):
         assert event['m_Target']['fileID']==app
         assert event['m_MethodName'] in methods,event
         clicks.append(event['m_MethodName'])
-for required in ['NewProject','OpenFile','Save','Undo','Redo','TogglePreview','Host','AddButton','AddText','AddImage','SiteSettings','ImportDownload','RemoveAsset','PivotCenter','PivotTopLeft','DeleteElement','ImportIcon','ImportFill','ClearImage','FontDefault','FontMono','FontMedium']:
+for required in ['NewProject','OpenFile','Save','Undo','Redo','TogglePreview','Host','AddButton','AddText','AddImage','SiteSettings','ImportDownload','RemoveAsset','PivotCenter','PivotTopLeft','DeleteElement','ImportIcon','ImportFill','ClearImage','FontDefault','FontMono','FontMedium','ToggleAddMenu','OpenInBrowser','AddAction','UpdateAction','RemoveAction']:
     assert required in clicks,required
 # Controls are authored INSIDE one body/workspace with margins for toolbar/status.
 names={p.data(t['m_GameObject']['fileID'])['m_Name']:(i,t) for i,t in transforms.items()}
@@ -30,12 +30,12 @@ body=names['EditorBody'][1]
 assert body['m_AnchorMin']==dict(x=0,y=0) and body['m_AnchorMax']==dict(x=1,y=1)
 # offset top=-42,bottom=6 => centered position -18, height delta -48.
 assert body['m_SizeDelta']==dict(x=-12,y=-48) and body['m_AnchoredPosition']==dict(x=0,y=-18)
-for panel in ['Toolbar','Workspace','Status','Palette','Inspector','Inspector viewport','Site properties','Element properties','Preview properties','SiteCanvas']:
+for panel in ['Toolbar','Workspace','Status','Hierarchy','Inspector','Inspector viewport','Site properties','Element properties','Preview properties','SiteCanvas']:
     assert panel in names,panel
 assert p.data(v['elementPanel']['fileID'])['m_IsActive']==0
 assert p.data(v['previewPanel']['fileID'])['m_IsActive']==0
 # At least one real viewport Mask for inspector and one for document canvas.
-assert sum(1 for _,d in p.objects(114) if d.get('m_Script',{}).get('guid')=='31a19414c41e5ae4aae2af33fee712f6')==2
+assert sum(1 for _,d in p.objects(114) if d.get('m_Script',{}).get('guid')=='31a19414c41e5ae4aae2af33fee712f6')>=4
 cs=r'''
 using System;using System.Reflection;using PC.Component.Software;using PC.Component.Software.Sites;using UnityEngine;
 class Test {
