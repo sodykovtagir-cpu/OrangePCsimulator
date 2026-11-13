@@ -1,0 +1,26 @@
+fileFormatVersion: 2
+guid: 51f2475459564a506343641b485a1637
+timeCreated: 1753801753
+licenseType: Free
+TrueTypeFontImporter:
+  serializedVersion: 4
+  externalObjects: {}
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Fixedsys Excelsior
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: f81d08ae9d632bb44950f71a970b8d47, type: 3}
+  customCharacters:
+  fontRenderingMode: 0
+  output:
+    hasEmptyFontData: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData:
+  assetBundleName:
+  assetBundleVariant:

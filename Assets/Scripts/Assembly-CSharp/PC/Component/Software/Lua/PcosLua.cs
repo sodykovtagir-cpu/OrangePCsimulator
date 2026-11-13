@@ -254,6 +254,12 @@ namespace PC.Component.Software.Lua
 	public sealed class PcosLua
 	{
 		public const int MaxOps = 250000;
+        // Optional tighter limits for untrusted website handlers. Existing apps
+        // keep their previous operation/string limits.
+        public int OperationLimit = MaxOps;
+        public int StringLimit;
+        public int CallDepthLimit;
+        private int callDepth;
 		public Env Globals { get; private set; }
 		public Action<string> Printer;
 		public int Ops;
@@ -284,7 +290,7 @@ namespace PC.Component.Software.Lua
 		void Tick()
 		{
 			Ops++;
-			if (Ops > MaxOps) throw new PcosLuaException("script ran too long (infinite loop?)");
+			if (Ops > OperationLimit) throw new PcosLuaException("script ran too long (infinite loop?)");
 		}
 
 		void ExecBlock(List<Stmt> block, Env env)
@@ -481,7 +487,13 @@ namespace PC.Component.Software.Lua
 					return LuaValue.Number(a.AsNumber() % divisor);
 				}
 				case "^": return LuaValue.Number(Math.Pow(a.AsNumber(), c.AsNumber()));
-				case "..": return LuaValue.String(a.AsString() + c.AsString());
+				case "..":
+                {
+                    string left = a.AsString(), right = c.AsString();
+                    if (StringLimit > 0 && (long)left.Length + right.Length > StringLimit)
+                        throw new PcosLuaException("string limit exceeded", b.Line);
+                    return LuaValue.String(left + right);
+                }
 				case "==": return LuaValue.Bool(a.Equals(c));
 				case "~=": return LuaValue.Bool(!a.Equals(c));
 				case "<": return LuaValue.Bool(Cmp(a, c) < 0);
@@ -501,6 +513,15 @@ namespace PC.Component.Software.Lua
 
 		public LuaValue Call(LuaValue fn, List<LuaValue> args, int line = 0)
 		{
+            if (CallDepthLimit > 0 && callDepth >= CallDepthLimit)
+                throw new PcosLuaException("call depth limit exceeded", line);
+            callDepth++;
+            try { return CallCore(fn, args, line); }
+            finally { callDepth--; }
+        }
+
+        private LuaValue CallCore(LuaValue fn, List<LuaValue> args, int line)
+        {
 			if (fn.Type != LuaType.Function) throw new PcosLuaException("attempt to call a " + fn.TypeName(), line);
 			var f = fn.Fn;
 			if (f.Native != null) return f.Native(args != null ? args.ToArray() : new LuaValue[0]);
@@ -514,7 +535,7 @@ namespace PC.Component.Software.Lua
 			catch (ReturnSignal r) { return r.Value; }
 			catch (BreakSignal) { throw new PcosLuaException("break outside loop", line); }
 			return LuaValue.Nil;
-		}
+        }
 
 		void InstallStd()
 		{
@@ -752,15 +773,15 @@ namespace PC.Component.Software.Lua
 			}));
 			SetGlobal("string", LuaValue.FromTable(str));
 
-			var tbl = new LuaTable();
-			tbl.Set(LuaValue.String("insert"), Native(a =>
+			var tableLibrary = new LuaTable();
+			tableLibrary.Set(LuaValue.String("insert"), Native(a =>
 			{
 				if (a.Length < 2 || a[0].Type != LuaType.Table) return LuaValue.Nil;
 				var t = a[0].Table;
 				t.Set(LuaValue.Number(t.Length() + 1), a[1]);
 				return LuaValue.Nil;
 			}));
-			tbl.Set(LuaValue.String("concat"), Native(a =>
+			tableLibrary.Set(LuaValue.String("concat"), Native(a =>
 			{
 				if (a.Length == 0 || a[0].Type != LuaType.Table) return LuaValue.String("");
 				var sep = a.Length > 1 ? a[1].AsString() : "";
@@ -774,7 +795,7 @@ namespace PC.Component.Software.Lua
 				}
 				return LuaValue.String(sb.ToString());
 			}));
-			tbl.Set(LuaValue.String("remove"), Native(a =>
+			tableLibrary.Set(LuaValue.String("remove"), Native(a =>
 			{
 				if (a.Length == 0 || a[0].Type != LuaType.Table) return LuaValue.Nil;
 				var t = a[0].Table;
@@ -790,7 +811,7 @@ namespace PC.Component.Software.Lua
 				t.Set(LuaValue.Number(n), LuaValue.Nil); // удаляем последний
 				return removed;
 			}));
-			tbl.Set(LuaValue.String("sort"), Native(a =>
+			tableLibrary.Set(LuaValue.String("sort"), Native(a =>
 			{
 				if (a.Length == 0 || a[0].Type != LuaType.Table) return LuaValue.Nil;
 				var t = a[0].Table;
@@ -821,7 +842,7 @@ namespace PC.Component.Software.Lua
 				for (int i = 0; i < n; i++) t.Set(LuaValue.Number(i + 1), arr[i]);
 				return LuaValue.Nil;
 			}));
-			SetGlobal("table", LuaValue.FromTable(tbl));
+			SetGlobal("table", LuaValue.FromTable(tableLibrary));
 		}
 
 		static double Num(LuaValue[] a, int i) { return i < a.Length ? a[i].AsNumber() : 0; }
