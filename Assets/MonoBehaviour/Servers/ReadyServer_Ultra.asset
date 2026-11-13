@@ -12,11 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 484ef020c3930db604de1872bd7b83d7, type: 3}
   m_Name: ReadyServer_Ultra
   m_EditorClassIdentifier: 
-  itemName: 'Orange Rack Ultra'
+  itemName: Orange Rack Ultra
   price: 22620
   bitcoin: 0
-  sprite: {fileID: 21300000, guid: 1937f011a2e1fc6d8ec04467c6d76f94, type: 3}
+  sprite: {fileID: 21300000, guid: 2e34ecd8ab6c16645a91f8f140fa8ca7, type: 3}
   spawn: {fileID: 3972074780588851196, guid: 94f5088a0fba07c1406a743856bf3f10, type: 3}
   large: 1
   translateDescription: 0
-  description: '2x RMD Ryzen Threadripper PRO 5995WX / 14x 64 GB (896 GB) / 4x HDD 20TB / 2000 W / PCOS'
+  description: 2x RMD Ryzen Threadripper PRO 5995WX / 14x 64 GB (896 GB) / 4x HDD
+    20TB / 2000 W / PCOS
