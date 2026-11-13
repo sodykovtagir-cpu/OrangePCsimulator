@@ -747,6 +747,10 @@ public class SaveManager : MonoBehaviour
         RenderTexture rt = null;
         Texture2D tex = null;
         var prev = cam.targetTexture;
+        // Camera.Render and ReadPixels use the global active render target.
+        // It may already belong to a monitor/app; capture must not replace
+        // that caller-owned target with the backbuffer, including on failure.
+        var previousActive = RenderTexture.active;
         try
         {
             rt = new RenderTexture(128, 128, 24);
@@ -764,9 +768,15 @@ public class SaveManager : MonoBehaviour
         }
         finally
         {
-            cam.targetTexture = prev;
-            RenderTexture.active = null;
-            if (rt != null) Destroy(rt);
+            if (cam != null) cam.targetTexture = prev;
+            RenderTexture.active = previousActive;
+            // Detach both camera/global references before freeing the owned
+            // GPU buffer. Never release a monitor's or another app's target.
+            if (rt != null)
+            {
+                rt.Release();
+                Destroy(rt);
+            }
             if (tex != null) Destroy(tex);
         }
     }
