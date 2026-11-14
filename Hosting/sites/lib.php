@@ -46,5 +46,32 @@ function site_write($file,$data){$raw=SITE_PREFIX.base64_encode(json_encode($dat
 function site_bill(&$s,$now){if(empty($s['active']))return;$n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));$s['total']+=$n*SITE_PRICE;$s['billed_at']+=$n*SITE_PERIOD;}
 function site_online(&$s,$now){$active=[];foreach($s['sessions']??[]as $key=>$row)if($row['at']>$now-90)$active[$key]=$row;$s['sessions']=$active;return count($active);}
 function site_custom_paid($s){return array_key_exists('custom_paid',$s)?(bool)$s['custom_paid']:$s['url']!=='s'.$s['id'].'.sites.pcos';}
-function site_public(&$s,$now){$online=site_online($s,$now);return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],'visits'=>$s['visits'],'online'=>$online,'active'=>(bool)$s['active'],'total'=>$s['total'],'custom_paid'=>site_custom_paid($s),'next_bill'=>$s['active']?$s['billed_at']+SITE_PERIOD:0,'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision']];}
+function site_public(&$s,$now){$online=site_online($s,$now);return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],'visits'=>$s['visits'],'online'=>$online,'active'=>(bool)$s['active'],'total'=>$s['total'],'unpaid'=>!empty($s['unpaid']),'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'','cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,'custom_paid'=>site_custom_paid($s),'next_bill'=>$s['active']&&empty($s['unpaid'])&&empty($s['banned'])?$s['billed_at']+SITE_PERIOD:0,'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision']];}
 function site_user($token,$usersFile){if(!is_string($token)||strlen($token)<32||strlen($token)>256)site_fail('Login required',401);$raw=@file_get_contents($usersFile);$users=json_decode($raw?:'[]',true);foreach(is_array($users)?$users:[]as $u)if(!empty($u['token'])&&hash_equals((string)$u['token'],$token)&&!empty($u['verified']))return (string)$u['id'];site_fail('Session expired',401);}
+
+function site_wallet_key($owner,$world){return $owner.':'.$world;}
+function site_suspend(&$s){if(empty($s['unpaid'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];}$s['unpaid']=true;}
+function site_reconcile(&$db,$now){
+ $totals=[];foreach($db['sites']as $s){$key=site_wallet_key($s['owner'],$s['world']);$totals[$key]=($totals[$key]??0)+$s['total'];}
+ foreach($db['sites']as &$s){if(empty($s['active'])||!empty($s['banned']))continue;$key=site_wallet_key($s['owner'],$s['world']);$ceiling=$db['wallets'][$key]['ceiling']??null;
+  if(!empty($s['unpaid'])){if($ceiling!==null&&$ceiling-$totals[$key]>=SITE_PRICE){$s['unpaid']=false;$s['total']+=SITE_PRICE;$totals[$key]+=SITE_PRICE;$s['billed_at']=$now;}continue;}
+  $n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));if(!$n)continue;
+  $paid=$ceiling===null?$n:min($n,max(0,intdiv((int)max(0,$ceiling-$totals[$key]),SITE_PRICE)));
+  $s['total']+=$paid*SITE_PRICE;$totals[$key]+=$paid*SITE_PRICE;$s['billed_at']+=$paid*SITE_PERIOD;
+  if($paid<$n)site_suspend($s);
+ }unset($s);
+}
+function site_snapshot(&$db,$owner,$world,$balance,$settled){
+ if(!is_scalar($balance)||!is_scalar($settled)||!ctype_digit((string)$balance)||!ctype_digit((string)$settled))site_fail('Invalid balance snapshot');
+ $total=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$total+=$s['total'];
+ if((float)$balance>9999999||(float)$settled>$total)site_fail('Invalid settled bill');
+ $db['wallets'][site_wallet_key($owner,$world)]=['ceiling'=>(int)$balance+(int)$settled];
+}
+function site_available_funds($db,$owner,$world){$key=site_wallet_key($owner,$world);if(!isset($db['wallets'][$key]))return PHP_INT_MAX;$total=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$total+=$s['total'];return max(0,$db['wallets'][$key]['ceiling']-$total);}
+function site_icon_data($doc){
+ foreach($doc['assets']??[]as $a)if(($a['name']??'')===($doc['icon']??'')){
+  $raw=base64_decode($a['data'],true);if(!$raw)return ['',''];$size=@getimagesizefromstring($raw);if(!$size)return ['',''];
+  if(function_exists('imagecreatefromstring')){$src=@imagecreatefromstring($raw);if($src){$w=max(1,(int)round($size[0]*min(1,96/$size[0],96/$size[1])));$h=max(1,(int)round($size[1]*min(1,96/$size[0],96/$size[1])));$dst=imagecreatetruecolor($w,$h);imagealphablending($dst,false);imagesavealpha($dst,true);imagecopyresampled($dst,$src,0,0,0,0,$w,$h,$size[0],$size[1]);ob_start();imagepng($dst);$png=ob_get_clean();imagedestroy($dst);imagedestroy($src);if(strlen($png)<=65536)return [base64_encode($png),'image/png'];}}
+  if(strlen($raw)<=65536&&$size[0]<=256&&$size[1]<=256)return [$a['data'],$a['media']];return ['',''];
+ }return ['',''];
+}

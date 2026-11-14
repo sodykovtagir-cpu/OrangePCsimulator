@@ -413,6 +413,7 @@ namespace PC.Component.Software.OS
             if (stressTest) { cpuDemand = capacity; gpuDemand = 1f; }
             float cpuTarget = Mathf.Clamp01(cpuDemand / capacity);
             CpuLoad = cpuBenchmark ? 1f : Mathf.MoveTowards(CpuLoad, cpuTarget, .075f);
+            if(PC.Component.Software.Sites.SiteHostingService.Instance!=null){int plan=PC.Component.Networking.InternetService.Instance!=null?PC.Component.Networking.InternetService.Instance.Plan:0;PC.Component.Software.Sites.SiteHostingService.Instance.ReportHost(Board.Id,capacity,CpuLoad,plan==3?75f:plan==2?5f:.45f);}
             GpuLoad = Mathf.Clamp01(gpuDemand);
             RamTotalMb = 0;
             var rams = Board.GetHardwares(HardwareType.RAM);

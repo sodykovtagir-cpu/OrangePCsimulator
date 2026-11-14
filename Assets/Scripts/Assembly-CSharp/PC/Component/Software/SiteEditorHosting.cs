@@ -37,10 +37,10 @@ namespace PC.Component.Software
    hostedIds.Clear();var options=new List<string>();var text=new System.Text.StringBuilder(service.Status).Append("\n\n");
    foreach(var site in service.Items)
    {
-    hostedIds.Add(site.id);options.Add(site.url+(site.active?" — работает":" — остановлен"));
-    text.Append(site.url).Append(site.active?" — работает":" — остановлен").Append("\nПосещения: ").Append(site.visits).Append(" | Онлайн: ").Append(site.online).Append(" | ПК: ").Append(site.host).Append("\nНачислено: $").Append(site.total);
+    hostedIds.Add(site.id);options.Add(site.url+(site.banned?" — заблокирован":site.unpaid?" — хост не оплачен":site.active?" — работает":" — остановлен"));
+    text.Append(site.url).Append(site.banned?" — заблокирован":site.unpaid?" — хост не оплачен":site.active?" — работает":" — остановлен").Append("\nПосещения: ").Append(site.visits).Append(" | Онлайн: ").Append(site.online).Append(" | ПК: ").Append(site.host).Append("\nНачислено: $").Append(site.total);
     if(site.active&&site.next_bill>0)text.Append(" | Следующее (UTC): ").Append(DateTimeOffset.FromUnixTimeSeconds(site.next_bill).UtcDateTime.ToString("yyyy-MM-dd HH:mm"));
-    else text.Append(" | Аренда остановлена");
+    else text.Append(site.unpaid?" | Ожидается оплата":site.banned?" | Заблокирован: "+site.ban_reason:" | Аренда остановлена");
     text.Append("\n\n");
    }
    hostURL.interactable=!stopPending;

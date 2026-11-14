@@ -94,6 +94,12 @@ namespace PC.Component.Software
         void DownloadSiteAsset(SiteAsset asset)
         {
             if (siteNavigationClosed || system == null || !system.Ready || system.SaveDialog == null || localDocument == null || localDocument.Asset(asset.name) != asset) return;
+            if(downloadHost!=null){StartCoroutine(DownloadHostedAsset(asset,downloadHost,localGeneration));return;}
+            SaveSiteAsset(asset);
+        }
+        void SaveSiteAsset(SiteAsset asset)
+        {
+            if(siteNavigationClosed||localDocument==null||localDocument.Asset(asset.name)!=asset)return;
             try
             {
                 string content = asset.media.StartsWith("image/", StringComparison.Ordinal) ? asset.data : new UTF8Encoding(false, true).GetString(asset.Bytes());

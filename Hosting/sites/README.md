@@ -42,3 +42,25 @@ Do not use a real account to seed public test publications automatically.
 Run `python tools/test_site_backend.py` from the repository root. It executes
 real PHP against temporary data and synthetic account fixtures; no network.
 Never upload its generated fixture data (it is automatically removed).
+
+Followup protocol: `info` supplies public metadata and a bounded thumbnail;
+`transfer` requires the current signed visit ticket plus a root filename and
+returns host telemetry after checking publication/ban/payment state. Nothing
+executes uploaded HTML/Lua on the web host. GD thumbnails are optional; safe
+small originals work without it. All icon data stays under the normal package
+validation and image limits.
+
+Authenticated stats/publish requests can include a nonnegative `balance` and
+`settled` (or the save's `ledgers` for initial account resolution). The verified
+owner/world key stores one shared expenditure ceiling, not one balance per
+site. Exhaustion suspends service at the next unpaid period, without growing
+unpaid debt. A sufficient new snapshot resumes with a new prepaid period.
+Existing pre-snapshot bills remain payable. This trusts the local game save;
+it is not an anti-cheat bank or visibility into offline edits to that file.
+
+Deploy `server/sites_admin.php` beside the existing workshop `admin.php`, and
+merge the new Sites tab/CSRF-gated actions into that existing page. Never
+replace admin_config.json, users.json, account.php or account sessions/config.
+Moderation uses the same storage lock as the API. Banned publications are
+stopped, their tickets revoked; unbanning does not auto-start rent. Direct
+requests to sites_admin.php have no independent authority and return 404.

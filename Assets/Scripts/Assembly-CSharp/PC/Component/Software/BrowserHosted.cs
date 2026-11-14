@@ -19,7 +19,7 @@ namespace PC.Component.Software
    SiteHostingService.Request("list",new Dictionary<string,string>{{"query",query}},(reply,error)=>{
     if(this==null||generation!=localGeneration||siteNavigationClosed)return;
     customResultsBusy=false;ClearCustomRows();if(error!=null||reply.items==null)return;
-    foreach(var site in reply.items){if(!site.active)continue;var copy=site;var row=Instantiate(oggleResultPrefab,resultsContainer);customRows.Add(row);var item=row.GetComponent<OggleResultItem>();item.title.text=site.url;item.description.text=site.title+" — "+site.description;row.GetComponent<Button>().onClick.AddListener(()=>{addressBar.text=copy.url;Search();});}
+    foreach(var site in reply.items){if(!site.active)continue;var copy=site;var row=Instantiate(oggleResultPrefab,resultsContainer);customRows.Add(row);var item=row.GetComponent<OggleResultItem>();item.title.text=string.IsNullOrWhiteSpace(site.title)?site.url:site.title;item.description.text=site.url+" — "+site.description;item.SetIcon(HostedIcon(site));row.GetComponent<Button>().onClick.AddListener(()=>{addressBar.text=copy.url;Search();});}
    });
   }
   void CustomOrResults(string query,string url)
@@ -29,6 +29,9 @@ namespace PC.Component.Software
    SiteHostingService.Request("view",new Dictionary<string,string>{{"url",url}},(reply,error)=>{
     if(this==null||generation!=localGeneration||siteNavigationClosed)return;
     if(error!=null){ShowResults(query.ToLowerInvariant());return;}
+    if(reply.item.banned){ShowError("Сайт заблокирован администрацией: "+reply.item.ban_reason);return;}
+    if(reply.item.unpaid){ShowError("Хост не оплачен. Владелец должен пополнить баланс.");return;}
+    downloadHost=reply.item;HostedIcon(reply.item);
     SiteDocument root=null;string route="/";
     try{root=SiteDocument.Parse(reply.document);int slash=url.IndexOf('/');if(slash>=0)route=url.Substring(slash);if(!SitePages.SafeRoute(route))throw new ArgumentException("Invalid page path");SitePages.At(root,route);}
     catch(Exception ex){ShowError(ex.Message);return;}
@@ -45,7 +48,7 @@ namespace PC.Component.Software
    canvas.Message=message=>system?.ShowMessageBox("Website",message);canvas.Download=DownloadSiteAsset;
    canvas.Redirect=destination=>DeferLocalNavigation(()=>{if(destination.StartsWith("/",StringComparison.Ordinal))RenderHosted(root,destination,item,remoteTicket);else{addressBar.text=destination;Search();}});
    canvas.OpenFile=asset=>DeferLocalNavigation(()=>{keepRemote=true;try{ShowBundledFile(page,0,"",asset,item.url+"/");}finally{keepRemote=false;}});
-   canvas.Render(page,false);RememberSite(item.url);Heartbeat();
+   canvas.Render(page,false);downloadHost=item;RememberSite(url);Heartbeat();
   }
   static readonly Dictionary<int,Browser> viewportOwners=new Dictionary<int,Browser>();
   public static Vector2 WorkingViewport(int host)
@@ -61,6 +64,7 @@ namespace PC.Component.Software
    if(remoteId!=0)
    {
     var service=SiteHostingService.Instance;var known=service!=null&&service.Available?service.Items.Find(site=>site.id==remoteId):null;
+    if(known!=null&&(known.unpaid||known.banned)){ShowError(known.banned?"Сайт заблокирован администрацией":"Хост не оплачен");return;}
     if(known!=null&&!known.active){ShowError("Владелец остановил сайт");return;}
     if(known!=null&&known.url!=null&&remoteURL!=known.url){ShowError("Домен сайта изменён на "+known.url);return;}
     if(Time.unscaledTime>=remoteBeat&&!remoteBusy)Heartbeat();
@@ -75,7 +79,7 @@ namespace PC.Component.Software
    int generation=localGeneration,id=remoteId;remoteBusy=true;remoteBeat=Time.unscaledTime+20;
    SiteHostingService.Request("visit",new Dictionary<string,string>{{"id",id.ToString()},{"ticket",remoteTicket},{"session",remoteSession}},(reply,error)=>{
     if(this==null||generation!=localGeneration||id!=remoteId)return;remoteBusy=false;
-    if(error!=null){ShowError("Сайт недоступен: "+error);return;}remoteTicket=reply.ticket;
+    if(error!=null){ShowError("Сайт недоступен: "+error);return;}downloadHost=reply.item;remoteTicket=reply.ticket;
    });
   }
   void ClearCustomContext()
@@ -83,7 +87,7 @@ namespace PC.Component.Software
    ClearCustomRows();customResultsBusy=false;
    if(keepRemote){remoteBusy=false;remoteBeat=Time.unscaledTime+1;return;}
    if(remoteId!=0){int id=remoteId;SiteHostingService.Request("leave",new Dictionary<string,string>{{"id",id.ToString()},{"session",remoteSession}},(r,e)=>{});}
-   remoteId=0;remoteURL="";remoteTicket="";remoteBusy=false;
+   downloadHost=null;remoteId=0;remoteURL="";remoteTicket="";remoteBusy=false;
   }
  }
 }

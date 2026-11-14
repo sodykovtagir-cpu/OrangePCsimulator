@@ -61,6 +61,6 @@ class Test {
 '''
 with tempfile.TemporaryDirectory() as td:
     path=Path(td);(path/'test.cs').write_text(cs)
-    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'SiteEditorPages.cs'),str(C/'SiteEditorHosting.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(C/'BrowserHosted.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
+    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),str(ROOT/'Assets/Scripts/Assembly-CSharp/OggleResultItem.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'SiteEditorPages.cs'),str(C/'SiteEditorHosting.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(C/'BrowserHosted.cs'),str(C/'BrowserSiteAssets.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
     subprocess.run(['mono',str(path/'test.exe')],check=True)
 print('PASS: serialized inspector inputs, buttons/events, panel hierarchy/margins, clipping masks and exclusive inspector panels')

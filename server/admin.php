@@ -71,6 +71,7 @@ if (!is_file(CONFIG_FILE)) {
 }
 $cfg = load_json(CONFIG_FILE, ['hash' => '']);
 
+require_once __DIR__.'/sites_admin.php';
 $msg = '';
 $msgType = 'ok';
 
@@ -92,7 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     elseif (is_admin() && csrf_ok()) {
 
-        if ($act === 'game_admin_set') {
+        if ($act === 'site_ban' || $act === 'site_unban') {
+            try { hosted_admin_ban((int)($_POST['site_id']??0),$act==='site_ban',clean($_POST['reason']??'',240));$msg=$act==='site_ban'?'Сайт заблокирован':'Сайт разблокирован (остановлен до публикации владельцем)'; }
+            catch(Throwable $e){$msg='Не удалось изменить состояние сайта';$msgType='err';}
+        }
+        elseif ($act === 'game_admin_set') {
             $id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
             $enabled = isset($_POST['enabled']) && $_POST['enabled'] === '1';
             if (game_set_admin($id, $enabled)) {
@@ -545,6 +550,7 @@ $defaultPass = empty($cfg['changed']);
       $tabs = [
         'dashboard' => ['Обзор', null],
         'saves'     => ['Сейвы', count($items)],
+        'sites'     => ['Сайты игроков', null],
         'accounts'  => ['Аккаунты', count($users)],
         'banned'    => ['Баны', count($bans)],
         'releases'  => ['Релизы', count($releases)],
@@ -665,6 +671,8 @@ $defaultPass = empty($cfg['changed']);
         <?php endif; ?>
       </div>
 
+    <?php elseif ($tab === 'sites'): ?>
+      <?php hosted_admin_render($csrf); ?>
     <?php elseif ($tab === 'accounts'): ?>
       <div class="card">
         <h2>Игроки</h2>

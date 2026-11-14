@@ -26,6 +26,15 @@ namespace PC.Component.Software.Sites
    p.title=doc.title;p.width=doc.width;p.height=doc.height;p.background=doc.background;p.backgroundImage=doc.backgroundImage;p.viewportMode=doc.viewportMode;p.elements=doc.elements;
    root.assets=doc.assets;root.icon=doc.icon;root.description=doc.description;root.keywords=doc.keywords;
   }
+  public static void Rename(SiteDocument root,string oldPath,string newPath)
+  {
+   if(oldPath=="/"||newPath=="/"||!SafeRoute(newPath))throw new ArgumentException("Главная страница остаётся /; используйте путь вроде /about");
+   var page=root.pages.Find(p=>p.path==oldPath);if(page==null)throw new ArgumentException("Страница не найдена");
+   if(root.pages.Exists(p=>p.path==newPath&&p!=page))throw new ArgumentException("Такой путь уже занят");
+   page.path=newPath;var docs=new List<SiteDocument>{root};foreach(var p in root.pages)docs.Add(Document(root,p));
+   foreach(var doc in docs)foreach(var e in doc.elements){foreach(var action in e.actions)if((action.command=="GoToPage"||action.command=="RedirectURL")&&action.arguments.Count==1&&action.arguments[0]==oldPath)action.arguments[0]=newPath;
+    e.onClick=Regex.Replace(e.onClick??"",@"\b(GoToPage|RedirectURL)\(\s*([""'])"+Regex.Escape(oldPath)+@"\2\s*\)",m=>m.Groups[1].Value+"("+SiteCommands.Quote(newPath)+")");}
+  }
   public static void MoveLayer(SiteDocument doc,string id,int delta)
   {
    int index=doc.elements.FindIndex(e=>e.id==id);if(index<0)return;int next=Math.Max(0,Math.Min(doc.elements.Count-1,index+delta));

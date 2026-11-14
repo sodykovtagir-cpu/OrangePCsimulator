@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace PC.Component.Software.Sites
 {
- [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision;public bool active,custom_paid;public long total,next_bill;public string url,title,description,publication_key;}
+ [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision;public bool active,custom_paid,unpaid,banned;public float cpu_capacity=1000,cpu_load,host_mbps=5;public long total,next_bill;public string url,title,description,publication_key,icon_data,icon_media,ban_reason;}
  [Serializable] public sealed class SiteReply {public bool ok,available;public string service,error,document,ticket,owner;public int version,price,period,custom_price,charged;public long total,now;public HostedSite item;public List<HostedSite> items;}
  [Serializable] public sealed class SiteHostingLedger {public string owner;public long charged;}
  public sealed class SiteHostingService:MonoBehaviour
@@ -31,8 +31,23 @@ namespace PC.Component.Software.Sites
     done(error==null?result:null,error);
    });
   }
-  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;StateRevision++;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
+  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;lastOwner="";hosts.Clear();StateRevision++;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
   public float Demand(int host){float value;return Available&&Time.unscaledTime-lastStats<45&&demand.TryGetValue(host,out value)?value:0;}
+  readonly Dictionary<int,SiteHostProfile> hosts=new Dictionary<int,SiteHostProfile>();
+  [Serializable] public sealed class SiteHostProfile {public int host;public float cpu_capacity,cpu_load,host_mbps;}
+  [Serializable] sealed class HostProfiles {public List<SiteHostProfile> items;}
+  public void ReportHost(int host,float capacity,float load,float mbps){hosts[host]=new SiteHostProfile{host=host,cpu_capacity=capacity,cpu_load=load,host_mbps=mbps};}
+  Dictionary<string,string> Funds(Dictionary<string,string> values)
+  {
+   var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   if(game!=null&&Main.Instance!=null){long settled=0;var ledger=game.siteHostingLedger;if(ledger!=null)foreach(var row in ledger)if(row.owner==lastOwner)settled=row.charged;
+    values["balance"]=Math.Max(0,Main.Instance.Money).ToString();
+    values["ledgers"]=JsonUtility.ToJson(new LedgerSnapshot{items=ledger??new List<SiteHostingLedger>()});
+    if(!string.IsNullOrEmpty(lastOwner))values["settled"]=settled.ToString();}
+   values["hosts"]=JsonUtility.ToJson(new HostProfiles{items=new List<SiteHostProfile>(hosts.Values)});return values;
+  }
+  [Serializable] sealed class LedgerSnapshot {public List<SiteHostingLedger> items;}
+  string lastOwner="";
   public void Refresh(Action completed)
   {
    if(completed!=null)refreshWaiters.Add(completed);
@@ -42,20 +57,20 @@ namespace PC.Component.Software.Sites
    string token=ServerAccounts.Token,world=World;
    if(string.IsNullOrEmpty(world)||!ServerAccounts.LoggedIn){Status="Войди в аккаунт игры";Complete();return;}
    busy=true;nextPoll=Time.unscaledTime+20;
-   Request("stats",new Dictionary<string,string>{{"world",world}},(reply,error)=>{
+   Request("stats",Funds(new Dictionary<string,string>{{"world",world}}),(reply,error)=>{
     if(token==ServerAccounts.Token&&world==World)Apply(reply,error);
     Complete();
    });
   }
   void Apply(SiteReply reply,string error)
   {
-   StateRevision++;ApplyCore(reply,error);
+   if(error==null&&reply!=null)lastOwner=reply.owner;StateRevision++;ApplyCore(reply,error);
   }
   void ApplyCore(SiteReply reply,string error)
   {
    if(error!=null){Available=false;Items.Clear();demand.Clear();Status=error;return;}
    Available=true;Items=reply.items??new List<HostedSite>();demand.Clear();var counts=new Dictionary<int,int>();var online=new Dictionary<int,int>();
-   foreach(var site in Items)if(site.active){if(!counts.ContainsKey(site.host)){counts[site.host]=0;online[site.host]=0;}counts[site.host]+=site.visits;online[site.host]+=site.online;if(!demand.ContainsKey(site.host))demand[site.host]=0;demand[site.host]+=20;}
+   foreach(var site in Items)if(site.active&&!site.unpaid&&!site.banned){if(!counts.ContainsKey(site.host)){counts[site.host]=0;online[site.host]=0;}counts[site.host]+=site.visits;online[site.host]+=site.online;if(!demand.ContainsKey(site.host))demand[site.host]=0;demand[site.host]+=20;}
    foreach(var pair in counts){int before;visits.TryGetValue(pair.Key,out before);float rate=lastStats>0?Mathf.Max(0,pair.Value-before)*60/Mathf.Max(1,Time.unscaledTime-lastStats):0;demand[pair.Key]+=online[pair.Key]*35+rate*4;visits[pair.Key]=pair.Value;}
    lastStats=Time.unscaledTime;Status="Подключено. $100 / 30 реальных минут. Начислено: $"+reply.total;
    var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;if(game==null||Main.Instance==null)return;
@@ -73,7 +88,7 @@ namespace PC.Component.Software.Sites
    int estimate;try{estimate=PublicationCost(existing,url);}catch(ArgumentException ex){done(ex.Message);return;}
    if(Main.Instance==null||Main.Instance.Money<estimate){done("Для публикации нужно $"+estimate+". Аренда $100 / 30 минут; собственный домен +$1000 только при первом подключении.");return;}
    if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){done("Сначала сохрани игру");return;}
-   busy=true;Request("publish",new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}},(reply,error)=>{
+   busy=true;Request("publish",Funds(new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}}),(reply,error)=>{
     if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
     if(error!=null){Complete();Refresh(()=>{if(token==ServerAccounts.Token&&world==World){Status=error;StateRevision++;done(error);}});return;}
     Apply(reply,null);Complete(()=>done("Опубликовано: "+reply.item.url+". "+Status));
@@ -83,7 +98,7 @@ namespace PC.Component.Software.Sites
   {
    string url=string.IsNullOrWhiteSpace(requested)?(existing!=null?existing.url:""):SiteDocument.NormalizeUrl(requested);
    bool custom=!string.IsNullOrEmpty(url)&&(existing==null||url!="s"+existing.id+".sites.pcos");
-   return (existing!=null&&existing.active?0:100)+(custom&&(existing==null||!existing.custom_paid)?1000:0);
+   return (existing!=null&&existing.active&&!existing.unpaid?0:100)+(custom&&(existing==null||!existing.custom_paid)?1000:0);
   }
   public void Stop(int id,Action<string> done)
   {
@@ -91,7 +106,7 @@ namespace PC.Component.Software.Sites
    string token=ServerAccounts.Token,world=World;
    Action stop=()=>{
     if(token!=ServerAccounts.Token||world!=World||!ServerAccounts.LoggedIn){done("Аккаунт или сохранение изменились; остановка отменена");if(!busy&&pendingStops.Count>0)pendingStops.Dequeue()();return;}
-    busy=true;Request("stop",new Dictionary<string,string>{{"world",world},{"id",id.ToString()}},(reply,error)=>{
+    busy=true;Request("stop",Funds(new Dictionary<string,string>{{"world",world},{"id",id.ToString()}}),(reply,error)=>{
      if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
      Apply(reply,error);
      if(error==null){var stopped=Items.Find(site=>site.id==id);Status=stopped!=null&&!stopped.active?"Сайт "+stopped.url+" остановлен. Он недоступен посетителям; новых начислений не будет.":"Сервер не подтвердил остановку сайта. Обнови статистику.";}

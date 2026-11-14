@@ -87,7 +87,7 @@ namespace PC.Component
 			}
 			else
 			{
-				temperature -= (temperature - ambient) * 2.5f * dt;
+				temperature = CpuThermals.PassiveStep(temperature,ambient,Power&&!Damaged,dt);
 			}
 
             if (!Power) { Workload = 0f; ThermalThrottleRatio = 1f; }
@@ -104,7 +104,8 @@ namespace PC.Component
 			var t = transform;
 			var origin = t.position;
 
-			if (TryGetCooler(t, out found))
+			found=t.GetComponentInChildren<ICooler>();
+            if (found!=null)
 				return true;
 
 			var ray = new Ray(origin, t.up);
@@ -135,8 +136,7 @@ namespace PC.Component
 				return true;
 			found = tr.GetComponentInParent<ICooler>();
 			if (found != null) return true;
-			found = tr.GetComponentInChildren<ICooler>();
-			return found != null;
+            return false; // Do not find an unrelated cooler elsewhere in a case/board subtree.
 		}
 
 		public void OverHeat()

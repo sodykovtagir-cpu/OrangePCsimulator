@@ -199,7 +199,7 @@ namespace PC.Component.Software
                 var row = Instantiate(historyItemPrefab, historyContent);
                 row.name = "History: " + url;
                 var label = row.GetComponentInChildren<Text>();
-                if (label != null) label.text = url;
+                if (label != null) {label.supportRichText=false;label.text = url;}
                 var icon = row.transform.Find("Image");
                 if (icon != null)
                 {
@@ -215,7 +215,7 @@ namespace PC.Component.Software
                 button.targetGraphic = row.GetComponent<Image>();
                 var capturedUrl = url;
                 button.onClick.AddListener(() => OpenRecentSite(capturedUrl));
-                historyItems.Add(row);
+                historyItems.Add(row);LoadHistoryMetadata(url,row,label);
             }
         }
 
@@ -226,6 +226,7 @@ namespace PC.Component.Software
                     if (site != null && site.page != null &&
                         NormalizeUrl(site.url) == NormalizeUrl(url) && site.page.icon != null)
                         return site.page.icon;
+            Sprite custom;if(hostedIcons.TryGetValue(SiteDomain(url),out custom))return custom;
             return fallbackSiteIcon;
         }
 
@@ -261,15 +262,8 @@ namespace PC.Component.Software
 
         private void OpenRecentSite(string url)
         {
-            var normalized = NormalizeUrl(url);
-            if (websites != null)
-                foreach (var site in websites)
-                    if (site != null && site.page != null &&
-                        NormalizeUrl(site.url) == normalized)
-                    { OpenSite(site); return; }
-            if (RouterWebPages.IsLocalAddress(normalized))
-            { ShowNetworkPage(normalized); return; }
-            ShowError("Сайт " + normalized + " пока недоступен в Oggle");
+            if(addressBar==null)return;
+            addressBar.SetTextWithoutNotify(url);Search();
         }
 
         public void CloseAddSiteDialog()
@@ -451,7 +445,8 @@ namespace PC.Component.Software
                     var result = Instantiate(oggleResultPrefab, resultsContainer);
 
                     var item = result.GetComponent<OggleResultItem>();
-                    item.title.text = site.url;
+                    item.title.text = string.IsNullOrWhiteSpace(site.page.websiteName)?site.url:site.page.websiteName;
+                    item.SetIcon(site.page.icon!=null?site.page.icon:fallbackSiteIcon);
                     item.description.text = site.description;
 
                     result.GetComponent<Button>().onClick.AddListener(() =>

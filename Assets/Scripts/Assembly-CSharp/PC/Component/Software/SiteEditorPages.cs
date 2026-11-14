@@ -29,7 +29,7 @@ namespace PC.Component.Software
     string route=routes[i];var row=Instantiate(rowTemplate,pageTabs);row.gameObject.SetActive(true);var r=(RectTransform)row.transform;
     r.anchorMin=r.anchorMax=new Vector2(0,1);r.pivot=new Vector2(0,1);r.anchoredPosition=new Vector2(i*112,0);r.sizeDelta=new Vector2(108,28);
     row.GetComponentInChildren<Text>().text=route;row.GetComponent<Image>().color=route==pageRoute?new Color(1,.72f,.35f):new Color(.83f,.83f,.83f);
-    row.onClick.AddListener(()=>{editEpoch++;pageRoute=route;selected="";selectedAction=-1;inspector.anchoredPosition=Vector2.zero;Redraw();});
+    row.onClick.AddListener(()=>{pagePath.SetTextWithoutNotify(route);editEpoch++;pageRoute=route;selected="";selectedAction=-1;inspector.anchoredPosition=Vector2.zero;Redraw();});
    }
    pageTabs.sizeDelta=new Vector2(routes.Count*112,28);
   }
@@ -40,6 +40,11 @@ namespace PC.Component.Software
     var fresh=NewPageDocument();project.Change(d=>{if(d.pages.Exists(p=>p.path==route))throw new ArgumentException("Такая страница уже есть");d.pages.Add(new SitePage{path=route,title=route.Substring(1),width=fresh.width,height=fresh.height});});
     editEpoch++;pageRoute=route;selected="";Redraw();
    }catch(Exception ex){Report(ex.Message);}
+  }
+  public void RenamePage()
+  {
+   string path=(pagePath.text??"").Trim().ToLowerInvariant();if(!path.StartsWith("/"))path="/"+path;
+   try{project.Change(root=>SitePages.Rename(root,pageRoute,path));editEpoch++;pageRoute=path;Redraw();Report("Путь страницы изменён; ссылки GoToPage обновлены. Проверь Lua с переменными путями.");}catch(Exception ex){Report(ex.Message);}
   }
   public void DeletePage()
   {
