@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory() as td:
  check(call('view',url='www.mycoolsite.com/about')['item']['id']==id)
  check(len(call('list')['items'])==1)
  badnav=json.loads(json.dumps(doc));badnav['elements'][0]['actions'][0]['arguments']=['https://another.com'];check(not publish(document=json.dumps(badnav))['ok'])
- check(publish()['charged']==0);check(publish(url='another.com')['ok']==False);check(not publish(_token=other,key='3'*32)['ok'])
+ check(publish()['charged']==0);renamed=publish(url='another.com');check(renamed['ok']and renamed['charged']==0 and renamed['item']['id']==id);check(not call('view',url='www.mycoolsite.com/about')['ok']);check(publish()['charged']==0);check(not publish(_token=other,key='3'*32)['ok'])
  listing=call('list',query='cool');check(len(listing['items'])==1);check('publication_key'not in listing['items'][0] and 'owner'not in listing['items'][0] and 'document'not in listing['items'][0]);check('mycoolsite' in listing['items'][0]['url'])
  loaded=call('view',url='www.mycoolsite.com/about');check(loaded['ok']);check(json.loads(loaded['document'])['pages'][0]['path']=='/about');ticket=loaded['ticket'];session='4'*32
  check(not call('visit',id=id,ticket='forged',session=session)['ok']);visit=call('visit',id=id,ticket=ticket,session=session);check(visit['ok']and visit['item']['visits']==1 and visit['item']['online']==1)
@@ -42,12 +42,39 @@ with tempfile.TemporaryDirectory() as td:
  subprocess.run(['php','-r',script],check=True)
  check(call('stats',_token=token,world=world)['total']==1300)
  check(call('stats',_token=token,world=world)['total']==1300)
- check(call('stop',_token=token,world=world,id=id)['ok']);check(call('list')['items']==[]);check(not call('view',url='www.mycoolsite.com')['ok']);check(publish()['charged']==100)
+ check(not call('stop',_token=token,world='9'*32,id=id)['ok'])
+ stopped=call('stop',_token=token,world=world,id=id);check(stopped['ok']and not stopped['item']['active']and stopped['item']['online']==0 and stopped['item']['next_bill']==0)
+ check(call('stop',_token=token,world=world,id=id)['total']==1300)
+ check(call('list')['items']==[]);check(not call('view',url='www.mycoolsite.com/about')['ok'])
+ check(not call('visit',id=id,ticket=ticket,session=session)['ok'])
+ subprocess.run(['php','-r',script],check=True) # elapsed time while stopped does not accrue rent
+ check(call('stats',_token=token,world=world)['total']==1300)
+ check(publish()['charged']==100)
+ check(not call('visit',id=id,ticket=ticket,session=session)['ok']) # pre-stop ticket stays invalid after restart
+ fresh=call('view',url='www.mycoolsite.com');check(call('visit',id=id,ticket=fresh['ticket'],session=session)['ok'])
+
  bad=dict(doc);bad['assets']=[{'name':'../secret','media':'application/x-pcos-file','data':''}];check(not publish(document=json.dumps(bad))['ok'])
  bad=dict(doc);bad['pages']=doc['pages']*2;check(not publish(document=json.dumps(bad))['ok'])
  bad=dict(doc);bad['backgroundImage']='missing.png';check(not publish(document=json.dumps(bad))['ok'])
  reserved=json.loads((R/'Hosting/sites/reserved.json').read_text());check(not publish(key='5'*32,url=reserved[0])['ok'])
  check(not publish(key='6'*32,url='s999.sites.pcos')['ok'])
+ # A generated-domain publication can gain a custom domain once, then rename
+ # without losing the publication, pages, visit count or paid rent period.
+ key2='7'*32;free=publish(key=key2,url='');id2=free['item']['id'];check(free['charged']==100 and not free['item']['custom_paid']);nextbill=free['item']['next_bill']
+ origin=free['item']['url'];seen=call('view',url=origin+'/about');check(call('visit',id=id2,ticket=seen['ticket'],session='8'*32)['ok'])
+ change=publish(key=key2,url='new-domain.com');check(change['charged']==1000 and change['item']['id']==id2 and change['item']['custom_paid'] and change['item']['next_bill']==nextbill and change['item']['visits']==1 and change['item']['online']==0)
+ check(not call('view',url=origin+'/about')['ok']);check(not call('visit',id=id2,ticket=seen['ticket'],session='8'*32)['ok'])
+ check(json.loads(call('view',url='new-domain.com/about')['document'])['pages'][0]['path']=='/about')
+ change=publish(key=key2,url='second-domain.com');check(change['charged']==0 and change['item']['id']==id2 and change['item']['visits']==1)
+ check(not call('view',url='new-domain.com')['ok']);check(len(call('list')['items'])==2)
+ check(not publish(key=key2,url='www.mycoolsite.com')['ok'])
+ check(call('view',url='second-domain.com')['ok'])
+ check(publish(key=key2,url='')['item']['url']=='second-domain.com')
+ # Old deployed records without custom_paid must not charge custom-domain
+ # setup again: infer the paid state from the existing URL.
+ migrate=f"require {lib};$s=site_read({state});unset($s['sites'][{id2}]['custom_paid']);site_write({state},$s);"
+ subprocess.run(['php','-r',migrate],check=True)
+ check(publish(key=key2,url='migrated-domain.com')['charged']==0)
  # The private storage file is valid non-executable PHP even if titles contain
  # PHP tags. It returns no JSON or secrets when requested/executed directly.
  p=subprocess.run(['php',str(data/'state.php')],capture_output=True,check=True);check(p.stdout==b'')

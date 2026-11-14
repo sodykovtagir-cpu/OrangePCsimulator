@@ -28,16 +28,16 @@ try{
   if(!isset($db['sites'][$id])||!$db['sites'][$id]['active'])site_fail('Site unavailable',404);$s=&$db['sites'][$id];
   if($action==='view'){
    $package=site_read($dir.'/p_'.$id.'.php');$out['document']=$package['document'];$out['item']=site_public($s,$now);
-   $nonce=bin2hex(random_bytes(16));$ticket=$nonce.'.'.($now+300);$out['ticket']=$ticket.'.'.hash_hmac('sha256',$id.'|'.$ticket,$db['secret']);
+   $nonce=bin2hex(random_bytes(16));$ticket=$nonce.'.'.($now+300);$out['ticket']=$ticket.'.'.hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$ticket,$db['secret']);
   }else{
    $session=$_POST['session']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$session))site_fail('Invalid session');$key=hash('sha256',$session);site_online($s,$now);
    if($action==='leave')unset($s['sessions'][$key]);
    else{
-    $ticket=$_POST['ticket']??'';$parts=explode('.',$ticket);if(count($parts)!==3||!ctype_digit($parts[1])||(int)$parts[1]<$now||!hash_equals(hash_hmac('sha256',$id.'|'.$parts[0].'.'.$parts[1],$db['secret']),$parts[2]))site_fail('Visit ticket expired',403);
+    $ticket=$_POST['ticket']??'';$parts=explode('.',$ticket);if(count($parts)!==3||!ctype_digit($parts[1])||(int)$parts[1]<$now||!hash_equals(hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$parts[0].'.'.$parts[1],$db['secret']),$parts[2]))site_fail('Visit ticket expired',403);
     $existing=$s['sessions'][$key]??null;if(!$existing){if(count($s['sessions'])>=1000)site_fail('Site busy',429);$s['visits']++;}
     $s['sessions'][$key]=['at'=>$now];
     // Renew only an active browser session, not a downloaded/cached package.
-    $ticket=$parts[0].'.'.($now+300);$out['ticket']=$ticket.'.'.hash_hmac('sha256',$id.'|'.$ticket,$db['secret']);
+    $ticket=$parts[0].'.'.($now+300);$out['ticket']=$ticket.'.'.hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$ticket,$db['secret']);
    }
    $out['item']=site_public($s,$now);
   }unset($s);
@@ -53,17 +53,19 @@ try{
    if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$url)||strlen($url)>160||strpos($url,'..')!==false)site_fail('Invalid game URL');
    $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);if(in_array($url,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$url)&&$url!=='s'.$id.'.sites.pcos')site_fail('Reserved URL',409);
    foreach($db['sites']as $k=>$site)if((string)$k!==$id&&$site['url']===$url)site_fail('URL already taken',409);
-   if($old&&$old['url']!==$url)site_fail('Этот проект уже опубликован на '.$old['url'].'. Страницы используют тот же домен и пути /about. Оставьте поле URL пустым для обновления; для другого домена создайте новый проект.',409);
    $custom=$url!=='s'.$id.'.sites.pcos';$fresh=!$old||!$old['active'];
-   $cost=($fresh?SITE_PRICE:0)+(!$old&&$custom?SITE_CUSTOM_PRICE:0);
+   $paid=$old?site_custom_paid($old):false;
+   $cost=($fresh?SITE_PRICE:0)+(!$paid&&$custom?SITE_CUSTOM_PRICE:0);
    // The exact fixed tariff must be confirmed; the client cannot submit price,
    // paid-until timestamps or a negative charge.
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
    $s=$old?:['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'visits'=>0,'sessions'=>[],'total'=>0,'revision'=>0];
+   if($old&&$old['url']!==$url){$s['sessions']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
+   $s['custom_paid']=$paid||$custom;
    $s['total']+=$cost;$s['active']=true;if($fresh)$s['billed_at']=$now;$s['url']=$url;$s['title']=$doc['title'];$s['description']=$doc['description']??'';$s['keywords']=$doc['keywords']??'';$s['bytes']=strlen($raw);$s['host']=(int)($_POST['host']??0);$s['revision']++;
    site_write($dir.'/p_'.$id.'.php',['document'=>$raw]);$db['sites'][$id]=$s;$out['item']=site_public($db['sites'][$id],$now);$out['charged']=$cost;
   }
-  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['sessions']=[];}
+  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['sessions']=[];$db['sites'][$id]['access_epoch']=($db['sites'][$id]['access_epoch']??0)+1;$out['item']=site_public($db['sites'][$id],$now);}
   $out['items']=[];$out['total']=0;
   foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world){$private=site_public($s,$now);$private['publication_key']=$s['key'];$out['items'][]=$private;$out['total']+=$s['total'];}unset($s);
  }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace PC.Component.Software.Sites
 {
- [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision;public bool active;public long total,next_bill;public string url,title,description,publication_key;}
+ [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision;public bool active,custom_paid;public long total,next_bill;public string url,title,description,publication_key;}
  [Serializable] public sealed class SiteReply {public bool ok,available;public string service,error,document,ticket,owner;public int version,price,period,custom_price,charged;public long total,now;public HostedSite item;public List<HostedSite> items;}
  [Serializable] public sealed class SiteHostingLedger {public string owner;public long charged;}
  public sealed class SiteHostingService:MonoBehaviour
@@ -11,6 +11,15 @@ namespace PC.Component.Software.Sites
   public static SiteHostingService Instance {get;private set;}
   public bool Available {get;private set;}public string Status="Хостинг ещё не проверен";public List<HostedSite> Items=new List<HostedSite>();
   public string World {get {var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;if(game==null)return "";if(string.IsNullOrEmpty(game.siteHostingWorld))game.siteHostingWorld=Guid.NewGuid().ToString("N");return game.siteHostingWorld;}}
+  public int StateRevision {get;private set;}
+  readonly List<Action> refreshWaiters=new List<Action>();
+  readonly Queue<Action> pendingStops=new Queue<Action>();
+  void Complete(Action completed=null)
+  {
+   busy=false;var callbacks=refreshWaiters.ToArray();refreshWaiters.Clear();
+   completed?.Invoke();foreach(var callback in callbacks)callback();
+   if(!busy&&pendingStops.Count>0)pendingStops.Dequeue()();
+  }
   string context="";float nextPoll,lastStats;bool busy;readonly Dictionary<int,float> demand=new Dictionary<int,float>();readonly Dictionary<int,int> visits=new Dictionary<int,int>();
   void Awake(){Instance=this;}
   void OnDestroy(){if(Instance==this)Instance=null;}
@@ -22,15 +31,27 @@ namespace PC.Component.Software.Sites
     done(error==null?result:null,error);
    });
   }
-  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
+  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;StateRevision++;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
   public float Demand(int host){float value;return Available&&Time.unscaledTime-lastStats<45&&demand.TryGetValue(host,out value)?value:0;}
   public void Refresh(Action completed)
   {
-   if(busy){completed?.Invoke();return;}string token=ServerAccounts.Token,world=World;if(string.IsNullOrEmpty(world)||!ServerAccounts.LoggedIn){Status="Войди в аккаунт игры";completed?.Invoke();return;}
+   if(completed!=null)refreshWaiters.Add(completed);
+   // A caller opening the panel must wait for the actual result, not draw an
+   // empty list merely because a background stats request is already running.
+   if(busy)return;
+   string token=ServerAccounts.Token,world=World;
+   if(string.IsNullOrEmpty(world)||!ServerAccounts.LoggedIn){Status="Войди в аккаунт игры";Complete();return;}
    busy=true;nextPoll=Time.unscaledTime+20;
-   Request("stats",new Dictionary<string,string>{{"world",world}},(reply,error)=>{busy=false;if(token!=ServerAccounts.Token||world!=World){completed?.Invoke();return;}Apply(reply,error);completed?.Invoke();});
+   Request("stats",new Dictionary<string,string>{{"world",world}},(reply,error)=>{
+    if(token==ServerAccounts.Token&&world==World)Apply(reply,error);
+    Complete();
+   });
   }
   void Apply(SiteReply reply,string error)
+  {
+   StateRevision++;ApplyCore(reply,error);
+  }
+  void ApplyCore(SiteReply reply,string error)
   {
    if(error!=null){Available=false;Items.Clear();demand.Clear();Status=error;return;}
    Available=true;Items=reply.items??new List<HostedSite>();demand.Clear();var counts=new Dictionary<int,int>();var online=new Dictionary<int,int>();
@@ -49,15 +70,37 @@ namespace PC.Component.Software.Sites
    if(busy){done("Дождись текущего запроса");return;}
    var doc=SiteDocument.Parse(document);string token=ServerAccounts.Token,world=World;if(!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done("Нужны аккаунт и сохранение игры");return;}
    var existing=Items.Find(item=>item.publication_key==doc.hostingKey);
-   if(existing!=null&&!string.IsNullOrWhiteSpace(url)&&SiteDocument.NormalizeUrl(url)!=existing.url){Status="Этот проект уже опубликован на "+existing.url+". Страницы живут на том же домене (/about и т. д.). Для другого домена нужен новый проект.";done(Status);return;}
-   int estimate=(existing!=null&&existing.active?0:100)+(existing==null&&!string.IsNullOrWhiteSpace(url)?1000:0);
-   if(Main.Instance==null||Main.Instance.Money<estimate){done("Нужно $100 за первый период (+$1000 за собственный URL при первой публикации)");return;}
+   int estimate;try{estimate=PublicationCost(existing,url);}catch(ArgumentException ex){done(ex.Message);return;}
+   if(Main.Instance==null||Main.Instance.Money<estimate){done("Для публикации нужно $"+estimate+". Аренда $100 / 30 минут; собственный домен +$1000 только при первом подключении.");return;}
    if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){done("Сначала сохрани игру");return;}
-   busy=true;Request("publish",new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}},(reply,error)=>{busy=false;if(token!=ServerAccounts.Token||world!=World)return;if(error!=null){Refresh(()=>{if(token!=ServerAccounts.Token||world!=World)return;Status=error;done(error);});return;}Apply(reply,null);done("Опубликовано: "+reply.item.url+". "+Status);});
+   busy=true;Request("publish",new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}},(reply,error)=>{
+    if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
+    if(error!=null){Complete();Refresh(()=>{if(token==ServerAccounts.Token&&world==World){Status=error;StateRevision++;done(error);}});return;}
+    Apply(reply,null);Complete(()=>done("Опубликовано: "+reply.item.url+". "+Status));
+   });
+  }
+  public static int PublicationCost(HostedSite existing,string requested)
+  {
+   string url=string.IsNullOrWhiteSpace(requested)?(existing!=null?existing.url:""):SiteDocument.NormalizeUrl(requested);
+   bool custom=!string.IsNullOrEmpty(url)&&(existing==null||url!="s"+existing.id+".sites.pcos");
+   return (existing!=null&&existing.active?0:100)+(custom&&(existing==null||!existing.custom_paid)?1000:0);
   }
   public void Stop(int id,Action<string> done)
   {
-   string token=ServerAccounts.Token,world=World;Request("stop",new Dictionary<string,string>{{"world",world},{"id",id.ToString()}},(reply,error)=>{if(token!=ServerAccounts.Token||world!=World)return;Apply(reply,error);done(error??"Хостинг остановлен. Новых начислений не будет.");});
+   if(id<=0){done("Выбери сайт для остановки");return;}
+   string token=ServerAccounts.Token,world=World;
+   Action stop=()=>{
+    if(token!=ServerAccounts.Token||world!=World||!ServerAccounts.LoggedIn){done("Аккаунт или сохранение изменились; остановка отменена");if(!busy&&pendingStops.Count>0)pendingStops.Dequeue()();return;}
+    busy=true;Request("stop",new Dictionary<string,string>{{"world",world},{"id",id.ToString()}},(reply,error)=>{
+     if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
+     Apply(reply,error);
+     if(error==null){var stopped=Items.Find(site=>site.id==id);Status=stopped!=null&&!stopped.active?"Сайт "+stopped.url+" остановлен. Он недоступен посетителям; новых начислений не будет.":"Сервер не подтвердил остановку сайта. Обнови статистику.";}
+     Complete(()=>done(Status));
+    });
+   };
+   // Serialize writes with stats/publication, so a late stats response cannot
+   // overwrite a successful stop with an old active=true snapshot.
+   if(busy)pendingStops.Enqueue(stop);else stop();
   }
  }
 }

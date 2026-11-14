@@ -22,7 +22,7 @@ def upgrade():
    if 'm_FontData'in d and d['m_GameObject']['fileID']not in samples:
     p.blocks[i]=re.sub(r'(    m_FontStyle:) \d+',r'\1 0',p.blocks[i])
  if v.get('pageTabs',{}).get('fileID'):
-  normalize_fonts();p.save(target);print('Pages/hosting panels already authored');return
+  print('Pages/hosting panels already authored; preserving user edits');return
  class B:
   def __init__(self):self.chunks=[]
   def next_id(self):return p.alloc()

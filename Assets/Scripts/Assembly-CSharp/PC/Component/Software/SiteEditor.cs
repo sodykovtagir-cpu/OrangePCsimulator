@@ -95,6 +95,7 @@ namespace PC.Component.Software
         }
         void LateUpdate()
         {
+            PollHostingView();
             var host = transform.parent as RectTransform;
             if (host == null) return;
             float inset = system != null ? system.GetTaskbarInsetLocalHeight() : 48f;
