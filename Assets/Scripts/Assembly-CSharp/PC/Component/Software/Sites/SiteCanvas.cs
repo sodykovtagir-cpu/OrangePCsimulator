@@ -37,6 +37,7 @@ namespace PC.Component.Software.Sites
             content.anchoredPosition = Vector2.zero;
             var sheet = SiteWidgets.Panel("Page", content, SiteWidgets.ColorValue(doc.background));
             design = SiteWidgets.Box(sheet, 0, 0, doc.width, doc.height);
+            if(!string.IsNullOrEmpty(doc.backgroundImage)){sheet.GetComponent<Image>().sprite=Image(doc.backgroundImage);sheet.GetComponent<Image>().preserveAspect=false;}
             var scroll = GetComponent<ScrollRect>(); if (scroll == null) scroll = gameObject.AddComponent<ScrollRect>();
             scroll.viewport = (RectTransform)transform; scroll.content = content;
             scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped;
@@ -132,11 +133,11 @@ namespace PC.Component.Software.Sites
         {
             if (design == null || content == null || document == null) return;
             var viewport = (RectTransform)transform; float scale = Mathf.Max(.01f, viewport.rect.width / document.width);
-            bool anchored = !Editing && document.elements.Exists(e=>e.layout!=0);
+            bool anchored = !Editing && (document.viewportMode=="viewport" || document.elements.Exists(e=>e.layout!=0));
             if (anchored) scale=1;
-            design.sizeDelta=new Vector2(anchored?viewport.rect.width:document.width, anchored?Mathf.Max(document.height,viewport.rect.height):document.height);
+            design.sizeDelta=new Vector2(anchored?viewport.rect.width:document.width, anchored?(document.viewportMode=="viewport"?viewport.rect.height:Mathf.Max(document.height,viewport.rect.height)):document.height);
             design.localScale = new Vector3(scale, scale, 1);
-            content.sizeDelta = new Vector2(0, Mathf.Max(viewport.rect.height, document.height * scale));
+            content.sizeDelta = new Vector2(0, Mathf.Max(viewport.rect.height, design.sizeDelta.y * scale));
         }
         public void Select(string id)
         {

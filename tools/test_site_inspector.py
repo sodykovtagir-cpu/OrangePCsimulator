@@ -39,6 +39,10 @@ if original.returncode==0:
         old_root=upgrade.ROOT;upgrade.ROOT=base
         try:upgrade.upgrade()
         finally:upgrade.ROOT=old_root
+        import upgrade_site_pages as pages_upgrade
+        old_root=pages_upgrade.ROOT;pages_upgrade.ROOT=base
+        try:pages_upgrade.upgrade()
+        finally:pages_upgrade.ROOT=old_root
         generated=Prefab(file);assert generated.render()==p.render(),'incremental output differs from checked-in prefab'
     old=Prefab(text=original.stdout);count=0
     background=next(f['input']['fileID']for f in old.mono('SiteEditor')[0][1]['fields']if f['key']=='background')
@@ -47,6 +51,9 @@ if original.returncode==0:
         if i not in p.blocks:continue
         new=p.data(i)
         for key in ['m_AnchorMin','m_AnchorMax','m_AnchoredPosition','m_Pivot','m_LocalScale','m_LocalPosition','m_LocalRotation','m_SizeDelta']:
+            name=old.data(d['m_GameObject']['fileID'])['m_Name']
+            if name=='Workspace'and key in ['m_AnchoredPosition','m_SizeDelta']:continue # room for tabs
+            if name=='Site properties'and key=='m_SizeDelta':continue # new background controls
             if d['m_GameObject']['fileID']==bg_go and key=='m_SizeDelta':continue
             assert new[key]==d[key],(i,key);count+=1
     print('PASS:',count,'surviving user-authored rect properties retained; incremental upgrade reproduces prefab exactly')
@@ -86,6 +93,6 @@ class Test {
 '''
 with tempfile.TemporaryDirectory() as td:
     t=Path(td);(t/'test.cs').write_text(cs)
-    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(t/'test.exe'),str(t/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'Lua/PcosLua.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),*[str(x)for x in (C/'Sites').glob('*.cs')]],check=True)
+    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(t/'test.exe'),str(t/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),str(C/'Lua/PcosLua.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'SiteEditorPages.cs'),str(C/'SiteEditorHosting.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(C/'BrowserHosted.cs'),*[str(x)for x in (C/'Sites').glob('*.cs')]],check=True)
     subprocess.run(['mono',str(t/'test.exe')],check=True)
 print('PASS: serialized conditional sections, typed argument controls, regular editor font and native Paint ColorPicker')

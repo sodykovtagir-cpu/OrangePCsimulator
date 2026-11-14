@@ -103,6 +103,7 @@ public class Main : MonoBehaviour
 	private void Awake()
 	{
 		Instance = this;
+        if(GetComponent<PC.Component.Software.Sites.SiteHostingService>()==null)gameObject.AddComponent<PC.Component.Software.Sites.SiteHostingService>();
 		var grid = GetComponent<ElectricityGrid>();
 		if (grid == null) grid = gameObject.AddComponent<ElectricityGrid>();
 		grid.ConfigureLoads(roomLightWatts, airConditionerWatts);

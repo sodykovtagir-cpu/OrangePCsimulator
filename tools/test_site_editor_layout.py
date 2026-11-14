@@ -15,7 +15,7 @@ for f in v['fields']:
     field=p.data(f['input']['fileID']);assert field['m_Script']['guid']=='d199490a83bb2b844b9695cbf13b01ef'
     assert field['m_TextComponent']['fileID'] in p.blocks
     text=p.data(field['m_TextComponent']['fileID']);assert text['m_FontData']['m_RichText']==0
-methods=set(re.findall(r'public void (\w+)\(', ((C/'SiteEditor.cs').read_text()+(C/'SiteEditorInspector.cs').read_text())))|{'Close','Maximize','Minimize'}
+methods=set(re.findall(r'public void (\w+)\(', ''.join(f.read_text()for f in C.glob('SiteEditor*.cs'))))|{'Close','Maximize','Minimize'}
 clicks=[]
 for _,d in p.objects(114):
     for event in d.get('m_OnClick',{}).get('m_PersistentCalls',{}).get('m_Calls',[]):
@@ -61,6 +61,6 @@ class Test {
 '''
 with tempfile.TemporaryDirectory() as td:
     path=Path(td);(path/'test.cs').write_text(cs)
-    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
+    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'SiteEditorPages.cs'),str(C/'SiteEditorHosting.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(C/'BrowserHosted.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
     subprocess.run(['mono',str(path/'test.exe')],check=True)
 print('PASS: serialized inspector inputs, buttons/events, panel hierarchy/margins, clipping masks and exclusive inspector panels')

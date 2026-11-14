@@ -12,6 +12,8 @@ C=ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/Software'
 if (ROOT/'Assets/Resources/apps/SiteEditor.prefab').exists() and '--rebuild-shell' not in sys.argv:
     from upgrade_site_inspector import upgrade
     upgrade()
+    from upgrade_site_pages import upgrade as upgrade_pages
+    upgrade_pages()
     print('Preserved existing authored Site Editor shell')
     raise SystemExit(0)
 for folder in [C/'Sites',ROOT/'Assets/Resources/SiteFonts']:
@@ -63,4 +65,6 @@ if not re.search(r'^Site Editor\t',text,re.M):
     translate.write_text(text.rstrip('\n')+'\nSite Editor\t'+'\t'.join(values)+'\n')
 from upgrade_site_inspector import upgrade
 upgrade()
+from upgrade_site_pages import upgrade as upgrade_pages
+upgrade_pages()
 print('Wired Site Editor into App Downloader; .osite association, native chrome, bundled standard fonts')

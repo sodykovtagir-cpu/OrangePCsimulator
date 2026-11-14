@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "^(lib|reserved)\.">
+Require all denied
+</FilesMatch>

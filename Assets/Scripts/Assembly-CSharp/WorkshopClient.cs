@@ -118,7 +118,7 @@ public class AccountMeResponse
 	public AccountSaveItem[] saves;
 }
 
-public class WorkshopClient : MonoBehaviour
+public partial class WorkshopClient : MonoBehaviour
 {
 	public static readonly string[] ApiUrls =
 	{

@@ -3,6 +3,8 @@ using System;
 [Serializable]
 public class GameData
 {
+    public string siteHostingWorld;
+    public System.Collections.Generic.List<PC.Component.Software.Sites.SiteHostingLedger> siteHostingLedger;
 	public string version;
 
 	public string roomName;

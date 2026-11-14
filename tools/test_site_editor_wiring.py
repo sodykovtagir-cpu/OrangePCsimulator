@@ -24,9 +24,9 @@ source=(C/'SiteEditor.cs').read_text()
 for required in ['ShowDialog(', '".osite"', 'SiteHistory', 'SiteDocument.Parse', 'ImportImage', 'BindUI', 'SetTextWithoutNotify', 'GetTaskbarInsetLocalHeight']:
     assert required in source,required
 assert 'SiteWidgets.' not in source and 'BuildUI' not in source
-assert 'new GameObject' not in source and 'AddComponent<' not in source
-assert 'StartCoroutine' not in source and 'UnityWebRequest' not in source, 'first stage must not pretend to publish'
-assert 'сейчас сайт не отправлен' in source
+assert 'new GameObject' not in source
+assert 'UnityWebRequest' not in source
+assert 'OpenHostingPanel' in source
 # Re-run generation and ensure it is idempotent and does not modify old apps/icons.
 files=[ROOT/'Assets/Resources/apps/SiteEditor.prefab',ROOT/'Assets/Resources/apps/Downloader.prefab',ROOT/'Assets/Resources/Translate.txt',ROOT/'Assets/Resources/apps/TextEditor.prefab']
 before={x:hashlib.sha256(x.read_bytes()).digest() for x in files}
@@ -35,5 +35,5 @@ assert all(hashlib.sha256(x.read_bytes()).digest()==h for x,h in before.items())
 # Compile complete new editor/renderer and the actual interpreter, with fake
 # Unity/PCOS declarations solely to catch type/signature/syntax mismatches.
 with tempfile.TemporaryDirectory() as td:
-    subprocess.run(['mcs','-target:library','-r:System.Web.Extensions','-out:'+str(Path(td)/'site-ui.dll'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'Lua/PcosLua.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
+    subprocess.run(['mcs','-target:library','-r:System.Web.Extensions','-out:'+str(Path(td)/'site-ui.dll'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'Lua/PcosLua.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'SiteEditorPages.cs'),str(C/'SiteEditorHosting.cs'),str(C/'Browser.cs'),str(C/'BrowserSites.cs'),str(C/'BrowserHosted.cs'),str(ROOT/'tools/tests/site_browser_stubs.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
 print('PASS: native Site Editor shell, all local refs, .osite, App Downloader, fonts, idempotent wiring, UI C# compile with API doubles; no false publication')

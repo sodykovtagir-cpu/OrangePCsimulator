@@ -357,7 +357,7 @@ namespace PC.Component.Software.OS
 
             bool mining = MiningActive;
             bool gpuMining = mining && HasDiscreteGpu;
-            float cpuDemand = 110f; // OS, drivers, shell
+            float cpuDemand = 110f + (PC.Component.Software.Sites.SiteHostingService.Instance!=null?PC.Component.Software.Sites.SiteHostingService.Instance.Demand(Board.Id):0f); // OS, drivers, shell
             float gpuDemand = 0.03f;
             int ramMb = 180;
             bool cpuBenchmark = false, gpuBenchmark = false, ramBenchmark = false;

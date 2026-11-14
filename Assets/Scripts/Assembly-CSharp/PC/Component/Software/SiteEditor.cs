@@ -39,10 +39,10 @@ namespace PC.Component.Software
         public override void Open(string content)
         {
             base.Open(content);
-            if (project == null) project = new SiteHistory(new SiteDocument());
+            if (project == null) project = new SiteHistory(NewPageDocument());
             if (!string.IsNullOrWhiteSpace(content))
             {
-                try { project.Reset(SiteDocument.Parse(content)); selected = ""; filePath = ""; fileDisk = -1; editEpoch++; }
+                try { project.Reset(SiteDocument.Parse(content)); pageRoute="/"; selected = ""; filePath = ""; fileDisk = -1; editEpoch++; }
                 catch (Exception ex) { system?.ShowMessageBox("Site Editor", ex.Message); }
             }
             if (!BindUI()) return;
@@ -72,7 +72,7 @@ namespace PC.Component.Software
             view.Moved = (id, x, y) => Change(d => { var e = d.Find(id); e.x = x; e.y = y; });
             view.TextEdited = (id, text) => Change(d => d.Find(id).text = text);
             view.Message = Report;
-            view.Redirect = url => Report("Preview redirect: " + url);
+            view.Redirect = url => {if(url.StartsWith("/",StringComparison.Ordinal))StartCoroutine(PreviewRoute(url,editEpoch));else Report("Preview redirect: " + url);};
             view.Download = asset => Report("Preview download: " + asset.name + " (файл не записан)");
             view.OpenFile = asset => Report("Preview OpenFile: " + asset.name + " (корень сайта)");
             bound = true;
@@ -103,16 +103,16 @@ namespace PC.Component.Software
         public override void Maximize() { base.Maximize(); if (!maximized) FitWindow(); }
         public void NewProject()
         {
-            if (!confirmNew && (project.Document.elements.Count > 0 || project.Document.assets.Count > 0))
+            if (!confirmNew && (project.Document.elements.Count > 0 || project.Document.assets.Count > 0 || project.Document.pages.Count > 0))
             { confirmNew = true; Report("Сохрани проект или нажми New ещё раз, чтобы очистить его."); return; }
-            confirmNew = false; editEpoch++; project.Reset(new SiteDocument()); selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
+            confirmNew = false; editEpoch++; project.Reset(NewPageDocument()); pageRoute="/"; selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
         }
         public void Undo() { project.Undo(); Redraw(); }
         public void Redo() { project.Redo(); Redraw(); }
         public void TogglePreview() { preview = !preview; Redraw(); }
         public void Host()
         {
-            Report("Публикация на Byethost ещё не подключена; сейчас сайт не отправлен.");
+            OpenHostingPanel();
         }
         public void AddButton() { Add("button"); }
         public void AddText() { Add("text"); }
@@ -145,22 +145,23 @@ namespace PC.Component.Software
         {
             for (int i = parent.childCount - 1; i >= 0; i--) { var go = parent.GetChild(i).gameObject; go.SetActive(false); Destroy(go); }
         }
-        void ListRow(RectTransform parent, string title, int index, bool active, Action action)
+        Button ListRow(RectTransform parent, string title, int index, bool active, Action action)
         {
             var row = Instantiate(rowTemplate, parent); row.gameObject.SetActive(true);
             var rect = (RectTransform)row.transform; rect.anchoredPosition = new Vector2(6, -index * 32); rect.sizeDelta = new Vector2(-12, 28);
             row.GetComponentInChildren<Text>().text = title;
             row.GetComponent<Image>().color = active ? new Color(1f, .72f, .35f) : new Color(.83f, .83f, .83f);
-            row.onClick.AddListener(() => action());
+            row.onClick.AddListener(() => action());return row;
         }
         void RefreshHierarchy()
         {
             if (hierarchyRoot == null || rowTemplate == null) return;
             ClearRows(hierarchyRoot); int index = 0;
-            foreach (var e in project.Document.elements)
+            foreach (var e in EditingDocument.elements)
             {
                 string id = e.id;
-                ListRow(hierarchyRoot, e.name + " [" + e.kind + "]", index++, id == selected, () => { selectedAction = -1; view.Select(id); });
+                var row=ListRow(hierarchyRoot, e.name + " [" + e.kind + "]", index++, id == selected, () => { selectedAction = -1; view.Select(id); });
+                row.gameObject.AddComponent<SiteHierarchyContext>().Bind(this,id);
             }
             hierarchyRoot.sizeDelta = new Vector2(0, Mathf.Max(32, index * 32));
         }
@@ -183,7 +184,7 @@ namespace PC.Component.Software
         }
         void LoadAction(int index)
         {
-            var e = project.Document.Find(selected); if (e == null || index < 0 || index >= e.actions.Count) return;
+            var e = EditingDocument.Find(selected); if (e == null || index < 0 || index >= e.actions.Count) return;
             selectedAction = index; var action = e.actions[index];
             commandDropdown.SetValueWithoutNotify(Array.FindIndex(SiteCommands.All, c => c.Name == action.command));
             ConfigureArguments(action.arguments);
@@ -197,19 +198,19 @@ namespace PC.Component.Software
         }
         public void AddAction()
         {
-            var e = project.Document.Find(selected); if (e == null || e.kind != "button") { Report("Выбери Button в Hierarchy"); return; }
+            var e = EditingDocument.Find(selected); if (e == null || e.kind != "button") { Report("Выбери Button в Hierarchy"); return; }
             try { var action = ReadAction(); selectedAction = e.actions.Count; Change(d => d.Find(selected).actions.Add(action)); }
             catch (Exception ex) { Report(ex.Message); }
         }
         public void UpdateAction()
         {
-            var e = project.Document.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) { Report("Выбери действие из списка"); return; }
+            var e = EditingDocument.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) { Report("Выбери действие из списка"); return; }
             try { var action = ReadAction(); Change(d => d.Find(selected).actions[selectedAction] = action); }
             catch (Exception ex) { Report(ex.Message); }
         }
         public void RemoveAction()
         {
-            var e = project.Document.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) return;
+            var e = EditingDocument.Find(selected); if (e == null || selectedAction < 0 || selectedAction >= e.actions.Count) return;
             int index = selectedAction; selectedAction = -1; Change(d => d.Find(selected).actions.RemoveAt(index));
         }
         public void ImportIcon() { ImportImage("", true); }
@@ -234,23 +235,24 @@ namespace PC.Component.Software
         }
         void Change(Action<SiteDocument> edit)
         {
-            try { confirmNew = false; project.Change(edit); Redraw(); Report("Изменения не сохранены"); }
+            try { confirmNew = false; project.Change(root => {var page=SitePages.At(root,pageRoute); edit(page);SitePages.Apply(root,pageRoute,page);}); Redraw(); Report("Изменения не сохранены"); }
             catch (Exception ex) { Report(ex.Message); Redraw(); }
         }
         void Redraw()
         {
-            if (view == null) return;
-            RefreshHierarchy();
-            if (project.Document.Find(selected) == null) selected = "";
+            if (view == null) return;CloseHierarchyMenu();
+            if(pageRoute!="/"&&!project.Document.pages.Exists(p=>p.path==pageRoute))pageRoute="/";
+            RefreshPages();RefreshHierarchy();
+            if (EditingDocument.Find(selected) == null) selected = "";
             // Lua preview uses an isolated copy, never the authored project.
-            try { view.Render(SiteDocument.Parse(project.Document.ToJson()), !preview); }
+            try { view.Render(SiteDocument.Parse(EditingDocument.ToJson()), !preview); }
             catch (Exception ex) { Report(ex.Message); }
             if (!preview && !string.IsNullOrEmpty(selected)) view.Select(selected); else BuildInspector();
         }
         void BuildInspector()
         {
             if (!bound) return;
-            var doc = project.Document; var element = doc.Find(selected);
+            var doc = EditingDocument; var element = doc.Find(selected);
             RefreshActions(element);
             RefreshInspector(element);
             sitePanel.SetActive(!preview && element == null);
@@ -325,7 +327,7 @@ namespace PC.Component.Software
             system.SelectFile(".osite", file =>
             {
                 if (file == null) return;
-                try { var document=SiteDocument.Parse(file.content); editEpoch++; project.Reset(document); selected = ""; filePath = file.path; fileDisk = DiskFor(file); preview = false; Redraw(); Report(filePath); }
+                try { var document=SiteDocument.Parse(file.content); editEpoch++; project.Reset(document); pageRoute="/"; selected = ""; filePath = file.path; fileDisk = DiskFor(file); preview = false; Redraw(); Report(filePath); }
                 catch (Exception ex) { Report(ex.Message); }
             });
         }
@@ -349,9 +351,9 @@ namespace PC.Component.Software
         void ImportImage(string id, bool icon)
         {
             if (system == null) return;
-            system.SelectFile(new[] { ".png", ".jpg", ".jpeg", ".pic" }, file =>
+            int epoch=editEpoch;system.SelectFile(new[] { ".png", ".jpg", ".jpeg", ".pic" }, file =>
             {
-                if (file == null) return;
+                if (file == null || epoch!=editEpoch) return;
                 try
                 {
                     var asset = new SiteAsset { name = "image_" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".png", data = file.content };
@@ -365,7 +367,7 @@ namespace PC.Component.Software
                             throw new ArgumentException("Не удалось прочитать изображение");
                     }
                     finally { Destroy(probe); }
-                    Change(d => { d.assets.Add(asset); if (icon) d.icon = asset.name; else { d.Find(id).image = asset.name; d.Find(id).fill = "#FFFFFF"; } });
+                    Change(d => { d.assets.Add(asset); if (icon) d.icon = asset.name; else if(id=="@background") {d.backgroundImage=asset.name;d.background="#FFFFFF";} else { d.Find(id).image = asset.name; d.Find(id).fill = "#FFFFFF"; } });
                 }
                 catch (Exception ex) { Report(ex.Message); }
             });
@@ -373,12 +375,12 @@ namespace PC.Component.Software
         public void ImportDownload()
         {
             if (system == null) return;
-            system.SelectFile("*", file =>
+            int epoch=editEpoch;system.SelectFile("*", file =>
             {
-                if (file == null || file.isFolder) return;
+                if (file == null || file.isFolder || epoch!=editEpoch) return;
                 try
                 {
-                    var asset = SiteEditing.ImportFile(project.Document, file.path, file.content);
+                    var asset = SiteEditing.ImportFile(EditingDocument, file.path, file.content);
                     Change(d => d.assets.Add(asset));
                 }
                 catch (Exception ex) { Report(ex.Message); }

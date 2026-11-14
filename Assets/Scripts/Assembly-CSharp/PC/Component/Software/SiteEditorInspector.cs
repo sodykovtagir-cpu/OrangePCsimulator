@@ -23,7 +23,7 @@ namespace PC.Component.Software
         void InitInspector()
         {
             pivotDropdown.ClearOptions();pivotDropdown.AddOptions(new List<string>(SiteEditing.LayoutNames));
-            pivotDropdown.onValueChanged.AddListener(index=>{ var id=selected; if(project.Document.Find(id)!=null)Change(d=>SiteEditing.SetLayout(d,d.Find(id),index)); });
+            pivotDropdown.onValueChanged.AddListener(index=>{ var id=selected; if(EditingDocument.Find(id)!=null)Change(d=>SiteEditing.SetLayout(d,d.Find(id),index)); });
             fontDropdown.ClearOptions();fontDropdown.AddOptions(new List<string>{"Default","Monospace","Medium"});
             fontDropdown.onValueChanged.AddListener(index=>SetField("font",new[]{"default","mono","medium"}[index]));
             ConfigureArguments(null);
@@ -31,6 +31,7 @@ namespace PC.Component.Software
         void RefreshInspector(SiteElement element)
         {
             if(sections==null)return;
+            ConfigureArguments(ReadArguments(false));LayoutActions();
             float y=44;
             foreach(var section in sections)
             {
@@ -47,7 +48,7 @@ namespace PC.Component.Software
                 Mark(boldButton,element.bold);Mark(italicButton,element.italic);Mark(underlineButton,element.underline);Mark(strikeButton,element.strike);
             }
             RefreshAssets();
-            ConfigureArguments(ReadArguments(false));
+            RefreshBackground();
         }
         static void Mark(Button button,bool selected)
         { if(button!=null)button.GetComponent<Image>().color=selected?new Color(1,.72f,.35f):new Color(.83f,.83f,.83f); }
@@ -55,21 +56,21 @@ namespace PC.Component.Software
         public void ToggleUnderline(){ToggleStyle("underline");} public void ToggleStrike(){ToggleStyle("strike");}
         void ToggleStyle(string style)
         {
-            if(!SiteEditing.Supports(project.Document.Find(selected),"text"))return;
+            if(!SiteEditing.Supports(EditingDocument.Find(selected),"text"))return;
             Change(d=>{var e=d.Find(selected);switch(style){case "bold":e.bold=!e.bold;break;case "italic":e.italic=!e.italic;break;case "underline":e.underline=!e.underline;break;case "strike":e.strike=!e.strike;break;}});
         }
         public void EnableImageClick()
         {
-            if(project.Document.Find(selected)==null)return;
+            if(EditingDocument.Find(selected)==null)return;
             Change(d=>SiteEditing.MakeClickable(d.Find(selected)));
         }
         public void PickTextColor(){PickFieldColor("textColor");} public void PickFillColor(){PickFieldColor("fill");} public void PickBackgroundColor(){PickFieldColor("background");}
         void PickFieldColor(string field)
         {
-            var e=project.Document.Find(selected);
+            var e=EditingDocument.Find(selected);
             if(field!="background"&&!SiteEditing.Supports(e,field=="fill"?"fill":"text"))return;
             string id=selected;int epoch=editEpoch;
-            string value=field=="background"?project.Document.background:field=="fill"?e.fill:e.textColor;
+            string value=field=="background"?EditingDocument.background:field=="fill"?e.fill:e.textColor;
             Pick(value,color=>{if(epoch!=editEpoch)return;Change(d=>{if(field=="background")d.background=color;else {var target=d.Find(id);if(target==null)return;if(field=="fill")target.fill=color;else target.textColor=color;}});});
         }
         void Pick(string initial,Action<string> completed)
@@ -83,7 +84,7 @@ namespace PC.Component.Software
         {
             if(assetRoot==null||assetRowTemplate==null)return;
             ClearRows(assetRoot);int i=0;
-            foreach(var asset in project.Document.assets)
+            foreach(var asset in EditingDocument.assets)
             {
                 string name=asset.name;var row=Instantiate(assetRowTemplate,assetRoot);row.SetActive(true);
                 var rect=(RectTransform)row.transform;rect.anchoredPosition=new Vector2(4,-i++*36);rect.sizeDelta=new Vector2(-8,32);
@@ -95,15 +96,18 @@ namespace PC.Component.Software
         }
         void RemoveAsset(string name)
         {
-            Change(d=>
+            try { project.Change(root=>
             {
-                if(d.icon==name)d.icon="";foreach(var e in d.elements)if(e.image==name)e.image="";
-                d.assets.Remove(d.Asset(name));
-            });
+                if(root.icon==name)root.icon="";
+                var docs=new List<SiteDocument>{root};foreach(var page in root.pages)docs.Add(SitePages.Document(root,page));
+                foreach(var doc in docs){if(doc.backgroundImage==name)doc.backgroundImage="";foreach(var e in doc.elements)if(e.image==name)e.image="";}
+                foreach(var page in root.pages)if(page.backgroundImage==name)page.backgroundImage="";
+                root.assets.Remove(root.Asset(name));
+            });Redraw(); }catch(Exception ex){Report(ex.Message);return;}
             Report("Удалён файл: "+name+". Проверь действия, которые ссылались на него.");
         }
         void CommandChanged()
-        { selectedAction=-1;ConfigureArguments(null);RefreshActions(project.Document.Find(selected)); }
+        { selectedAction=-1;ConfigureArguments(null);BuildInspector(); }
         void ConfigureArguments(List<string> values)
         {
             if(argumentControls==null)return;
@@ -117,11 +121,11 @@ namespace PC.Component.Software
                 row.color.gameObject.SetActive(!choice&&spec.Arguments[i]=="color");
                 if(choice)
                 {
-                    var options=SiteEditing.Choices(project.Document,spec,i);var titles=new List<string>{"— Choose —"};
+                    var options=SiteEditing.Choices(EditingDocument,spec,i);var titles=new List<string>{"— Choose —"};
                     var stored=new List<string>{""};
                     foreach(string option in options)
                     {
-                        stored.Add(option);var element=spec.Arguments[i]=="id"?project.Document.Find(option):null;
+                        stored.Add(option);var element=spec.Arguments[i]=="id"?EditingDocument.Find(option):null;
                         titles.Add(element==null?option:element.name+" ["+element.kind+"] · "+option);
                     }
                     int index=stored.IndexOf(value);
@@ -140,7 +144,7 @@ namespace PC.Component.Software
             {
                 var row=argumentControls[i];bool choice=SiteEditing.UsesChoice(spec,i);
                 string value=choice?(argumentOptions.Count>i&&row.choice.value<argumentOptions[i].Count?argumentOptions[i][row.choice.value]:""):row.input.text;
-                if(validate&&choice&&!SiteEditing.Choices(project.Document,spec,i).Contains(value))throw new ArgumentException("Выбери допустимый "+spec.Arguments[i]+" из списка");
+                if(validate&&choice&&!SiteEditing.Choices(EditingDocument,spec,i).Contains(value))throw new ArgumentException("Выбери допустимый "+spec.Arguments[i]+" из списка");
                 values.Add(value);
             }
             return values;

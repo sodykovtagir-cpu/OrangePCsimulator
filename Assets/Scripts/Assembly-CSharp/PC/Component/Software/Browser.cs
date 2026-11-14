@@ -334,7 +334,7 @@ namespace PC.Component.Software
             }
             // Searching is a real (simulated) request, even though site
             // prefabs themselves are local assets.
-            LoadOnline(url, .3f, () => ShowResults(query.ToLowerInvariant()));
+            LoadOnline(url, .3f, () => CustomOrResults(query,url));
         }
 
         private static string NormalizeUrl(string url)
@@ -460,6 +460,7 @@ namespace PC.Component.Software
                     });
                 }
             }
+            LoadCustomResults(query);
         }
 
         // ================= OPEN SITE =================

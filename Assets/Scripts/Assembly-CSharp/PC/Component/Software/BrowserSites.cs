@@ -28,6 +28,8 @@ namespace PC.Component.Software
         {
             if (siteNavigationClosed || system == null || !system.Ready) return false;
             localNavigationStarted = true;
+            string route="/";int pageHash=url.IndexOf("#page/",StringComparison.Ordinal);
+            if(pageHash>=0){route="/"+url.Substring(pageHash+6);url=url.Substring(0,pageHash);if(!SitePages.SafeRoute(route)){ShowError("Invalid page path");return false;}}
             int id; string path, asset;
             if (!SiteLocalAddress.TryParse(url, out id, out path, out asset) || system == null || system.AllStorage == null || system.FileManager == null)
             { ShowError("Неверный локальный путь сайта"); return false; }
@@ -38,7 +40,7 @@ namespace PC.Component.Software
                 try
                 {
                     var doc = SiteDocument.Parse(file.content);
-                    if (string.IsNullOrEmpty(asset)) RenderLocalDocument(doc, id, path);
+                    if (string.IsNullOrEmpty(asset)) RenderLocalDocument(doc, id, path,route);
                     else
                     {
                         var found = doc.Asset(asset); if (found == null) throw new ArgumentException("File not found in site root");
@@ -50,20 +52,20 @@ namespace PC.Component.Software
             }
             ShowError("Файл сайта не найден на диске PCOS"); return false;
         }
-        void RenderLocalDocument(SiteDocument document, int diskId, string path)
+        void RenderLocalDocument(SiteDocument document, int diskId, string path,string route="/")
         {
             ClearPage(); localNavigationStarted = true; oggleHome.SetActive(false);
-            localDocument = document;
-            string url = SiteLocalAddress.Build(diskId, path); addressBar.SetTextWithoutNotify(url);
+            var root=document;document=SitePages.At(root,route);localDocument = document;
+            string url = SiteLocalAddress.Build(diskId, path)+(route=="/"?"":"#page"+route); addressBar.SetTextWithoutNotify(url);
             var canvas = SiteCanvas.Create(pageContainer); networkPage = canvas.gameObject;
             canvas.URL = url;
             canvas.Message = message => system?.ShowMessageBox("Website", message);
-            canvas.Redirect = destination => DeferLocalNavigation(() => { addressBar.text = destination; Search(); });
+            canvas.Redirect = destination => DeferLocalNavigation(() => { if(destination.StartsWith("/",StringComparison.Ordinal))RenderLocalDocument(root,diskId,path,destination);else{addressBar.text = destination; Search();} });
             canvas.OpenFile = asset => DeferLocalNavigation(() => ShowBundledFile(document, diskId, path, asset));
             canvas.Download = DownloadSiteAsset;
             canvas.Render(document, false);
         }
-        void ShowBundledFile(SiteDocument document, int diskId, string path, SiteAsset asset)
+        void ShowBundledFile(SiteDocument document, int diskId, string path, SiteAsset asset,string remoteBase="")
         {
             // Keep a root-scoped package reference; never resolve file arguments
             // through the visitor's FileManager or execute an imported program.
@@ -73,7 +75,7 @@ namespace PC.Component.Software
             { system?.ShowMessageBox("Website", "OpenFile открывает текст и изображения из сайта. Для других файлов используй StartDownload."); return; }
             ClearPage(); localNavigationStarted = true; oggleHome.SetActive(false);
             localDocument = document;
-            string url = SiteLocalAddress.Build(diskId, path, asset.name); addressBar.SetTextWithoutNotify(url);
+            string url = remoteBase==""?SiteLocalAddress.Build(diskId, path, asset.name):remoteBase+"#site/"+Uri.EscapeDataString(asset.name); addressBar.SetTextWithoutNotify(url);
             if (image)
             {
                 var picture = new SiteDocument(); picture.assets.Add(asset);
@@ -122,7 +124,7 @@ namespace PC.Component.Software
         }
         void ClearLocalContext()
         {
-            localGeneration++;
+            ClearCustomContext();localGeneration++;
             if (pendingLocalNavigation != null) { StopCoroutine(pendingLocalNavigation); pendingLocalNavigation = null; }
             localDocument = null;
         }

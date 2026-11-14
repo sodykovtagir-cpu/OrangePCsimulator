@@ -11,5 +11,5 @@ if not(shutil.which('mcs') and shutil.which('mono')):raise SystemExit('Mono/mcs 
 with tempfile.TemporaryDirectory() as td:
     for test in ['site_core_tests.cs','site_actions_tests.cs','site_inspector_tests.cs']:
         exe=Path(td)/'test.exe'
-        subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(exe),str(R/'tools/tests/site_core_stubs.cs'),str(R/'tools/tests'/test),str(C/'Lua/PcosLua.cs'),*[str(C/'Sites'/n) for n in ['SiteDocument.cs','SiteHistory.cs','SiteLua.cs','SiteCommands.cs','SiteLocalAddress.cs','SiteEditing.cs']]],check=True)
+        subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(exe),str(R/'tools/tests/site_core_stubs.cs'),str(R/'tools/tests'/test),str(C/'Lua/PcosLua.cs'),*[str(C/'Sites'/n) for n in ['SiteDocument.cs','SiteHistory.cs','SiteLua.cs','SiteCommands.cs','SiteLocalAddress.cs','SiteEditing.cs','SitePages.cs']]],check=True)
         subprocess.run(['mono',str(exe)],check=True,timeout=20)

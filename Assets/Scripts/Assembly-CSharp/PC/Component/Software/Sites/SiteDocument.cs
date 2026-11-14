@@ -16,13 +16,15 @@ namespace PC.Component.Software.Sites
         public const int MaxAssetBytes = 2 * 1024 * 1024;
         public const int MaxScriptLength = 8192;
         public string format = "orange-site";
+        public string hostingKey = "";
         public int version = 1;
         public string title = "New site";
         public string description = "";
         public string keywords = "";
         public string icon = "";
         public float width = 960, height = 720;
-        public string background = "#FFFFFF";
+        public string background = "#FFFFFF", backgroundImage = "", viewportMode = "";
+        public List<SitePage> pages = new List<SitePage>();
         public List<SiteElement> elements = new List<SiteElement>();
         // Flat, virtual site root. No operating-system paths or external URLs.
         public List<SiteAsset> assets = new List<SiteAsset>();
@@ -117,6 +119,17 @@ namespace PC.Component.Software.Sites
                 if (element.kind != "button" && (!string.IsNullOrEmpty(element.onClick) || element.actions.Count > 0)) throw new ArgumentException("OnClick belongs to a button");
             }
             if (!string.IsNullOrEmpty(icon)) ImageAsset(icon);
+            if (!string.IsNullOrEmpty(backgroundImage)) ImageAsset(backgroundImage);
+            if (viewportMode != "" && viewportMode != "viewport") throw new ArgumentException("Unknown viewport mode");
+            if (pages == null) pages = new List<SitePage>();
+            if (pages.Count > 15) throw new ArgumentException("16 pages maximum");
+            var paths = new HashSet<string>(); int elementCount=elements.Count;
+            foreach(var page in pages)
+            {
+                if(page==null || !SitePages.SafeRoute(page.path) || page.path=="/" || !paths.Add(page.path) || page.elements==null) throw new ArgumentException("Invalid or duplicate page route");
+                elementCount+=page.elements.Count;if(elementCount>MaxElements)throw new ArgumentException("256 elements across all pages maximum");
+                SitePages.Document(this,page).Validate();
+            }
         }
 
         public SiteElement Find(string id) { return elements.Find(e => e.id == id); }
@@ -135,6 +148,7 @@ namespace PC.Component.Software.Sites
         public static string NormalizeUrl(string value)
         {
             value = (value ?? "").Trim().ToLowerInvariant();
+            if(value.StartsWith("/",StringComparison.Ordinal)&&SitePages.SafeRoute(value))return value;
             if (value.StartsWith("https://", StringComparison.Ordinal)) value = value.Substring(8);
             else if (value.StartsWith("http://", StringComparison.Ordinal)) value = value.Substring(7);
             value = value.TrimEnd('/');
