@@ -105,6 +105,17 @@ def pipeline(native,source=colour,angle=180):
 
 zero=np.zeros((h,w,2),dtype='f4');still,_=pipeline(zero)
 assert np.max(np.abs(still-image))<.0001,'stationary stock filter blurred';checks+=1
+for angle in [270,360]:
+ stationary,_=pipeline(zero,angle=angle)
+ assert np.max(np.abs(stationary-image))<.0001,'strong preset smeared stationary frame';checks+=1
+# Reproduce a subtle turn falling below the stock 2px radius threshold at
+# 180 degrees, then verify 270 degrees actually crosses it. No custom blur.
+subtle=zero.copy();subtle[:,:,0]=6/w
+subtle180,_=pipeline(subtle,angle=180)
+subtle270,_=pipeline(subtle,angle=270)
+assert np.max(np.abs(subtle180-image))<.0001,'fixture must be below stock threshold';checks+=1
+subtle_difference=float(np.mean(np.abs(subtle270[:,:,:3]-image[:,:,:3])))
+assert subtle_difference>.01,('270-degree preset still below stock threshold',subtle_difference);checks+=1
 # Isolated yaw-like input, with no player translation. Native vectors are synthetic.
 native=zero.copy();native[:,:,0]=16/w
 blur,velocity=pipeline(native)

@@ -14,6 +14,8 @@ namespace UnityEngine {
  public enum HideFlags{HideAndDontSave}
  public class RequireComponent:Attribute{public RequireComponent(Type t){}}
  public class DisallowMultipleComponent:Attribute{}
+ public class RangeAttribute:Attribute{public RangeAttribute(float a,float b){}}
+ public class ContextMenu:Attribute{public ContextMenu(string s){}}
  public class DefaultExecutionOrder:Attribute{public DefaultExecutionOrder(int n){}}
  public static class Events{public static void Call(object o,string s){var m=o.GetType().GetMethod(s,BindingFlags.Instance|BindingFlags.NonPublic|BindingFlags.Public);if(m!=null)m.Invoke(o,null);}}
  public class Component:Object{public GameObject gameObject;public Transform transform=>gameObject.transform;public T GetComponent<T>()where T:class{return gameObject.GetComponent<T>();}}
@@ -23,7 +25,7 @@ namespace UnityEngine {
  public class ScriptableObject:Object{public static T CreateInstance<T>()where T:new(){return new T();}}
  public struct Vector3{public float x,y,z;public Vector3(float a,float b,float c){x=a;y=b;z=c;}public static float Distance(Vector3 a,Vector3 b){return(float)Math.Sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));}}
  public struct Quaternion{public float yaw;public static float Angle(Quaternion a,Quaternion b){return Math.Abs(a.yaw-b.yaw);}}
- public static class Mathf{public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
+ public static class Mathf{public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static int Clamp(int v,int a,int b){return Math.Max(a,Math.Min(b,v));}public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
  [Flags]public enum DepthTextureMode{None=0,Depth=1,MotionVectors=4}
  public enum RenderTextureFormat{Default,RGHalf}
  public class Camera:MonoBehaviour{public float fieldOfView=60;public int pixelWidth=1920,pixelHeight=1080;public RenderTexture targetTexture;public bool allowHDR,allowMSAA;public DepthTextureMode depthTextureMode;}
@@ -33,7 +35,7 @@ namespace UnityEngine {
  public static class Graphics{public static void Blit(object a,object b){}public static void Blit(object a,object b,object c,int d){}}
  public static class Resources{public static bool available=true;public static T Load<T>(string s)where T:class,new(){return available?new T():null;}}
  public static class SystemInfo{public static bool supportsMotionVectors=true,half=true;public static bool SupportsRenderTextureFormat(RenderTextureFormat f){return half;}}
- public static class Debug{public static int warnings;public static void LogWarning(string s){warnings++;}}
+ public static class Debug{public static int warnings;public static void LogWarning(string s){warnings++;}public static void Log(string s){}}
  public static class Time{public static float timeScale=1,unscaledDeltaTime=1f/180;public static int frameCount;}
  public static class PlayerPrefs{public static Dictionary<string,int> p=new Dictionary<string,int>();public static int GetInt(string s,int d){return p.ContainsKey(s)?p[s]:d;}}
 }
@@ -45,7 +47,7 @@ namespace UnityEngine.Rendering.PostProcessing {
  public class ShaderResources{public Shader motionBlur=new Shader();}
  public class PostProcessResources:ScriptableObject{public ShaderResources shaders=new ShaderResources();}
  public class Fog{public bool enabled=true;}
- public class PostProcessLayer:MonoBehaviour{public enum Antialiasing{None,TemporalAntialiasing}public int volumeLayer;public Transform volumeTrigger;public Antialiasing antialiasingMode;public bool finalBlitToCameraTarget=true;public Fog fog=new Fog();public PostProcessResources resources;public int resets;public void Init(PostProcessResources r){resources=r;}public void ResetHistory(){resets++;}}
+ public class PostProcessLayer:MonoBehaviour{public enum Antialiasing{None,TemporalAntialiasing}public int volumeLayer;public Transform volumeTrigger;public Antialiasing antialiasingMode;public bool finalBlitToCameraTarget=true;public Fog fog=new Fog();public PostProcessResources resources;public int resets;public void Init(PostProcessResources r){resources=r;}public void ResetHistory(){resets++;}public T GetSettings<T>()where T:new(){return new T();}}
 }
 static class Bootstrap { SETUP public static void Run(Camera c){SetupCamera(c);}}
 class Test {
@@ -60,7 +62,7 @@ class Test {
   Check(layer!=null&&layer.enabled,"stock layer missing");Check(c.GetComponent<SimpleScreenFx>()==null,"second blur/image pass created");
   Check(layer.resources!=null&&!layer.finalBlitToCameraTarget,"resources/chain wrong");
   Check(layer.antialiasingMode==PostProcessLayer.Antialiasing.None&&!layer.fog.enabled,"unrequested AA/fog");
-  Check(Settings().shutterAngle.value==180&&Settings().sampleCount.value==16,"wrong baseline");
+  Check(Settings().shutterAngle.value==270&&Settings().sampleCount.value==16,"wrong baseline");
   Check(Settings().shutterAngle.overrideState&&Settings().sampleCount.overrideState,"settings not overridden");
   Check(c.depthTextureMode==(DepthTextureMode.Depth|DepthTextureMode.MotionVectors),"native camera motion/depth not requested");
   Check(!Frame(c)&&Frame(c),"initial reset/stationary native pipeline");
@@ -68,8 +70,13 @@ class Test {
   c.transform.position=new Vector3(0,0,.1f);Check(Frame(c),"walking disabled blur");
   foreach(int fps in new[]{30,60,90,120,144,180,240}){
    Time.unscaledDeltaTime=1f/fps;c.transform.rotation=new Quaternion{yaw=c.transform.rotation.yaw+.1f};Check(Frame(c),"normal turn considered cut");
-   Check(Settings().shutterAngle.value==180,"FPS compensation reintroduced");
+   Check(Settings().shutterAngle.value==270,"FPS compensation reintroduced");
   }
+  var controls=c.GetComponent<StockMotionBlur>();
+  controls.shutterAngle=360;controls.sampleCount=24;Check(Frame(c)&&Settings().shutterAngle.value==360&&Settings().sampleCount.value==24,"live Inspector controls not applied");
+  controls.shutterAngle=999;controls.sampleCount=100;Frame(c);Check(Settings().shutterAngle.value==360&&Settings().sampleCount.value==32,"Inspector upper limits ignored");
+  controls.shutterAngle=-100;controls.sampleCount=-5;Frame(c);Check(Settings().shutterAngle.value==0&&Settings().sampleCount.value==4,"Inspector lower limits ignored");
+  controls.shutterAngle=270;controls.sampleCount=16;Frame(c);Events.Call(controls,"PrintDiagnostics");
   Time.timeScale=0;Check(!Frame(c),"pause blur");Time.timeScale=1;Check(!Frame(c)&&Frame(c),"resume not reset");
   c.transform.position=new Vector3(0,0,20);Check(!Frame(c)&&Frame(c),"teleport not reset");
   c.transform.rotation=new Quaternion{yaw=90};Check(!Frame(c)&&Frame(c),"camera cut not reset");
@@ -101,7 +108,7 @@ class Test {
   Events.Call(second.GetComponent<StockMotionBlur>(),"OnDisable");Events.Call(second.GetComponent<StockMotionBlur>(),"OnDestroy");
   Check(Settings()==null,"last camera leaked runtime profile");
   f.SetValue(null,new PostProcessResources());var afterScene=NewCamera();Bootstrap.Run(afterScene);
-  Check(afterScene.GetComponent<PostProcessLayer>()!=null&&Settings().shutterAngle.value==180,"new scene did not recreate stock profile");
+  Check(afterScene.GetComponent<PostProcessLayer>()!=null&&Settings().shutterAngle.value==270,"new scene did not recreate stock profile");
   Console.WriteLine("PASS: "+n+" real integration C# checks with lifecycle/API doubles (not Unity rendering)");
  }
 }

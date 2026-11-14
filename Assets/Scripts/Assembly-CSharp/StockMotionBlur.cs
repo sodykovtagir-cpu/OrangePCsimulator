@@ -7,6 +7,9 @@ using UnityEngine.Rendering.PostProcessing;
 [DisallowMultipleComponent]
 public sealed class StockMotionBlur : MonoBehaviour
 {
+    [Range(0f, 360f)] public float shutterAngle = 270f;
+    [Range(4, 32)] public int sampleCount = 16;
+
     private const string ResourceName = "OrangePCPostProcessResources";
     // An unnamed, otherwise unused layer: the volume has no renderers/colliders.
     private const int VolumeLayer = 31;
@@ -66,8 +69,8 @@ public sealed class StockMotionBlur : MonoBehaviour
             profile.hideFlags = HideFlags.HideAndDontSave;
             settings = profile.AddSettings<MotionBlur>();
             settings.enabled.Override(true);
-            settings.shutterAngle.Override(180f);
-            settings.sampleCount.Override(16);
+            settings.shutterAngle.Override(Mathf.Clamp(shutterAngle, 0f, 360f));
+            settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
             var holder = new GameObject("Motion Blur (Unity Post-processing)");
             holder.hideFlags = HideFlags.HideAndDontSave;
             holder.layer = VolumeLayer;
@@ -112,6 +115,10 @@ public sealed class StockMotionBlur : MonoBehaviour
             Mathf.Abs(previousFov - viewCamera.fieldOfView) > .5f ||
             previousWidth != viewCamera.pixelWidth || previousHeight != viewCamera.pixelHeight ||
             Time.unscaledDeltaTime > .1f;
+        // Read live Inspector values for THIS camera before volume blending.
+        // This is the stock shutter-angle scale, never an FPS multiplier.
+        settings.shutterAngle.Override(Mathf.Clamp(shutterAngle, 0f, 360f));
+        settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
         settings.enabled.Override(!suspended && !cut);
         if (suspended || cut) layer.ResetHistory();
         havePrevious = !suspended;
@@ -142,6 +149,22 @@ public sealed class StockMotionBlur : MonoBehaviour
         volume = null;
         settings = null;
         profile = null;
+    }
+
+    [ContextMenu("Motion Blur/Print active settings")]
+    private void PrintDiagnostics()
+    {
+        if (!ready || layer == null || !layer.enabled)
+        {
+            Debug.Log("[StockMotionBlur] Inactive. Toggle PP_MotionBlur on and check warnings for GPU/shader support.");
+            return;
+        }
+        var effective = layer.GetSettings<MotionBlur>();
+        Debug.Log("[StockMotionBlur] Effective stock settings: enabled=" + effective.enabled.value +
+            ", shutter=" + effective.shutterAngle.value + ", samples=" + effective.sampleCount.value +
+            ", frameTimeMs=" + (Time.unscaledDeltaTime * 1000f) +
+            ", depthMode=" + viewCamera.depthTextureMode +
+            ". These are layer settings, not a measurement of GPU vector contents.");
     }
 
     private void Warn(string message)

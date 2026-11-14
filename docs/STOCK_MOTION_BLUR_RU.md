@@ -9,12 +9,12 @@
 
 Настройки профиля:
 
-- `shutterAngle = 180°`: половина текущего кадра, а не постоянная 1/40 секунды;
+- `shutterAngle = 270°`: три четверти текущего кадра, а не постоянная 1/40 секунды;
 - `sampleCount = 16`;
 - штатные native motion vectors + depth, stock velocity/tile/neighbor/reconstruction;
 - без включения TAA, FXAA, SMAA и дополнительного deferred fog.
 
-При 180 FPS выдержка соответствует примерно 1/360 секунды, а не 1/40.
+При 180 FPS выдержка соответствует примерно 1/240 секунды, а не 1/40.
 Поэтому медленное движение на высоком FPS намеренно остаётся почти резким.
 Мы больше не пытаемся сделать одинаковую силу смаза на 60 и 240 FPS.
 Поворот камеры не зависит от нажатия клавиш ходьбы: векторы формирует Unity.
@@ -64,14 +64,14 @@ python tools/test_motion_blur_stability.py
 python tools/test_motion_blur_visibility_gpu.py --package /path/to/extracted/package
 ```
 
-- 57 assertions над реальным интеграционным C# с lifecycle/API doubles:
-  включение/выключение, настройки 180°/16, 180 FPS, поворот без ходьбы,
+- 60 assertions над реальным интеграционным C# с lifecycle/API doubles:
+  включение/выключение, настройки 270°/16 и live Inspector controls, 180 FPS, поворот без ходьбы,
   пауза, cuts/FOV/resize, thumbnails, несколько камер, cleanup и fallback отказ.
 - 14 проверок реального MovePlayer с doubles на 30–240 FPS, включая 180.
 - Все 4 оставшихся прохода SimpleScreenFx компилируются/валидируются.
 - Все 6 **исходных stock shader fragments** 3.4.0 компилируются/валидируются
   через glslang/SPIR-V и исполняются на Mesa/EGL с platform shim.
-- 14 GPU assertions: нулевые векторы, yaw-/pitch-like векторы, ограничение
+- 18 GPU assertions: нулевые векторы, yaw-/pitch-like векторы, ограничение
   цвета, правильная половинная выдержка при 60/120/144/180/240 FPS,
   разные глубины, сильный near blur и резкие дальние поверхности.
 - GUID каждой ссылки Resources asset найден в meta точной версии пакета.
@@ -105,3 +105,27 @@ Unity Editor, Play Mode и устройство пользователя зде�
 - https://docs.unity3d.com/Packages/com.unity.postprocessing@3.4/manual/Motion-Blur.html
 - https://github.com/Unity-Technologies/PostProcessing/blob/v2/PostProcessing/Runtime/Effects/MotionBlur.cs
 - https://packages.unity.com/com.unity.postprocessing/-/com.unity.postprocessing-3.4.0.tgz
+
+
+## Настройка заметности в Unity Editor
+
+После отзыва «вроде что-то есть» стандартный пресет поднят с 180° до 270°,
+без превышения штатного диапазона 0–360° и без множителя FPS. GPU fixture
+с native смещением 6 px показывает, почему небольшое изменение может быть
+заметным: при 180° radius=1.5 px и штатный фильтр возвращает исходный цвет,
+при 270° radius=2.25 px и реконструкция уже применяется. Это искусственный
+пример порога stock shader, не измерение векторов игровой сцены пользователя.
+
+В Play Mode выберите **игровую Camera** → компонент **Stock Motion Blur**:
+
+- `Shutter Angle`: живой регулятор 0–360°, исходно 270°;
+- `Sample Count`: 4–32, исходно 16 (качество, а не сила);
+- для A/B сравнения поверните камеру с 0°, затем с 270°/360°;
+- меню компонента → `Motion Blur / Print active settings` выводит параметры
+  **эффективного** слоя, frame time и depth flags в Console. Это не readback GPU.
+
+Inspector-настройки применяются перед рендером каждой камеры. Изменения только
+в Play Mode обычно не сохраняются после его остановки; дефолт 270° задан в коде.
+Если при 0° и 360° на быстром повороте нет заметной разницы, не увеличивать
+выдержку сверх диапазона: нужен захват native motion vectors / Frame Debugger
+в Unity, потому что здешний headless тест не подтверждает их генерацию сценой.
