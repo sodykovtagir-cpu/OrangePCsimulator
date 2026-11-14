@@ -13,7 +13,7 @@ namespace UnityEngine {
  public class RequireComponent:Attribute{public RequireComponent(Type t){}}
  public struct Vector3{public float x,y,z;public Vector3(float a,float b,float c){x=a;y=b;z=c;}public static Vector3 operator-(Vector3 a,Vector3 b){return new Vector3(a.x-b.x,a.y-b.y,a.z-b.z);}public static Vector3 operator*(Vector3 a,float b){return new Vector3(a.x*b,a.y*b,a.z*b);}public float sqrMagnitude=>x*x+y*y+z*z;public static float Distance(Vector3 a,Vector3 b){var d=a-b;return(float)Math.Sqrt(d.sqrMagnitude);}}
  public struct Vector4{public float x,y,z,w;public Vector4(float a,float b,float c,float d){x=a;y=b;z=c;w=d;}}
- public struct Quaternion{public float yaw;public Vector3 eulerAngles=>new Vector3(0,yaw,0);public static Quaternion Inverse(Quaternion a){return new Quaternion{yaw=-a.yaw};}public static Quaternion operator*(Quaternion a,Quaternion b){return new Quaternion{yaw=a.yaw+b.yaw};}public static float Angle(Quaternion a,Quaternion b){return Math.Abs(a.yaw-b.yaw);}}
+ public struct Quaternion{public float yaw,pitch;public float y=>(float)Math.Sin(yaw*Math.PI/360);public float x=>(float)Math.Sin(pitch*Math.PI/360);public float w=>(float)(Math.Cos(yaw*Math.PI/360)*Math.Cos(pitch*Math.PI/360));public Vector3 eulerAngles=>new Vector3(0,yaw,0);public static Quaternion Inverse(Quaternion a){return new Quaternion{yaw=-a.yaw,pitch=-a.pitch};}public static Quaternion operator*(Quaternion a,Quaternion b){return new Quaternion{yaw=a.yaw+b.yaw,pitch=a.pitch+b.pitch};}public static float Angle(Quaternion a,Quaternion b){return Math.Abs(a.yaw-b.yaw);}}
  public class Transform{public Vector3 position;public Quaternion rotation;public Vector3 InverseTransformDirection(Vector3 v){return v;}public Vector3 TransformDirection(Vector3 v){return v;}}
  public class Camera{public Transform transform=new Transform();public float fieldOfView=60,aspect=1.777f;public RenderTexture targetTexture;}
  public class Shader{public static Shader Find(string s){return new Shader();}}
@@ -24,7 +24,7 @@ namespace UnityEngine {
  public static class Debug{public static void LogWarning(string s){}}
  public static class SystemInfo{public static bool supportsMotionVectors;}
  public static class Time{public static int frameCount;public static float timeScale=1,unscaledDeltaTime=1f/60;}
- public static class Mathf{public static int Max(int a,int b){return Math.Max(a,b);}public static float Max(float a,float b){return Math.Max(a,b);}public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static float Abs(float a){return Math.Abs(a);}public static float DeltaAngle(float a,float b){float d=(b-a)%360;return d>180?d-360:d;}}
+ public static class Mathf{public const float Rad2Deg=57.29578f;public static float Atan2(float a,float b){return(float)Math.Atan2(a,b);}public static float Exp(float a){return(float)Math.Exp(a);}public static int Max(int a,int b){return Math.Max(a,b);}public static float Max(float a,float b){return Math.Max(a,b);}public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static float Abs(float a){return Math.Abs(a);}public static float DeltaAngle(float a,float b){float d=(b-a)%360;return d>180?d-360:d;}}
  public class AudioClip{}public class AudioSource{public void PlayOneShot(AudioClip a){}}
  public class CharacterController{public bool enabled=true,isGrounded=true;public Vector3 velocity;public float z;public void Move(Vector3 d){z+=d.z;velocity=d;}}
  public static class Random{public static int Range(int a,int b){return a;}}
@@ -37,7 +37,7 @@ class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new
  var camera=new Camera();MonoBehaviour.TestCamera=camera;var fx=new SimpleScreenFx{motionBlur=true};var material=new Material(new Shader());var source=new RenderTexture();Time.frameCount=1;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"first frame smeared");
  Time.frameCount++;camera.transform.position=new Vector3(0,0,.1f);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==1&&material.v["_FallbackMotion"].z>0,"forward movement missing");Check(Math.Abs(material.f["_Shutter"]-1.5f)<.0001&&material.f["_MaxMotionPixels"]==24,"unbounded shutter");
  Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"duplicate camera render corrupted state");
- Time.frameCount++;SystemInfo.supportsMotionVectors=true;Call(fx,"ConfigureMotion",material,source);Check(material.f["_UseMotionVectors"]==1,"GPU velocity not selected");
+ Time.frameCount++;SystemInfo.supportsMotionVectors=true;Call(fx,"ConfigureMotion",material,source);Check(material.f["_UseMotionVectors"]==0,"native vectors competed with camera velocity");
  Time.frameCount++;camera.transform.position=new Vector3(0,0,10);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"teleport smeared");
  Time.frameCount++;source.width=1280;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"resolution switch smeared");
  Time.frameCount++;camera.fieldOfView=90;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"FOV switch smeared");
@@ -45,6 +45,31 @@ class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new
  Time.frameCount+=3;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"missing frames smeared");
  Time.frameCount++;camera.targetTexture=new RenderTexture();Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"save thumbnail smeared");camera.targetTexture=null;Call(fx,"OnDisable");Time.frameCount++;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"disable did not reset");
  foreach(int fps in new[]{30,60,90,120,144,180,240}){Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/fps;Time.frameCount++;camera.transform.position=new Vector3();Call(fx,"ConfigureMotion",material,source);Time.frameCount++;camera.transform.position=new Vector3(0,0,10f/fps);Call(fx,"ConfigureMotion",material,source);Check(Math.Abs(material.f["_Shutter"]-fps/40f)<.0001,"high-FPS exposure faded");Check(Math.Abs(material.f["_Shutter"]*material.v["_FallbackMotion"].z-.035f)<.0001,"sprint blur depends on refresh rate");}
+
+ // Exercise actual C# angular extraction, not a manually supplied shader vector.
+ foreach(int fps in new[]{60,120,180,240}) foreach(bool vertical in new[]{false,true}) {
+  Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/fps;camera.transform.rotation=new Quaternion();
+  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
+  camera.transform.rotation=vertical?new Quaternion{pitch=.001f}:new Quaternion{yaw=.001f};
+  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
+  Vector4 v=material.v["_FallbackMotion"];
+  Check(vertical?v.y>0:v.x<0,"tiny rotation at rest lost");
+  Check(material.f["_UseMotionVectors"]==0,"camera/native source toggled during rotation");
+ }
+ // Simulate mouse samples arriving every other 180-Hz render frame.
+ Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/180;camera.transform.rotation=new Quaternion();
+ Time.frameCount++;Call(fx,"ConfigureMotion",material,source);float previous=0,maxJump=0;
+ for(int i=0;i<100;i++){
+  if(i%2==0)camera.transform.rotation=new Quaternion{yaw=(i/2+1)*.2f};
+  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
+  float current=material.v["_FallbackMotion"].x*material.f["_Shutter"];
+  if(i>20){maxJump=Math.Max(maxJump,Math.Abs(current-previous));Check(Math.Abs(current)>.001,"blur flickered off between input samples");}
+  previous=current;
+ }
+ Check(maxJump<.002,"velocity smoothing did not suppress alternating input");
+ for(int i=0;i<40;i++){Time.frameCount++;Call(fx,"ConfigureMotion",material,source);}
+ Check(Math.Abs(material.v["_FallbackMotion"].x)<.000001,"stationary camera retained blur");
+ Check(material.f["_UseMotionVectors"]==1,"stationary camera lost object vectors");
  foreach(int fps in new[]{30,60,90,120,144,180,240}){var walker=new Walker();for(int i=0;i<fps;i++)walker.Run(1f/fps);Check(Math.Abs(walker.controller.z-10)<.0001,"movement depends on frame rate");walker.controller.enabled=false;walker.Run(1);Check(Math.Abs(walker.controller.z-10)<.0001,"disabled controller moved");}
  Console.WriteLine("PASS: "+n+" actual motion/reset/movement checks: forward blur, GPU/fallback selection, camera cuts, pause/resume, thumbnails and 30–240 FPS movement");}}
 '''.replace('MOVEMENT',movement)

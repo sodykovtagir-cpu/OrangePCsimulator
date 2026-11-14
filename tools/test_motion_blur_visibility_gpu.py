@@ -65,5 +65,14 @@ with tempfile.TemporaryDirectory()as td:
  for frame in references:assert np.max(np.abs(frame-at180))<.003,'different blur at same camera speed'
  still_depth=render(fallback=(0,0,0,0),fps=180,depth_edges=True)
  assert np.max(np.abs(still_depth-off))<.0001,'depth filter smeared stationary scene'
- print('PASS: 21 GPU visibility checks including 60/120/144/180/240 FPS, depth discontinuities and weak nonzero native vectors: blank native texture still blurs, GPU/camera paths, static/off sharpness, invalid vectors, thin-line spread and bounded colour; 180-FPS mean pixel change %.3f'%change180)
+ # A camera pitch moves horizontal edges, not the vertical-only fixture above.
+ # Keep the render dimensions: horizontal strips instead of transposed texture.
+ horizontal=np.zeros_like(image);horizontal[:,:,3]=1
+ for y in range(0,h,16):horizontal[y:y+2,:,:3]=1
+ texture.write(horizontal.tobytes())
+ pitch=render(fallback=(0,.9/180,0,0),use_vectors=0,fps=180)
+ assert np.mean(np.abs(pitch[:,:,:3]-horizontal[:,:,:3]))>.03,'pitch-only camera blur invisible'
+ assert .01<pitch[4,w//2,0]<.9,'pitch blur does not spread horizontal edges'
+ texture.write(image.tobytes())
+ print('PASS: 23 GPU visibility checks including 60/120/144/180/240 FPS, depth discontinuities and weak nonzero native vectors: blank native texture still blurs, GPU/camera paths, static/off sharpness, invalid vectors, thin-line spread and bounded colour; 180-FPS mean pixel change %.3f'%change180)
  ctx.release()
