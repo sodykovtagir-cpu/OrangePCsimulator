@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Compile real integration C# with lifecycle/API doubles, not a Unity Player test."""
 from pathlib import Path
-import re, subprocess, tempfile
+import argparse, json, re, subprocess, tempfile
+parser=argparse.ArgumentParser();parser.add_argument("--export-exposure",type=Path);args=parser.parse_args()
 R=Path(__file__).resolve().parents[1]
 C=R/'Assets/Scripts/Assembly-CSharp'
 bootstrap=(C/'GraphicsBootstrap.cs').read_text()
@@ -14,6 +15,7 @@ namespace UnityEngine {
  public enum HideFlags{HideAndDontSave}
  public class RequireComponent:Attribute{public RequireComponent(Type t){}}
  public class DisallowMultipleComponent:Attribute{}
+ public class TooltipAttribute:Attribute{public TooltipAttribute(string s){}}
  public class RangeAttribute:Attribute{public RangeAttribute(float a,float b){}}
  public class ContextMenu:Attribute{public ContextMenu(string s){}}
  public class DefaultExecutionOrder:Attribute{public DefaultExecutionOrder(int n){}}
@@ -25,7 +27,7 @@ namespace UnityEngine {
  public class ScriptableObject:Object{public static T CreateInstance<T>()where T:new(){return new T();}}
  public struct Vector3{public float x,y,z;public Vector3(float a,float b,float c){x=a;y=b;z=c;}public static float Distance(Vector3 a,Vector3 b){return(float)Math.Sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));}}
  public struct Quaternion{public float yaw;public static float Angle(Quaternion a,Quaternion b){return Math.Abs(a.yaw-b.yaw);}}
- public static class Mathf{public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static int Clamp(int v,int a,int b){return Math.Max(a,Math.Min(b,v));}public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
+ public static class Mathf{public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static int Clamp(int v,int a,int b){return Math.Max(a,Math.Min(b,v));}public static float Max(float a,float b){return Math.Max(a,b);}public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
  [Flags]public enum DepthTextureMode{None=0,Depth=1,MotionVectors=4}
  public enum RenderTextureFormat{Default,RGHalf}
  public class Camera:MonoBehaviour{public float fieldOfView=60;public int pixelWidth=1920,pixelHeight=1080;public RenderTexture targetTexture;public bool allowHDR,allowMSAA;public DepthTextureMode depthTextureMode;}
@@ -62,7 +64,7 @@ class Test {
   Check(layer!=null&&layer.enabled,"stock layer missing");Check(c.GetComponent<SimpleScreenFx>()==null,"second blur/image pass created");
   Check(layer.resources!=null&&!layer.finalBlitToCameraTarget,"resources/chain wrong");
   Check(layer.antialiasingMode==PostProcessLayer.Antialiasing.None&&!layer.fog.enabled,"unrequested AA/fog");
-  Check(Settings().shutterAngle.value==270&&Settings().sampleCount.value==16,"wrong baseline");
+  Check(Math.Abs(Settings().shutterAngle.value-1620)<.001&&Settings().sampleCount.value==16,"wrong baseline");
   Check(Settings().shutterAngle.overrideState&&Settings().sampleCount.overrideState,"settings not overridden");
   Check(c.depthTextureMode==(DepthTextureMode.Depth|DepthTextureMode.MotionVectors),"native camera motion/depth not requested");
   Check(!Frame(c)&&Frame(c),"initial reset/stationary native pipeline");
@@ -70,11 +72,13 @@ class Test {
   c.transform.position=new Vector3(0,0,.1f);Check(Frame(c),"walking disabled blur");
   foreach(int fps in new[]{30,60,90,120,144,180,240}){
    Time.unscaledDeltaTime=1f/fps;c.transform.rotation=new Quaternion{yaw=c.transform.rotation.yaw+.1f};Check(Frame(c),"normal turn considered cut");
-   Check(Settings().shutterAngle.value==270,"FPS compensation reintroduced");
+   Check(Math.Abs(Settings().shutterAngle.value-270f*fps/30f)<.001,"blur exposure changes with FPS");
+   Console.WriteLine("EXPOSURE_CASE "+fps+" "+Settings().shutterAngle.value.ToString(System.Globalization.CultureInfo.InvariantCulture));
   }
+  Time.unscaledDeltaTime=1f/30;
   var controls=c.GetComponent<StockMotionBlur>();
-  controls.shutterAngle=360;controls.sampleCount=24;Check(Frame(c)&&Settings().shutterAngle.value==360&&Settings().sampleCount.value==24,"live Inspector controls not applied");
-  controls.shutterAngle=999;controls.sampleCount=100;Frame(c);Check(Settings().shutterAngle.value==360&&Settings().sampleCount.value==32,"Inspector upper limits ignored");
+  controls.shutterAngle=360;controls.sampleCount=24;Check(Frame(c)&&Math.Abs(Settings().shutterAngle.value-360)<.001&&Settings().sampleCount.value==24,"live Inspector controls not applied");
+  controls.shutterAngle=999;controls.sampleCount=100;Frame(c);Check(Math.Abs(Settings().shutterAngle.value-360)<.001&&Settings().sampleCount.value==32,"Inspector upper limits ignored");
   controls.shutterAngle=-100;controls.sampleCount=-5;Frame(c);Check(Settings().shutterAngle.value==0&&Settings().sampleCount.value==4,"Inspector lower limits ignored");
   controls.shutterAngle=270;controls.sampleCount=16;Frame(c);Events.Call(controls,"PrintDiagnostics");
   Time.timeScale=0;Check(!Frame(c),"pause blur");Time.timeScale=1;Check(!Frame(c)&&Frame(c),"resume not reset");
@@ -108,7 +112,7 @@ class Test {
   Events.Call(second.GetComponent<StockMotionBlur>(),"OnDisable");Events.Call(second.GetComponent<StockMotionBlur>(),"OnDestroy");
   Check(Settings()==null,"last camera leaked runtime profile");
   f.SetValue(null,new PostProcessResources());var afterScene=NewCamera();Bootstrap.Run(afterScene);
-  Check(afterScene.GetComponent<PostProcessLayer>()!=null&&Settings().shutterAngle.value==270,"new scene did not recreate stock profile");
+  Check(afterScene.GetComponent<PostProcessLayer>()!=null&&Math.Abs(Settings().shutterAngle.value-1620)<.001,"new scene did not recreate stock profile");
   Console.WriteLine("PASS: "+n+" real integration C# checks with lifecycle/API doubles (not Unity rendering)");
  }
 }
@@ -116,7 +120,10 @@ class Test {
 with tempfile.TemporaryDirectory() as td:
  d=Path(td); (d/'test.cs').write_text(harness)
  subprocess.run(['mcs','-out:'+str(d/'test.exe'),str(d/'test.cs'),str(C/'StockMotionBlur.cs'),str(C/'SimpleScreenFx.cs')],check=True)
- subprocess.run(['mono',str(d/'test.exe')],check=True)
+ result=subprocess.run(['mono',str(d/'test.exe')],check=True,text=True,capture_output=True)
+ exposure={int(fps):float(angle) for fps,angle in re.findall(r'^EXPOSURE_CASE (\d+) ([0-9.eE+-]+)$',result.stdout,re.M)}
+ print('\n'.join(line for line in result.stdout.splitlines() if not line.startswith('EXPOSURE_CASE ')))
+ if args.export_exposure:args.export_exposure.write_text(json.dumps(exposure))
 # Runtime resource references must resolve into the exact installed package.
 asset=R/'Assets/Resources/OrangePCPostProcessResources.asset'
 assert asset.exists() and asset.with_suffix('.asset.meta').exists()

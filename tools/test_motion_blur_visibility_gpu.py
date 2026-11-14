@@ -103,6 +103,12 @@ def pipeline(native,source=colour,angle=180):
  for t in owned:t.release()
  return result,velocity
 
+# Use angles produced by the real C# OnPreCull implementation, not a second
+# Python copy of its normalization formula.
+with tempfile.TemporaryDirectory() as td:
+ exposure_file=Path(td)/'exposure.json'
+ subprocess.run(['python',str(R/'tools/test_stock_motion_blur.py'),'--export-exposure',str(exposure_file)],check=True,capture_output=True)
+ exposure_cases={int(k):v for k,v in json.loads(exposure_file.read_text()).items()}
 zero=np.zeros((h,w,2),dtype='f4');still,_=pipeline(zero)
 assert np.max(np.abs(still-image))<.0001,'stationary stock filter blurred';checks+=1
 for angle in [270,360]:
@@ -140,6 +146,36 @@ for fps in [60,120,144,180,240]:
  _,v=pipeline(motion)
  radius_pixels=(v[h//2,w//2,0]*2-1)*18
  assert abs(radius_pixels-16*180/fps*.25)<.0001,(fps,radius_pixels);checks+=1
+# User regression: the same physical speed (12px/frame at 30 FPS) is
+# visible at 30, invisible at 180 even at 360 degrees before normalization.
+slow30=zero.copy();slow30[:,:,0]=12/w
+slow180=zero.copy();slow180[:,:,0]=(12*30/180)/w
+old30,_=pipeline(slow30,angle=270)
+old180,_=pipeline(slow180,angle=360)
+assert np.mean(np.abs(old30[:,:,:3]-image[:,:,:3]))>.03;checks+=1
+assert np.max(np.abs(old180-image))<.0001,'fixture did not reproduce invisible high-FPS blur';checks+=1
+fixed=[]
+for fps,angle in exposure_cases.items():
+ motion=zero.copy();motion[:,:,0]=(12*30/fps)/w
+ frame,v= pipeline(motion,angle=angle)
+ assert np.mean(np.abs(frame[:,:,:3]-image[:,:,:3]))>.03,(fps,'normalized effect invisible');checks+=1
+ assert abs((v[h//2,w//2,0]*2-1)*18-4.5)<.0001,(fps,'exposure length changed');checks+=1
+ fixed.append(frame)
+for frame in fixed:
+ assert np.max(np.abs(frame-fixed[0]))<.0002,'same speed gives different blur at different FPS';checks+=1
+pitch_fixed=[]
+for fps,angle in exposure_cases.items():
+ motion=zero.copy();motion[:,:,1]=(12*30/fps)/h
+ frame,_=pipeline(motion,htex,angle=angle)
+ assert np.mean(np.abs(frame[:,:,:3]-horizontal[:,:,:3]))>.03,(fps,'normalized pitch invisible');checks+=1
+ pitch_fixed.append(frame)
+for frame in pitch_fixed:
+ assert np.max(np.abs(frame-pitch_fixed[0]))<.0002,'pitch blur changes with FPS';checks+=1
+# At 180 FPS normalized angles exceed 360 intentionally. Zero velocity is
+# still perfectly sharp, including at the strongest reference-angle setting.
+for angle in [exposure_cases[180],360*180/30]:
+ stationary,_=pipeline(zero,angle=angle)
+ assert np.max(np.abs(stationary-image))<.0001,'normalization smeared stationary scene';checks+=1
 # Depth discontinuities and depth-dependent projected translation. These are
 # explicit synthetic fixtures, not a claim to have reproduced the user's scene.
 depth_values=np.where(image[:,:,0:1]>.5,.1,.8).astype('f4');depth.write(depth_values.tobytes())
@@ -151,5 +187,11 @@ translated=zero.copy();translated[:,:w//2,0]=16/w;translated[:,w//2:,0]=.2/w
 translated_image,_=pipeline(translated)
 assert np.mean(np.abs(translated_image[:,:w//2-48,:3]-image[:,:w//2-48,:3]))>.03,'near translation missing';checks+=1
 assert np.max(np.abs(translated_image[:,w//2+48:,:3]-image[:,w//2+48:,:3]))<.0001,'distant translation smeared';checks+=1
+# Repeat depth-dependent near/far movement with the normalized C# angles.
+for fps,angle in exposure_cases.items():
+ motion=zero.copy();motion[:,:w//2,0]=(12*30/fps)/w;motion[:,w//2:,0]=(.1*30/fps)/w
+ frame,_=pipeline(motion,angle=angle)
+ assert np.mean(np.abs(frame[:,:w//2-48,:3]-image[:,:w//2-48,:3]))>.03,(fps,'near blur missing');checks+=1
+ assert np.max(np.abs(frame[:,w//2+48:,:3]-image[:,w//2+48:,:3]))<.0001,(fps,'far scenery smeared');checks+=1
 htex.release();colour.release();depth.release();ctx.release()
 print('PASS: all 6 exact stock shader fragments compile/validate; %d stock GPU checks on synthetic vectors; package resource GUIDs resolve. NOT Unity/device validation.'%checks)

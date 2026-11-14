@@ -7,9 +7,11 @@ using UnityEngine.Rendering.PostProcessing;
 [DisallowMultipleComponent]
 public sealed class StockMotionBlur : MonoBehaviour
 {
+    [Tooltip("Blur strength as a shutter angle at 30 FPS. Exposure is held constant as FPS changes.")]
     [Range(0f, 360f)] public float shutterAngle = 270f;
     [Range(4, 32)] public int sampleCount = 16;
 
+    private const float ReferenceFrameRate = 30f;
     private const string ResourceName = "OrangePCPostProcessResources";
     // An unnamed, otherwise unused layer: the volume has no renderers/colliders.
     private const int VolumeLayer = 31;
@@ -69,7 +71,7 @@ public sealed class StockMotionBlur : MonoBehaviour
             profile.hideFlags = HideFlags.HideAndDontSave;
             settings = profile.AddSettings<MotionBlur>();
             settings.enabled.Override(true);
-            settings.shutterAngle.Override(Mathf.Clamp(shutterAngle, 0f, 360f));
+            settings.shutterAngle.Override(EffectiveShutterAngle());
             settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
             var holder = new GameObject("Motion Blur (Unity Post-processing)");
             holder.hideFlags = HideFlags.HideAndDontSave;
@@ -116,8 +118,9 @@ public sealed class StockMotionBlur : MonoBehaviour
             previousWidth != viewCamera.pixelWidth || previousHeight != viewCamera.pixelHeight ||
             Time.unscaledDeltaTime > .1f;
         // Read live Inspector values for THIS camera before volume blending.
-        // This is the stock shutter-angle scale, never an FPS multiplier.
-        settings.shutterAngle.Override(Mathf.Clamp(shutterAngle, 0f, 360f));
+        // Native vectors are per-frame displacement. Convert the reference
+        // exposure to this frame's angle so 180 FPS does not erase the blur.
+        settings.shutterAngle.Override(EffectiveShutterAngle());
         settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
         settings.enabled.Override(!suspended && !cut);
         if (suspended || cut) layer.ResetHistory();
@@ -128,6 +131,17 @@ public sealed class StockMotionBlur : MonoBehaviour
         previousWidth = viewCamera.pixelWidth;
         previousHeight = viewCamera.pixelHeight;
         previousFrame = Time.frameCount;
+    }
+
+    private float EffectiveShutterAngle()
+    {
+        float referenceAngle = Mathf.Clamp(shutterAngle, 0f, 360f);
+        float dt = Mathf.Max(.001f, Time.unscaledDeltaTime);
+        // Deliberately NOT clamped to 360 after normalization. That is an
+        // Inspector range, not a runtime/shader limit in PP 3.4.0. Clamping
+        // here would bring back the disappearing effect at high frame rates.
+        // e.g. 270 at 30 FPS -> 1620 at 180 FPS: both expose for 25 ms.
+        return referenceAngle / (ReferenceFrameRate * dt);
     }
 
     private void OnDisable()
@@ -161,7 +175,10 @@ public sealed class StockMotionBlur : MonoBehaviour
         }
         var effective = layer.GetSettings<MotionBlur>();
         Debug.Log("[StockMotionBlur] Effective stock settings: enabled=" + effective.enabled.value +
-            ", shutter=" + effective.shutterAngle.value + ", samples=" + effective.sampleCount.value +
+            ", referenceShutterAt30=" + shutterAngle +
+            ", effectiveShutter=" + effective.shutterAngle.value +
+            ", exposureMs=" + (Mathf.Clamp(shutterAngle, 0f, 360f) / (360f * ReferenceFrameRate) * 1000f) +
+            ", samples=" + effective.sampleCount.value +
             ", frameTimeMs=" + (Time.unscaledDeltaTime * 1000f) +
             ", depthMode=" + viewCamera.depthTextureMode +
             ". These are layer settings, not a measurement of GPU vector contents.");
