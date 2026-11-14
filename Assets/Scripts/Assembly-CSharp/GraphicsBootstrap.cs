@@ -208,7 +208,10 @@ public static class GraphicsBootstrap
 		bool motionBlur = PlayerPrefs.GetInt("PP_MotionBlur", 0) == 1;
 		bool ao = PlayerPrefs.GetInt("PP_AO", 0) == 1;
 
-		bool anyEffect = bloom || vignette || grain || motionBlur || ao;
+		// The package owns Motion Blur. SimpleScreenFx must never blur again.
+		bool stockBlur = StockMotionBlur.Configure(cam, motionBlur);
+		bool simpleEffects = bloom || vignette || grain || ao;
+		bool anyEffect = simpleEffects || stockBlur;
 
 		// HDR нужен только под пост-обработку: без неё расширенный диапазон
 		// некуда применять, а кадровый буфер становится вдвое толще. На
@@ -216,12 +219,11 @@ public static class GraphicsBootstrap
 		cam.allowHDR = anyEffect;
 		cam.allowMSAA = true;
 
-		cam.depthTextureMode = (ao || motionBlur)
+		cam.depthTextureMode = (ao || stockBlur)
 			? cam.depthTextureMode | DepthTextureMode.Depth
 			: cam.depthTextureMode & ~DepthTextureMode.Depth;
 
-        bool vectors = motionBlur && SystemInfo.supportsMotionVectors;
-        cam.depthTextureMode = vectors ? cam.depthTextureMode | DepthTextureMode.MotionVectors : cam.depthTextureMode & ~DepthTextureMode.MotionVectors;
+		cam.depthTextureMode = stockBlur ? cam.depthTextureMode | DepthTextureMode.MotionVectors : cam.depthTextureMode & ~DepthTextureMode.MotionVectors;
 
 		var fx = cam.GetComponent<SimpleScreenFx>();
 
@@ -236,7 +238,7 @@ public static class GraphicsBootstrap
 		// Graphics.Blit(src, dest) "на всякий случай": формально безобидный,
 		// по факту полноэкранный проход каждый кадр при полностью выключенных
 		// эффектах.
-		if (!anyEffect)
+		if (!simpleEffects)
 		{
 			if (fx != null) fx.enabled = false;
 			return;
@@ -248,7 +250,6 @@ public static class GraphicsBootstrap
 		fx.bloom = bloom;
 		fx.vignette = vignette;
 		fx.grain = grain;
-		fx.motionBlur = motionBlur;
 		fx.ao = ao;
 		fx.enabled = true;
 	}

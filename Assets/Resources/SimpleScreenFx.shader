@@ -88,13 +88,9 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 			#include "UnityCG.cginc"
 			sampler2D _MainTex;
 			sampler2D _BloomTex;
-            sampler2D _CameraMotionVectorsTexture;
 			float _Bloom;
 			float _Vignette;
 			float _Grain;
-		float _Motion;
-		float4 _FallbackMotion;
-        float _UseMotionVectors, _Shutter, _MaxMotionPixels;
 		float _AO;
 		float4 _MainTex_TexelSize;
 			UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
@@ -106,58 +102,6 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				float2 ndc = uv * 2.0 - 1.0;
 
 				float3 col = tex2D(_MainTex, uv).rgb;
-
-				// Сначала размытие по сырому кадру, потом виньетка/зерно —
-				// иначе края смешиваются с невиньетированными сэмплами и мигают.
-			if (_Motion > 0.001)
-			{
-                float2 cameraVelocity = _FallbackMotion.xy + (uv-.5)*_FallbackMotion.z;
-                float2 velocity = cameraVelocity;
-                float2 motionUV = uv;
-                #if UNITY_UV_STARTS_AT_TOP
-                if (_MainTex_TexelSize.y < 0) motionUV.y = 1.0-motionUV.y;
-                #endif
-                if (_UseMotionVectors > .5)
-                    {
-                    float2 nativeVelocity = tex2D(_CameraMotionVectorsTexture, motionUV).rg;
-                    #if UNITY_UV_STARTS_AT_TOP
-                    if (_MainTex_TexelSize.y < 0) nativeVelocity.y = -nativeVelocity.y;
-                    #endif
-                    // API capability does not guarantee usable vectors for this
-                    // pixel/camera. A blank texture must not erase camera blur.
-                    float2 nativePixels = nativeVelocity / max(abs(_MainTex_TexelSize.xy),1e-6);
-                    float2 cameraPixels = cameraVelocity / max(abs(_MainTex_TexelSize.xy),1e-6);
-                    // A weak but nonzero native vector must not suppress the
-                    // camera baseline (especially at high refresh rates).
-                    if (dot(nativePixels,nativePixels) >= max(.0625,dot(cameraPixels,cameraPixels)) && all(abs(nativeVelocity) < .5))
-                        velocity = nativeVelocity;
-                    }
-                float2 pixels = velocity / max(abs(_MainTex_TexelSize.xy), 1e-6) * _Shutter;
-                pixels *= min(1.0, _MaxMotionPixels/max(length(pixels),1e-4));
-                float2 span = pixels * abs(_MainTex_TexelSize.xy);
-                float centerDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, motionUV));
-                float3 acc = 0; float wsum = 0;
-                // 25 samples over at most 24 pixels: <=1 pixel spacing even
-                // when sprinting. No separated copies or accumulated ghost frame.
-                [unroll]
-                for (int s = -12; s <= 12; s++)
-                {
-                    float t = s/24.0;
-                    float2 sampleUV = saturate(uv+span*t);
-                    float2 depthUV = sampleUV;
-                    #if UNITY_UV_STARTS_AT_TOP
-                    if (_MainTex_TexelSize.y < 0) depthUV.y = 1.0-depthUV.y;
-                    #endif
-                    float sampleDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture,depthUV));
-                    float edge = saturate(1.0-abs(sampleDepth-centerDepth)/max(.1,centerDepth*.08));
-                    // Rejecting every cross-depth sample preserves a perfectly
-                    // sharp silhouette, i.e. removes the visible motion blur.
-                    // Attenuate depth crossings; never erase their contribution.
-                    float weight = exp(-t*t*6.0) * lerp(.25,1.0,edge);
-                    acc += tex2D(_MainTex,sampleUV).rgb*weight; wsum+=weight;
-                }
-                col = acc/max(wsum,1e-4);
-			}
 
 				if (_AO > 0.001)
 				{

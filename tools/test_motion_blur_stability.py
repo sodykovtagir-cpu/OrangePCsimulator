@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Actual SimpleScreenFx and selected movement method with render/physics doubles;
+"""Actual non-motion SimpleScreenFx and selected movement method with render/physics doubles;
 compile actual shader passes with a UnityCG compatibility shim.
 """
 from pathlib import Path
@@ -33,45 +33,9 @@ public static class InputManager{public static bool GetButton(string s){return t
 class Walker:MonoBehaviour{public CharacterController controller=new CharacterController();bool sit,pauseControls,isSnow;float runSpeed=10,walkSpeed=5,gravity=-9.8f,footstepTime,runstepLenghten=1.3f,footstepInterval=.5f;Vector3 playerDirection;AudioClip[] snowFootsteps,concreteFootsteps;AudioSource source;
  MOVEMENT
  public void Run(float dt){MovePlayer(dt);}}
-class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new Exception(why);}static void Call(object o,string name,params object[] a){o.GetType().GetMethod(name,BindingFlags.NonPublic|BindingFlags.Instance).Invoke(o,a);}static void Main(){
- var camera=new Camera();MonoBehaviour.TestCamera=camera;var fx=new SimpleScreenFx{motionBlur=true};var material=new Material(new Shader());var source=new RenderTexture();Time.frameCount=1;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"first frame smeared");
- Time.frameCount++;camera.transform.position=new Vector3(0,0,.1f);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==1&&material.v["_FallbackMotion"].z>0,"forward movement missing");Check(Math.Abs(material.f["_Shutter"]-1.5f)<.0001&&material.f["_MaxMotionPixels"]==24,"unbounded shutter");
- Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"duplicate camera render corrupted state");
- Time.frameCount++;SystemInfo.supportsMotionVectors=true;Call(fx,"ConfigureMotion",material,source);Check(material.f["_UseMotionVectors"]==0,"native vectors competed with camera velocity");
- Time.frameCount++;camera.transform.position=new Vector3(0,0,10);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"teleport smeared");
- Time.frameCount++;source.width=1280;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"resolution switch smeared");
- Time.frameCount++;camera.fieldOfView=90;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"FOV switch smeared");
- Time.frameCount++;Time.timeScale=0;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"pause smeared");Time.timeScale=1;Time.frameCount++;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"resume retained stale state");
- Time.frameCount+=3;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"missing frames smeared");
- Time.frameCount++;camera.targetTexture=new RenderTexture();Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"save thumbnail smeared");camera.targetTexture=null;Call(fx,"OnDisable");Time.frameCount++;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"disable did not reset");
- foreach(int fps in new[]{30,60,90,120,144,180,240}){Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/fps;Time.frameCount++;camera.transform.position=new Vector3();Call(fx,"ConfigureMotion",material,source);Time.frameCount++;camera.transform.position=new Vector3(0,0,10f/fps);Call(fx,"ConfigureMotion",material,source);Check(Math.Abs(material.f["_Shutter"]-fps/40f)<.0001,"high-FPS exposure faded");Check(Math.Abs(material.f["_Shutter"]*material.v["_FallbackMotion"].z-.035f)<.0001,"sprint blur depends on refresh rate");}
-
- // Exercise actual C# angular extraction, not a manually supplied shader vector.
- foreach(int fps in new[]{60,120,180,240}) foreach(bool vertical in new[]{false,true}) {
-  Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/fps;camera.transform.rotation=new Quaternion();
-  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
-  camera.transform.rotation=vertical?new Quaternion{pitch=.001f}:new Quaternion{yaw=.001f};
-  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
-  Vector4 v=material.v["_FallbackMotion"];
-  Check(vertical?v.y>0:v.x<0,"tiny rotation at rest lost");
-  Check(material.f["_UseMotionVectors"]==0,"camera/native source toggled during rotation");
- }
- // Simulate mouse samples arriving every other 180-Hz render frame.
- Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/180;camera.transform.rotation=new Quaternion();
- Time.frameCount++;Call(fx,"ConfigureMotion",material,source);float previous=0,maxJump=0;
- for(int i=0;i<100;i++){
-  if(i%2==0)camera.transform.rotation=new Quaternion{yaw=(i/2+1)*.2f};
-  Time.frameCount++;Call(fx,"ConfigureMotion",material,source);
-  float current=material.v["_FallbackMotion"].x*material.f["_Shutter"];
-  if(i>20){maxJump=Math.Max(maxJump,Math.Abs(current-previous));Check(Math.Abs(current)>.001,"blur flickered off between input samples");}
-  previous=current;
- }
- Check(maxJump<.002,"velocity smoothing did not suppress alternating input");
- for(int i=0;i<40;i++){Time.frameCount++;Call(fx,"ConfigureMotion",material,source);}
- Check(Math.Abs(material.v["_FallbackMotion"].x)<.000001,"stationary camera retained blur");
- Check(material.f["_UseMotionVectors"]==1,"stationary camera lost object vectors");
+class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new Exception(why);}static void Main(){
  foreach(int fps in new[]{30,60,90,120,144,180,240}){var walker=new Walker();for(int i=0;i<fps;i++)walker.Run(1f/fps);Check(Math.Abs(walker.controller.z-10)<.0001,"movement depends on frame rate");walker.controller.enabled=false;walker.Run(1);Check(Math.Abs(walker.controller.z-10)<.0001,"disabled controller moved");}
- Console.WriteLine("PASS: "+n+" actual motion/reset/movement checks: forward blur, GPU/fallback selection, camera cuts, pause/resume, thumbnails and 30–240 FPS movement");}}
+ Console.WriteLine("PASS: "+n+" actual movement checks at 30–240 FPS (including 180)");}}
 '''.replace('MOVEMENT',movement)
 with tempfile.TemporaryDirectory()as td:
  d=Path(td);test=d/'test.cs';test.write_text(harness);exe=d/'test.exe'
@@ -95,5 +59,6 @@ float4 _Time;float LinearEyeDepth(float d){return 1.0/max(d,.0001);}
    subprocess.run(['spirv-val',str(binary)],check=True)
 assert 'Time.deltaTime / Mathf.Max(.0001f, Time.fixedDeltaTime)'in s
 assert 'MovePlayer(Time.deltaTime);'in s and 'private void FixedUpdate()'not in s
-assert '_PrevTex'not in shader and 's <= 12' in shader and 's/24.0' in shader
-print('PASS: all 4 actual effect shader passes compiled/validated; dense <=1px samples and no colour-history accumulation')
+assert all(old not in shader for old in ['_PrevTex','_Motion','_FallbackMotion','_Shutter'])
+print('PASS: all 4 remaining SimpleScreenFx passes compile/validate; old motion shader is absent')
+subprocess.run(['python',str(R/'tools/test_stock_motion_blur.py')],check=True)
