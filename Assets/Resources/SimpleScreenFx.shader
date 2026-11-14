@@ -111,31 +111,35 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				// иначе края смешиваются с невиньетированными сэмплами и мигают.
 			if (_Motion > 0.001)
 			{
-                float2 velocity;
+                float2 cameraVelocity = _FallbackMotion.xy + (uv-.5)*_FallbackMotion.z;
+                float2 velocity = cameraVelocity;
                 float2 motionUV = uv;
                 #if UNITY_UV_STARTS_AT_TOP
                 if (_MainTex_TexelSize.y < 0) motionUV.y = 1.0-motionUV.y;
                 #endif
                 if (_UseMotionVectors > .5)
                     {
-                    velocity = tex2D(_CameraMotionVectorsTexture, motionUV).rg;
+                    float2 nativeVelocity = tex2D(_CameraMotionVectorsTexture, motionUV).rg;
                     #if UNITY_UV_STARTS_AT_TOP
-                    if (_MainTex_TexelSize.y < 0) velocity.y = -velocity.y;
+                    if (_MainTex_TexelSize.y < 0) nativeVelocity.y = -nativeVelocity.y;
                     #endif
+                    // API capability does not guarantee usable vectors for this
+                    // pixel/camera. A blank texture must not erase camera blur.
+                    float2 nativePixels = nativeVelocity / max(abs(_MainTex_TexelSize.xy),1e-6);
+                    if (dot(nativePixels,nativePixels) >= .0625 && all(abs(nativeVelocity) < .5))
+                        velocity = nativeVelocity;
                     }
-                else
-                    velocity = _FallbackMotion.xy + (uv-.5)*_FallbackMotion.z;
                 float2 pixels = velocity / max(abs(_MainTex_TexelSize.xy), 1e-6) * _Shutter;
                 pixels *= min(1.0, _MaxMotionPixels/max(length(pixels),1e-4));
                 float2 span = pixels * abs(_MainTex_TexelSize.xy);
                 float centerDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, motionUV));
                 float3 acc = 0; float wsum = 0;
-                // 13 samples over at most 12 pixels: <=1 pixel spacing even
+                // 25 samples over at most 24 pixels: <=1 pixel spacing even
                 // when sprinting. No separated copies or accumulated ghost frame.
                 [unroll]
-                for (int s = -6; s <= 6; s++)
+                for (int s = -12; s <= 12; s++)
                 {
-                    float t = s/12.0;
+                    float t = s/24.0;
                     float2 sampleUV = saturate(uv+span*t);
                     float2 depthUV = sampleUV;
                     #if UNITY_UV_STARTS_AT_TOP

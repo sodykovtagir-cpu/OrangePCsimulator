@@ -117,13 +117,14 @@ public class SimpleScreenFx : MonoBehaviour
         previousPosition=position; previousRotation=rotation; previousFov=viewCamera.fieldOfView;
         previousWidth=source.width; previousHeight=source.height; previousFrame=Time.frameCount; havePrevious=true;
         if (cut) return;
-        // Half-frame shutter. Motion vectors already contain this frame's UV
-        // displacement, including forward movement; no old colour buffer/history.
+        // Use a 1/40-second exposure, not a fraction that gets imperceptible
+        // on high-refresh screens. Vectors are frame deltas, so normalize by dt.
+        // No old colour buffer/history is accumulated.
         material.SetFloat("_Motion", 1);
         material.SetFloat("_UseMotionVectors", SystemInfo.supportsMotionVectors ? 1 : 0);
         float fov = Mathf.Max(1,viewCamera.fieldOfView), aspect = Mathf.Max(.1f,viewCamera.aspect);
         material.SetVector("_FallbackMotion", new Vector4(-yaw/(fov*aspect)-local.x*.14f, pitch/fov+local.y*.14f, local.z*.14f, 0));
-        material.SetFloat("_Shutter", .5f);
-        material.SetFloat("_MaxMotionPixels", 12f);
+        material.SetFloat("_Shutter", Mathf.Clamp((1f/40f)/Mathf.Max(.001f,Time.unscaledDeltaTime),.25f,6f));
+        material.SetFloat("_MaxMotionPixels", 24f);
     }
 }

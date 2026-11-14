@@ -24,7 +24,7 @@ namespace UnityEngine {
  public static class Debug{public static void LogWarning(string s){}}
  public static class SystemInfo{public static bool supportsMotionVectors;}
  public static class Time{public static int frameCount;public static float timeScale=1,unscaledDeltaTime=1f/60;}
- public static class Mathf{public static int Max(int a,int b){return Math.Max(a,b);}public static float Max(float a,float b){return Math.Max(a,b);}public static float Abs(float a){return Math.Abs(a);}public static float DeltaAngle(float a,float b){float d=(b-a)%360;return d>180?d-360:d;}}
+ public static class Mathf{public static int Max(int a,int b){return Math.Max(a,b);}public static float Max(float a,float b){return Math.Max(a,b);}public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static float Abs(float a){return Math.Abs(a);}public static float DeltaAngle(float a,float b){float d=(b-a)%360;return d>180?d-360:d;}}
  public class AudioClip{}public class AudioSource{public void PlayOneShot(AudioClip a){}}
  public class CharacterController{public bool enabled=true,isGrounded=true;public Vector3 velocity;public float z;public void Move(Vector3 d){z+=d.z;velocity=d;}}
  public static class Random{public static int Range(int a,int b){return a;}}
@@ -35,7 +35,7 @@ class Walker:MonoBehaviour{public CharacterController controller=new CharacterCo
  public void Run(float dt){MovePlayer(dt);}}
 class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new Exception(why);}static void Call(object o,string name,params object[] a){o.GetType().GetMethod(name,BindingFlags.NonPublic|BindingFlags.Instance).Invoke(o,a);}static void Main(){
  var camera=new Camera();MonoBehaviour.TestCamera=camera;var fx=new SimpleScreenFx{motionBlur=true};var material=new Material(new Shader());var source=new RenderTexture();Time.frameCount=1;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"first frame smeared");
- Time.frameCount++;camera.transform.position=new Vector3(0,0,.1f);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==1&&material.v["_FallbackMotion"].z>0,"forward movement missing");Check(material.f["_Shutter"]==.5f&&material.f["_MaxMotionPixels"]==12,"unbounded shutter");
+ Time.frameCount++;camera.transform.position=new Vector3(0,0,.1f);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==1&&material.v["_FallbackMotion"].z>0,"forward movement missing");Check(Math.Abs(material.f["_Shutter"]-1.5f)<.0001&&material.f["_MaxMotionPixels"]==24,"unbounded shutter");
  Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"duplicate camera render corrupted state");
  Time.frameCount++;SystemInfo.supportsMotionVectors=true;Call(fx,"ConfigureMotion",material,source);Check(material.f["_UseMotionVectors"]==1,"GPU velocity not selected");
  Time.frameCount++;camera.transform.position=new Vector3(0,0,10);Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"teleport smeared");
@@ -44,6 +44,7 @@ class Test{static int n;static void Check(bool v,string why){n++;if(!v)throw new
  Time.frameCount++;Time.timeScale=0;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"pause smeared");Time.timeScale=1;Time.frameCount++;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"resume retained stale state");
  Time.frameCount+=3;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"missing frames smeared");
  Time.frameCount++;camera.targetTexture=new RenderTexture();Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"save thumbnail smeared");camera.targetTexture=null;Call(fx,"OnDisable");Time.frameCount++;Call(fx,"ConfigureMotion",material,source);Check(material.f["_Motion"]==0,"disable did not reset");
+ foreach(int fps in new[]{30,60,90,120,144,240}){Call(fx,"OnEnable");Time.unscaledDeltaTime=1f/fps;Time.frameCount++;camera.transform.position=new Vector3();Call(fx,"ConfigureMotion",material,source);Time.frameCount++;camera.transform.position=new Vector3(0,0,10f/fps);Call(fx,"ConfigureMotion",material,source);Check(Math.Abs(material.f["_Shutter"]-fps/40f)<.0001,"high-FPS exposure faded");Check(Math.Abs(material.f["_Shutter"]*material.v["_FallbackMotion"].z-.035f)<.0001,"sprint blur depends on refresh rate");}
  foreach(int fps in new[]{30,60,90,120,144,240}){var walker=new Walker();for(int i=0;i<fps;i++)walker.Run(1f/fps);Check(Math.Abs(walker.controller.z-10)<.0001,"movement depends on frame rate");walker.controller.enabled=false;walker.Run(1);Check(Math.Abs(walker.controller.z-10)<.0001,"disabled controller moved");}
  Console.WriteLine("PASS: "+n+" actual motion/reset/movement checks: forward blur, GPU/fallback selection, camera cuts, pause/resume, thumbnails and 30–240 FPS movement");}}
 '''.replace('MOVEMENT',movement)
@@ -69,5 +70,5 @@ float4 _Time;float LinearEyeDepth(float d){return 1.0/max(d,.0001);}
    subprocess.run(['spirv-val',str(binary)],check=True)
 assert 'Time.deltaTime / Mathf.Max(.0001f, Time.fixedDeltaTime)'in s
 assert 'MovePlayer(Time.deltaTime);'in s and 'private void FixedUpdate()'not in s
-assert '_PrevTex'not in shader and 's <= 6' in shader and 's/12.0' in shader
+assert '_PrevTex'not in shader and 's <= 12' in shader and 's/24.0' in shader
 print('PASS: all 4 actual effect shader passes compiled/validated; dense <=1px samples and no colour-history accumulation')
