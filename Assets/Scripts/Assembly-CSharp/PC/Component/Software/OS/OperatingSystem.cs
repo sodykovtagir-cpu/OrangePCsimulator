@@ -262,6 +262,9 @@ namespace PC.Component.Software.OS
         public float BenchmarkCpuFactor => !MiningActive ? 1f : HasDiscreteGpu ? .72f : .36f;
         public float BenchmarkGpuFactor => MiningActive && HasDiscreteGpu ? .48f : 1f;
 
+        public bool ServerProcessRunning => Board != null && PC.Component.Software.Sites.SiteHostingService.Instance != null && PC.Component.Software.Sites.SiteHostingService.Instance.Hosting(Board.Id);
+        public int ServerMemoryMb => Board != null && PC.Component.Software.Sites.SiteHostingService.Instance != null ? PC.Component.Software.Sites.SiteHostingService.Instance.ServerMemory(Board.Id, RamTotalMb) : 0;
+        public float ServerCpuLoad => Board != null && PC.Component.Software.Sites.SiteHostingService.Instance != null ? Mathf.Clamp01(PC.Component.Software.Sites.SiteHostingService.Instance.Demand(Board.Id) / Mathf.Max(350, CpuCapacity)) : 0;
         public float ProcessCpuLoad(App app)
         {
             if (app == null) return 0f;
@@ -305,6 +308,7 @@ namespace PC.Component.Software.OS
                 HideShell();
                 return;
             }
+            if (process == "Server.exe") { PC.Component.Software.Sites.SiteHostingService.Instance?.HostStopped(Board.Id); return; }
             foreach (var app in RunningProcesses())
                 if (app.AppName + ".exe" == process) { app.Close(); return; }
         }
@@ -419,6 +423,7 @@ namespace PC.Component.Software.OS
             var rams = Board.GetHardwares(HardwareType.RAM);
             if (rams != null) foreach (var h in rams)
                 if (h != null && h.Power && !h.Damaged) RamTotalMb += h.Capacity;
+            ramMb += ServerMemoryMb;
             RamUsedMb = ramBenchmark ? RamTotalMb : Mathf.Min(ramMb, RamTotalMb);
             RamLoad = RamTotalMb > 0 ? (float)RamUsedMb / RamTotalMb : 0f;
             if (RamLoad >= .96f && ShellRunning &&
@@ -1225,6 +1230,7 @@ namespace PC.Component.Software.OS
         {
             if (error) return;
             error = true;
+            if (Board != null && PC.Component.Software.Sites.SiteHostingService.Instance != null) PC.Component.Software.Sites.SiteHostingService.Instance.HostStopped(Board.Id);
             StopProcess();
             // The BSOD must not inherit any startup text or board logo,
             // regardless of when the boot failed. ApplyBrand restores them

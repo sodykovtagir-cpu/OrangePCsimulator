@@ -183,7 +183,7 @@ namespace PC.Component
 
 		public void AllowZoom(bool value)
         {
-			trigger.SetActive(value);
+			if (trigger != null) trigger.SetActive(value);
 			if (!value) ZoomOut();
         }
 

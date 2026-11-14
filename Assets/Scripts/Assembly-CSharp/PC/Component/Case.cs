@@ -59,17 +59,17 @@ namespace PC.Component
         private void OnDestroy()
         {
             if (motherboard != null) motherboard.onChanged.RemoveListener(MotherboardChanged);
-            DisconnectBoard();
+            DisconnectBoard(false);
         }
 
-        private void DisconnectBoard()
+        private void DisconnectBoard(bool reportHosting = true)
         {
             var previous = ActiveBoard;
             ActiveBoard = null;
             BoardChanged?.Invoke(null);
             if (previous == null) return;
             previous.PowerChanged -= UpdatePower;
-            if (previous.Running) previous.PowerOff(false);
+            if (previous.Running) previous.PowerOff(false, reportHosting);
             previous.RemoveExternal(external);
             UpdatePower(false);
         }

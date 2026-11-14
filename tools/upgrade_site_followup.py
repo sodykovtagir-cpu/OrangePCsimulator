@@ -39,5 +39,9 @@ def upgrade():
   pathgo=p.data(v['pagePath']['fileID'])['m_GameObject']['fileID'];pathtr=next(i for i,d in p.objects(224)if d['m_GameObject']['fileID']==pathgo);span(pathtr,.62,.76)
   delete=next(i for i,d in p.objects(114)if any(c.get('m_MethodName')=='DeletePage'for c in d.get('m_OnClick',{}).get('m_PersistentCalls',{}).get('m_Calls',[])));deletego=p.data(delete)['m_GameObject']['fileID'];span(next(i for i,d in p.objects(224)if d['m_GameObject']['fileID']==deletego),.93,1)
   save_patch(p,f)
+ for i,d in p.objects(114):
+  if str(d.get('m_Text','')).startswith('$100 / 30 real minutes'):
+   p.set(i,'m_Text',"'$100 / 30 min. Custom domain +$1000 / 30 min.'")
+ save_patch(p,f)
  print('Bound authored RawImage; added Rename page using the existing button style')
 if __name__=='__main__':upgrade()

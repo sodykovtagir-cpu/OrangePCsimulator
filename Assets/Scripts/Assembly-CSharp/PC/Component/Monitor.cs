@@ -9,6 +9,7 @@ namespace PC.Component
 
 		protected override void ResetCanvas()
 		{
+			if (canvas == null || point == null) return;
 			canvas.transform.SetParent(point);
 			canvas.renderMode = RenderMode.WorldSpace;
 		}

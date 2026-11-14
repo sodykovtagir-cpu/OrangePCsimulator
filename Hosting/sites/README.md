@@ -18,7 +18,7 @@ requires a signed five-minute ticket; online sessions expire after 90 seconds.
 The service is not a general file execution service or real DNS registrar.
 
 Tariff: $100 per 1800 real seconds, offline included; first period upfront;
-custom game URL +$1000 once. Backend time controls the cumulative bill. Stopping
+custom game URL +$1000 per 1800 seconds. Backend time controls the cumulative bill. Stopping
 ends future charges; restart starts a new period. Publishing updates is
 idempotent for owner/save/publication key. Domains can be changed on the same
 publication without changing that key or restarting the active rent period.
@@ -64,3 +64,19 @@ replace admin_config.json, users.json, account.php or account sessions/config.
 Moderation uses the same storage lock as the API. Banned publications are
 stopped, their tickets revoked; unbanning does not auto-start rent. Direct
 requests to sites_admin.php have no independent authority and return 404.
+
+
+Current additions: authenticated `host_stop` stops every publication on the
+matching owner/world/host, including leases and access epochs. `stopped_hosts`
+on owner stats retries failed reports. Exiting the save is not a host stop.
+Transfer phases `start/pulse/end/cancel` track active downloads (30s TTL), renew
+5-minute tickets, and expose `transferring` + cumulative `downloads` for CPU/RAM
+simulation. Stats are polled every 5s; short transfers are accounted by deltas.
+Custom domain rent is now recurring: $1100 total per period versus $100 for the
+generated domain. Existing elapsed boundaries are not retroactively increased.
+
+Deploy `sites_preview.php` and `sites_preview.js` beside `sites_admin.php`.
+The authenticated admin renderer embeds validated packages into a sandboxed
+srcdoc with a restrictive CSP; JSON/text is escaped, images use validated data
+URIs, only trusted renderer code runs. No eval, user Lua, external requests or
+arbitrary HTML from packages. Full Lua behavior remains an in-game feature.

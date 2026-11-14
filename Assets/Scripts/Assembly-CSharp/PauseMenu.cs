@@ -91,6 +91,7 @@ public class PauseMenu : MonoBehaviour
 
 	public void MainMenu()
 	{
+		if (PC.Component.Software.Sites.SiteHostingService.Instance != null) PC.Component.Software.Sites.SiteHostingService.Instance.LeavingWorld = true;
 		SceneManager.LoadScene("Menu");
 	}
 
@@ -127,6 +128,7 @@ public class PauseMenu : MonoBehaviour
 
     public void Restart()
 	{
+		if (PC.Component.Software.Sites.SiteHostingService.Instance != null) PC.Component.Software.Sites.SiteHostingService.Instance.LeavingWorld = true;
 		SceneManager.LoadScene(SceneManager.GetActiveScene().name);
 	}
 

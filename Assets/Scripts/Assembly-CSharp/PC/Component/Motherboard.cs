@@ -448,8 +448,10 @@ namespace PC.Component
 			System.RemoveHardware(hardware);
 		}
 
-		public void PowerOff(bool restart = false)
+		public void PowerOff(bool restart = false, bool reportHosting = true)
         {
+            if (reportHosting && !SaveManager.RestoringSave && PC.Component.Software.Sites.SiteHostingService.Instance != null)
+                PC.Component.Software.Sites.SiteHostingService.Instance.HostStopped(Id);
             powerEpoch++;
             overclockRebootScheduled = false;
             PC.Component.Software.OS.OverclockBoot.Apply(this, null);

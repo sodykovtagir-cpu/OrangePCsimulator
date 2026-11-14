@@ -61,7 +61,7 @@ namespace PC.Component.Software {
 namespace PC.Component.Software.OS {
  using PC.Component.Software;
  public class TestBoard{public int Id=123;}
- public class OperatingSystem {public TestBoard Board=new TestBoard();public bool Ready=true;public FileManager FileManager=new FileManager();public static bool IsSystemPath(string p){return p.StartsWith("System/");}public UnityEngine.Sprite GetFileTypeSprite(string name){return null;}public bool OpenSiteFile(File f){return true;}public float GetTaskbarInsetLocalHeight(){return 48;}public List<Storage> AllStorage;public SaveDialog SaveDialog;public void ShowMessageBox(string t,string s){}public void SelectFile(string ext,Action<File> a){}public void SelectFile(string[] ext,Action<File> a){}}
+ public class OperatingSystem {public ProgressBar ProgressBar=new ProgressBar();public TestBoard Board=new TestBoard();public bool Ready=true;public FileManager FileManager=new FileManager();public static bool IsSystemPath(string p){return p.StartsWith("System/");}public UnityEngine.Sprite GetFileTypeSprite(string name){return null;}public bool OpenSiteFile(File f){return true;}public float GetTaskbarInsetLocalHeight(){return 48;}public List<Storage> AllStorage;public SaveDialog SaveDialog;public void ShowMessageBox(string t,string s){}public void SelectFile(string ext,Action<File> a){}public void SelectFile(string[] ext,Action<File> a){}}
  public class FileManager {public File Write(int disk,string path,string content){return null;}public bool TryGetFile(int disk,string path,out File file){file=null;return false;}}
  public class SaveDialog {public int calls;public bool administrator;public string content;public string[] extensions;public void ShowDialog(string n,string c,string[] e,string p,int d,Action<File> a,bool admin){calls++;administrator=admin;content=c;extensions=e;}}
 }
@@ -74,3 +74,7 @@ public class Main {public static Main Instance;public int Money;public void SetM
 public class TestGameData {public string siteHostingWorld;public List<PC.Component.Software.Sites.SiteHostingLedger> siteHostingLedger;}
 public class TestLoader {public TestGameData GameData=new TestGameData();}
 public class SaveManager {public static TestLoader Loader;public static SaveManager Instance;public static bool RestoringSave;public bool fail;public int saves;public bool SaveData(){saves++;return !fail;}}
+
+public class ProgressBar:UnityEngine.MonoBehaviour {public Action cancel;public bool opened;public float progress;public int opens,closes;public void CallProgressBar(string t,UnityEngine.Color c,Action cancel){this.cancel=cancel;opened=true;opens++;}public void SetProgress(float p){progress=p;}public void CloseProgressBar(){opened=false;closes++;}}
+
+public static class Localization {public static string GetText(string s){return s;}}

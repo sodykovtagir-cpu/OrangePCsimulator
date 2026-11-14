@@ -43,21 +43,30 @@ function site_validate($json) {
 }
 function site_read($file,$default=[]) {if(!is_file($file))return $default;$raw=file_get_contents($file);if(strncmp($raw,SITE_PREFIX,strlen(SITE_PREFIX))!==0)site_fail('Storage header invalid',503);$data=json_decode(base64_decode(substr($raw,strlen(SITE_PREFIX),-3),true),true);if(!is_array($data))site_fail('Storage unavailable',503);return $data;}
 function site_write($file,$data){$raw=SITE_PREFIX.base64_encode(json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR))."\n*/";$tmp=$file.'.'.bin2hex(random_bytes(6)).'.tmp.php';if(file_put_contents($tmp,$raw,LOCK_EX)!==strlen($raw)||!rename($tmp,$file)){@unlink($tmp);site_fail('Storage write failed',503);}}
-function site_bill(&$s,$now){if(empty($s['active']))return;$n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));$s['total']+=$n*SITE_PRICE;$s['billed_at']+=$n*SITE_PERIOD;}
+function site_period_price($s){return SITE_PRICE+($s['url']!=='s'.$s['id'].'.sites.pcos'?SITE_CUSTOM_PRICE:0);}
+function site_stop_host(&$db,$owner,$world,$host){foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world&&$s['host']===$host&&$s['active']){$s['active']=false;$s['unpaid']=false;$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}unset($s);}
+function site_transfers(&$s,$now){$active=[];foreach($s['transfers']??[]as $k=>$v)if($v['at']>$now-30)$active[$k]=$v;$s['transfers']=$active;return count($active);}
+function site_bill(&$s,$now){if(empty($s['active']))return;$n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));$s['total']+=$n*site_period_price($s);$s['billed_at']+=$n*SITE_PERIOD;}
 function site_online(&$s,$now){$active=[];foreach($s['sessions']??[]as $key=>$row)if($row['at']>$now-90)$active[$key]=$row;$s['sessions']=$active;return count($active);}
 function site_custom_paid($s){return array_key_exists('custom_paid',$s)?(bool)$s['custom_paid']:$s['url']!=='s'.$s['id'].'.sites.pcos';}
-function site_public(&$s,$now){$online=site_online($s,$now);return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],'visits'=>$s['visits'],'online'=>$online,'active'=>(bool)$s['active'],'total'=>$s['total'],'unpaid'=>!empty($s['unpaid']),'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'','cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,'custom_paid'=>site_custom_paid($s),'next_bill'=>$s['active']&&empty($s['unpaid'])&&empty($s['banned'])?$s['billed_at']+SITE_PERIOD:0,'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision']];}
+function site_public(&$s,$now){$online=site_online($s,$now);return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],'downloads'=>$s['downloads']??0,'transferring'=>site_transfers($s,$now),'visits'=>$s['visits'],'online'=>$online,'active'=>(bool)$s['active'],'total'=>$s['total'],'unpaid'=>!empty($s['unpaid']),'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'','cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,'custom_paid'=>site_custom_paid($s),'next_bill'=>$s['active']&&empty($s['unpaid'])&&empty($s['banned'])?$s['billed_at']+SITE_PERIOD:0,'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision']];}
 function site_user($token,$usersFile){if(!is_string($token)||strlen($token)<32||strlen($token)>256)site_fail('Login required',401);$raw=@file_get_contents($usersFile);$users=json_decode($raw?:'[]',true);foreach(is_array($users)?$users:[]as $u)if(!empty($u['token'])&&hash_equals((string)$u['token'],$token)&&!empty($u['verified']))return (string)$u['id'];site_fail('Session expired',401);}
 
 function site_wallet_key($owner,$world){return $owner.':'.$world;}
-function site_suspend(&$s){if(empty($s['unpaid'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];}$s['unpaid']=true;}
+function site_suspend(&$s){if(empty($s['unpaid'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];$s['transfers']=[];}$s['unpaid']=true;}
 function site_reconcile(&$db,$now){
  $totals=[];foreach($db['sites']as $s){$key=site_wallet_key($s['owner'],$s['world']);$totals[$key]=($totals[$key]??0)+$s['total'];}
- foreach($db['sites']as &$s){if(empty($s['active'])||!empty($s['banned']))continue;$key=site_wallet_key($s['owner'],$s['world']);$ceiling=$db['wallets'][$key]['ceiling']??null;
-  if(!empty($s['unpaid'])){if($ceiling!==null&&$ceiling-$totals[$key]>=SITE_PRICE){$s['unpaid']=false;$s['total']+=SITE_PRICE;$totals[$key]+=SITE_PRICE;$s['billed_at']=$now;}continue;}
+ foreach($db['sites']as &$s){if(empty($s['active'])||!empty($s['banned']))continue;$key=site_wallet_key($s['owner'],$s['world']);$ceiling=$db['wallets'][$key]['ceiling']??null;$price=site_period_price($s);
+  // Upgrade only future billing boundaries; never retroactively increase old bills.
+  if(!isset($s['recurring_from']))$s['recurring_from']=$s['billed_at']+max(1,(int)floor(($now-$s['billed_at'])/SITE_PERIOD)+1)*SITE_PERIOD;
+  if(!empty($s['unpaid'])){if($ceiling!==null&&$ceiling-$totals[$key]>=$price){$s['unpaid']=false;$s['total']+=$price;$totals[$key]+=$price;$s['billed_at']=$now;}continue;}
   $n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));if(!$n)continue;
-  $paid=$ceiling===null?$n:min($n,max(0,intdiv((int)max(0,$ceiling-$totals[$key]),SITE_PRICE)));
-  $s['total']+=$paid*SITE_PRICE;$totals[$key]+=$paid*SITE_PRICE;$s['billed_at']+=$paid*SITE_PERIOD;
+  $legacy=min($n,max(0,(int)ceil(($s['recurring_from']-$s['billed_at'])/SITE_PERIOD)-1));
+  $funds=$ceiling===null?PHP_INT_MAX:max(0,$ceiling-$totals[$key]);
+  $oldPaid=min($legacy,intdiv((int)$funds,SITE_PRICE));$funds-=$oldPaid*SITE_PRICE;
+  $newPaid=$oldPaid===$legacy?min($n-$legacy,intdiv((int)$funds,$price)):0;
+  $paid=$oldPaid+$newPaid;$cost=$oldPaid*SITE_PRICE+$newPaid*$price;
+  $s['total']+=$cost;$totals[$key]+=$cost;$s['billed_at']+=$paid*SITE_PERIOD;
   if($paid<$n)site_suspend($s);
  }unset($s);
 }

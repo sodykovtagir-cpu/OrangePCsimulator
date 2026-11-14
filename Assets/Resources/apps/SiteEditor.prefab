@@ -5328,9 +5328,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: $100 / 30 real minutes, including offline. Custom URL +$1000 once. Offline
-    charges are collected on next connection. Publish confirms this tariff. Stop
-    hosting cancels future charges.
+  m_Text: '$100 / 30 min. Custom domain +$1000 / 30 min.'
 --- !u!1 &920000000000000212
 GameObject:
   m_ObjectHideFlags: 0

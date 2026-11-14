@@ -16,7 +16,7 @@ class LifecycleTest {
  answer(Reply());Check(calls[calls.Count-1]=="stop"&&args["id"]=="2");bool afterStop=false;service.Refresh(()=>afterStop=true);Check(!afterStop);answer(Reply(true));Check(afterStop&&!service.Items[1].active&&service.Items[0].active);Check(stats.text.Contains("Аренда остановлена")&&service.Status.Contains("остановлен"));Check(service.Demand(0)==20); // only the other active site
  // A confirmed stop never turns back into active=true due to a late stats reply:
  // there can be no outstanding earlier stats request after the stop is sent.
- Check(pending==null);Check(SiteHostingService.PublicationCost(service.Items[1],"candidate.com")==100);
+ Check(pending==null);Check(SiteHostingService.PublicationCost(service.Items[1],"candidate.com")==1100);
  Check(SiteHostingService.PublicationCost(new HostedSite{id=3,active=true,url="s3.sites.pcos",custom_paid=false},"custom.com")==1000);
  Check(SiteHostingService.PublicationCost(new HostedSite{id=3,active=true,url="custom.com",custom_paid=true},"another.com")==0);
  // Renaming publishes the same key; no client-side immutable-domain rejection.

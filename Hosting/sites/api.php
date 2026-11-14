@@ -15,7 +15,7 @@ try{
  foreach($db['rates']as $k=>$rate)if($rate[0]<$bucket)unset($db['rates'][$k]);
  $rate=$db['rates'][$rateKey]??[$bucket,0];if(++$rate[1]>180)site_fail('Rate limited',429);$db['rates'][$rateKey]=$rate;
  $db['wallets']=$db['wallets']??[];
- if(in_array($action,['publish','stats','stop'],true)){
+ if(in_array($action,['publish','stats','stop','host_stop'],true)){
   $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
   if(isset($_POST['balance'])){
    $settled=$_POST['settled']??null;
@@ -28,6 +28,10 @@ try{
   }unset($site);
  }
  site_reconcile($db,$now);
+ if(isset($owner,$world)){
+  $off=explode(',',$_POST['stopped_hosts']??'');if($action==='host_stop')$off[]=$_POST['host']??'';
+  foreach(array_slice($off,0,200)as $host)if(ctype_digit((string)$host))site_stop_host($db,$owner,$world,(int)$host);
+ }
  if(in_array($action,['list','view','info'],true))foreach($db['sites']as &$site)if(!array_key_exists('icon_data',$site)){try{$package=site_read($dir.'/p_'.$site['id'].'.php');$doc=json_decode($package['document'],true);[$site['icon_data'],$site['icon_media']]=site_icon_data($doc);}catch(Throwable $e){$site['icon_data']='';$site['icon_media']='';}}unset($site);
  $out=['ok'=>true,'service'=>'orange-sites','version'=>1,'now'=>$now,'period'=>SITE_PERIOD,'price'=>SITE_PRICE,'custom_price'=>SITE_CUSTOM_PRICE];
  if($action==='health'){$out['available']=true;}
@@ -49,6 +53,11 @@ try{
    if($action==='transfer'){
     $ticket=$_POST['ticket']??'';$parts=explode('.',$ticket);if(count($parts)!==3||!ctype_digit($parts[1])||(int)$parts[1]<$now||!hash_equals(hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$parts[0].'.'.$parts[1],$db['secret']),$parts[2]))site_fail('Visit ticket expired',403);
     $package=site_read($dir.'/p_'.$id.'.php');$doc=json_decode($package['document'],true);$found=false;foreach($doc['assets']??[]as $asset)if(($asset['name']??'')===($_POST['file']??''))$found=true;if(!$found)site_fail('File unavailable',404);
+    $phase=$_POST['phase']??'check';if(!in_array($phase,['check','start','pulse','end','cancel'],true))site_fail('Invalid transfer phase');
+    $transferKey=hash('sha256',$parts[0].'|'.($_POST['file']??''));site_transfers($s,$now);
+    if($phase==='start'||$phase==='pulse'){if(!isset($s['transfers'][$transferKey])&&count($s['transfers'])>=1000)site_fail('Site busy',429);if(!isset($s['transfers'][$transferKey])&&$phase==='start')$s['downloads']=($s['downloads']??0)+1;$s['transfers'][$transferKey]=['at'=>$now];}
+    elseif($phase==='end'||$phase==='cancel')unset($s['transfers'][$transferKey]);
+    $renew=$parts[0].'.'.($now+300);$out['ticket']=$renew.'.'.hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$renew,$db['secret']);
     $out['item']=site_public($s,$now);
    }else{
    $session=$_POST['session']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$session))site_fail('Invalid session');$key=hash('sha256',$session);site_online($s,$now);
@@ -64,7 +73,7 @@ try{
    }
   }unset($s);
  }
- elseif(in_array($action,['publish','stats','stop'],true)){
+ elseif(in_array($action,['publish','stats','stop','host_stop'],true)){
   $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$out['owner']=$owner;$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
   if($action==='publish'){
    $key=$_POST['key']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$key))site_fail('Invalid publication identity');$raw=$_POST['document']??'';$doc=site_validate($raw);
@@ -77,18 +86,18 @@ try{
    foreach($db['sites']as $k=>$site)if((string)$k!==$id&&$site['url']===$url)site_fail('URL already taken',409);
    $custom=$url!=='s'.$id.'.sites.pcos';$fresh=!$old||!$old['active']||!empty($old['unpaid']);
    $paid=$old?site_custom_paid($old):false;
-   $cost=($fresh?SITE_PRICE:0)+(!$paid&&$custom?SITE_CUSTOM_PRICE:0);
+   $cost=($fresh?SITE_PRICE+($custom?SITE_CUSTOM_PRICE:0):($custom&&$old['url']==='s'.$id.'.sites.pcos'?SITE_CUSTOM_PRICE:0));
    // The exact fixed tariff must be confirmed; the client cannot submit price,
    // paid-until timestamps or a negative charge.
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
    if(site_available_funds($db,$owner,$world)<$cost)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
    $s=$old?:['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'visits'=>0,'sessions'=>[],'total'=>0,'revision'=>0];
-   if($old&&$old['url']!==$url){$s['sessions']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
+   if($old&&$old['url']!==$url){$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
    $s['custom_paid']=$paid||$custom;$s['unpaid']=false;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
-   $s['total']+=$cost;$s['active']=true;if($fresh)$s['billed_at']=$now;$s['url']=$url;$s['title']=$doc['title'];$s['description']=$doc['description']??'';$s['keywords']=$doc['keywords']??'';$s['bytes']=strlen($raw);$s['host']=(int)($_POST['host']??0);$s['revision']++;
+   $s['total']+=$cost;$s['active']=true;if($fresh){$s['billed_at']=$now;$s['recurring_from']=$now;}$s['url']=$url;$s['title']=$doc['title'];$s['description']=$doc['description']??'';$s['keywords']=$doc['keywords']??'';$s['bytes']=strlen($raw);$s['host']=(int)($_POST['host']??0);$s['revision']++;
    site_write($dir.'/p_'.$id.'.php',['document'=>$raw]);$db['sites'][$id]=$s;$out['item']=site_public($db['sites'][$id],$now);$out['charged']=$cost;
   }
-  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['unpaid']=false;$db['sites'][$id]['sessions']=[];$db['sites'][$id]['access_epoch']=($db['sites'][$id]['access_epoch']??0)+1;$out['item']=site_public($db['sites'][$id],$now);}
+  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['unpaid']=false;$db['sites'][$id]['sessions']=[];$db['sites'][$id]['transfers']=[];$db['sites'][$id]['access_epoch']=($db['sites'][$id]['access_epoch']??0)+1;$out['item']=site_public($db['sites'][$id],$now);}
   $out['items']=[];$out['total']=0;
   foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world){$private=site_public($s,$now);$private['publication_key']=$s['key'];$out['items'][]=$private;$out['total']+=$s['total'];}unset($s);
  }

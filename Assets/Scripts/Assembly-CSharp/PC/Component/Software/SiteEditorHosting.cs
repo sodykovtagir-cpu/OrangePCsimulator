@@ -47,9 +47,9 @@ namespace PC.Component.Software
    // Do not destroy an in-progress domain edit on every background refresh.
    if(changedProject||hostURL.text==hostingBoundDomain||string.IsNullOrEmpty(hostURL.text))hostURL.SetTextWithoutNotify(current!=null?current.url:"");
    hostingBoundDomain=current!=null?current.url:"";hostingProjectKey=project.Document.hostingKey;
-   if(current!=null){text.Append("Текущий проект: ").Append(current.url).Append("\nДомен можно изменить в поле выше и нажать Publish. Страницы и файлы сохранятся.\n");text.Append(current.url).Append("/\n");foreach(var page in project.Document.pages)text.Append(current.url).Append(page.path).Append("\n");}
+   if(current!=null){text.Append("Текущий проект: ").Append(current.url).Append("\n");text.Append(current.url).Append("/\n");foreach(var page in project.Document.pages)text.Append(current.url).Append(page.path).Append("\n");}
    else text.Append("Новый сайт: введите домен или оставьте URL пустым для бесплатного адреса.\n");
-   text.Append("\nСобственный домен: +$1000 при первом подключении к этому сайту; последующие смены без доплаты. Старый адрес после смены перестаёт работать.");
+   text.Append("\nАренда: $100 / 30 мин. Домен: +$1000 / 30 мин.");
    hostedSites.ClearOptions();hostedSites.AddOptions(options);hostedSites.SetValueWithoutNotify(Mathf.Max(0,hostedIds.IndexOf(selected)));hostingStats.text=text.ToString();hostingSeenRevision=service.StateRevision;
   }
   public void PublishSite()

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace PC.Component.Software.Sites
 {
- [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision;public bool active,custom_paid,unpaid,banned;public float cpu_capacity=1000,cpu_load,host_mbps=5;public long total,next_bill;public string url,title,description,publication_key,icon_data,icon_media,ban_reason;}
+ [Serializable] public sealed class HostedSite {public int id,host,online,visits,bytes,revision,transferring,downloads;public bool active,custom_paid,unpaid,banned;public float cpu_capacity=1000,cpu_load,host_mbps=5;public long total,next_bill;public string url,title,description,publication_key,icon_data,icon_media,ban_reason;}
  [Serializable] public sealed class SiteReply {public bool ok,available;public string service,error,document,ticket,owner;public int version,price,period,custom_price,charged;public long total,now;public HostedSite item;public List<HostedSite> items;}
  [Serializable] public sealed class SiteHostingLedger {public string owner;public long charged;}
  public sealed class SiteHostingService:MonoBehaviour
@@ -21,7 +21,30 @@ namespace PC.Component.Software.Sites
    if(!busy&&pendingStops.Count>0)pendingStops.Dequeue()();
   }
   string context="";float nextPoll,lastStats;bool busy;readonly Dictionary<int,float> demand=new Dictionary<int,float>();readonly Dictionary<int,int> visits=new Dictionary<int,int>();
+  public bool LeavingWorld;
+  readonly Dictionary<int,int> lastDownloads=new Dictionary<int,int>(),downloadBursts=new Dictionary<int,int>();
+  readonly HashSet<int> stoppedHosts=new HashSet<int>();
+  readonly HashSet<int> queuedHostStops=new HashSet<int>();
   void Awake(){Instance=this;}
+  void OnApplicationQuit(){LeavingWorld=true;}
+  public bool Hosting(int host){return !stoppedHosts.Contains(host)&&Items.Exists(s=>s.host==host&&s.active&&!s.unpaid&&!s.banned);}
+  public int ServerMemory(int host,int total){if(!Hosting(host))return 0;int extra=0;foreach(var s in Items)if(s.host==host&&s.active&&!s.unpaid&&!s.banned)extra+=s.online*4+s.transferring*16;int burst;return Math.Min(total,(total+1)/2+extra+(Time.unscaledTime-lastStats<10&&downloadBursts.TryGetValue(host,out burst)?burst*16:0));}
+  public void HostStopped(int host)
+  {
+   if(LeavingWorld||SaveManager.RestoringSave||string.IsNullOrEmpty(World)||!ServerAccounts.LoggedIn)return;
+   if(string.IsNullOrEmpty(context))context=ServerAccounts.Token+"|"+World;
+   stoppedHosts.Add(host);demand.Remove(host);StateRevision++;QueueHostStop(host);
+  }
+  void QueueHostStop(int host)
+  {
+   if(!queuedHostStops.Add(host))return;string token=ServerAccounts.Token,world=World;
+   Action stop=()=>{
+    if(token!=ServerAccounts.Token||world!=World){queuedHostStops.Remove(host);Complete();return;}
+    busy=true;Request("host_stop",Funds(new Dictionary<string,string>{{"world",world},{"host",host.ToString()}}),(reply,error)=>{
+     queuedHostStops.Remove(host);if(token==ServerAccounts.Token&&world==World)Apply(reply,error);Complete();
+    });
+   };if(busy)pendingStops.Enqueue(stop);else stop();
+  }
   void OnDestroy(){if(Instance==this)Instance=null;}
   public static void Request(string action,Dictionary<string,string> values,Action<SiteReply,string> done)
   {
@@ -31,8 +54,8 @@ namespace PC.Component.Software.Sites
     done(error==null?result:null,error);
    });
   }
-  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;lastOwner="";hosts.Clear();StateRevision++;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
-  public float Demand(int host){float value;return Available&&Time.unscaledTime-lastStats<45&&demand.TryGetValue(host,out value)?value:0;}
+  void Update(){string active=ServerAccounts.Token+"|"+World;if(context!=active){context=active;lastOwner="";hosts.Clear();stoppedHosts.Clear();queuedHostStops.Clear();lastDownloads.Clear();downloadBursts.Clear();StateRevision++;Available=false;Items.Clear();demand.Clear();visits.Clear();lastStats=0;nextPoll=0;}if(!ServerAccounts.LoggedIn){Available=false;Items.Clear();demand.Clear();return;}if(!busy&&Time.unscaledTime>=nextPoll&&Main.Instance!=null&&!SaveManager.RestoringSave&&ServerAccounts.LoggedIn&&!string.IsNullOrEmpty(World))Refresh(null);}
+  public float Demand(int host){float value;return !stoppedHosts.Contains(host)&&Available&&Time.unscaledTime-lastStats<45&&demand.TryGetValue(host,out value)?value:0;}
   readonly Dictionary<int,SiteHostProfile> hosts=new Dictionary<int,SiteHostProfile>();
   [Serializable] public sealed class SiteHostProfile {public int host;public float cpu_capacity,cpu_load,host_mbps;}
   [Serializable] sealed class HostProfiles {public List<SiteHostProfile> items;}
@@ -44,6 +67,7 @@ namespace PC.Component.Software.Sites
     values["balance"]=Math.Max(0,Main.Instance.Money).ToString();
     values["ledgers"]=JsonUtility.ToJson(new LedgerSnapshot{items=ledger??new List<SiteHostingLedger>()});
     if(!string.IsNullOrEmpty(lastOwner))values["settled"]=settled.ToString();}
+   values["stopped_hosts"]=string.Join(",",new List<int>(stoppedHosts).ConvertAll(i=>i.ToString()).ToArray());
    values["hosts"]=JsonUtility.ToJson(new HostProfiles{items=new List<SiteHostProfile>(hosts.Values)});return values;
   }
   [Serializable] sealed class LedgerSnapshot {public List<SiteHostingLedger> items;}
@@ -56,7 +80,8 @@ namespace PC.Component.Software.Sites
    if(busy)return;
    string token=ServerAccounts.Token,world=World;
    if(string.IsNullOrEmpty(world)||!ServerAccounts.LoggedIn){Status="Войди в аккаунт игры";Complete();return;}
-   busy=true;nextPoll=Time.unscaledTime+20;
+   if(string.IsNullOrEmpty(context))context=token+"|"+world;
+   busy=true;nextPoll=Time.unscaledTime+5;
    Request("stats",Funds(new Dictionary<string,string>{{"world",world}}),(reply,error)=>{
     if(token==ServerAccounts.Token&&world==World)Apply(reply,error);
     Complete();
@@ -69,10 +94,10 @@ namespace PC.Component.Software.Sites
   void ApplyCore(SiteReply reply,string error)
   {
    if(error!=null){Available=false;Items.Clear();demand.Clear();Status=error;return;}
-   Available=true;Items=reply.items??new List<HostedSite>();demand.Clear();var counts=new Dictionary<int,int>();var online=new Dictionary<int,int>();
-   foreach(var site in Items)if(site.active&&!site.unpaid&&!site.banned){if(!counts.ContainsKey(site.host)){counts[site.host]=0;online[site.host]=0;}counts[site.host]+=site.visits;online[site.host]+=site.online;if(!demand.ContainsKey(site.host))demand[site.host]=0;demand[site.host]+=20;}
-   foreach(var pair in counts){int before;visits.TryGetValue(pair.Key,out before);float rate=lastStats>0?Mathf.Max(0,pair.Value-before)*60/Mathf.Max(1,Time.unscaledTime-lastStats):0;demand[pair.Key]+=online[pair.Key]*35+rate*4;visits[pair.Key]=pair.Value;}
-   lastStats=Time.unscaledTime;Status="Подключено. $100 / 30 реальных минут. Начислено: $"+reply.total;
+   Available=true;Items=reply.items??new List<HostedSite>();demand.Clear();var counts=new Dictionary<int,int>();var online=new Dictionary<int,int>();var downloads=new Dictionary<int,int>();downloadBursts.Clear();
+   foreach(var site in Items)if(site.active&&!site.unpaid&&!site.banned&&!stoppedHosts.Contains(site.host)){if(!counts.ContainsKey(site.host)){counts[site.host]=0;online[site.host]=0;downloads[site.host]=0;}counts[site.host]+=site.visits;downloads[site.host]+=site.downloads;online[site.host]+=site.online;if(!demand.ContainsKey(site.host))demand[site.host]=0;demand[site.host]+=20+site.transferring*120;}
+   foreach(var pair in counts){int before;visits.TryGetValue(pair.Key,out before);float rate=lastStats>0?Mathf.Max(0,pair.Value-before)*60/Mathf.Max(1,Time.unscaledTime-lastStats):0;int previousDownloads;lastDownloads.TryGetValue(pair.Key,out previousDownloads);int burst=lastStats>0?Math.Max(0,downloads[pair.Key]-previousDownloads):0;downloadBursts[pair.Key]=burst;lastDownloads[pair.Key]=downloads[pair.Key];demand[pair.Key]+=online[pair.Key]*35+rate*4+burst*120;visits[pair.Key]=pair.Value;}
+   lastStats=Time.unscaledTime;Status="Подключено. Аренда $100, домен +$1000 / 30 минут. Начислено: $"+reply.total;
    var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;if(game==null||Main.Instance==null)return;
    if(game.siteHostingLedger==null)game.siteHostingLedger=new List<SiteHostingLedger>();var ledger=game.siteHostingLedger.Find(l=>l.owner==reply.owner);if(ledger==null){ledger=new SiteHostingLedger{owner=reply.owner};game.siteHostingLedger.Add(ledger);}
    long due=reply.total-ledger.charged;if(due<=0)return;int money=Main.Instance.Money;long paid=ledger.charged;
@@ -86,19 +111,19 @@ namespace PC.Component.Software.Sites
    var doc=SiteDocument.Parse(document);string token=ServerAccounts.Token,world=World;if(!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done("Нужны аккаунт и сохранение игры");return;}
    var existing=Items.Find(item=>item.publication_key==doc.hostingKey);
    int estimate;try{estimate=PublicationCost(existing,url);}catch(ArgumentException ex){done(ex.Message);return;}
-   if(Main.Instance==null||Main.Instance.Money<estimate){done("Для публикации нужно $"+estimate+". Аренда $100 / 30 минут; собственный домен +$1000 только при первом подключении.");return;}
+   if(Main.Instance==null||Main.Instance.Money<estimate){done("Для публикации нужно $"+estimate+". Аренда $100 / 30 минут; собственный домен +$1000 / 30 минут.");return;}
    if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){done("Сначала сохрани игру");return;}
    busy=true;Request("publish",Funds(new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}}),(reply,error)=>{
     if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
     if(error!=null){Complete();Refresh(()=>{if(token==ServerAccounts.Token&&world==World){Status=error;StateRevision++;done(error);}});return;}
-    Apply(reply,null);Complete(()=>done("Опубликовано: "+reply.item.url+". "+Status));
+    stoppedHosts.Remove(host);Apply(reply,null);Complete(()=>done("Опубликовано: "+reply.item.url+". "+Status));
    });
   }
   public static int PublicationCost(HostedSite existing,string requested)
   {
    string url=string.IsNullOrWhiteSpace(requested)?(existing!=null?existing.url:""):SiteDocument.NormalizeUrl(requested);
    bool custom=!string.IsNullOrEmpty(url)&&(existing==null||url!="s"+existing.id+".sites.pcos");
-   return (existing!=null&&existing.active&&!existing.unpaid?0:100)+(custom&&(existing==null||!existing.custom_paid)?1000:0);
+   return (existing!=null&&existing.active&&!existing.unpaid?0:100)+(custom&&((existing==null||!existing.active||existing.unpaid)||existing.url=="s"+existing.id+".sites.pcos")?1000:0);
   }
   public void Stop(int id,Action<string> done)
   {

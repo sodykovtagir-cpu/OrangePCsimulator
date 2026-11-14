@@ -124,6 +124,7 @@ namespace PC.Component.Software
             foreach (var service in Services)
                 if (service != "shell.exe" || system.ShellRunning)
                 { names.Add(service); apps.Add(null); }
+            if (system.ServerProcessRunning) { names.Add("Server.exe"); apps.Add(null); }
             foreach (var app in current)
             { names.Add(app.AppName + ".exe"); apps.Add(app); }
 
@@ -153,7 +154,9 @@ namespace PC.Component.Software
                 if (row == null) continue;
                 row.SetSelected(selected == names[i]);
                 var app = apps[i];
-                if (app == null)
+                if (names[i] == "Server.exe")
+                    row.SetMetrics((system.ServerCpuLoad * 100f).ToString("0") + "%", "0%", system.ServerMemoryMb + " MB");
+                else if (app == null)
                     row.SetMetrics(i == 0 ? (system.CpuLoad * 5f).ToString("0") + "%" : "1%",
                         names[i] == "shell.exe" ? (system.GpuLoad * 3f).ToString("0") + "%" : "0%",
                         i == 0 ? "180 MB" : "28 MB");
@@ -248,10 +251,11 @@ namespace PC.Component.Software
         {
             if (system == null || rows == null) return;
             var current = system.RunningProcesses();
-            bool changed = names.Count != current.Count + (system.ShellRunning ? 4 : 3);
+            int serviceCount = (system.ShellRunning ? 4 : 3) + (system.ServerProcessRunning ? 1 : 0);
+            bool changed = names.Count != current.Count + serviceCount || names.Contains("Server.exe") != system.ServerProcessRunning;
             if (!changed)
                 for (int i = 0; i < current.Count; i++)
-                    if (apps[i + (system.ShellRunning ? 4 : 3)] != current[i])
+                    if (apps[i + serviceCount] != current[i])
                     { changed = true; break; }
             if (changed) RebuildRows(current);
             if (status != null) status.text = L("Running: ", "Запущено: ") + names.Count +

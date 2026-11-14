@@ -672,7 +672,7 @@ $defaultPass = empty($cfg['changed']);
       </div>
 
     <?php elseif ($tab === 'sites'): ?>
-      <?php hosted_admin_render($csrf); ?>
+      <div class="card"><?php hosted_admin_render($csrf); ?></div>
     <?php elseif ($tab === 'accounts'): ?>
       <div class="card">
         <h2>Игроки</h2>

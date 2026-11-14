@@ -40,28 +40,32 @@ namespace PC.Component.Software
   }
   IEnumerator DownloadHostedAsset(SiteAsset asset,HostedSite host,int generation)
   {
-   if(downloading)yield break;downloading=true;
+   if(downloading)yield break;downloading=true;var progress=system!=null?system.ProgressBar:null;bool transferStarted=false,cancelled=false;string transferTicket=remoteTicket;
    try{
-    if(loadingPage!=null)loadingPage.SetActive(true);if(loadingText!=null)loadingText.text="Загрузка файла: "+asset.name;
+    if(progress!=null)progress.CallProgressBar(Localization.GetText("Downloading")+": "+asset.name,new Color(.3f,1f,.3f,1f),()=>cancelled=true);
     SiteReply reply=null;string error=null;bool complete=false;
-    Action check=()=>{complete=false;SiteHostingService.Request("transfer",new Dictionary<string,string>{{"id",host.id.ToString()},{"ticket",remoteTicket},{"file",asset.name}},(r,e)=>{reply=r;error=e;complete=true;});};
-    check();while(!complete){if(siteNavigationClosed||generation!=localGeneration)yield break;yield return null;}
+    Action<string> check=(phase)=>{complete=false;SiteHostingService.Request("transfer",new Dictionary<string,string>{{"id",host.id.ToString()},{"ticket",transferTicket},{"file",asset.name},{"phase",phase}},(r,e)=>{reply=r;error=e;if(r!=null&&!string.IsNullOrEmpty(r.ticket))transferTicket=r.ticket;complete=true;});};
+    check("start");while(!complete){if(cancelled||siteNavigationClosed||generation!=localGeneration)yield break;yield return null;}
     if(error!=null){system?.ShowMessageBox("Website",error);yield break;}
+    transferStarted=true;float nextPulse=0;
     float internetDelay=0;string internetError=null;float mb=asset.Bytes().Length/1048576f;
     if(InternetService.Instance==null||!InternetService.Instance.TryTransfer(system.Board,host.url,mb,out internetDelay,out internetError)){system?.ShowMessageBox("Website",internetError??"Нет подключения");yield break;}
-    float duration=SiteTransfer.Delay(mb,internetDelay,reply.item.cpu_capacity,reply.item.cpu_load,reply.item.host_mbps,reply.item.online);
+    float duration=Mathf.Max(1,SiteTransfer.Delay(mb,internetDelay,reply.item.cpu_capacity,reply.item.cpu_load,reply.item.host_mbps,reply.item.online));
     float elapsed=0;while(elapsed<duration){
-     if(siteNavigationClosed||generation!=localGeneration||system==null||!system.Ready)yield break;
+     if(cancelled||siteNavigationClosed||generation!=localGeneration||system==null||!system.Ready)yield break;
      var link=InternetService.Instance.Status(system.Board);if(link==null||link.Quality<=0){system.ShowMessageBox("Website","Загрузка прервана: нет соединения");yield break;}
-     if(loadingText!=null)loadingText.text="Загрузка "+asset.name+" — "+(int)(elapsed/Math.Max(.01f,duration)*100)+"%";
+     if(progress!=null)progress.SetProgress(elapsed/Math.Max(.01f,duration));
+     if(elapsed>=nextPulse){check("pulse");while(!complete){if(cancelled||siteNavigationClosed||generation!=localGeneration||system==null||!system.Ready)yield break;yield return null;}if(error!=null){system?.ShowMessageBox("Website",error);yield break;}nextPulse=elapsed+10;}
+
      InternetService.Instance.SignalTraffic(system.Board);float step=Mathf.Min(.25f,duration-elapsed);yield return new WaitForSecondsRealtime(step);elapsed+=step;
     }
     // A stop, ban or exhausted hosting budget during the transfer must also
     // prevent a late save dialog. No execution or arbitrary filesystem writes.
-    check();while(!complete){if(siteNavigationClosed||generation!=localGeneration)yield break;yield return null;}
+    check("end");while(!complete){if(cancelled||siteNavigationClosed||generation!=localGeneration)yield break;yield return null;}
     if(error!=null){system?.ShowMessageBox("Website",error);yield break;}
+    transferStarted=false;if(progress!=null){progress.SetProgress(1);progress.CloseProgressBar();}
     if(generation==localGeneration&&!siteNavigationClosed&&system!=null&&system.Ready)SaveSiteAsset(asset);
-   }finally{if(generation==localGeneration&&loadingPage!=null)loadingPage.SetActive(false);downloading=false;}
+   }finally{if(progress!=null)progress.CloseProgressBar();if(transferStarted)SiteHostingService.Request("transfer",new Dictionary<string,string>{{"id",host.id.ToString()},{"ticket",transferTicket},{"file",asset.name},{"phase","cancel"}},(r,e)=>{});downloading=false;}
   }
   void OnDestroy(){foreach(var sprite in hostedIcons.Values){if(sprite!=null){Destroy(sprite.texture);Destroy(sprite);}}hostedIcons.Clear();}
  }

@@ -38,18 +38,18 @@ with tempfile.TemporaryDirectory() as td:
  mine=call('stats',_token=token,world=world);check(mine['items'][0]['publication_key']==key);check(call('stats',_token=other,world=world)['items']==[]);check(not call('stop',_token=other,world=world,id=id)['ok'])
  # Simulate 61 real minutes offline without sleeping or accepting client time.
  lib=json.dumps(str(R/'Hosting/sites/lib.php'));state=json.dumps(str(data/'state.php'))
- script=f"require {lib};$s=site_read({state});foreach($s['sites']as &$x)$x['billed_at']-=3660;unset($x);site_write({state},$s);"
+ script=f"require {lib};$s=site_read({state});foreach($s['sites']as &$x){{$x['billed_at']-=3660;$x['recurring_from']-=3660;}}unset($x);site_write({state},$s);"
  subprocess.run(['php','-r',script],check=True)
- check(call('stats',_token=token,world=world)['total']==1300)
- check(call('stats',_token=token,world=world)['total']==1300)
+ check(call('stats',_token=token,world=world)['total']==3300)
+ check(call('stats',_token=token,world=world)['total']==3300)
  check(not call('stop',_token=token,world='9'*32,id=id)['ok'])
  stopped=call('stop',_token=token,world=world,id=id);check(stopped['ok']and not stopped['item']['active']and stopped['item']['online']==0 and stopped['item']['next_bill']==0)
- check(call('stop',_token=token,world=world,id=id)['total']==1300)
+ check(call('stop',_token=token,world=world,id=id)['total']==3300)
  check(call('list')['items']==[]);check(not call('view',url='www.mycoolsite.com/about')['ok'])
  check(not call('visit',id=id,ticket=ticket,session=session)['ok'])
  subprocess.run(['php','-r',script],check=True) # elapsed time while stopped does not accrue rent
- check(call('stats',_token=token,world=world)['total']==1300)
- check(publish()['charged']==100)
+ check(call('stats',_token=token,world=world)['total']==3300)
+ check(publish()['charged']==1100)
  check(not call('visit',id=id,ticket=ticket,session=session)['ok']) # pre-stop ticket stays invalid after restart
  fresh=call('view',url='www.mycoolsite.com');check(call('visit',id=id,ticket=fresh['ticket'],session=session)['ok'])
 

@@ -27,9 +27,9 @@ for _,d in p.objects(114):
         assert d['m_FontData']['m_RichText']==0
 picker=p.data(v['colorPicker']['fileID']);assert picker['m_Script']['guid']==read_guid(ROOT/'Assets/Scripts/Assembly-CSharp/ColorPicker.cs')
 for key in ['redSlider','greenSlider','blueSlider','hexInput']:assert picker[key]['fileID'] in p.blocks
-# Re-run the INCREMENTAL upgrader against the user's latest edited revision (ba5ecb4) in an
+# Re-run the INCREMENTAL upgrader against the user's latest edited revision (23f1a0e2) in an
 # isolated temp folder. This verifies determinism and preserved surviving rects.
-original=subprocess.run(['git','show','ba5ecb4:Assets/Resources/apps/SiteEditor.prefab'],cwd=ROOT,text=True,capture_output=True)
+original=subprocess.run(['git','show','23f1a0e2:Assets/Resources/apps/SiteEditor.prefab'],cwd=ROOT,text=True,capture_output=True)
 if original.returncode==0:
     import upgrade_site_inspector as upgrade
     with tempfile.TemporaryDirectory() as td:

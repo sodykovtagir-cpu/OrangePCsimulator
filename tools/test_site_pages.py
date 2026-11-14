@@ -14,7 +14,7 @@ for _,d in p.objects(114):
   assert p.data(graphic)['m_Color']==dict(r=1,g=1,b=1,a=1)
   names=[p.data(p.data(x['fileID'])['m_GameObject']['fileID'])['m_Name']for x in tr['m_Children']]
   assert all('Input frame '+edge in names for edge in ['Top','Bottom','Left','Right'])
-for test in ['site_pages_tests.cs','site_hosting_lifecycle_tests.cs','site_followup_tests.cs']:
+for test in ['site_pages_tests.cs','site_hosting_lifecycle_tests.cs','site_followup_tests.cs','site_server_runtime_tests.cs']:
  with tempfile.TemporaryDirectory()as td:
   exe=Path(td)/'pages.exe'
   subprocess.run(['mcs',str(ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/CpuThermals.cs'),str(ROOT/'Assets/Scripts/Assembly-CSharp/OggleResultItem.cs'),'-r:System.Web.Extensions','-out:'+str(exe),*[str(ROOT/'tools/tests'/n)for n in ['site_core_stubs.cs','site_ui_stubs.cs','site_browser_stubs.cs',test]],*[str(C/n)for n in ['Lua/PcosLua.cs','SiteEditor.cs','SiteEditorInspector.cs','SiteEditorPages.cs','SiteEditorHosting.cs','Browser.cs','BrowserSites.cs','BrowserHosted.cs','BrowserSiteAssets.cs']],*[str(x)for x in (C/'Sites').glob('*.cs')]],check=True)
