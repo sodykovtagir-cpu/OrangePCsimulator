@@ -75,6 +75,13 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [SerializeField]
     private RectTransform[] iconRects;
 
+    private readonly Vector3[] corners = new Vector3[4];
+    private Vector3 authoredScale;
+    private bool scaleCaptured;
+    private Rect lastBounds;
+    private Vector2 lastPanelSize;
+    private bool lastEditMode;
+    private bool layoutApplied;
     private RectTransform rect;
     private CanvasGroup canvasGroup;
 
@@ -155,9 +162,15 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
 
     private void LateUpdate()
     {
-        if (MobileCustomizeManager.EditMode && forceOpenedInEditMode)
+        if (!EnsureRefs()) return;
+        // No global Canvas rebuild every frame while editing. Refit only when
+        // layout/viewport actually changes (including orientation/SetResolution).
+        if (!layoutApplied || lastBounds != parentRect.rect || lastPanelSize != rect.rect.size ||
+            lastEditMode != MobileCustomizeManager.EditMode)
         {
-            ApplyOpenPosition();
+            if (animationRoutine != null) StopCoroutine(animationRoutine);
+            animationRoutine = null;
+            ApplyInstant();
         }
     }
 
@@ -172,6 +185,11 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
             return false;
         }
 
+        if (!scaleCaptured)
+        {
+            authoredScale = rect.localScale;
+            scaleCaptured = true;
+        }
         if (parentRect == null)
             parentRect = rect.parent as RectTransform;
 
@@ -404,29 +422,8 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
         if (!EnsureRefs())
             return 0f;
 
-        float width = rect.rect.width;
-
-        float preferredWidth = LayoutUtility.GetPreferredWidth(rect);
-
-        if (preferredWidth > 0f)
-            width = Mathf.Max(width, preferredWidth);
-
-        return width;
-    }
-
-    private float GetPanelThickness()
-    {
-        if (!EnsureRefs())
-            return 0f;
-
-        float height = rect.rect.height;
-
-        float preferredHeight = LayoutUtility.GetPreferredHeight(rect);
-
-        if (preferredHeight > 0f)
-            height = Mathf.Max(height, preferredHeight);
-
-        return height;
+        Rect bounds = MeasureBounds();
+        return targetEdge == SnapEdge.Left || targetEdge == SnapEdge.Right ? bounds.height : bounds.width;
     }
 
     private Vector2 GetAnchor()
@@ -530,68 +527,91 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
         return new Vector2(0.5f, 0f);
     }
 
+    // Bounds are measured in the selected viewport, NOT assumed to be in
+    // rect.parent's coordinate system. Functions/Panel is nested in the HUD.
+    private Rect MeasureBounds()
+    {
+        rect.GetWorldCorners(corners);
+        Vector3 first = parentRect.InverseTransformPoint(corners[0]);
+        float minX = first.x, maxX = first.x, minY = first.y, maxY = first.y;
+        for (int i = 1; i < corners.Length; i++)
+        {
+            Vector3 p = parentRect.InverseTransformPoint(corners[i]);
+            minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+            minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
+        }
+        return Rect.MinMaxRect(minX, minY, maxX, maxY);
+    }
+
+    private Vector2 ToAnchoredDelta(Vector2 viewportDelta)
+    {
+        return rect.parent.InverseTransformVector(parentRect.TransformVector(viewportDelta));
+    }
+
+    private Rect PaddedViewport()
+    {
+        Rect r = parentRect.rect;
+        float pad = Mathf.Clamp(edgePadding, 0f, Mathf.Min(r.width, r.height) * 0.49f);
+        return Rect.MinMaxRect(r.xMin + pad, r.yMin + pad, r.xMax - pad, r.yMax - pad);
+    }
+
     private Vector2 GetOpenAnchoredPosition()
     {
+        Rect bounds = MeasureBounds();
+        Rect view = PaddedViewport();
+        // Corner pivots remain meaningful, but also get the edge inset along
+        // the tangent; no corner is allowed to bypass the final bounds check.
+        float dx = Mathf.Clamp(0f, view.xMin - bounds.xMin, view.xMax - bounds.xMax);
+        float dy = Mathf.Clamp(0f, view.yMin - bounds.yMin, view.yMax - bounds.yMax);
         switch (edge)
         {
-            case SnapEdge.Left:
-                return new Vector2(edgePadding, 0f);
-
-            case SnapEdge.Right:
-                return new Vector2(-edgePadding, 0f);
-
-            case SnapEdge.Bottom:
-                return new Vector2(0f, edgePadding);
-
-            case SnapEdge.Top:
-                return new Vector2(0f, -edgePadding);
+            case SnapEdge.Left: dx = view.xMin - bounds.xMin; break;
+            case SnapEdge.Right: dx = view.xMax - bounds.xMax; break;
+            case SnapEdge.Bottom: dy = view.yMin - bounds.yMin; break;
+            case SnapEdge.Top: dy = view.yMax - bounds.yMax; break;
         }
-
-        return Vector2.zero;
+        return rect.anchoredPosition + ToAnchoredDelta(new Vector2(dx, dy));
     }
 
     private Vector2 GetClosedAnchoredPosition()
     {
-        float thickness = GetPanelThickness();
-
+        Rect bounds = MeasureBounds();
+        Vector2 shift = Vector2.zero;
         switch (edge)
         {
-            case SnapEdge.Left:
-                return new Vector2(-thickness - edgePadding, 0f);
-
-            case SnapEdge.Right:
-                return new Vector2(thickness + edgePadding, 0f);
-
-            case SnapEdge.Bottom:
-                return new Vector2(0f, -thickness - edgePadding);
-
-            case SnapEdge.Top:
-                return new Vector2(0f, thickness + edgePadding);
+            case SnapEdge.Left: shift.x = -(bounds.width + edgePadding * 2f); break;
+            case SnapEdge.Right: shift.x = bounds.width + edgePadding * 2f; break;
+            case SnapEdge.Bottom: shift.y = -(bounds.height + edgePadding * 2f); break;
+            case SnapEdge.Top: shift.y = bounds.height + edgePadding * 2f; break;
         }
-
-        return Vector2.zero;
+        return GetOpenAnchoredPosition() + ToAnchoredDelta(shift);
     }
 
     private void ConfigureForEdge()
     {
-        if (!EnsureRefs())
-            return;
-
+        if (!EnsureRefs()) return;
+        // Rebuild only this toolbar, after the layout group/content fitter has
+        // resolved its ACTUAL width. Never shrink the already-fitted scale.
+        LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+        rect.localScale = authoredScale;
         rect.pivot = GetPivotForEdge();
-
+        float z = GetRotationForEdge();
+        rect.localRotation = Quaternion.Euler(0f, 0f, z);
+        ApplyIconsCounterRotation(z);
+        Rect bounds = MeasureBounds();
+        Rect view = PaddedViewport();
+        float fit = Mathf.Min(1f, Mathf.Min(view.width / Mathf.Max(0.001f, bounds.width),
+                                          view.height / Mathf.Max(0.001f, bounds.height)));
+        rect.localScale = authoredScale * fit;
+        // Re-evaluate t with fitted dimensions, rather than an unscaled 550px
+        // toolbar on the 500-unit short edge.
         Vector2 anchor = GetAnchor();
-
         rect.anchorMin = anchor;
         rect.anchorMax = anchor;
-
-        float z = GetRotationForEdge();
-
-        rect.localRotation = Quaternion.Euler(0f, 0f, z);
-
-        ApplyIconsCounterRotation(z);
-
-        Canvas.ForceUpdateCanvases();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+        lastBounds = parentRect.rect;
+        lastPanelSize = rect.rect.size;
+        lastEditMode = MobileCustomizeManager.EditMode;
+        layoutApplied = true;
     }
 
     private void ApplyIconsCounterRotation(float panelRotationZ)

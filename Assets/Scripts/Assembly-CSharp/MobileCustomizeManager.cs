@@ -21,6 +21,9 @@ public class MobileCustomizeManager : MonoBehaviour
     [SerializeField]
     private GameObject editPanel;
 
+    private Vector2 lastPreviewArea;
+    private int lastScreenWidth, lastScreenHeight;
+
     private MobileFreeDraggable[] controls;
 
     private MobileAdaptiveSlidePanel[] adaptivePanels;
@@ -30,6 +33,7 @@ public class MobileCustomizeManager : MonoBehaviour
         if (controlsRoot == null && previewPanel != null)
             controlsRoot = previewPanel.transform as RectTransform;
 
+        FitPreviewToScreen();
         RefreshControls();
         SetEditMode(false);
     }
@@ -66,6 +70,40 @@ public class MobileCustomizeManager : MonoBehaviour
 
         yield return new WaitForEndOfFrame();
         ApplySavedLayout();
+    }
+
+    // The menu is a world-space 840x500 canvas, not the phone screen.
+    // Match the room HUD's Expand CanvasScaler (reference 800x500), then
+    // uniformly fit that logical viewport inside the authored menu shell.
+    private void FitPreviewToScreen()
+    {
+        if (previewPanel == null) return;
+        var viewport = previewPanel.transform as RectTransform;
+        var area = viewport != null ? viewport.parent as RectTransform : null;
+        if (area == null || Screen.width <= 0 || Screen.height <= 0) return;
+        float aspect = (float)Screen.width / Screen.height;
+        Vector2 logical = aspect >= 800f / 500f
+            ? new Vector2(500f * aspect, 500f)
+            : new Vector2(800f, 800f / aspect);
+        float fit = Mathf.Min(area.rect.width / logical.x, area.rect.height / logical.y);
+        if (fit <= 0f) return;
+        viewport.anchorMin = viewport.anchorMax = new Vector2(0.5f, 0.5f);
+        viewport.pivot = new Vector2(0.5f, 0.5f);
+        viewport.sizeDelta = logical;
+        viewport.anchoredPosition = Vector2.zero;
+        viewport.localScale = new Vector3(fit, fit, 1f);
+        lastPreviewArea = area.rect.size;
+        lastScreenWidth = Screen.width;
+        lastScreenHeight = Screen.height;
+    }
+
+    private void LateUpdate()
+    {
+        var viewport = previewPanel != null ? previewPanel.transform as RectTransform : null;
+        var area = viewport != null ? viewport.parent as RectTransform : null;
+        if (area != null && (lastPreviewArea != area.rect.size ||
+            lastScreenWidth != Screen.width || lastScreenHeight != Screen.height))
+            FitPreviewToScreen(); // Never reload prefs while the user is dragging.
     }
 
     private void RefreshControls()

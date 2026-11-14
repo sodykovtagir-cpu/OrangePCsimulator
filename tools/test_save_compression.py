@@ -19,7 +19,7 @@ assert 'public static SaveIntegrity DecodeHeader(' in source
 assert 'using (var reader = new StreamReader(zip, new UTF8Encoding(false, true)))' in source
 loader_source = (root / 'SaveManagement/DataLoader.cs').read_text()
 assert 'public void LoadHeaderFromPath()' in loader_source
-assert 'SaveUtility.DecodeHeader(File.ReadAllText(Path), out header)' in loader_source
+assert 'SaveUtility.DecodeHeader(File.ReadAllText(Path), out header, out reason)' in loader_source
 assert 'if (headerOnly)' in loader_source and 'SaveUtility.Decode(File.ReadAllText(Path), out payload)' in loader_source
 file_menu = (root / 'FileMenu.cs').read_text()
 assert 'entry.Loader' in file_menu and 'LoadSavedFile(entry.Path)' in file_menu
@@ -78,6 +78,20 @@ class Harness {
               "OPC3 round-trip / Unicode");
         Check(SaveUtility.DecodeHeader(modern, out decoded) == SaveUtility.SaveIntegrity.Ok &&
               decoded == "{\"name\":\"Привет 🖥\"}", "OPC3 header-only preview");
+        // GameData contains the other cable-mode world's entire content. A
+        // legitimate header can exceed 8 MiB even with a much smaller OPC3 file.
+        string largeHeader = "{\"version\":\"1.8.3\",\"otherCableMode\":{\"content\":\"" + new string('x', 12*1024*1024) + "\"}}";
+        string largeSave = SaveUtility.Encode(largeHeader + "\nworld");
+        Check(SaveUtility.Decode(largeSave, out decoded) == SaveUtility.SaveIntegrity.Ok, "large save full decode failed");
+        Check(SaveUtility.DecodeHeader(largeSave, out decoded) == SaveUtility.SaveIntegrity.Ok && decoded == largeHeader,
+              "valid >8MiB GameData header falsely marked tampered");
+        string largeOld = SignedOld(largeHeader + "\n" + new string('w', 14*1024*1024));
+        Check(Encoding.UTF8.GetByteCount(largeOld) > 25*1024*1024, "fixture must exceed 25MB on disk");
+        Check(SaveUtility.DecodeHeader(largeOld, out decoded) == SaveUtility.SaveIntegrity.Ok && decoded == largeHeader,
+              "large historical OPC2 header compatibility");
+        Check(SaveUtility.Decode(largeOld, out decoded) == SaveUtility.SaveIntegrity.Ok && decoded.Length > 25*1024*1024,
+              "large historical OPC2 full compatibility");
+        largeOld = null;
         var modified = modern.ToCharArray(); modified[modified.Length - 10] =
             modified[modified.Length - 10] == 'A' ? 'B' : 'A';
         Check(SaveUtility.Decode(new string(modified), out decoded) == SaveUtility.SaveIntegrity.Tampered,
@@ -96,6 +110,9 @@ class Harness {
               "image-heavy OPC3 round-trip");
         Check(SaveUtility.Decode(SaveUtility.EncryptDecrypt(text), out decoded) ==
               SaveUtility.SaveIntegrity.None && decoded == text, "unsigned legacy backwards compatibility");
+        string reason;
+        Check(SaveUtility.DecodeHeader(new string(modified), out decoded, out reason) == SaveUtility.SaveIntegrity.Tampered &&
+              reason.Contains("HMAC mismatch"), "diagnostic reason missing");
         var path = Path.Combine(args[0], "test.opc");
         var loader = new DataLoader(path, new GameData()); loader.Content = text;
         loader.WriteToFile();
@@ -103,6 +120,10 @@ class Harness {
         var preview = new DataLoader(path); preview.LoadHeaderFromPath();
         Check(preview.GameData != null, "header-only loader failed");
         Check(preview.Content == text, "lazy world hydration failed");
+        string before = File.ReadAllText(path);
+        string report = SaveUtility.InspectFile(path);
+        Check(report.Contains("HMAC OK") && !report.Contains(path) && !report.Contains("Привет"), "diagnostic privacy");
+        Check(File.ReadAllText(path) == before, "diagnostic modified save");
         var reopened = new DataLoader(path); reopened.LoadFromPath();
         Check(reopened.Content == text && reopened.GameData != null, "DataLoader reload failed");
         Console.WriteLine("PASS: compressed OPC3 roundtrip, HMAC, OPC2/legacy reads, Unicode, DataLoader");

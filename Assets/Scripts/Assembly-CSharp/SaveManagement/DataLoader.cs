@@ -61,10 +61,10 @@ namespace SaveManagement
         {
             if (string.IsNullOrEmpty(Path) || !File.Exists(Path))
                 throw new FileNotFoundException("Save file is missing.", Path);
-            string header;
-            if (SaveUtility.DecodeHeader(File.ReadAllText(Path), out header) ==
+            string header, reason;
+            if (SaveUtility.DecodeHeader(File.ReadAllText(Path), out header, out reason) ==
                 SaveUtility.SaveIntegrity.Tampered)
-                throw new Exception("Save integrity check failed (file may be modified).");
+                throw new InvalidDataException("Cannot read save header: " + reason);
             var parsed = JsonUtility.FromJson<GameData>(header);
             if (parsed == null) throw new Exception("Invalid GameData.");
             GameData = parsed;

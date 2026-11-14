@@ -91,11 +91,19 @@ namespace SaveManagement
         // of parsing every item's files/cable poses for every row in the menu.
         public static SaveIntegrity DecodeHeader(string fileText, out string header)
         {
+            string reason;
+            return DecodeHeader(fileText, out header, out reason);
+        }
+
+        public static SaveIntegrity DecodeHeader(string fileText, out string header, out string reason)
+        {
             header = string.Empty;
+            reason = "Empty save";
             if (string.IsNullOrEmpty(fileText)) return SaveIntegrity.Tampered;
             if (!fileText.StartsWith(CompressedTag, StringComparison.Ordinal))
             {
                 var status = Decode(fileText, out var oldPayload);
+                reason = status == SaveIntegrity.Tampered ? "Legacy/OPC2 authentication or decoding failed" : "Legacy/OPC2 decoded";
                 if (status != SaveIntegrity.Tampered)
                 {
                     int end = oldPayload.IndexOf('\n');
@@ -104,8 +112,10 @@ namespace SaveManagement
                 return status;
             }
             int nl = fileText.IndexOf('\n');
+            reason = "Invalid OPC3 envelope";
             if (nl != CompressedTag.Length + 44) return SaveIntegrity.Tampered;
             string body = fileText.Substring(nl + 1);
+            reason = "OPC3 HMAC mismatch (changed/truncated file or incompatible signature)";
             if (!FixedEquals(fileText.Substring(CompressedTag.Length, 44), ComputeHmac(body)))
                 return SaveIntegrity.Tampered;
             try
@@ -114,17 +124,52 @@ namespace SaveManagement
                 using (var zip = new GZipStream(input, CompressionMode.Decompress))
                 using (var reader = new StreamReader(zip, new UTF8Encoding(false, true)))
                 {
-                    header = reader.ReadLine();
-                    if (string.IsNullOrEmpty(header) || header.Length > 8 * 1024 * 1024)
+                    // GameData.otherCableMode.content is a complete second world,
+                    // not small metadata. Match the full decoder's size budget.
+                    // Bound allocation while reading, not after ReadLine allocated it.
+                    var text = new StringBuilder();
+                    var buffer = new char[8192];
+                    int count;
+                    while ((count = reader.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        int end = Array.IndexOf(buffer, '\n', 0, count);
+                        int take = end < 0 ? count : end;
+                        if (text.Length + take > MaxDecodedBytes)
+                        {
+                            reason = "OPC3 HMAC OK; GameData exceeds supported size budget";
+                            return SaveIntegrity.Tampered;
+                        }
+                        text.Append(buffer, 0, take);
+                        if (end >= 0) break;
+                    }
+                    header = text.ToString().TrimEnd('\r');
+                    if (string.IsNullOrEmpty(header))
+                    {
+                        reason = "OPC3 HMAC OK; empty GameData";
                         return SaveIntegrity.Tampered;
+                    }
                 }
+                reason = "OPC3 HMAC OK; GameData decoded";
                 return SaveIntegrity.Ok;
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 header = string.Empty;
+                reason = "OPC3 HMAC OK; base64/gzip/UTF-8 decode failed (" + e.GetType().Name + ")";
                 return SaveIntegrity.Tampered;
             }
+        }
+
+        // Read-only, short report: no world contents, keys, screenshots or file paths.
+        public static string InspectFile(string path)
+        {
+            var info = new FileInfo(path);
+            string header, reason;
+            var status = DecodeHeader(File.ReadAllText(path), out header, out reason);
+            return "Save diagnostics\nFile bytes: " + info.Length + "\nHeader characters: " +
+                (header == null ? 0 : header.Length) + "\nHeader status: " + status +
+                "\nDetails: " + reason +
+                "\nNote: header validation does not validate the complete world JSON.";
         }
 
 		/// <summary>Decode OPC3 (gzip), OPC2 (uncompressed), and old unsigned XOR saves.</summary>
