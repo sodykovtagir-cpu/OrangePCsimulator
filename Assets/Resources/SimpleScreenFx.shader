@@ -4,7 +4,6 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 	{
 		_MainTex ("Texture", 2D) = "white" {}
 		_BloomTex ("Bloom", 2D) = "black" {}
-		_PrevTex ("Prev", 2D) = "black" {}
 	}
 	SubShader
 	{
@@ -83,17 +82,19 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 		Pass
 		{
 			CGPROGRAM
-			#pragma vertex vert
+			#pragma target 3.0
+            #pragma vertex vert
 			#pragma fragment frag
 			#include "UnityCG.cginc"
 			sampler2D _MainTex;
 			sampler2D _BloomTex;
-			sampler2D _PrevTex;
+            sampler2D _CameraMotionVectorsTexture;
 			float _Bloom;
 			float _Vignette;
 			float _Grain;
 		float _Motion;
-		float2 _MotionDir;
+		float4 _FallbackMotion;
+        float _UseMotionVectors, _Shutter, _MaxMotionPixels;
 		float _AO;
 		float4 _MainTex_TexelSize;
 			UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
@@ -110,19 +111,42 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
 				// иначе края смешиваются с невиньетированными сэмплами и мигают.
 			if (_Motion > 0.001)
 			{
-				// Широкий гаусс: шлейф виден, но без отдельных «копий» кадра.
-				float2 d = _MotionDir;
-				float3 acc = 0;
-				float wsum = 0;
-				[unroll]
-				for (int s = -7; s <= 7; s++)
-				{
-					float t = s / 7.0;
-					float w = exp(-t * t * 1.55);
-					acc += tex2D(_MainTex, saturate(uv + d * t)).rgb * w;
-					wsum += w;
-				}
-				col = lerp(col, acc / max(wsum, 1e-4), saturate(_Motion));
+                float2 velocity;
+                float2 motionUV = uv;
+                #if UNITY_UV_STARTS_AT_TOP
+                if (_MainTex_TexelSize.y < 0) motionUV.y = 1.0-motionUV.y;
+                #endif
+                if (_UseMotionVectors > .5)
+                    {
+                    velocity = tex2D(_CameraMotionVectorsTexture, motionUV).rg;
+                    #if UNITY_UV_STARTS_AT_TOP
+                    if (_MainTex_TexelSize.y < 0) velocity.y = -velocity.y;
+                    #endif
+                    }
+                else
+                    velocity = _FallbackMotion.xy + (uv-.5)*_FallbackMotion.z;
+                float2 pixels = velocity / max(abs(_MainTex_TexelSize.xy), 1e-6) * _Shutter;
+                pixels *= min(1.0, _MaxMotionPixels/max(length(pixels),1e-4));
+                float2 span = pixels * abs(_MainTex_TexelSize.xy);
+                float centerDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, motionUV));
+                float3 acc = 0; float wsum = 0;
+                // 13 samples over at most 12 pixels: <=1 pixel spacing even
+                // when sprinting. No separated copies or accumulated ghost frame.
+                [unroll]
+                for (int s = -6; s <= 6; s++)
+                {
+                    float t = s/12.0;
+                    float2 sampleUV = saturate(uv+span*t);
+                    float2 depthUV = sampleUV;
+                    #if UNITY_UV_STARTS_AT_TOP
+                    if (_MainTex_TexelSize.y < 0) depthUV.y = 1.0-depthUV.y;
+                    #endif
+                    float sampleDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture,depthUV));
+                    float edge = saturate(1.0-abs(sampleDepth-centerDepth)/max(.1,centerDepth*.08));
+                    float weight = exp(-t*t*6.0) * edge;
+                    acc += tex2D(_MainTex,sampleUV).rgb*weight; wsum+=weight;
+                }
+                col = acc/max(wsum,1e-4);
 			}
 
 				if (_AO > 0.001)

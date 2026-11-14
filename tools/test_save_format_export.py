@@ -12,7 +12,8 @@ def main():
     assert '"sav"' not in export
     imports=(CS/'FileMenu.cs').read_text()
     assert 'string[] exts = new string[] { ".pc", ".opc" };' in imports
-    assert 'if (ext == ".pc")' in imports and 'else if (ext == ".opc")' in imports
+    assert 'SaveFileImport.Import' in imports
+    assert 'ext != ".pc" && ext != ".opc"' in (CS/'SaveManagement/SaveFileImport.cs').read_text()
     harness='''using System;using System.IO;
 public static class Debug {public static void LogWarning(string s){}}
 class MessageBox {public int Count;public void Show(string text){Count++;}}

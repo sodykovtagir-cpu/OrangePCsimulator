@@ -216,9 +216,12 @@ public static class GraphicsBootstrap
 		cam.allowHDR = anyEffect;
 		cam.allowMSAA = true;
 
-		cam.depthTextureMode = ao
+		cam.depthTextureMode = (ao || motionBlur)
 			? cam.depthTextureMode | DepthTextureMode.Depth
 			: cam.depthTextureMode & ~DepthTextureMode.Depth;
+
+        bool vectors = motionBlur && SystemInfo.supportsMotionVectors;
+        cam.depthTextureMode = vectors ? cam.depthTextureMode | DepthTextureMode.MotionVectors : cam.depthTextureMode & ~DepthTextureMode.MotionVectors;
 
 		var fx = cam.GetComponent<SimpleScreenFx>();
 

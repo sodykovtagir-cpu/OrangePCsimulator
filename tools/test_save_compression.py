@@ -22,7 +22,8 @@ assert 'public void LoadHeaderFromPath()' in loader_source
 assert 'SaveUtility.DecodeHeader(File.ReadAllText(Path), out header)' in loader_source
 assert 'if (headerOnly)' in loader_source and 'SaveUtility.Decode(File.ReadAllText(Path), out payload)' in loader_source
 file_menu = (root / 'FileMenu.cs').read_text()
-assert 'l.LoadHeaderFromPath();' in file_menu and 'var world = l.Content;' in file_menu
+assert 'entry.Loader' in file_menu and 'LoadSavedFile(entry.Path)' in file_menu
+assert 'item.Loader.LoadHeaderFromPath()' in (root / 'SaveManagement/SaveCatalog.cs').read_text()
 if not shutil.which('mcs') or not shutil.which('mono'):
     print('NOTE: Mono unavailable; checked OPC3 source guards only')
     raise SystemExit(0)
@@ -57,6 +58,7 @@ namespace UnityEngine.Networking {
         public UnityWebRequestAsyncOperation SendWebRequest() { return new UnityWebRequestAsyncOperation(); }
     }
 }
+namespace PC.Component.Software.Sites {public class SiteHostingLedger {public string owner;public long charged;}}
 class Harness {
     static void Check(bool test, string name) { if (!test) throw new Exception(name); }
     static string SignedOld(string payload) {
@@ -113,6 +115,6 @@ with tempfile.TemporaryDirectory(prefix='pcos-save-test-') as tmp:
     exe = Path(tmp) / 'test.exe'
     subprocess.run(['mcs', '-out:' + str(exe), str(test),
                     str(root / 'SaveManagement/SaveUtility.cs'),
-                    str(root / 'SaveManagement/DataLoader.cs'), str(root / 'GameData.cs')],
+                    str(root / 'SaveManagement/DataLoader.cs'), str(root / 'SaveManagement/SaveStorage.cs'), str(root / 'SaveManagement/SaveCatalog.cs'), str(root / 'GameData.cs')],
                    check=True)
     subprocess.run(['mono', str(exe), tmp], check=True)

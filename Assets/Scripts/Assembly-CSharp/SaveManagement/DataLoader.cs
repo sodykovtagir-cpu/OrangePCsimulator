@@ -112,7 +112,8 @@ namespace SaveManagement
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(Path, encrypted);
+            SaveStorage.WriteAtomic(Path, encrypted);
+            SaveCatalog.Invalidate(Path);
         }
     }
 }

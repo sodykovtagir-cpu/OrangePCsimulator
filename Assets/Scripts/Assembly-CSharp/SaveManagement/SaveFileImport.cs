@@ -20,16 +20,14 @@ namespace SaveManagement
             if (string.IsNullOrEmpty(SaveUtility.GetSafeFileName(baseName))) baseName = "Imported save";
             string destination = SaveUtility.GetNewPath(baseName); // never overwrite an existing save
 
-            if (ext == ".pc")
-            {
-                var converted = new DataLoader(destination, loader.GameData);
-                converted.Content = loader.Content;
-                converted.WriteToFile();
-            }
-            else
-            {
-                File.Copy(source, destination);
-            }
+            // A picker/ACTION_VIEW path is borrowed Android cache storage.
+            // Both formats become a fully committed private OPC3 save before
+            // the temporary source is released or a world can be opened.
+            var imported = new DataLoader(destination, loader.GameData);
+            imported.Content = loader.Content;
+            imported.WriteToFile();
+            var verify = new DataLoader(destination);
+            verify.LoadHeaderFromPath();
             return destination;
         }
     }

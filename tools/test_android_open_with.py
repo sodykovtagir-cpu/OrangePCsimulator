@@ -119,7 +119,7 @@ for guard in ('activity.getIntent()', 'activity.setIntent(new Intent(Intent.ACTI
               'OpenableColumns.DISPLAY_NAME', 'openInputStream(uri)', '".opc"', '".pc"'):
     assert guard in java, guard
 importer = (assets / 'Scripts/Assembly-CSharp/SaveManagement/SaveFileImport.cs').read_text()
-assert importer.index('loader.LoadFromPath()') < importer.index('File.Copy(source, destination)')
+assert importer.index('loader.LoadFromPath()') < importer.index('imported.WriteToFile()')
 assert 'SaveUtility.GetNewPath(baseName)' in importer
 file_menu = (assets / 'Scripts/Assembly-CSharp/FileMenu.cs').read_text()
 bridge = (assets / 'Scripts/Assembly-CSharp/AndroidSaveOpen.cs').read_text()

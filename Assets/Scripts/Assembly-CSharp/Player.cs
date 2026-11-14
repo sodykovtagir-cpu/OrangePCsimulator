@@ -135,12 +135,13 @@ public class Player : MonoBehaviour
         {
             cam.localRotation = Quaternion.Euler(clampY, 0f, 0f);
         }
+        MovePlayer(Time.deltaTime);
     }
 
-    private void FixedUpdate()
+    private void MovePlayer(float deltaTime)
     {
         // LoadPlayer temporarily disables the CharacterController while it
-        // teleports. A FixedUpdate during that frame must not call Move on it.
+        // teleports. Movement during that frame must not call Move on it.
         if (controller == null || !controller.enabled) return;
         bool run = InputManager.GetButton("Run");
         if (sit) return;
@@ -156,19 +157,19 @@ public class Player : MonoBehaviour
         Vector3 worldDir = transform.TransformDirection(playerDirection);
         playerDirection = worldDir;
 
-        Vector3 motion = worldDir * Time.fixedDeltaTime;
+        Vector3 motion = worldDir * deltaTime;
         controller.Move(motion);
 
         if (!controller.isGrounded)
         {
-            playerDirection.y += gravity * Time.fixedDeltaTime;
+            playerDirection.y += gravity * deltaTime;
             return;
         }
 
         Vector3 vel = controller.velocity;
         if (vel.sqrMagnitude > 1f && (playerDirection.x != 0f || playerDirection.z != 0f))
         {
-            footstepTime += Time.fixedDeltaTime * (run ? runstepLenghten : 1f);
+            footstepTime += deltaTime * (run ? runstepLenghten : 1f);
             if (footstepTime >= footstepInterval)
             {
                 footstepTime = 0f;
@@ -217,7 +218,10 @@ public class Player : MonoBehaviour
             return;
 
         Vector3 pushDir = new Vector3(moveDir.x, 0f, moveDir.z);
-        body.AddForce(pushDir * pushForce, ForceMode.Force);
+        // Move now runs per rendered frame. Force accumulates until a physics
+        // tick, so compensate the callback rate instead of pushing harder at 144 Hz.
+        float frameWeight = Time.deltaTime / Mathf.Max(.0001f, Time.fixedDeltaTime);
+        body.AddForce(pushDir * pushForce * frameWeight, ForceMode.Force);
     }
 
     public void ResetView()

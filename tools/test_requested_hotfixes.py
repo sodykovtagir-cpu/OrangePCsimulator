@@ -22,8 +22,9 @@ assert 'new Texture2D(2, 2, TextureFormat.RGBA32, false)' in read('FormatConvert
 assert 'gridImage.color = on ? Color.red : gridOffColor;' in read('Functions.cs')
 assert 'StartCoroutine(FileMenu.PreloadHeaders());' in main_menu
 assert 'private void OnEnable()' in menu and 'RebuildList();' in menu
-assert 'cached.size == info.Length && cached.modifiedUtc == info.LastWriteTimeUtc' in menu
-assert 'headerCache.Remove(path);' in menu
+catalog = read('SaveManagement/SaveCatalog.cs')
+assert 'item.Size != info.Length || item.ModifiedUtc != info.LastWriteTimeUtc' in catalog
+assert 'Task.Run' in catalog and 'Directory.GetFiles' not in menu
 assert 'ScreenshotCover(GameData data)' in workshop
 assert 'CoverForSave(path)' in workshop and 'ScreenshotCover(load.loader.GameData)' in info
 client = read('WorkshopClient.cs')

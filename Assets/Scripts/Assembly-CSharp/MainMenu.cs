@@ -158,6 +158,24 @@ public class MainMenu : MonoBehaviour
         LoadFile(lod);
     }
 
+    bool openingSave;
+    public void LoadSavedFile(string path)
+    {
+        if (!openingSave) StartCoroutine(OpenSavedFile(path));
+    }
+    private IEnumerator OpenSavedFile(string path)
+    {
+        openingSave = true; menuManager.ShowMenu("Loading");
+        loadingText.text = Localization.GetText("Loading...");
+        // Render the loading screen before validating/decompressing the world.
+        yield return null;
+        var work = System.Threading.Tasks.Task.Run(() => { var loader = new DataLoader(path); loader.LoadFromPath(); if (loader.GameData == null) throw new System.IO.IOException("Save is missing"); return loader; });
+        while (!work.IsCompleted) yield return null;
+        if (work.IsFaulted)
+        { Debug.LogWarning("Cannot open save: " + work.Exception.GetBaseException().Message); openingSave = false; menuManager.Back(); yield break; }
+        openingSave = false; LoadFile(work.Result);
+    }
+
     public void LoadFile(DataLoader loader)
     {
         PC.Component.Cabling.CableMode.SelectForLoad(loader);

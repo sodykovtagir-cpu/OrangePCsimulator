@@ -35,43 +35,12 @@ public class FileMenu : MonoBehaviour
 
 	private List<Load> loads;
 
-	private sealed class CachedHeader
-	{
-		public long size;
-		public DateTime modifiedUtc;
-		public DataLoader loader;
-	}
-	private static readonly Dictionary<string, CachedHeader> headerCache =
-		new Dictionary<string, CachedHeader>(StringComparer.Ordinal);
-
-	private static DataLoader HeaderFor(string path)
-	{
-		var info = new FileInfo(path);
-		if (!info.Exists) throw new FileNotFoundException("Save file is missing.", path);
-		CachedHeader cached;
-		if (headerCache.TryGetValue(path, out cached) &&
-			cached.size == info.Length && cached.modifiedUtc == info.LastWriteTimeUtc)
-			return cached.loader;
-		var loader = new DataLoader(path);
-		loader.LoadHeaderFromPath();
-		headerCache[path] = new CachedHeader {
-			size = info.Length, modifiedUtc = info.LastWriteTimeUtc, loader = loader
-		};
-		return loader;
-	}
-
-	// Called at boot, one header per frame. The list is ready before the player
-	// opens Saves, and returning to the menu reuses unchanged validated headers.
-	public static System.Collections.IEnumerator PreloadHeaders()
-	{
-		var folder = SaveUtility.GetFolderPath();
-		foreach (var path in Directory.GetFiles(folder, "*" + SaveUtility.extension))
-		{
-			try { HeaderFor(path); }
-			catch (Exception e) { Debug.LogWarning("Cannot index save " + Path.GetFileName(path) + ": " + e.Message); }
-			yield return null;
-		}
-	}
+    int listGeneration;
+    public static System.Collections.IEnumerator PreloadHeaders()
+    {
+        SaveCatalog.Initialize(SaveUtility.GetFolderPath());
+        while (SaveCatalog.IsScanning) yield return null;
+    }
 
 	[SerializeField]
 	private FileInformation fileInformation;
@@ -96,12 +65,13 @@ public class FileMenu : MonoBehaviour
 	/// <summary>Refresh the list after picker / Android Files import.</summary>
 	public void RefreshFromDisk() { RebuildList(); }
 
-	private bool AddSlot(string path)
+	private bool AddSlot(SaveCatalog.Entry entry)
 	{
 		try
 		{
 			// read
-			DataLoader l = HeaderFor(path); // validated metadata, cached until file changes
+			DataLoader l = entry.Loader; // disk/HMAC/JSON work already completed on a worker
+            if (l == null) return false;
 			// load
 			var parent = slotParent;
 			var pref = slotPrefab;
@@ -119,13 +89,7 @@ public class FileMenu : MonoBehaviour
 			x.Find("Edit").GetComponent<Button>().onClick.AddListener(() => { ShowFileInformation(v); });
             x.Find("Name").GetComponent<Button>().onClick.AddListener(() =>
             {
-                try
-                {
-                    headerCache.Remove(path); // don't retain the full world in the menu cache
-                    var world = l.Content; // full verification/decompression only on open
-                    MainMenu.Instance.LoadFile(l);
-                }
-                catch (Exception e) { Debug.LogWarning("Cannot open save: " + e.Message); }
+                MainMenu.Instance.LoadSavedFile(entry.Path);
             });
 			empty.SetActive(loads.Count == 0);
 			return true;
@@ -142,31 +106,43 @@ public class FileMenu : MonoBehaviour
 		fileInformation.Show(load);
 	}
 
-	public void RebuildList()
-	{
-		if (loads == null) loads = new List<Load>();
-		loads.Clear();
-		if (slotParent != null)
-		{
-		for (int i = slotParent.childCount - 1; i >= 0; i--)
-		{
-			var old = slotParent.GetChild(i).gameObject;
-			old.SetActive(false); // Destroy is deferred until end of frame.
-			Destroy(old);
-		}
-		}
-		string fpath = SaveUtility.GetFolderPath();
-		string pattern = "*" + SaveUtility.extension;
-		var nList = new Dictionary<string, DateTime>();
-		if (Directory.Exists(fpath))
-		{
-			foreach (var b in Directory.GetFiles(fpath, pattern))
-				nList[b] = File.GetLastWriteTime(b);
-		}
-		foreach (var x in nList.OrderByDescending(kvp => kvp.Value))
-			AddSlot(x.Key);
-		if (empty != null) empty.SetActive(loads.Count == 0);
-	}
+    private void OnDisable() { listGeneration++; }
+    public void RebuildList()
+    {
+        SaveCatalog.Refresh();
+        if (!isActiveAndEnabled) return;
+        StartCoroutine(BuildList(++listGeneration));
+    }
+    private System.Collections.IEnumerator BuildList(int generation)
+    {
+        // Let the button click/menu transition render before doing UI work.
+        yield return null;
+        if (generation != listGeneration) yield break;
+        if (loads == null) loads = new List<Load>();
+        loads.Clear();
+        if (slotParent != null)
+            for (int i = slotParent.childCount - 1; i >= 0; i--)
+            {
+                if (generation != listGeneration) yield break;
+                var old = slotParent.GetChild(i).gameObject; old.SetActive(false); Destroy(old);
+                if (i % 32 == 0) yield return null;
+            }
+        if (empty != null) empty.SetActive(false);
+        while (SaveCatalog.IsScanning) { if (generation != listGeneration) yield break; yield return null; }
+        var rows = SaveCatalog.Snapshot();
+        SaveCoverCache.Prune(rows);
+        long started = System.Diagnostics.Stopwatch.GetTimestamp(); int batch = 0;
+        foreach (var entry in rows)
+        {
+            if (generation != listGeneration) yield break;
+            if (entry.Loader == null) { Debug.LogWarning("Cannot index save " + Path.GetFileName(entry.Path) + ": " + entry.Error); continue; }
+            AddSlot(entry);
+            if (++batch >= 8 || (System.Diagnostics.Stopwatch.GetTimestamp()-started)*1000.0/System.Diagnostics.Stopwatch.Frequency >= 3)
+            { yield return null; batch = 0; started = System.Diagnostics.Stopwatch.GetTimestamp(); }
+        }
+        if (empty != null) empty.SetActive(loads.Count == 0);
+        if (SaveCatalog.Error != null) Debug.LogWarning("Cannot list saves: " + SaveCatalog.Error);
+    }
 
 	public void RefreshLoadButton(Load load)
 	{
@@ -183,7 +159,7 @@ public class FileMenu : MonoBehaviour
 		Texture tex = null;
 		if (g != null && !string.IsNullOrEmpty(g.icon))
 		{
-			try { tex = FormatConverter.StringToTexture(g.icon); }
+			try { tex = SaveCoverCache.Get(g.icon); }
 			catch { tex = null; }
 		}
 
@@ -292,8 +268,7 @@ public class FileMenu : MonoBehaviour
 
 	public void DeleteLoadButton(Load load)
 	{
-		if (File.Exists(load.loader.Path))
-			File.Delete(load.loader.Path);
+		SaveStorage.Delete(load.loader.Path);
 		loads.Remove(load);
 		if (load.graphic != null)
 		{
@@ -312,7 +287,10 @@ public void Import()
         string[] exts = new string[] { "*/*" };
 #endif
 
-        bool CanReadFile(string path)
+        NativeFilePicker.PickFile(PickFileCallback, exts);
+}
+
+    private static bool CanReadFile(string path)
 	{
 		try
 		{
@@ -325,7 +303,7 @@ public void Import()
 		}
 	}
 
-	void pickFileCallback(string path)
+	private void PickFileCallback(string path)
 	{
 		if (string.IsNullOrEmpty(path))
 			return;
@@ -353,6 +331,4 @@ public void Import()
 		RefreshFromDisk();
 	}
 
-	NativeFilePicker.PickFile(pickFileCallback, exts);
-}
 }
