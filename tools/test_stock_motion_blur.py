@@ -27,7 +27,7 @@ namespace UnityEngine {
  public class ScriptableObject:Object{public static T CreateInstance<T>()where T:new(){return new T();}}
  public struct Vector3{public float x,y,z;public Vector3(float a,float b,float c){x=a;y=b;z=c;}public static float Distance(Vector3 a,Vector3 b){return(float)Math.Sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));}}
  public struct Quaternion{public float yaw;public static float Angle(Quaternion a,Quaternion b){return Math.Abs(a.yaw-b.yaw);}}
- public static class Mathf{public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static int Clamp(int v,int a,int b){return Math.Max(a,Math.Min(b,v));}public static float Max(float a,float b){return Math.Max(a,b);}public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
+ public static class Mathf{public static float Clamp(float v,float a,float b){return Math.Max(a,Math.Min(b,v));}public static int Clamp(int v,int a,int b){return Math.Max(a,Math.Min(b,v));}public static int Min(int a,int b){return Math.Min(a,b);}public static float Max(float a,float b){return Math.Max(a,b);}public static float Abs(float v){return Math.Abs(v);}public static int Max(int a,int b){return Math.Max(a,b);}}
  [Flags]public enum DepthTextureMode{None=0,Depth=1,MotionVectors=4}
  public enum RenderTextureFormat{Default,RGHalf}
  public class Camera:MonoBehaviour{public float fieldOfView=60;public int pixelWidth=1920,pixelHeight=1080;public RenderTexture targetTexture;public bool allowHDR,allowMSAA;public DepthTextureMode depthTextureMode;}
@@ -38,6 +38,7 @@ namespace UnityEngine {
  public static class Resources{public static bool available=true;public static T Load<T>(string s)where T:class,new(){return available?new T():null;}}
  public static class SystemInfo{public static bool supportsMotionVectors=true,half=true;public static bool SupportsRenderTextureFormat(RenderTextureFormat f){return half;}}
  public static class Debug{public static int warnings;public static void LogWarning(string s){warnings++;}public static void Log(string s){}}
+ public static class Application{public static bool isMobilePlatform;}
  public static class Time{public static float timeScale=1,unscaledDeltaTime=1f/180;public static int frameCount;}
  public static class PlayerPrefs{public static Dictionary<string,int> p=new Dictionary<string,int>();public static int GetInt(string s,int d){return p.ContainsKey(s)?p[s]:d;}}
 }
@@ -81,6 +82,9 @@ class Test {
   controls.shutterAngle=999;controls.sampleCount=100;Frame(c);Check(Math.Abs(Settings().shutterAngle.value-360)<.001&&Settings().sampleCount.value==32,"Inspector upper limits ignored");
   controls.shutterAngle=-100;controls.sampleCount=-5;Frame(c);Check(Settings().shutterAngle.value==0&&Settings().sampleCount.value==4,"Inspector lower limits ignored");
   controls.shutterAngle=270;controls.sampleCount=16;Frame(c);Events.Call(controls,"PrintDiagnostics");
+  Application.isMobilePlatform=true;Frame(c);Check(Settings().sampleCount.value==8,"mobile sample budget not applied");
+  Application.isMobilePlatform=false;Frame(c);Check(Settings().sampleCount.value==16,"desktop sample count was reduced");
+  Check(!c.allowHDR,"blur-only camera forced an HDR framebuffer");
   Time.timeScale=0;Check(!Frame(c),"pause blur");Time.timeScale=1;Check(!Frame(c)&&Frame(c),"resume not reset");
   c.transform.position=new Vector3(0,0,20);Check(!Frame(c)&&Frame(c),"teleport not reset");
   c.transform.rotation=new Quaternion{yaw=90};Check(!Frame(c)&&Frame(c),"camera cut not reset");

@@ -24,6 +24,8 @@ public sealed class StockMotionBlur : MonoBehaviour
     private Camera viewCamera;
     private PostProcessLayer layer;
     private bool ready, warned, havePrevious;
+    private int activeFrames, suppressedFrames;
+    private bool diagnosticReported;
     private Vector3 previousPosition;
     private Quaternion previousRotation;
     private float previousFov;
@@ -44,6 +46,8 @@ public sealed class StockMotionBlur : MonoBehaviour
     private void OnEnable()
     {
         havePrevious = false;
+        activeFrames = suppressedFrames = 0;
+        diagnosticReported = false;
         EnsureReady();
         if (ready) { layer.enabled = true; layer.ResetHistory(); }
     }
@@ -72,7 +76,7 @@ public sealed class StockMotionBlur : MonoBehaviour
             settings = profile.AddSettings<MotionBlur>();
             settings.enabled.Override(true);
             settings.shutterAngle.Override(EffectiveShutterAngle());
-            settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
+            settings.sampleCount.Override(EffectiveSampleCount());
             var holder = new GameObject("Motion Blur (Unity Post-processing)");
             holder.hideFlags = HideFlags.HideAndDontSave;
             holder.layer = VolumeLayer;
@@ -121,9 +125,10 @@ public sealed class StockMotionBlur : MonoBehaviour
         // Native vectors are per-frame displacement. Convert the reference
         // exposure to this frame's angle so 180 FPS does not erase the blur.
         settings.shutterAngle.Override(EffectiveShutterAngle());
-        settings.sampleCount.Override(Mathf.Clamp(sampleCount, 4, 32));
+        settings.sampleCount.Override(EffectiveSampleCount());
         settings.enabled.Override(!suspended && !cut);
-        if (suspended || cut) layer.ResetHistory();
+        if (suspended || cut) { suppressedFrames++; layer.ResetHistory(); }
+        else activeFrames++;
         havePrevious = !suspended;
         previousPosition = position;
         previousRotation = rotation;
@@ -131,6 +136,18 @@ public sealed class StockMotionBlur : MonoBehaviour
         previousWidth = viewCamera.pixelWidth;
         previousHeight = viewCamera.pixelHeight;
         previousFrame = Time.frameCount;
+        // One useful runtime report per enable, also visible in Android logcat.
+        if (!diagnosticReported && activeFrames + suppressedFrames >= 120)
+        {
+            diagnosticReported = true;
+            PrintDiagnostics();
+        }
+    }
+
+    private int EffectiveSampleCount()
+    {
+        int count = Mathf.Clamp(sampleCount, 4, 32);
+        return Application.isMobilePlatform ? Mathf.Min(count, 8) : count;
     }
 
     private float EffectiveShutterAngle()
@@ -181,6 +198,7 @@ public sealed class StockMotionBlur : MonoBehaviour
             ", samples=" + effective.sampleCount.value +
             ", frameTimeMs=" + (Time.unscaledDeltaTime * 1000f) +
             ", depthMode=" + viewCamera.depthTextureMode +
+            ", activeFrames=" + activeFrames + ", suppressedFrames=" + suppressedFrames +
             ". These are layer settings, not a measurement of GPU vector contents.");
     }
 

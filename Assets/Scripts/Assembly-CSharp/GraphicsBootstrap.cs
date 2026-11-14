@@ -5,12 +5,31 @@ public static class GraphicsBootstrap
 {
 	private static Resolution nativeResolution;
 
+    // Capture once, before any SetResolution. Android currentResolution may
+    // report our reduced render size after the first change / scene reload.
+    public static Resolution NativeResolution
+    {
+        get
+        {
+            if (nativeResolution.width <= 0 || nativeResolution.height <= 0)
+                nativeResolution = Screen.currentResolution;
+            return nativeResolution;
+        }
+    }
+    private static int requestedWidth, requestedHeight;
+#if !UNITY_ANDROID && !UNITY_IOS
+    private static int requestedFullscreen = -1;
+#endif
+
 	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
 	private static void OnGameStart()
 	{
-		if (nativeResolution.width == 0)
-			nativeResolution = Screen.currentResolution;
-
+        // Also reset static request state when entering Play with domain reload off.
+        nativeResolution = default(Resolution);
+        requestedWidth = requestedHeight = 0;
+#if !UNITY_ANDROID && !UNITY_IOS
+        requestedFullscreen = -1;
+#endif
 		ApplyRTX();
 		ApplyReflectionsQuality();
 		ApplyResolution();
@@ -42,8 +61,7 @@ public static class GraphicsBootstrap
 
 	public static void ApplyResolution()
 	{
-		if (nativeResolution.width == 0)
-			nativeResolution = Screen.currentResolution;
+        var native = NativeResolution;
 
 		// Always render 1:1. FPS is changed by picking a real output resolution, not a scale.
 		QualitySettings.resolutionScalingFixedDPIFactor = 1f;
@@ -53,14 +71,23 @@ public static class GraphicsBootstrap
 		int h = PlayerPrefs.GetInt("ResHeight", 0);
 		if (w <= 0 || h <= 0)
 		{
-			w = nativeResolution.width;
-			h = nativeResolution.height;
+			w = native.width;
+			h = native.height;
 		}
 
 #if UNITY_ANDROID || UNITY_IOS
-		Screen.SetResolution(w, h, true);
+        // Recover preferences damaged by repeatedly scaling a scaled size.
+        float scale = Mathf.Clamp((float)w / Mathf.Max(1, native.width), .35f, 1f);
+        w = Mathf.RoundToInt(native.width * scale);
+        h = Mathf.RoundToInt(native.height * scale);
+        if (w == requestedWidth && h == requestedHeight) return;
+        requestedWidth = w; requestedHeight = h;
+        Screen.SetResolution(w, h, true);
 #else
 		bool fullscreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
+        int fullscreenValue = fullscreen ? 1 : 0;
+        if (w == requestedWidth && h == requestedHeight && fullscreenValue == requestedFullscreen) return;
+        requestedWidth = w; requestedHeight = h; requestedFullscreen = fullscreenValue;
 		var mode = fullscreen ? FullScreenMode.FullScreenWindow : FullScreenMode.Windowed;
 		int refresh = nativeResolution.refreshRate;
 		Screen.SetResolution(w, h, mode, refresh);
@@ -211,12 +238,12 @@ public static class GraphicsBootstrap
 		// The package owns Motion Blur. SimpleScreenFx must never blur again.
 		bool stockBlur = StockMotionBlur.Configure(cam, motionBlur);
 		bool simpleEffects = bloom || vignette || grain || ao;
-		bool anyEffect = simpleEffects || stockBlur;
 
 		// HDR нужен только под пост-обработку: без неё расширенный диапазон
 		// некуда применять, а кадровый буфер становится вдвое толще. На
 		// телефоне это чистый расход пропускной способности.
-		cam.allowHDR = anyEffect;
+		// Only bloom needs HDR here; motion/vignette/grain/AO do not.
+		cam.allowHDR = bloom;
 		cam.allowMSAA = true;
 
 		cam.depthTextureMode = (ao || stockBlur)

@@ -11,7 +11,7 @@
 
 - `shutterAngle = 270°` в Inspector означает силу при **опорных 30 FPS**;
 - выдержка нормализуется по unscaledDeltaTime, а не укорачивается с ростом FPS;
-- `sampleCount = 16`;
+- `sampleCount = 16` на ПК, мобильный бюджет — не более 8;
 - штатные native motion vectors + depth, stock velocity/tile/neighbor/reconstruction;
 - без включения TAA, FXAA, SMAA и дополнительного deferred fog.
 
@@ -80,7 +80,7 @@ python tools/test_motion_blur_stability.py
 python tools/test_motion_blur_visibility_gpu.py --package /path/to/extracted/package
 ```
 
-- 60 assertions над реальным интеграционным C# с lifecycle/API doubles:
+- 63 assertions над реальным интеграционным C# с lifecycle/API doubles:
   включение/выключение, настройки 270°/16 и live Inspector controls, 180 FPS, поворот без ходьбы,
   пауза, cuts/FOV/resize, thumbnails, несколько камер, cleanup и fallback отказ.
 - 14 проверок реального MovePlayer с doubles на 30–240 FPS, включая 180.
@@ -151,3 +151,15 @@ Inspector-настройки применяются перед рендером 
 Если при нормализованном режиме, 0° и 360° на быстром повороте нет разницы,
 нужен захват native motion vectors / Frame Debugger
 в Unity, потому что здешний headless тест не подтверждает их генерацию сценой.
+
+
+## После лога с Redmi Note 11 Pro
+
+Добавлен однократный автоматический отчёт `[StockMotionBlur]` после 120
+рендеров подключённой камеры: effective settings, activeFrames и suppressedFrames.
+Последние считают пропуски из-за pause/cut/resize/длинных кадров; это не GPU-readback.
+На телефонах sampleCount ограничен 8 (ПК сохраняет заданное значение),
+SimpleScreenFx больше не создаёт промежуточную полноэкранную текстуру только
+ради копирования результата. HDR включается по bloom, а не по одному факту
+включения blur/виньетки/зерна/AO. При включённом bloom HDR остаётся.
+См. также [исправления разрешения и Android picker](ANDROID_RESOLUTION_PICKER_RU.md).

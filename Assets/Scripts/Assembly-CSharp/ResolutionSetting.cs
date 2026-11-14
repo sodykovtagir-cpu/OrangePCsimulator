@@ -37,7 +37,26 @@ public class ResolutionSetting : MonoBehaviour
 	[SerializeField] private Text fpsLabel;
 
 	private readonly List<Resolution> uniqueResolutions = new List<Resolution>();
-	private bool bound;
+	private bool bound, initializing, resolutionPending;
+    private float applyResolutionAt;
+    private int pendingWidth, pendingHeight;
+
+    private void Update()
+    {
+        if (resolutionPending && Time.unscaledTime >= applyResolutionAt) ApplyPendingResolution();
+    }
+    private void OnDisable() { ApplyPendingResolution(); }
+    private void ApplyPendingResolution()
+    {
+        if (!resolutionPending) return;
+        resolutionPending = false;
+        if (PlayerPrefs.GetInt("ResWidth", 0) == pendingWidth &&
+            PlayerPrefs.GetInt("ResHeight", 0) == pendingHeight) return;
+        PlayerPrefs.SetInt("ResWidth", pendingWidth);
+        PlayerPrefs.SetInt("ResHeight", pendingHeight);
+        PlayerPrefs.Save();
+        GraphicsBootstrap.ApplyResolution();
+    }
 
 	private void Awake()
 	{
@@ -59,6 +78,8 @@ public class ResolutionSetting : MonoBehaviour
 
 	private void WireAll()
 	{
+        if (bound) return;
+        initializing = true;
 		AutoFindControls();
 		BindToggle(rtxToggle, "RTXMode", 0, SetRTXMode);
 		// Значение по умолчанию берём у GraphicsBootstrap: на телефонах
@@ -88,6 +109,7 @@ public class ResolutionSetting : MonoBehaviour
 			if (mobileScaleSlider != null) mobileScaleSlider.gameObject.SetActive(false);
 		}
 		SetupFpsSlider();
+        initializing = false;
 		bound = true;
 	}
 
@@ -142,39 +164,26 @@ public class ResolutionSetting : MonoBehaviour
 		if (field == null) field = found;
 	}
 
-	private static string IdentifySlider(Slider sl)
-	{
-		if (sl == null) return "";
-		var parts = sl.name;
-		var tr = sl.transform;
-		for (int d = 0; d < 3 && tr != null; d++)
-		{
-			parts += " " + tr.name;
-			var labels = tr.GetComponentsInChildren<Text>(true);
-			for (int i = 0; i < labels.Length && i < 3; i++)
-				if (labels[i] != null) parts += " " + labels[i].text;
-			tr = tr.parent;
-		}
-		return parts.ToLowerInvariant();
-	}
-
-	private static string Identify(Toggle t)
-	{
-		if (t == null) return "";
-		var parts = t.name;
-		var tr = t.transform;
-		for (int d = 0; d < 4 && tr != null; d++)
-		{
-			parts += " " + tr.name;
-			var labels = tr.GetComponentsInChildren<Text>(true);
-			for (int i = 0; i < labels.Length && i < 4; i++)
-			{
-				if (labels[i] != null) parts += " " + labels[i].text;
-			}
-			tr = tr.parent;
-		}
-		return parts.ToLowerInvariant();
-	}
+    private static string IdentifySlider(Slider sl) { return IdentifyControl(sl); }
+    private static string Identify(Toggle t) { return IdentifyControl(t); }
+    private static string IdentifyControl(Component control)
+    {
+        if (control == null) return "";
+        string parts = control.name;
+        var tr = control.transform;
+        for (int d = 0; d < 4 && tr != null; d++, tr = tr.parent)
+        {
+            // A settings group/canvas contains other rows. Their labels must
+            // never identify this toggle/slider as a different setting.
+            if (tr.GetComponentsInChildren<Toggle>(true).Length > 1 ||
+                tr.GetComponentsInChildren<Slider>(true).Length > 1) break;
+            parts += " " + tr.name;
+            var labels = tr.GetComponentsInChildren<Text>(true);
+            for (int i = 0; i < labels.Length && i < 4; i++)
+                if (labels[i] != null) parts += " " + labels[i].text;
+        }
+        return parts.ToLowerInvariant();
+    }
 
 	private void HideFullscreenRow()
 	{
@@ -226,24 +235,26 @@ public class ResolutionSetting : MonoBehaviour
 		mobileScaleSlider.maxValue = 1f;
 		float saved = 1f;
 		int sw = PlayerPrefs.GetInt("ResWidth", 0);
-		var native = Screen.currentResolution;
+		var native = GraphicsBootstrap.NativeResolution;
 		if (sw > 0 && native.width > 0)
 			saved = Mathf.Clamp((float)sw / native.width, 0.35f, 1f);
 		mobileScaleSlider.SetValueWithoutNotify(saved);
 		if (mobileScaleLabel != null)
 			mobileScaleLabel.text = Mathf.RoundToInt(saved * 100f) + "%";
-		mobileScaleSlider.onValueChanged.AddListener(v =>
-		{
-			int w = Mathf.Max(320, Mathf.RoundToInt(native.width * v));
-			int h = Mathf.Max(240, Mathf.RoundToInt(native.height * v));
-			PlayerPrefs.SetInt("ResWidth", w);
-			PlayerPrefs.SetInt("ResHeight", h);
-			PlayerPrefs.Save();
-			if (mobileScaleLabel != null)
-				mobileScaleLabel.text = Mathf.RoundToInt(v * 100f) + "%";
-			GraphicsBootstrap.ApplyResolution();
-		});
-	}
+        mobileScaleSlider.onValueChanged.AddListener(OnMobileScaleChanged);
+    }
+
+    private void OnMobileScaleChanged(float value)
+    {
+        if (initializing) return;
+        float scale = Mathf.Clamp(value, .35f, 1f);
+        var native = GraphicsBootstrap.NativeResolution;
+        pendingWidth = Mathf.RoundToInt(native.width * scale);
+        pendingHeight = Mathf.RoundToInt(native.height * scale);
+        if (mobileScaleLabel != null) mobileScaleLabel.text = Mathf.RoundToInt(scale * 100f) + "%";
+        resolutionPending = true;
+        applyResolutionAt = Time.unscaledTime + .2f;
+    }
 
 	private void SetupFpsSlider()
 	{
@@ -270,7 +281,8 @@ public class ResolutionSetting : MonoBehaviour
 
 		fpsSlider.onValueChanged.AddListener(v =>
 		{
-			int fps = Mathf.RoundToInt(v);
+            if (initializing) return;
+			int fps = Mathf.Clamp(Mathf.RoundToInt(v), 30, maxFps);
 			PlayerPrefs.SetInt("TargetFps", fps);
 			PlayerPrefs.SetInt("TargetFPS", fps);
 			PlayerPrefs.Save();
@@ -319,7 +331,7 @@ public class ResolutionSetting : MonoBehaviour
 
 	private void OnPcResolutionChanged(int index)
 	{
-		ApplyListedResolution(index);
+        if (!initializing) ApplyListedResolution(index);
 	}
 
 	private void ApplyListedResolution(int index)
@@ -365,6 +377,8 @@ public class ResolutionSetting : MonoBehaviour
 
 	private void SetPP(string key, bool enabled)
 	{
+        if (initializing || PlayerPrefs.GetInt(key, 0) == (enabled ? 1 : 0)) return;
+        Debug.Log("[ResolutionSetting] Changed " + key + "=" + (enabled ? 1 : 0));
 		PlayerPrefs.SetInt(key, enabled ? 1 : 0);
 		PlayerPrefs.Save();
 		GraphicsBootstrap.ApplyPostProcess();

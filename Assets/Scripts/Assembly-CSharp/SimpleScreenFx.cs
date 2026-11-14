@@ -71,11 +71,10 @@ public class SimpleScreenFx : MonoBehaviour
 		m.SetFloat("_Grain", grain ? 0.08f : 0f);
 		m.SetFloat("_AO", ao ? 0.28f : 0f);
 
-		var composed = RenderTexture.GetTemporary(w, h, 0, fmt);
-		Graphics.Blit(src, composed, m, 3);
-		Graphics.Blit(composed, dest);
+        // The composite samples src, never dest. A second full-resolution
+        // texture and copy were redundant, especially on mobile tile GPUs.
+        Graphics.Blit(src, dest, m, 3);
 
-		RenderTexture.ReleaseTemporary(composed);
 		if (bloomTex != null)
 			RenderTexture.ReleaseTemporary(bloomTex);
 	}

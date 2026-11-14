@@ -287,7 +287,13 @@ public void Import()
         string[] exts = new string[] { "*/*" };
 #endif
 
-        NativeFilePicker.PickFile(PickFileCallback, exts);
+        Debug.Log("[FileMenu] Opening native save picker");
+        try { NativeFilePicker.PickFile(PickFileCallback, exts); }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+            messageBox.Show("Could not open the system file picker. See Player.log.");
+        }
 }
 
     private static bool CanReadFile(string path)
@@ -305,8 +311,11 @@ public void Import()
 
 	private void PickFileCallback(string path)
 	{
-		if (string.IsNullOrEmpty(path))
-			return;
+        if (string.IsNullOrEmpty(path))
+        {
+            Debug.Log("[FileMenu] Picker cancelled or did not grant a file");
+            return;
+        }
 
 		if (!CanReadFile(path))
 		{

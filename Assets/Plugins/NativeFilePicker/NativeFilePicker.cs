@@ -22,8 +22,15 @@ public static class NativeFilePicker
 	{
 		get
 		{
-			if( m_ajc == null )
-				m_ajc = new AndroidJavaClass( "com.yasirkula.unity.NativeFilePicker" );
+            if( m_ajc == null )
+            {
+                m_ajc = new AndroidJavaClass( "com.yasirkula.unity.NativeFilePicker" );
+                // SAF GET_CONTENT/OPEN_DOCUMENT grants access to the selected URI;
+                // the AAR copies it into private cache. No broad storage permission
+                // is required, including on Android 10–12 / MIUI.
+                m_ajc.SetStatic("PermissionFreeMode", true);
+                m_ajc.SetStatic("UseDefaultFilePickerApp", true);
+            }
 
 			return m_ajc;
 		}
