@@ -107,6 +107,8 @@ namespace PC.Component.Software.Sites
                 Range(element.width, 1, 4096); Range(element.height, 1, 16384);
                 Range(element.pivotX, 0, 1); Range(element.pivotY, 0, 1); Range(element.fontSize, 6, 256);
                 if (element.font != "default" && element.font != "mono" && element.font != "medium") throw new ArgumentException("Unknown font");
+                if (element.layout < 0 || element.layout >= SiteEditing.LayoutNames.Length) throw new ArgumentException("Unknown layout");
+                if (element.layout != 0) { Range(element.layoutWidth, 1, 4096); Range(element.layoutHeight, 1, 16384); }
                 ValidateColor(element.fill); ValidateColor(element.textColor);
                 if (!string.IsNullOrEmpty(element.image)) ImageAsset(element.image);
                 if (element.actions == null) element.actions = new List<SiteAction>(); // legacy v1 files
@@ -126,8 +128,9 @@ namespace PC.Component.Software.Sites
         }
         public static bool SafeName(string name)
         {
-            return !string.IsNullOrEmpty(name) && name.Length <= 80 && name != "." && name != ".." &&
-                Regex.IsMatch(name, "^[A-Za-z0-9_-][A-Za-z0-9_.-]*$");
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 80 || name != name.Trim() || name == "." || name == "..") return false;
+            foreach (char c in name) if (char.IsControl(c) || "/\\:\"<>|?*".IndexOf(c) >= 0) return false;
+            return true;
         }
         public static string NormalizeUrl(string value)
         {
@@ -192,7 +195,9 @@ namespace PC.Component.Software.Sites
         // Position/pivot use a top-left origin: (0,0) top-left, (.5,.5) center.
         public float x = 100, y = 100, width = 240, height = 48, pivotX = .5f, pivotY = .5f;
         public string fill = "#BEBEBE", textColor = "#000000", image = "", font = "default", onClick = "";
-        public int fontSize = 24;
+        public int fontSize = 24, layout;
+        public float layoutWidth, layoutHeight;
+        public bool bold, italic, underline, strike;
         public List<SiteAction> actions = new List<SiteAction>();
     }
     [Serializable]
@@ -205,7 +210,7 @@ namespace PC.Component.Software.Sites
             byte[] bytes;
             try { bytes = Convert.FromBase64String(data); }
             catch (FormatException) { throw new ArgumentException("Invalid asset encoding"); }
-            if (bytes.Length == 0 || bytes.Length > SiteDocument.MaxAssetBytes) throw new ArgumentException("Invalid asset size");
+            if ((bytes.Length == 0 && media != "application/x-pcos-file") || bytes.Length > SiteDocument.MaxAssetBytes) throw new ArgumentException("Invalid asset size");
             return bytes;
         }
     }

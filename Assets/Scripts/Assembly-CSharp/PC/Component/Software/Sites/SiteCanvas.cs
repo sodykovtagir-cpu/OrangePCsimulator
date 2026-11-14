@@ -56,8 +56,7 @@ namespace PC.Component.Software.Sites
         void Draw(SiteElement element)
         {
             var go = SiteWidgets.Node(element.name, design); var rect = (RectTransform)go.transform;
-            rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(element.pivotX, 1 - element.pivotY);
-            rect.anchoredPosition = new Vector2(element.x, -element.y); rect.sizeDelta = new Vector2(element.width, element.height);
+            ApplyGeometry(rect, element);
             nodes[element.id] = rect;
             if (element.kind != "text")
             {
@@ -70,6 +69,7 @@ namespace PC.Component.Software.Sites
                 var label = SiteWidgets.Label(go.transform, element.text, element.fontSize);
                 label.font = SiteWidgets.Font(element.font); label.color = SiteWidgets.ColorValue(element.textColor);
                 label.alignment = element.kind == "button" ? TextAnchor.MiddleCenter : TextAnchor.UpperLeft;
+                Style(label, element);
                 label.raycastTarget = Editing;
                 labels[element.id] = label;
             }
@@ -93,11 +93,30 @@ namespace PC.Component.Software.Sites
         {
             RectTransform node; if (!nodes.TryGetValue(id, out node)) return;
             var e = document.Find(id); if (e == null) return;
-            node.anchoredPosition = new Vector2(e.x, -e.y); node.sizeDelta = new Vector2(e.width, e.height); node.pivot = new Vector2(e.pivotX, 1 - e.pivotY);
+            ApplyGeometry(node, e);
             Text label;
-            if (labels.TryGetValue(id, out label)) { label.text = e.text; label.color = SiteWidgets.ColorValue(e.textColor); label.font = SiteWidgets.Font(e.font); label.fontSize = e.fontSize; }
+            if (labels.TryGetValue(id, out label)) { label.text = e.text; label.color = SiteWidgets.ColorValue(e.textColor); label.font = SiteWidgets.Font(e.font); label.fontSize = e.fontSize; Style(label,e); }
             var image = node.GetComponent<Image>();
             if (image != null) { image.color = SiteWidgets.ColorValue(e.fill); image.sprite = string.IsNullOrEmpty(e.image) ? null : Image(e.image); image.preserveAspect = false; }
+        }
+        void ApplyGeometry(RectTransform node, SiteElement e)
+        {
+            float l,t,r,b; SiteEditing.Anchors(e.layout,out l,out t,out r,out b);
+            node.anchorMin=new Vector2(l,1-b);node.anchorMax=new Vector2(r,1-t);node.pivot=new Vector2(e.pivotX,1-e.pivotY);
+            float referenceW=e.layout==0?0:e.layoutWidth, referenceH=e.layout==0?0:e.layoutHeight;
+            node.anchoredPosition=new Vector2(e.x-referenceW*(l+(r-l)*e.pivotX),-e.y+referenceH*(t+(b-t)*e.pivotY));
+            node.sizeDelta=new Vector2(e.width-referenceW*(r-l),e.height-referenceH*(b-t));
+        }
+        static void Style(Text label,SiteElement e)
+        {
+            label.fontStyle=e.bold?(e.italic?FontStyle.BoldAndItalic:FontStyle.Bold):(e.italic?FontStyle.Italic:FontStyle.Normal);
+            var decoration=label.GetComponent<SiteTextDecoration>();
+            if(decoration==null && (e.underline||e.strike))decoration=label.gameObject.AddComponent<SiteTextDecoration>();
+            if(decoration!=null)
+            {
+                label.font.RequestCharactersInTexture("_",label.fontSize,label.fontStyle);
+                decoration.underline=e.underline;decoration.strike=e.strike;label.SetVerticesDirty();
+            }
         }
         Sprite Image(string name)
         {
@@ -113,6 +132,9 @@ namespace PC.Component.Software.Sites
         {
             if (design == null || content == null || document == null) return;
             var viewport = (RectTransform)transform; float scale = Mathf.Max(.01f, viewport.rect.width / document.width);
+            bool anchored = !Editing && document.elements.Exists(e=>e.layout!=0);
+            if (anchored) scale=1;
+            design.sizeDelta=new Vector2(anchored?viewport.rect.width:document.width, anchored?Mathf.Max(document.height,viewport.rect.height):document.height);
             design.localScale = new Vector3(scale, scale, 1);
             content.sizeDelta = new Vector2(0, Mathf.Max(viewport.rect.height, document.height * scale));
         }
@@ -121,14 +143,18 @@ namespace PC.Component.Software.Sites
             foreach (var entry in outlines) if (entry.Value != null) entry.Value.enabled = entry.Key == id;
             Selected?.Invoke(id);
         }
-        public void Move(string id, Vector2 position) { Moved?.Invoke(id, position.x, -position.y); }
+        public void Move(string id, Vector2 position)
+        {
+            var e=document.Find(id);if(e==null)return;float l,t,r,b;SiteEditing.Anchors(e.layout,out l,out t,out r,out b);
+            Moved?.Invoke(id,position.x+(e.layout==0?0:e.layoutWidth*(l+(r-l)*e.pivotX)),-position.y+(e.layout==0?0:e.layoutHeight*(t+(b-t)*e.pivotY)));
+        }
         public void EditText(string id)
         {
             RectTransform node; if (!Editing || !nodes.TryGetValue(id, out node) || node.Find("Inline edit") != null) return;
             var element = document.Find(id); if (element == null || element.kind != "text") return;
             var input = SiteWidgets.Input(node, element.text, value => TextEdited?.Invoke(id, value), true);
             input.gameObject.name = "Inline edit"; input.textComponent.fontSize = element.fontSize;
-            input.textComponent.font = SiteWidgets.Font(element.font); input.textComponent.color = SiteWidgets.ColorValue(element.textColor);
+            input.textComponent.font = SiteWidgets.Font(element.font); input.textComponent.color = SiteWidgets.ColorValue(element.textColor);Style(input.textComponent,element);
             input.characterLimit = 4096; input.ActivateInputField(); input.MoveTextEnd(false);
         }
         void DisposeTextures()

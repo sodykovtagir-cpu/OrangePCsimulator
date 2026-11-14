@@ -1735,6 +1735,12 @@ namespace PC.Component.Software.OS
                 if (pack != null) return pack.MakeIcon(fallback);
             }
 
+            return GetFileTypeSprite(fileName);
+        }
+
+        // Extension icon lookup without probing a real visitor disk by name.
+        public Sprite GetFileTypeSprite(string fileName)
+        {
             var ext = File.Extension(fileName);
             if (appPrefabs == null) return unknownFileSprite;
 

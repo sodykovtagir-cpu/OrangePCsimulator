@@ -7,7 +7,7 @@ using UnityEngine.UI;
 namespace PC.Component.Software
 {
     /// <summary>Native PCOS visual site editor. Content is orange-site JSON, not HTML.</summary>
-    public sealed class SiteEditor : App
+    public sealed partial class SiteEditor : App
     {
         [Serializable]
         public sealed class InspectorField
@@ -19,14 +19,12 @@ namespace PC.Component.Software
         [SerializeField] private RectTransform inspector;
         [SerializeField] private GameObject sitePanel, elementPanel, previewPanel;
         [SerializeField] private Text status, iconInfo, elementId;
-        [SerializeField] private InputField assetList, assetToRemove;
         [SerializeField] private Button undoButton, redoButton;
         [SerializeField] private InspectorField[] fields;
         [SerializeField] private GameObject addMenu;
         [SerializeField] private RectTransform hierarchyRoot, actionRoot;
         [SerializeField] private Button rowTemplate;
         [SerializeField] private Dropdown commandDropdown;
-        [SerializeField] private InputField commandArguments;
         [SerializeField] private Text argumentHint;
         int selectedAction = -1;
         SiteHistory project;
@@ -44,7 +42,7 @@ namespace PC.Component.Software
             if (project == null) project = new SiteHistory(new SiteDocument());
             if (!string.IsNullOrWhiteSpace(content))
             {
-                try { project.Reset(SiteDocument.Parse(content)); selected = ""; filePath = ""; fileDisk = -1; }
+                try { project.Reset(SiteDocument.Parse(content)); selected = ""; filePath = ""; fileDisk = -1; editEpoch++; }
                 catch (Exception ex) { system?.ShowMessageBox("Site Editor", ex.Message); }
             }
             if (!BindUI()) return;
@@ -54,7 +52,7 @@ namespace PC.Component.Software
         bool BindUI()
         {
             if (bound) return true;
-            if (view == null || inspector == null || sitePanel == null || elementPanel == null || previewPanel == null || fields == null || hierarchyRoot == null || actionRoot == null || rowTemplate == null || commandDropdown == null || commandArguments == null || addMenu == null)
+            if (view == null || inspector == null || sitePanel == null || elementPanel == null || previewPanel == null || fields == null || hierarchyRoot == null || actionRoot == null || rowTemplate == null || commandDropdown == null || addMenu == null || sections == null || argumentControls == null || pivotDropdown == null || fontDropdown == null || colorPicker == null)
             {
                 system?.ShowMessageBox("Site Editor", "Неполный префаб SiteEditor: проверь ссылки интерфейса.");
                 return false;
@@ -68,7 +66,8 @@ namespace PC.Component.Software
             commandDropdown.ClearOptions();
             var commands = new System.Collections.Generic.List<string>();
             foreach (var command in SiteCommands.All) commands.Add(command.Name);
-            commandDropdown.AddOptions(commands); commandDropdown.onValueChanged.AddListener(index => UpdateArgumentHint());
+            commandDropdown.AddOptions(commands); commandDropdown.onValueChanged.AddListener(index => CommandChanged());
+            InitInspector();
             view.Selected = SelectElement;
             view.Moved = (id, x, y) => Change(d => { var e = d.Find(id); e.x = x; e.y = y; });
             view.TextEdited = (id, text) => Change(d => d.Find(id).text = text);
@@ -106,7 +105,7 @@ namespace PC.Component.Software
         {
             if (!confirmNew && (project.Document.elements.Count > 0 || project.Document.assets.Count > 0))
             { confirmNew = true; Report("Сохрани проект или нажми New ещё раз, чтобы очистить его."); return; }
-            confirmNew = false; project.Reset(new SiteDocument()); selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
+            confirmNew = false; editEpoch++; project.Reset(new SiteDocument()); selected = ""; filePath = ""; fileDisk = -1; preview = false; Redraw();
         }
         public void Undo() { project.Undo(); Redraw(); }
         public void Redo() { project.Redo(); Redraw(); }
@@ -187,13 +186,13 @@ namespace PC.Component.Software
             var e = project.Document.Find(selected); if (e == null || index < 0 || index >= e.actions.Count) return;
             selectedAction = index; var action = e.actions[index];
             commandDropdown.SetValueWithoutNotify(Array.FindIndex(SiteCommands.All, c => c.Name == action.command));
-            commandArguments.SetTextWithoutNotify(string.Join("\n", action.arguments));
+            ConfigureArguments(action.arguments);
             RefreshActions(e);
         }
         SiteAction ReadAction()
         {
             var command = SiteCommands.All[commandDropdown.value];
-            var action = new SiteAction { command = command.Name, arguments = SiteCommands.ReadArgumentLines(commandArguments.text, command.Arguments.Length) };
+            var action = new SiteAction { command = command.Name, arguments = ReadArguments(true) };
             SiteCommands.Validate(action); return action;
         }
         public void AddAction()
@@ -223,12 +222,6 @@ namespace PC.Component.Software
         public void FontDefault() { SetField("font", "default"); }
         public void FontMono() { SetField("font", "mono"); }
         public void FontMedium() { SetField("font", "medium"); }
-        public void RemoveAsset()
-        {
-            string name = assetToRemove != null ? assetToRemove.text.Trim() : "";
-            if (project.Document.Asset(name) == null) { Report("Укажи имя файла из корня сайта"); return; }
-            Change(d => { if (d.icon == name) d.icon = ""; foreach (var e in d.elements) if (e.image == name) e.image = ""; d.assets.Remove(d.Asset(name)); });
-        }
         void Add(string kind)
         {
             addMenu.SetActive(false); selectedAction = -1;
@@ -259,6 +252,7 @@ namespace PC.Component.Software
             if (!bound) return;
             var doc = project.Document; var element = doc.Find(selected);
             RefreshActions(element);
+            RefreshInspector(element);
             sitePanel.SetActive(!preview && element == null);
             elementPanel.SetActive(!preview && element != null);
             previewPanel.SetActive(preview);
@@ -274,12 +268,6 @@ namespace PC.Component.Software
             }
             if (iconInfo != null) iconInfo.text = "Icon: " + doc.icon;
             if (elementId != null) elementId.text = element == null ? "" : "ID: " + element.id + " | " + element.kind;
-            if (assetList != null)
-            {
-                var list = new System.Text.StringBuilder();
-                foreach (var asset in doc.assets) list.Append(asset.name).Append(" (").Append(asset.Bytes().Length).Append(" B)\n");
-                assetList.SetTextWithoutNotify(list.ToString());
-            }
             if (undoButton != null) undoButton.interactable = project.CanUndo;
             if (redoButton != null) redoButton.interactable = project.CanRedo;
         }
@@ -337,7 +325,7 @@ namespace PC.Component.Software
             system.SelectFile(".osite", file =>
             {
                 if (file == null) return;
-                try { project.Reset(SiteDocument.Parse(file.content)); selected = ""; filePath = file.path; fileDisk = DiskFor(file); preview = false; Redraw(); Report(filePath); }
+                try { var document=SiteDocument.Parse(file.content); editEpoch++; project.Reset(document); selected = ""; filePath = file.path; fileDisk = DiskFor(file); preview = false; Redraw(); Report(filePath); }
                 catch (Exception ex) { Report(ex.Message); }
             });
         }
@@ -388,10 +376,9 @@ namespace PC.Component.Software
             system.SelectFile("*", file =>
             {
                 if (file == null || file.isFolder) return;
-                string name = (file.path ?? "").Replace('\\', '/'); name = name.Substring(name.LastIndexOf('/') + 1);
                 try
                 {
-                    var asset = new SiteAsset { name = name, media = "application/x-pcos-file", data = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(file.content ?? "")) };
+                    var asset = SiteEditing.ImportFile(project.Document, file.path, file.content);
                     Change(d => d.assets.Add(asset));
                 }
                 catch (Exception ex) { Report(ex.Message); }

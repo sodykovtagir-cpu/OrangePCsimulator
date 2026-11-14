@@ -10,19 +10,20 @@ p=Prefab(ROOT/'Assets/Resources/apps/SiteEditor.prefab');app,v=p.mono('SiteEdito
 transforms={i:d for i,d in p.objects(224)}
 root=next(d for d in transforms.values() if d['m_Father']['fileID']==0)
 assert root['m_SizeDelta']==dict(x=900,y=560)
-assert len(v['fields'])==19 and len({f['key'] for f in v['fields']})==19
+assert len(v['fields'])==18 and len({f['key'] for f in v['fields']})==18
 for f in v['fields']:
     field=p.data(f['input']['fileID']);assert field['m_Script']['guid']=='d199490a83bb2b844b9695cbf13b01ef'
     assert field['m_TextComponent']['fileID'] in p.blocks
     text=p.data(field['m_TextComponent']['fileID']);assert text['m_FontData']['m_RichText']==0
-methods=set(re.findall(r'public void (\w+)\(', (C/'SiteEditor.cs').read_text()))|{'Close','Maximize','Minimize'}
+methods=set(re.findall(r'public void (\w+)\(', ((C/'SiteEditor.cs').read_text()+(C/'SiteEditorInspector.cs').read_text())))|{'Close','Maximize','Minimize'}
 clicks=[]
 for _,d in p.objects(114):
     for event in d.get('m_OnClick',{}).get('m_PersistentCalls',{}).get('m_Calls',[]):
-        assert event['m_Target']['fileID']==app
+        if event['m_Target']['fileID']!=app:
+            assert event['m_Target']['fileID']==v['colorPicker']['fileID'];continue
         assert event['m_MethodName'] in methods,event
         clicks.append(event['m_MethodName'])
-for required in ['NewProject','OpenFile','Save','Undo','Redo','TogglePreview','Host','AddButton','AddText','AddImage','SiteSettings','ImportDownload','RemoveAsset','PivotCenter','PivotTopLeft','DeleteElement','ImportIcon','ImportFill','ClearImage','FontDefault','FontMono','FontMedium','ToggleAddMenu','OpenInBrowser','AddAction','UpdateAction','RemoveAction']:
+for required in ['NewProject','OpenFile','Save','Undo','Redo','TogglePreview','Host','AddButton','AddText','AddImage','SiteSettings','ImportDownload','DeleteElement','ImportIcon','ImportFill','ClearImage','ToggleAddMenu','OpenInBrowser','AddAction','UpdateAction','RemoveAction','EnableImageClick','ToggleBold','ToggleItalic','ToggleUnderline','ToggleStrike','PickTextColor','PickFillColor','PickBackgroundColor']:
     assert required in clicks,required
 # Controls are authored INSIDE one body/workspace with margins for toolbar/status.
 names={p.data(t['m_GameObject']['fileID'])['m_Name']:(i,t) for i,t in transforms.items()}
@@ -60,6 +61,6 @@ class Test {
 '''
 with tempfile.TemporaryDirectory() as td:
     path=Path(td);(path/'test.cs').write_text(cs)
-    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'SiteEditor.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
+    subprocess.run(['mcs','-r:System.Web.Extensions','-out:'+str(path/'test.exe'),str(path/'test.cs'),str(ROOT/'tools/tests/site_core_stubs.cs'),str(ROOT/'tools/tests/site_ui_stubs.cs'),str(C/'SiteEditor.cs'),str(C/'SiteEditorInspector.cs'),str(C/'Lua/PcosLua.cs'),*[str(x) for x in (C/'Sites').glob('*.cs')]],check=True)
     subprocess.run(['mono',str(path/'test.exe')],check=True)
 print('PASS: serialized inspector inputs, buttons/events, panel hierarchy/margins, clipping masks and exclusive inspector panels')

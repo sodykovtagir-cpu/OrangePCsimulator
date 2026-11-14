@@ -7,6 +7,13 @@ import hashlib,re,shutil,sys
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from server_assets import ROOT,Prefab,read_guid,meta,ref
 C=ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/Software'
+# Existing prefabs may have been hand-edited in Unity. Never overwrite them
+# implicitly; the incremental upgrader preserves the user's chrome and layout.
+if (ROOT/'Assets/Resources/apps/SiteEditor.prefab').exists() and '--rebuild-shell' not in sys.argv:
+    from upgrade_site_inspector import upgrade
+    upgrade()
+    print('Preserved existing authored Site Editor shell')
+    raise SystemExit(0)
 for folder in [C/'Sites',ROOT/'Assets/Resources/SiteFonts']:
     folder.mkdir(parents=True,exist_ok=True);meta(folder,'DefaultImporter')
 for p in [C/'SiteEditor.cs',C/'BrowserSites.cs',*(C/'Sites').glob('*.cs')]:
@@ -54,4 +61,6 @@ if not re.search(r'^Site Editor\t',text,re.M):
     headers=text.splitlines()[0].lstrip('\ufeff').split('\t');values=['Site Editor']*(len(headers)-1)
     if 'RU' in headers:values[headers.index('RU')-1]='Редактор сайтов'
     translate.write_text(text.rstrip('\n')+'\nSite Editor\t'+'\t'.join(values)+'\n')
+from upgrade_site_inspector import upgrade
+upgrade()
 print('Wired Site Editor into App Downloader; .osite association, native chrome, bundled standard fonts')
