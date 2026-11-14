@@ -30,9 +30,11 @@ with tempfile.TemporaryDirectory()as td:
   binding=next(t['binding']for t in reflection['textures']if t['name']==name);tex.use(binding);program[name].value=binding
  block=reflection['ubos'][0];members=reflection['types'][block['type']]['members'];uniforms=ctx.buffer(reserve=max(96,block['block_size']));uniforms.bind_to_uniform_block(block['binding'])
  output=ctx.texture((w,h),4,dtype='f4');fbo=ctx.framebuffer([output]);fbo.use()
- def render(enabled=1,use_vectors=1,fallback=(.01,0,0,0),native=(0,0)):
+ def render(enabled=1,use_vectors=1,fallback=(.01,0,0,0),native=(0,0),fps=60,depth_edges=False):
+  depth_values=np.where(image[:,:,0]>.5,1.,.25).astype('f4') if depth_edges else np.ones((h,w),dtype='f4')
+  depth.write(depth_values.tobytes())
   motion[:,:,0]=native[0];motion[:,:,1]=native[1];vectors.write(motion.tobytes())
-  values={'_Motion':enabled,'_UseMotionVectors':use_vectors,'_FallbackMotion':fallback,'_Shutter':1.5,'_MaxMotionPixels':24.,'_MainTex_TexelSize':(1/w,1/h,w,h)}
+  values={'_Motion':enabled,'_UseMotionVectors':use_vectors,'_FallbackMotion':fallback,'_Shutter':min(6.,fps/40.),'_MaxMotionPixels':24.,'_MainTex_TexelSize':(1/w,1/h,w,h)}
   data=bytearray(uniforms.size)
   for member in members:
    v=values.get(member['name'],(0,0,0,0)if member['type']=='vec4'else 0)
@@ -47,5 +49,21 @@ with tempfile.TemporaryDirectory()as td:
  # A thin white line must acquire intermediate neighbouring pixels, not remain sharp.
  assert .01<blank[h//2,4,0]<.9
  assert np.isfinite(blank).all()and blank.min()>=0 and blank.max()<=1.0001
- print('PASS: 8 actual GPU visibility checks: blank native texture still blurs, GPU/camera paths, static/off sharpness, invalid vectors, thin-line spread and bounded colour; mean pixel change %.3f'%difference)
+ weak=render(fallback=(.9/180,0,0,0),native=(.3/w,0),fps=180)
+ camera_only=render(fallback=(.9/180,0,0,0),use_vectors=0,fps=180)
+ assert np.max(np.abs(weak-camera_only))<.0001,'weak native vector replaced stronger camera blur'
+ # Reproduce the reported 180-FPS case: real depth discontinuities plus
+ # a weak but nonzero native vector that used to suppress camera displacement.
+ at180=render(fallback=(.9/180,0,0,0),native=(.3/w,0),fps=180,depth_edges=True)
+ change180=float(np.mean(np.abs(at180[:,:,:3]-off[:,:,:3])))
+ assert change180>.03,('180 FPS: depth/native selection erased camera blur',change180)
+ references=[]
+ for fps in [60,120,144,180,240]:
+  frame=render(fallback=(.9/fps,0,0,0),native=(.3/w,0),fps=fps,depth_edges=True)
+  assert np.mean(np.abs(frame[:,:,:3]-off[:,:,:3]))>.03,(fps,'effect invisible')
+  references.append(frame)
+ for frame in references:assert np.max(np.abs(frame-at180))<.003,'different blur at same camera speed'
+ still_depth=render(fallback=(0,0,0,0),fps=180,depth_edges=True)
+ assert np.max(np.abs(still_depth-off))<.0001,'depth filter smeared stationary scene'
+ print('PASS: 21 GPU visibility checks including 60/120/144/180/240 FPS, depth discontinuities and weak nonzero native vectors: blank native texture still blurs, GPU/camera paths, static/off sharpness, invalid vectors, thin-line spread and bounded colour; 180-FPS mean pixel change %.3f'%change180)
  ctx.release()

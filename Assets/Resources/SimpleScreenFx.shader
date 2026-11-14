@@ -126,7 +126,10 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
                     // API capability does not guarantee usable vectors for this
                     // pixel/camera. A blank texture must not erase camera blur.
                     float2 nativePixels = nativeVelocity / max(abs(_MainTex_TexelSize.xy),1e-6);
-                    if (dot(nativePixels,nativePixels) >= .0625 && all(abs(nativeVelocity) < .5))
+                    float2 cameraPixels = cameraVelocity / max(abs(_MainTex_TexelSize.xy),1e-6);
+                    // A weak but nonzero native vector must not suppress the
+                    // camera baseline (especially at high refresh rates).
+                    if (dot(nativePixels,nativePixels) >= max(.0625,dot(cameraPixels,cameraPixels)) && all(abs(nativeVelocity) < .5))
                         velocity = nativeVelocity;
                     }
                 float2 pixels = velocity / max(abs(_MainTex_TexelSize.xy), 1e-6) * _Shutter;
@@ -147,7 +150,10 @@ Shader "Hidden/OrangePC/SimpleScreenFx"
                     #endif
                     float sampleDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture,depthUV));
                     float edge = saturate(1.0-abs(sampleDepth-centerDepth)/max(.1,centerDepth*.08));
-                    float weight = exp(-t*t*6.0) * edge;
+                    // Rejecting every cross-depth sample preserves a perfectly
+                    // sharp silhouette, i.e. removes the visible motion blur.
+                    // Attenuate depth crossings; never erase their contribution.
+                    float weight = exp(-t*t*6.0) * lerp(.25,1.0,edge);
                     acc += tex2D(_MainTex,sampleUV).rgb*weight; wsum+=weight;
                 }
                 col = acc/max(wsum,1e-4);
