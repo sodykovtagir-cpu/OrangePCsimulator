@@ -50,6 +50,9 @@ namespace PC.Component.Software.Sites
             string first = args.Length > 0 && args[0].Type == LuaType.String ? args[0].S : "";
             switch (command)
             {
+                case "GoToPage":
+                    if(!SitePages.SafeRoute(first))throw new ArgumentException("GoToPage expects a page path such as /about, not a domain");
+                    Redirect?.Invoke(first);return LuaValue.Nil;
                 case "RedirectURL": Redirect?.Invoke(SiteDocument.NormalizeUrl(first)); return LuaValue.Nil;
                 case "OpenFile": case "StartDownload":
                     var asset = document.Asset(SiteCommands.RootFile(first));

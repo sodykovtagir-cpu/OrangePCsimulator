@@ -41,6 +41,7 @@ namespace PC.Component.Software.Sites
             new SiteCommand("Show", "id:string"), new SiteCommand("Hide", "id:string"), new SiteCommand("ToggleVisible", "id:string"),
             new SiteCommand("SetVisible", "id:string", "visible:bool"), new SiteCommand("IsVisible", "id:string"),
             new SiteCommand("SetEnabled", "id:string", "enabled:bool"), new SiteCommand("IsEnabled", "id:string"),
+            new SiteCommand("GoToPage", "page:string"),
             new SiteCommand("GetTitle"), new SiteCommand("GetDescription"), new SiteCommand("GetURL"), new SiteCommand("FileExists", "file:string")
         };
         public static SiteCommand Find(string name) { return Array.Find(All, c => c.Name == name); }
@@ -55,6 +56,7 @@ namespace PC.Component.Software.Sites
             var command = action == null ? null : Find(action.command);
             if (command == null || action.arguments == null || action.arguments.Count != command.Arguments.Length)
                 throw new ArgumentException("Unknown command or incorrect argument count");
+            if(action.command=="GoToPage"&&!SitePages.SafeRoute(action.arguments[0]))throw new ArgumentException("Choose a page path such as /about (same site)");
             for (int i = 0; i < action.arguments.Count; i++)
             {
                 string value = action.arguments[i];

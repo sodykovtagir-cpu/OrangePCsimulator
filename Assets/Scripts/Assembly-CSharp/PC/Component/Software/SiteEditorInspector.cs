@@ -121,7 +121,7 @@ namespace PC.Component.Software
                 row.color.gameObject.SetActive(!choice&&spec.Arguments[i]=="color");
                 if(choice)
                 {
-                    var options=SiteEditing.Choices(EditingDocument,spec,i);var titles=new List<string>{"— Choose —"};
+                    var options=SiteEditing.Choices(spec.Arguments[i]=="page"?project.Document:EditingDocument,spec,i);var titles=new List<string>{"— Choose —"};
                     var stored=new List<string>{""};
                     foreach(string option in options)
                     {
@@ -144,7 +144,7 @@ namespace PC.Component.Software
             {
                 var row=argumentControls[i];bool choice=SiteEditing.UsesChoice(spec,i);
                 string value=choice?(argumentOptions.Count>i&&row.choice.value<argumentOptions[i].Count?argumentOptions[i][row.choice.value]:""):row.input.text;
-                if(validate&&choice&&!SiteEditing.Choices(EditingDocument,spec,i).Contains(value))throw new ArgumentException("Выбери допустимый "+spec.Arguments[i]+" из списка");
+                if(validate&&choice&&!SiteEditing.Choices(spec.Arguments[i]=="page"?project.Document:EditingDocument,spec,i).Contains(value))throw new ArgumentException("Выбери допустимый "+spec.Arguments[i]+" из списка");
                 values.Add(value);
             }
             return values;

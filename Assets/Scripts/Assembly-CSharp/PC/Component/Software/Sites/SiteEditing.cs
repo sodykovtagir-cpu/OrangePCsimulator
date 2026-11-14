@@ -76,10 +76,11 @@ namespace PC.Component.Software.Sites
                 }
             }
             else if(name=="file") { foreach(var a in doc.assets)if(spec.Name!="SetImage"||a.media.StartsWith("image/",StringComparison.Ordinal))values.Add(a.name); }
+            else if(name=="page"){values.Add("/");foreach(var page in doc.pages)values.Add(page.path);}
             else if(name=="font")values.AddRange(new[]{"default","mono","medium"});
             else if(spec.Types[argument]=="bool")values.AddRange(new[]{"true","false"});
             return values;
         }
-        public static bool UsesChoice(SiteCommand spec,int argument) { string n=spec.Arguments[argument];return n=="id"||n=="file"||n=="font"||spec.Types[argument]=="bool"; }
+        public static bool UsesChoice(SiteCommand spec,int argument) { string n=spec.Arguments[argument];return n=="id"||n=="file"||n=="page"||n=="font"||spec.Types[argument]=="bool"; }
     }
 }

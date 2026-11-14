@@ -24,7 +24,12 @@ namespace PC.Component.Software
   {
    var service=SiteHostingService.Instance;if(service==null)return;hostedIds.Clear();var options=new List<string>();var text=new System.Text.StringBuilder(service.Status).Append("\n\n");
    foreach(var site in service.Items){hostedIds.Add(site.id);options.Add(site.url);text.Append(site.url).Append(site.active?" — active":" — stopped").Append("\nVisits: ").Append(site.visits).Append(" | Online: ").Append(site.online).Append(" | Host PC: ").Append(site.host).Append("\nTotal: $").Append(site.total).Append(" | Next (UTC): ").Append(DateTimeOffset.FromUnixTimeSeconds(site.next_bill).UtcDateTime.ToString("yyyy-MM-dd HH:mm")).Append("\n\n");}
-   hostedSites.ClearOptions();hostedSites.AddOptions(options);hostingStats.text=text.ToString();
+   var current=service.Items.Find(site=>site.publication_key==project.Document.hostingKey);
+   hostURL.interactable=current==null;
+   if(current!=null){hostURL.SetTextWithoutNotify(current.url);text.Append("Текущий проект: ").Append(current.url).Append("\nВсе страницы используют этот домен. Для другого домена нужен новый проект.\n");}
+   else text.Append("Новый сайт: введите домен или оставьте URL пустым для бесплатного адреса.\n");
+   if(current!=null){text.Append(current.url).Append("/\n");foreach(var page in project.Document.pages)text.Append(current.url).Append(page.path).Append("\n");}
+   int selected=hostedSites.value;hostedSites.ClearOptions();hostedSites.AddOptions(options);hostedSites.SetValueWithoutNotify(Mathf.Min(Mathf.Max(0,selected),Mathf.Max(0,options.Count-1)));hostingStats.text=text.ToString();
   }
   public void PublishSite()
   {

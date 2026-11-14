@@ -24,6 +24,11 @@ with tempfile.TemporaryDirectory() as td:
   vals=dict(_token=token,world=world,key=key,url='www.mycoolsite.com',document=json.dumps(doc),confirm='100/1800/1000',host=123);vals.update(overrides);return call('publish',**vals)
  check(call('health')['service']=='orange-sites');check(call('list')['items']==[]);check(not publish(_token='')['ok']);check(not publish(confirm='free')['ok'])
  first=publish();check(first['ok']);check(first['charged']==1100 and first['total']==1100);check(first['owner']=='1');id=first['item']['id']
+ doc['elements']=[{'id':'nav','kind':'button','actions':[{'command':'GoToPage','arguments':['/about']}]}]
+ update=publish();check(update['ok']and update['charged']==0 and update['item']['id']==id)
+ check(call('view',url='www.mycoolsite.com/about')['item']['id']==id)
+ check(len(call('list')['items'])==1)
+ badnav=json.loads(json.dumps(doc));badnav['elements'][0]['actions'][0]['arguments']=['https://another.com'];check(not publish(document=json.dumps(badnav))['ok'])
  check(publish()['charged']==0);check(publish(url='another.com')['ok']==False);check(not publish(_token=other,key='3'*32)['ok'])
  listing=call('list',query='cool');check(len(listing['items'])==1);check('publication_key'not in listing['items'][0] and 'owner'not in listing['items'][0] and 'document'not in listing['items'][0]);check('mycoolsite' in listing['items'][0]['url'])
  loaded=call('view',url='www.mycoolsite.com/about');check(loaded['ok']);check(json.loads(loaded['document'])['pages'][0]['path']=='/about');ticket=loaded['ticket'];session='4'*32

@@ -10,13 +10,13 @@ class Test {
  foreach(var command in SiteCommands.All){
   var args=new List<string>();foreach(string name in command.Arguments){switch(name){
    case "id":args.Add("label");break;case "file":args.Add(command.Name=="SetImage"?"pixel.png":"test.txt");break;
-   case "url":args.Add("www.modforge.com");break;case "color":args.Add("#AABBCC");break;case "font":args.Add("mono");break;
+   case "page":args.Add("/about");break;case "url":args.Add("www.modforge.com");break;case "color":args.Add("#AABBCC");break;case "font":args.Add("mono");break;
    case "text":args.Add("Updated");break;case "visible":case "enabled":args.Add("true");break;
    case "x":case "y":args.Add(command.Name=="SetPivot"?"0.5":"12");break;
    case "size":args.Add("32");break;default:args.Add("80");break;}}
-  button.actions=new List<SiteAction>{new SiteAction{command=command.Name,arguments=args}};runtime.Click("trigger");Check(true,command.Name);
+  button.actions=new List<SiteAction>{new SiteAction{command=command.Name,arguments=args}};runtime.Click("trigger");Check(true,command.Name);if(command.Name=="RedirectURL")Check(redirect=="www.modforge.com");
  }
- Check(opened==note&&downloaded==note);Check(redirect=="www.modforge.com");Check(style>10);Check(message=="true");
+ Check(opened==note&&downloaded==note);Check(redirect=="/about");Check(style>10);Check(message=="true");
  button.actions=new List<SiteAction>{Action("SetText","label","Quoted \" ) Alert(\"BAD\") -- "),Action("AppendText","label","Suffix")};runtime.Click("trigger");Check(label.text.EndsWith("Suffix")&&label.text.Contains("Alert"));
  button.actions.Clear();button.onClick=SiteCommands.Compile(Action("SetText","label","\" ); Alert(\"bad\") --\nline"));runtime.Click("trigger");Check(label.text=="\" ); Alert(\"bad\") --\nline");button.onClick="";
  var saved=SiteDocument.Parse(doc.ToJson());Check(saved.Find("trigger").actions.Count==0);

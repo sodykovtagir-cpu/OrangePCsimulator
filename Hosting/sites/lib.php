@@ -10,7 +10,7 @@ function site_name($value) { return is_string($value)&&$value!==''&&strlen($valu
 function site_route($value) { return is_string($value)&&strlen($value)<=96&&preg_match('~^/(?:[a-z0-9_-]+(?:/[a-z0-9_-]+)*)?$~D',$value); }
 function site_number($v,$min,$max) { if(!is_numeric($v)||!is_finite((float)$v)||$v<$min||$v>$max)site_fail('Value outside site bounds'); }
 function site_color($value) { if(!is_string($value)||!preg_match('/^#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?$/D',$value))site_fail('Invalid color'); }
-function site_commands() {return ['RedirectURL'=>1,'OpenFile'=>1,'StartDownload'=>1,'Alert'=>1,'SetText'=>2,'AppendText'=>2,'ClearText'=>1,'GetText'=>1,'SetTextColor'=>2,'SetFontSize'=>2,'SetFont'=>2,'SetPosition'=>3,'MoveBy'=>3,'SetSize'=>3,'SetPivot'=>3,'GetX'=>1,'GetY'=>1,'GetWidth'=>1,'GetHeight'=>1,'SetFillColor'=>2,'SetImage'=>2,'ClearImage'=>1,'SetBackground'=>1,'Show'=>1,'Hide'=>1,'ToggleVisible'=>1,'SetVisible'=>2,'IsVisible'=>1,'SetEnabled'=>2,'IsEnabled'=>1,'GetTitle'=>0,'GetDescription'=>0,'GetURL'=>0,'FileExists'=>1];}
+function site_commands() {return ['GoToPage'=>1,'RedirectURL'=>1,'OpenFile'=>1,'StartDownload'=>1,'Alert'=>1,'SetText'=>2,'AppendText'=>2,'ClearText'=>1,'GetText'=>1,'SetTextColor'=>2,'SetFontSize'=>2,'SetFont'=>2,'SetPosition'=>3,'MoveBy'=>3,'SetSize'=>3,'SetPivot'=>3,'GetX'=>1,'GetY'=>1,'GetWidth'=>1,'GetHeight'=>1,'SetFillColor'=>2,'SetImage'=>2,'ClearImage'=>1,'SetBackground'=>1,'Show'=>1,'Hide'=>1,'ToggleVisible'=>1,'SetVisible'=>2,'IsVisible'=>1,'SetEnabled'=>2,'IsEnabled'=>1,'GetTitle'=>0,'GetDescription'=>0,'GetURL'=>0,'FileExists'=>1];}
 function site_page_validate($page,$assets,&$elements) {
  site_text($page['title']??'',480);site_color($page['background']??'#FFFFFF');site_number($page['width']??960,128,4096);site_number($page['height']??720,128,16384);
  if(!in_array($page['viewportMode']??'',['','viewport'],true))site_fail('Invalid viewport');
@@ -26,7 +26,7 @@ function site_page_validate($page,$assets,&$elements) {
   if(!empty($e['image'])&&empty($assets[$e['image']]['image']))site_fail('Missing image');
   $actions=$e['actions']??[];if(!is_array($actions)||count($actions)>32)site_fail('Too many actions');
   if($e['kind']!=='button'&&(!empty($actions)||!empty($e['onClick'])))site_fail('Only Button supports actions');
-  foreach($actions as $a){if(!is_array($a)||!array_key_exists($a['command']??'',$commands)||!is_array($a['arguments']??null)||count($a['arguments'])!==$commands[$a['command']])site_fail('Invalid action');foreach($a['arguments']as $arg)site_text($arg,16384);}
+  foreach($actions as $a){if(!is_array($a)||!array_key_exists($a['command']??'',$commands)||!is_array($a['arguments']??null)||count($a['arguments'])!==$commands[$a['command']])site_fail('Invalid action');foreach($a['arguments']as $arg)site_text($arg,16384);if($a['command']==='GoToPage'&&!site_route($a['arguments'][0]))site_fail('GoToPage requires a page path such as /about');}
  }
  $elements+=count($list);if($elements>256)site_fail('256 elements across pages maximum');
 }

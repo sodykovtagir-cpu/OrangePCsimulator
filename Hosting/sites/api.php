@@ -53,7 +53,7 @@ try{
    if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$url)||strlen($url)>160||strpos($url,'..')!==false)site_fail('Invalid game URL');
    $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);if(in_array($url,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$url)&&$url!=='s'.$id.'.sites.pcos')site_fail('Reserved URL',409);
    foreach($db['sites']as $k=>$site)if((string)$k!==$id&&$site['url']===$url)site_fail('URL already taken',409);
-   if($old&&$old['url']!==$url)site_fail('Published URL is immutable; stop and create another project',409);
+   if($old&&$old['url']!==$url)site_fail('Этот проект уже опубликован на '.$old['url'].'. Страницы используют тот же домен и пути /about. Оставьте поле URL пустым для обновления; для другого домена создайте новый проект.',409);
    $custom=$url!=='s'.$id.'.sites.pcos';$fresh=!$old||!$old['active'];
    $cost=($fresh?SITE_PRICE:0)+(!$old&&$custom?SITE_CUSTOM_PRICE:0);
    // The exact fixed tariff must be confirmed; the client cannot submit price,

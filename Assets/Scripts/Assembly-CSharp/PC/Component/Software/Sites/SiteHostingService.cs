@@ -48,10 +48,12 @@ namespace PC.Component.Software.Sites
   {
    if(busy){done("Дождись текущего запроса");return;}
    var doc=SiteDocument.Parse(document);string token=ServerAccounts.Token,world=World;if(!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done("Нужны аккаунт и сохранение игры");return;}
-   var existing=Items.Find(item=>item.publication_key==doc.hostingKey);int estimate=(existing!=null&&existing.active?0:100)+(existing==null&&!string.IsNullOrWhiteSpace(url)?1000:0);
+   var existing=Items.Find(item=>item.publication_key==doc.hostingKey);
+   if(existing!=null&&!string.IsNullOrWhiteSpace(url)&&SiteDocument.NormalizeUrl(url)!=existing.url){Status="Этот проект уже опубликован на "+existing.url+". Страницы живут на том же домене (/about и т. д.). Для другого домена нужен новый проект.";done(Status);return;}
+   int estimate=(existing!=null&&existing.active?0:100)+(existing==null&&!string.IsNullOrWhiteSpace(url)?1000:0);
    if(Main.Instance==null||Main.Instance.Money<estimate){done("Нужно $100 за первый период (+$1000 за собственный URL при первой публикации)");return;}
    if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){done("Сначала сохрани игру");return;}
-   busy=true;Request("publish",new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}},(reply,error)=>{busy=false;if(token!=ServerAccounts.Token||world!=World)return;Apply(reply,error);done(error??("Опубликовано: "+reply.item.url+". "+Status));});
+   busy=true;Request("publish",new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",url},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}},(reply,error)=>{busy=false;if(token!=ServerAccounts.Token||world!=World)return;if(error!=null){Refresh(()=>{if(token!=ServerAccounts.Token||world!=World)return;Status=error;done(error);});return;}Apply(reply,null);done("Опубликовано: "+reply.item.url+". "+Status);});
   }
   public void Stop(int id,Action<string> done)
   {
