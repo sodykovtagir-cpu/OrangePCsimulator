@@ -354,7 +354,7 @@ namespace PC.Component.Software
                         Texture2D imported = null;
                         try
                         {
-                            imported = DecodeTexture(File.ReadAllBytes(path));
+                            imported = DecodeTexture(System.IO.File.ReadAllBytes(path));
                             int targetX = canvasSize.x;
                             int targetY = canvasSize.y;
                             if (imported.width != targetX || imported.height != targetY) Resize(imported, targetX, targetY);

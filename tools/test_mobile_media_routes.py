@@ -15,8 +15,9 @@ paint='\n'.join(method(p,s) for s in ['public void OpenLocalFile()','private voi
 video=method(a,'private void PickVideoFromDevice(Vector2Int resolution)')
 assert 'NativeGallery' not in video and 'NativeGallery.GetImageFromGallery' not in paint
 assert 'new System.Uri(System.IO.Path.GetFullPath(path)).AbsoluteUri' in a
-h=r'''using System;using System.IO;using System.Collections;using UnityEngine;
+h=r'''using System;using System.IO;using System.Collections;using UnityEngine;using Paint=PC.Component.Software.Paint;using Animator=PC.Component.Software.Animator;
 namespace UnityEngine{
+ public class TextAreaAttribute:Attribute{public TextAreaAttribute(int a,int b){}}
  public class GameObject{public bool activeInHierarchy=true;}
  public class MonoBehaviour{public GameObject gameObject=new GameObject();public IEnumerator started;public object StartCoroutine(IEnumerator c){started=c;return c;}public static void Destroy(Texture2D t){t.dead=true;}}
  public struct Vector2Int{public int x,y;public Vector2Int(int w,int h){x=w;y=h;}}
@@ -31,8 +32,10 @@ namespace UnityEngine{
 class OS{public int errors;public void ShowMessageBox(string a,string b){errors++;}}
 class Display{public Texture2D texture;}
 static class NativeFilePicker{public static Action<string> callback;public static string[] filters;public static bool fail;public static void PickFile(Action<string> c,string[] f){if(fail)throw new Exception();callback=c;filters=f;}}
+namespace PC.Component.Software{
 class Paint:MonoBehaviour{public OS system=new OS();public Texture2D texture;public Display display=new Display();public Vector2Int canvasSize=new Vector2Int(128,128);PAINT}
 class Animator:MonoBehaviour{public OS system=new OS();public bool mediaAvailable=true;public object mediaImport;public string imported;public Vector2Int resolution;void ImportFailure(string s){system.errors++;}public void Pick(Vector2Int r){PickVideoFromDevice(r);}IEnumerator ImportVideoFrames(string p,Vector2Int r){imported=p;resolution=r;yield return null;}VIDEO}
+}
 class Test{static int n;static void Check(bool b,string s){n++;if(!b)throw new Exception(s);}static void Main(string[] args){
  string file=Path.Combine(args[0],"Юникод # image.png");File.WriteAllBytes(file,new byte[]{1,2,3});
  var p=new Paint();p.OpenLocalFile();Check(NativeFilePicker.filters.Length==2&&NativeFilePicker.filters[0]=="image/png","image filters");NativeFilePicker.callback(file);Check(p.texture.width==128&&p.texture.height==128,"paint import/resize not reached");Check(p.display.texture==p.texture,"paint display not updated");Check(RenderTexture.gets==RenderTexture.releases,"paint RT leak");
@@ -48,5 +51,5 @@ class Test{static int n;static void Check(bool b,string s){n++;if(!b)throw new E
 '''.replace('PAINT',paint).replace('VIDEO',video)
 with tempfile.TemporaryDirectory() as td:
  d=Path(td);(d/'test.cs').write_text(h)
- subprocess.run(['mcs','-out:'+str(d/'test.exe'),str(d/'test.cs')],check=True)
+ subprocess.run(['mcs','-out:'+str(d/'test.exe'),str(d/'test.cs'),str(C/'File.cs')],check=True)
  subprocess.run(['mono',str(d/'test.exe'),td],check=True)
