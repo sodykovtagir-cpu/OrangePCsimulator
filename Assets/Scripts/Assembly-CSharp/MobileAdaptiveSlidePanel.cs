@@ -33,6 +33,11 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     [SerializeField]
     private float edgePadding = 8f;
 
+    // Top HUD (money and + button) occupies 60 reference units in all rooms.
+    // Reserve the same band in the settings preview and on both side edges.
+    [SerializeField]
+    private float sideHeaderClearance = 60f;
+
     [SerializeField]
     private float animationTime = 0.2f;
 
@@ -552,7 +557,9 @@ public class MobileAdaptiveSlidePanel : MonoBehaviour, IDragHandler, IEndDragHan
     {
         Rect r = parentRect.rect;
         float pad = Mathf.Clamp(edgePadding, 0f, Mathf.Min(r.width, r.height) * 0.49f);
-        return Rect.MinMaxRect(r.xMin + pad, r.yMin + pad, r.xMax - pad, r.yMax - pad);
+        float header = edge == SnapEdge.Left || edge == SnapEdge.Right
+            ? Mathf.Clamp(sideHeaderClearance, 0f, Mathf.Max(0f, r.height - pad * 2f - 1f)) : 0f;
+        return Rect.MinMaxRect(r.xMin + pad, r.yMin + pad, r.xMax - pad, r.yMax - pad - header);
     }
 
     private Vector2 GetOpenAnchoredPosition()

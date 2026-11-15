@@ -42,7 +42,8 @@ assert 'NativeFilePicker.PickFile(' in code
 assert 'NativeFilePicker.ConvertExtensionToFileType("gif")' in code
 assert 'GifFrames.TryDecode(System.IO.File.ReadAllBytes(path)' in code
 assert 'info.Length > 24000000L' in code
-assert 'NativeGallery.GetVideoFromGallery(' in code
+assert 'NativeGallery.GetVideoFromGallery(' not in code
+assert 'NativeFilePicker.PickFile(' in code.split('private void PickVideoFromDevice(')[1].split('// Resize every GIF')[0]
 assert '"video/*"' in code
 assert 'private const int MaxImportFrames = 96;' in code
 assert 'private const int MaxImportDimension = 512;' in code

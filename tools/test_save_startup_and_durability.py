@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory()as td:
  for mode in ['write','read']:subprocess.run(['mono',str(exe),str(d/'persistent'),mode],check=True,timeout=30)
 menu=(C/'FileMenu.cs').read_text();startup=(C/'SaveStartup.cs').read_text();main=(C/'MainMenu.cs').read_text()
 assert 'BeforeSplashScreen' in startup and 'BeforeSceneLoad' in startup
-assert 'Directory.GetFiles'not in menu and 'File.ReadAllText'not in menu and 'LoadHeaderFromPath'not in menu
+assert 'Directory.GetFiles'not in menu and 'File.ReadAllText'not in menu and 'full.LoadHeaderFromPath()' in menu and 'Task.Run' in menu
 assert 'Task.Run' in (C/'SaveManagement/SaveCatalog.cs').read_text() and 'BuildList(++listGeneration)'in menu
 assert 'SaveCoverCache.Get' in menu and 'SaveCoverCache.Get' in startup and 'Task.Run' in main
 assert 'SaveStorage.Delete(load.loader.Path)'in menu

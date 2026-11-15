@@ -10,10 +10,17 @@ namespace SaveManagement
 
         private string content = string.Empty;
         private bool headerOnly;
+        // Persistent menu cache is display-only, never a source for saving.
+        public bool IsPreviewOnly { get; private set; }
+        internal static DataLoader FromPreview(string path, GameData display)
+        {
+            return new DataLoader(path, display) { headerOnly = true, IsPreviewOnly = true };
+        }
         public string Content
         {
             get
             {
+                if (IsPreviewOnly) LoadFromPath();
                 if (headerOnly)
                 {
                     // Do not replace GameData: a menu may already have edited
@@ -70,6 +77,7 @@ namespace SaveManagement
             GameData = parsed;
             content = string.Empty;
             headerOnly = true;
+            IsPreviewOnly = false;
         }
 
         public void LoadFromString(string data)
@@ -94,10 +102,13 @@ namespace SaveManagement
                 throw new Exception("Invalid GameData.");
 
             Content = parts.Length > 1 ? parts[1] : string.Empty;
+            IsPreviewOnly = false;
         }
 
         public void WriteToFile()
         {
+            if (IsPreviewOnly)
+                throw new InvalidOperationException("Menu preview must be hydrated from the authenticated save before editing.");
             if (GameData == null)
                 throw new InvalidOperationException("GameData is null.");
 

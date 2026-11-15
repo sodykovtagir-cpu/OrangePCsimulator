@@ -330,12 +330,22 @@ namespace PC.Component.Software
 
         private void PickVideoFromDevice(Vector2Int resolution)
         {
-            NativeGallery.GetVideoFromGallery(path =>
+            try
             {
-                if (this == null || !mediaAvailable || system == null ||
-                    string.IsNullOrEmpty(path) || mediaImport != null) return;
-                mediaImport = StartCoroutine(ImportVideoFrames(path, resolution));
-            }, "Import video into Animator", "video/*");
+                NativeFilePicker.PickFile(path =>
+                {
+                    if (this == null || !mediaAvailable || system == null ||
+                        string.IsNullOrEmpty(path) || mediaImport != null) return;
+                    if (!System.IO.File.Exists(path))
+                    { ImportFailure("The selected video is not available locally."); return; }
+                    mediaImport = StartCoroutine(ImportVideoFrames(path, resolution));
+                }, new[] { "video/*" });
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogWarning("[Animator] Video picker: " + e.GetType().Name);
+                ImportFailure("Could not open the system video picker.");
+            }
         }
 
         // Resize every GIF frame before it enters the timeline. On failure
@@ -492,7 +502,7 @@ namespace PC.Component.Software
                 var player = importPlayer;
                 player.playOnAwake = false;
                 player.source = VideoSource.Url;
-                player.url = path;
+                player.url = new System.Uri(System.IO.Path.GetFullPath(path)).AbsoluteUri;
                 player.audioOutputMode = VideoAudioOutputMode.None;
                 player.renderMode = VideoRenderMode.RenderTexture;
                 player.isLooping = false;

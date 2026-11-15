@@ -22,7 +22,7 @@ assert 'public void LoadHeaderFromPath()' in loader_source
 assert 'SaveUtility.DecodeHeader(File.ReadAllText(Path), out header, out reason)' in loader_source
 assert 'if (headerOnly)' in loader_source and 'SaveUtility.Decode(File.ReadAllText(Path), out payload)' in loader_source
 file_menu = (root / 'FileMenu.cs').read_text()
-assert 'entry.Loader' in file_menu and 'LoadSavedFile(entry.Path)' in file_menu
+assert 'entry.Loader' in file_menu and 'LoadSavedFile(v.loader.Path)' in file_menu
 assert 'item.Loader.LoadHeaderFromPath()' in (root / 'SaveManagement/SaveCatalog.cs').read_text()
 if not shutil.which('mcs') or not shutil.which('mono'):
     print('NOTE: Mono unavailable; checked OPC3 source guards only')

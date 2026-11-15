@@ -47,6 +47,7 @@ class Test{
  Call(panel,"ConfigureForEdge");r.anchoredPosition=(UnityEngine.Vector2)Call(panel,"GetOpenAnchoredPosition");
  var b=(UnityEngine.Rect)Call(panel,"MeasureBounds");var v=(UnityEngine.Rect)Call(panel,"PaddedViewport");
  Check(b.xMin>=v.xMin-.01&&b.xMax<=v.xMax+.01&&b.yMin>=v.yMin-.01&&b.yMax<=v.yMax+.01,"open outside viewport");
+ if(e==0||e==1)Check(b.yMax<=bounds.rect.yMax-68+.01,"side panel overlaps money/header band");
  Check(Math.Abs(e==0?b.xMin-v.xMin:e==1?b.xMax-v.xMax:e==2?b.yMax-v.yMax:b.yMin-v.yMin)<.01,"gap at dock edge");
  var scale=r.localScale;Call(panel,"ConfigureForEdge");Check(Math.Abs(r.localScale.x-scale.x)<.0001,"cumulative shrink");
  r.anchoredPosition=(UnityEngine.Vector2)Call(panel,"GetClosedAnchoredPosition");b=(UnityEngine.Rect)Call(panel,"MeasureBounds");var view=bounds.rect;

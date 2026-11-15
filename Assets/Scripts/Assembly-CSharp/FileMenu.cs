@@ -89,7 +89,7 @@ public class FileMenu : MonoBehaviour
 			x.Find("Edit").GetComponent<Button>().onClick.AddListener(() => { ShowFileInformation(v); });
             x.Find("Name").GetComponent<Button>().onClick.AddListener(() =>
             {
-                MainMenu.Instance.LoadSavedFile(entry.Path);
+                MainMenu.Instance.LoadSavedFile(v.loader.Path);
             });
 			empty.SetActive(loads.Count == 0);
 			return true;
@@ -100,11 +100,35 @@ public class FileMenu : MonoBehaviour
 		}
 	}
 
-	private void ShowFileInformation(Load load)
-	{
-		menuManager.ShowMenu("FileInformation");
-		fileInformation.Show(load);
-	}
+    private void ShowFileInformation(Load load)
+    {
+        if (load.loader.IsPreviewOnly)
+        {
+            StartCoroutine(HydrateForEdit(load, listGeneration));
+            return;
+        }
+        menuManager.ShowMenu("FileInformation");
+        fileInformation.Show(load);
+    }
+
+    private System.Collections.IEnumerator HydrateForEdit(Load load, int generation)
+    {
+        string path = load.loader.Path;
+        var work = System.Threading.Tasks.Task.Run(() =>
+        {
+            var full = new DataLoader(path); full.LoadHeaderFromPath(); return full;
+        });
+        while (!work.IsCompleted) yield return null;
+        if (generation != listGeneration || !isActiveAndEnabled) yield break;
+        if (work.IsFaulted)
+        {
+            Debug.LogWarning("Cannot edit save: " + work.Exception.GetBaseException().GetType().Name);
+            if (messageBox != null) messageBox.Show("Cannot read this save. Refresh the list and try again.");
+            yield break;
+        }
+        load.loader = work.Result;
+        menuManager.ShowMenu("FileInformation"); fileInformation.Show(load);
+    }
 
     private void OnDisable() { listGeneration++; }
     public void RebuildList()
@@ -115,33 +139,57 @@ public class FileMenu : MonoBehaviour
     }
     private System.Collections.IEnumerator BuildList(int generation)
     {
-        // Let the button click/menu transition render before doing UI work.
-        yield return null;
-        if (generation != listGeneration) yield break;
         if (loads == null) loads = new List<Load>();
-        loads.Clear();
-        if (slotParent != null)
-            for (int i = slotParent.childCount - 1; i >= 0; i--)
-            {
-                if (generation != listGeneration) yield break;
-                var old = slotParent.GetChild(i).gameObject; old.SetActive(false); Destroy(old);
-                if (i % 32 == 0) yield return null;
-            }
         if (empty != null) empty.SetActive(false);
-        while (SaveCatalog.IsScanning) { if (generation != listGeneration) yield break; yield return null; }
-        var rows = SaveCatalog.Snapshot();
-        SaveCoverCache.Prune(rows);
+        // Show RAM/persistent-cache rows now, NOT after the validation worker.
+        // Keep live row objects (and their cover textures) across menu opens.
+        int seen = SaveCatalog.Revision;
+        var update = ReconcileRows(SaveCatalog.Snapshot(), generation, !SaveCatalog.IsScanning);
+        while (update.MoveNext()) yield return update.Current;
+        while (SaveCatalog.IsScanning)
+        { if (generation != listGeneration) yield break; yield return null; }
+        if (generation != listGeneration) yield break;
+        if (seen != SaveCatalog.Revision)
+        {
+            update = ReconcileRows(SaveCatalog.Snapshot(), generation, true);
+            while (update.MoveNext()) yield return update.Current;
+        }
+        if (empty != null) empty.SetActive(loads.Count == 0);
+        if (SaveCatalog.Error != null) Debug.LogWarning("Cannot list saves: " + SaveCatalog.Error);
+    }
+
+    private System.Collections.IEnumerator ReconcileRows(SaveCatalog.Entry[] rows, int generation, bool removeMissing)
+    {
+        var existing = new Dictionary<string, Load>(StringComparer.Ordinal);
+        foreach (var row in loads) existing[row.loader.Path] = row;
+        var keep = new HashSet<string>(StringComparer.Ordinal);
         long started = System.Diagnostics.Stopwatch.GetTimestamp(); int batch = 0;
         foreach (var entry in rows)
         {
             if (generation != listGeneration) yield break;
-            if (entry.Loader == null) { Debug.LogWarning("Cannot index save " + Path.GetFileName(entry.Path) + ": " + entry.Error); continue; }
-            AddSlot(entry);
+            if (entry.Loader == null)
+            { Debug.LogWarning("Cannot index save " + Path.GetFileName(entry.Path) + ": " + entry.Error); continue; }
+            keep.Add(entry.Path);
+            Load row;
+            if (existing.TryGetValue(entry.Path, out row))
+            {
+                if (!object.ReferenceEquals(row.loader, entry.Loader))
+                { row.loader = entry.Loader; RefreshLoadButton(row); }
+            }
+            else if (AddSlot(entry)) row = loads[loads.Count - 1];
+            else continue;
+            row.graphic.transform.SetSiblingIndex(keep.Count - 1);
             if (++batch >= 8 || (System.Diagnostics.Stopwatch.GetTimestamp()-started)*1000.0/System.Diagnostics.Stopwatch.Frequency >= 3)
             { yield return null; batch = 0; started = System.Diagnostics.Stopwatch.GetTimestamp(); }
         }
-        if (empty != null) empty.SetActive(loads.Count == 0);
-        if (SaveCatalog.Error != null) Debug.LogWarning("Cannot list saves: " + SaveCatalog.Error);
+        if (generation != listGeneration) yield break;
+        if (removeMissing)
+            for (int i = loads.Count - 1; i >= 0; i--)
+                if (!keep.Contains(loads[i].loader.Path))
+                {
+                    var old = loads[i]; loads.RemoveAt(i);
+                    if (old.graphic != null) { old.graphic.SetActive(false); Destroy(old.graphic); }
+                }
     }
 
 	public void RefreshLoadButton(Load load)

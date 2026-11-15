@@ -120,6 +120,9 @@ public class DragRotateControls : MonoBehaviour
 
         var canvas = FindHudCanvas();
         if (canvas == null) return; // попробуем в следующем кадре
+        var viewport = canvas.transform as RectTransform;
+        if (viewport == null || viewport.rect.width < 1f || viewport.rect.height < 1f ||
+            canvas.scaleFactor <= 0f) return; // wait for CanvasScaler, never build in a zero-size startup canvas
 
         // Стрелки должны ловить нажатия — без raycaster канвас только рисуется.
         EnsureRaycaster(canvas);
@@ -224,6 +227,15 @@ public class DragRotateControls : MonoBehaviour
     /// <summary>HUD-канвас игры (общий для панели стрелок и подписи режима сетки).</summary>
     public static Canvas FindHudCanvas()
     {
+        // ControlRig knows the real shared room HUD even before it switches
+        // Mobile/Standalone in Start. Don't bind to whichever overlay happens
+        // to be enumerated first while a scene is still initializing.
+        foreach (var rig in FindObjectsOfType<ControlRig>())
+        {
+            if (rig.mobile == null) continue;
+            var hud = rig.mobile.GetComponentInParent<Canvas>();
+            if (hud != null && hud.renderMode == RenderMode.ScreenSpaceOverlay) return hud;
+        }
         // Several room scenes contain more than one Functions component.
         // FindObjectOfType picks an arbitrary one (sometimes on a world-space
         // monitor); its controls render but cannot receive HUD touch events.
@@ -249,27 +261,20 @@ public class DragRotateControls : MonoBehaviour
     }
 
     /// <summary>
-    /// Масштаб панели под экран. В канвасе проекта нет CanvasScaler, поэтому
-    /// «сырые» пиксели на телефоне (1080×2340) — это физически мелкие кнопки.
-    /// Считаем от длинной стороны экрана и от DPI, когда Android его отдаёт.
+    /// Один масштаб в логических единицах HUD/превью. Не зависит от DPI,
+    /// render-resolution и того, на каком кадре запустилась конкретная карта.
     /// </summary>
     public static float UiScale()
     {
-        // Размер считаем от КОРОТКОЙ стороны экрана, а не от длинной.
-        // Раньше бралась длинная (на телефоне 2340) и делилась на 1440 —
-        // получалось 1.6–2.4, и панель в 300*s занимала почти пол-экрана.
-        float shortSide = Mathf.Min(Screen.width, Screen.height);
-
-        // Ограничиваем масштаб до 1.35, чтобы панель не заслоняла остальной HUD;
-        // ниже базового размера допускаем только ради размещения на экране.
-        float scale = shortSide / 1080f;
-        scale = Mathf.Clamp(scale, 0.85f, 1.35f);
-
-        float dpi = Screen.dpi;
-        if (dpi > 1f) scale = Mathf.Clamp(scale, scale, dpi / 400f);
-
-        // Вся панель, включая крайние кнопки, должна помещаться даже на
-        // маленьком дисплее; DPI не имеет права раздвинуть её за экран.
+        // HUD and preview both use logical Expand units (800x500), NOT render
+        // pixels. Screen.height can change after scene startup when resolution
+        // quality is restored; a one-time pixel-derived size could therefore
+        // differ between rooms and shift the meaning of saved offsets.
+        float aspect = (float)Mathf.Max(1, Screen.width) / Mathf.Max(1, Screen.height);
+        float width = Mathf.Max(800f, 500f * aspect);
+        float height = Mathf.Max(500f, 800f / aspect);
+        float shortSide = Mathf.Min(width, height);
+        float scale = Mathf.Clamp(0.85f * shortSide / 500f, 0.85f, 1.35f);
         float fit = (shortSide - 24f) / PanelSize;
         return Mathf.Max(0.1f, Mathf.Min(scale, fit));
     }

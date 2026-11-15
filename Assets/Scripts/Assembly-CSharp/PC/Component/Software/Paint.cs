@@ -338,17 +338,43 @@ namespace PC.Component.Software
 
         public void OpenLocalFile()
         {
-            NativeGallery.GetImageFromGallery(path =>
+            // Use the same permission-free SAF route as the working GIF/save
+            // picker. NativeGallery still requests legacy media permissions.
+            try
             {
-                if (string.IsNullOrEmpty(path)) return;
-                var bytes = System.IO.File.ReadAllBytes(path);
-                LoadTexture(bytes);
-                var tex = texture;
-                if (tex == null) return;
-                int targetX = canvasSize.x;
-                int targetY = canvasSize.y;
-                if (tex.width != targetX || tex.height != targetY) Resize(tex, targetX, targetY);
-            }, "Select an image", "image/*");
+                NativeFilePicker.PickFile(path =>
+                {
+                    if (this == null || system == null || !gameObject.activeInHierarchy ||
+                        string.IsNullOrEmpty(path)) return;
+                    try
+                    {
+                        var info = new FileInfo(path);
+                        if (!info.Exists || info.Length > 32L * 1024 * 1024)
+                            throw new System.IO.InvalidDataException("Image is missing or exceeds 32 MB.");
+                        Texture2D imported = null;
+                        try
+                        {
+                            imported = DecodeTexture(File.ReadAllBytes(path));
+                            int targetX = canvasSize.x;
+                            int targetY = canvasSize.y;
+                            if (imported.width != targetX || imported.height != targetY) Resize(imported, targetX, targetY);
+                            SetTexture(imported); // commit only after decode and resize succeed
+                            imported = null;
+                        }
+                        finally { if (imported != null) Destroy(imported); }
+                    }
+                    catch (System.Exception e)
+                    {
+                        UnityEngine.Debug.LogWarning("[Paint] Image import: " + e.GetType().Name);
+                        if (system != null) system.ShowMessageBox("Paint", "Cannot import this image. Choose a PNG or JPEG file.");
+                    }
+                }, new[] { "image/png", "image/jpeg" });
+            }
+            catch (System.Exception e)
+            {
+                UnityEngine.Debug.LogWarning("[Paint] Picker: " + e.GetType().Name);
+                if (system != null) system.ShowMessageBox("Paint", "Could not open the system image picker.");
+            }
         }
 
         public void PrintPicture()
@@ -359,9 +385,19 @@ namespace PC.Component.Software
 
         private void LoadTexture(byte[] bytes)
         {
+            SetTexture(DecodeTexture(bytes));
+        }
+
+        private Texture2D DecodeTexture(byte[] bytes)
+        {
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            ImageConversion.LoadImage(tex, bytes);
-            SetTexture(tex);
+            try
+            {
+                if (!ImageConversion.LoadImage(tex, bytes))
+                    throw new InvalidDataException("Unsupported image data.");
+                return tex;
+            }
+            catch { Destroy(tex); throw; }
         }
 
         private void SetTexture(Texture2D tex)
@@ -378,16 +414,22 @@ namespace PC.Component.Software
 
         private void Resize(Texture2D texture2D, int targetX, int targetY)
         {
-            var rt = new RenderTexture(targetX, targetY, 24);
-            RenderTexture.active = rt;
-            Graphics.Blit(texture2D, rt);
-            if (texture2D == null) return;
-            texture2D.Reinitialize(targetX, targetY);
-            var source = new Rect(0f, 0f, targetX, targetY);
-            texture2D.ReadPixels(source, 0, 0);
-            texture2D.Apply();
-            RenderTexture.active = null; // ������� �� ��������� ������ ������
-            rt.Release();
+            if (texture2D == null || targetX < 1 || targetY < 1) return;
+            var previous = RenderTexture.active;
+            var rt = RenderTexture.GetTemporary(targetX, targetY, 0);
+            try
+            {
+                Graphics.Blit(texture2D, rt);
+                RenderTexture.active = rt;
+                texture2D.Reinitialize(targetX, targetY);
+                texture2D.ReadPixels(new Rect(0f, 0f, targetX, targetY), 0, 0);
+                texture2D.Apply();
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+            }
         }
 
         public override void Close()
