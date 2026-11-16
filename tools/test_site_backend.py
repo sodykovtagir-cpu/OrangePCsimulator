@@ -45,14 +45,16 @@ with tempfile.TemporaryDirectory() as td:
  # Continuous seconds: first $1100 buys 1800 s of hosting, the next 1860 s cost
  # $1100*1860/1800 = $1136 (long offline runs are no longer a period jump).
  offline=call('stats',_token=token,world=world);check(abs(offline['total']-(1100+1136))<=2)
- check(call('stats',_token=token,world=world)['total']==offline['total'])
+ # Rent is continuous, so a second of hosting may be billed between two polls.
+ check(abs(call('stats',_token=token,world=world)['total']-offline['total'])<=2)
  check(not call('stop',_token=token,world='9'*32,id=id)['ok'])
  stopped=call('stop',_token=token,world=world,id=id);check(stopped['ok']and not stopped['item']['active']and stopped['item']['online']==0 and stopped['item']['next_bill']==0)
- check(call('stop',_token=token,world=world,id=id)['total']==offline['total'])
+ check(abs(call('stop',_token=token,world=world,id=id)['total']-offline['total'])<=4)
  check(call('list')['items']==[]);check(not call('view',url='www.mycoolsite.com/about')['ok'])
  check(not call('visit',id=id,ticket=ticket,session=session)['ok'])
+ stopped_total=call('stats',_token=token,world=world)['total']
  subprocess.run(['php','-r',script],check=True) # elapsed time while stopped does not accrue rent
- check(call('stats',_token=token,world=world)['total']==offline['total'])
+ check(call('stats',_token=token,world=world)['total']==stopped_total)
  check(publish()['charged']==1100)
  check(not call('visit',id=id,ticket=ticket,session=session)['ok']) # pre-stop ticket stays invalid after restart
  fresh=call('view',url='www.mycoolsite.com');check(call('visit',id=id,ticket=fresh['ticket'],session=session)['ok'])
