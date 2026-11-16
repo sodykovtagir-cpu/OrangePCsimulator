@@ -15,8 +15,8 @@ namespace UnityEngine {
  public struct Rect {public float x,y,width,height;public Rect(float x,float y,float w,float h){this.x=x;this.y=y;width=w;height=h;}}
  public struct Color {public float r,g,b,a;public Color(float x,float y,float z,float w=1){r=x;g=y;b=z;a=w;}public static Color white{get{return new Color(1,1,1);}}public static Color black{get{return new Color();}}}
  public static class ColorUtility {public static string ToHtmlStringRGBA(Color c){return "FFFFFF00";}public static bool TryParseHtmlString(string s,out Color c){c=new Color();return true;}}
- public static class Mathf {public static int Max(int a,int b){return Math.Max(a,b);}public static float Clamp(float x,float a,float b){return Math.Min(b,Math.Max(a,x));}public static float Max(float a,float b){return Math.Max(a,b);}public static int Min(int a,int b){return Math.Min(a,b);}public static float Min(float a,float b){return Math.Min(a,b);}}
- public static class Time {public static float unscaledTime;}
+ public static class Mathf {public static int Max(int a,int b){return Math.Max(a,b);}public static float Clamp(float x,float a,float b){return Math.Min(b,Math.Max(a,x));}public static int Clamp(int x,int a,int b){return Math.Min(b,Math.Max(a,x));}public static float Max(float a,float b){return Math.Max(a,b);}public static int Min(int a,int b){return Math.Min(a,b);}public static float Min(float a,float b){return Math.Min(a,b);}}
+ public static class Time {public static float unscaledTime;public static float unscaledDeltaTime=0.02f;public static float deltaTime=0.02f;}
  public class Font:Object{public void RequestCharactersInTexture(string s,int n,FontStyle f){}public bool GetCharacterInfo(char c,out CharacterInfo g,int s,FontStyle f){g=new CharacterInfo();return true;}}
  public static class Resources {public static T Load<T>(string s)where T:Object{return null;}public static T GetBuiltinResource<T>(string s)where T:Object{return null;}}
  public class Texture:Object{}
@@ -47,7 +47,7 @@ namespace UnityEngine.UI {
  public class Button:Component {public bool interactable;public Graphic targetGraphic;public UnityEvent onClick=new UnityEvent();}
  public class InputField:Component {public enum LineType{MultiLineNewline,SingleLine}public bool readOnly;public bool interactable;public string text;public void SetTextWithoutNotify(string s){text=s;}public int characterLimit;public Text textComponent;public Graphic targetGraphic;public LineType lineType;public UnityEvent<string> onEndEdit=new UnityEvent<string>();public void ActivateInputField(){}public void MoveTextEnd(bool b){}}
  public class ScrollRect:Component {public void OnBeginDrag(UnityEngine.EventSystems.PointerEventData e){}public void OnDrag(UnityEngine.EventSystems.PointerEventData e){}public void OnEndDrag(UnityEngine.EventSystems.PointerEventData e){}public enum MovementType{Clamped}public RectTransform viewport,content;public bool horizontal;public MovementType movementType;public float verticalNormalizedPosition;public void StopMovement(){}}
- public class Dropdown:Component{public int value;public UnityEvent<int> onValueChanged=new UnityEvent<int>();public void ClearOptions(){}public void AddOptions(List<string> a){}public void SetValueWithoutNotify(int n){value=n;}}
+ public class Dropdown:Component{public class OptionData{public string text;public OptionData(string t){text=t;}}public int value;public List<OptionData> options=new List<OptionData>();public UnityEvent<int> onValueChanged=new UnityEvent<int>();public void ClearOptions(){options=new List<OptionData>();}public void AddOptions(List<string> a){foreach(var t in a)options.Add(new OptionData(t));}public void SetValueWithoutNotify(int n){value=n;}}
  public class Mask:Component{public bool showMaskGraphic;}
  public class RectMask2D:Component{}
  public class Outline:Component{public Color effectColor;public Vector2 effectDistance;public bool enabled;}
@@ -62,7 +62,7 @@ namespace PC.Component.Software.OS {
  using PC.Component.Software;
  public class TestBoard{public int Id=123;}
  public class OperatingSystem {public ProgressBar ProgressBar=new ProgressBar();public TestBoard Board=new TestBoard();public bool Ready=true;public FileManager FileManager=new FileManager();public static bool IsSystemPath(string p){return p.StartsWith("System/");}public UnityEngine.Sprite GetFileTypeSprite(string name){return null;}public bool OpenSiteFile(File f){return true;}public float GetTaskbarInsetLocalHeight(){return 48;}public List<Storage> AllStorage;public SaveDialog SaveDialog;public void ShowMessageBox(string t,string s){}public void SelectFile(string ext,Action<File> a){}public void SelectFile(string[] ext,Action<File> a){}}
- public class FileManager {public File Write(int disk,string path,string content){return null;}public bool TryGetFile(int disk,string path,out File file){file=null;return false;}}
+ public class FileManager {public File Write(int disk,string path,string content){return null;}public bool TryGetFile(int disk,string path,out File file){file=null;return false;}public File Find(Storage disk,string path){return null;}}
  public class SaveDialog {public int calls;public bool administrator;public string content;public string[] extensions;public void ShowDialog(string n,string c,string[] e,string p,int d,Action<File> a,bool admin){calls++;administrator=admin;content=c;extensions=e;}}
 }
 
@@ -71,7 +71,7 @@ public class ColorPicker:UnityEngine.MonoBehaviour{public void PickColor(UnityEn
 public static class ServerAccounts {public static string Token="token",Name="tester";public static bool LoggedIn=true;}
 public class WorkshopClient {public static WorkshopClient Instance;public static WorkshopClient Ensure(){return Instance;}public Action<string,Dictionary<string,string>,Action<string,string>> Handler;public void SiteRequest(string action,Dictionary<string,string> values,Action<string,string> done){if(Handler!=null)Handler(action,values,done);else done(null,"unavailable");}}
 public class Main {public static Main Instance;public int Money;public void SetMoney(int n,bool b){Money=n;}}
-public class TestGameData {public string siteHostingWorld;public List<PC.Component.Software.Sites.SiteHostingLedger> siteHostingLedger;}
+public class TestGameData {public string siteHostingWorld;public List<PC.Component.Software.Sites.SiteHostingLedger> siteHostingLedger;public List<PC.Component.Software.Sites.LocalHostedSite> siteHostingLocals;public PC.Component.Software.Sites.SiteHostingWallet siteHostingWallet;}
 public class TestLoader {public TestGameData GameData=new TestGameData();}
 public class SaveManager {public static TestLoader Loader;public static SaveManager Instance;public static bool RestoringSave;public bool fail;public int saves;public bool SaveData(){saves++;return !fail;}}
 

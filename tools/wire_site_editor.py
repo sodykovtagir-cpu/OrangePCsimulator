@@ -16,6 +16,8 @@ if (ROOT/'Assets/Resources/apps/SiteEditor.prefab').exists() and '--rebuild-shel
     upgrade_pages()
     from upgrade_site_followup import upgrade as followup
     followup()
+    from upgrade_site_hosting_panel import upgrade as hosting_panel
+    hosting_panel()
     print('Preserved existing authored Site Editor shell')
     raise SystemExit(0)
 for folder in [C/'Sites',ROOT/'Assets/Resources/SiteFonts']:
@@ -69,6 +71,8 @@ from upgrade_site_inspector import upgrade
 upgrade()
 from upgrade_site_pages import upgrade as upgrade_pages
 upgrade_pages()
+from upgrade_site_hosting_panel import upgrade as hosting_panel
+hosting_panel()
 from upgrade_site_followup import upgrade as followup
 followup()
 print('Wired Site Editor into App Downloader; .osite association, native chrome, bundled standard fonts')

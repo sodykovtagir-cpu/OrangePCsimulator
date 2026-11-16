@@ -24,6 +24,36 @@ namespace PC.Component.Software
             try { RenderLocalDocument(SiteDocument.Parse(file.content), disk.Id, file.path); return true; }
             catch (Exception ex) { ShowError("Site: " + ex.Message); return false; }
         }
+        /// <summary>
+        /// Open a publication that is hosted from this save (local hosting). It is
+        /// resolved on the local disk only, so it works without any internet.
+        /// </summary>
+        public bool OpenLocalHosted(string domain)
+        {
+            if (siteNavigationClosed || system == null || !system.Ready || string.IsNullOrEmpty(domain)) return false;
+            var service = Sites.SiteHostingService.Instance;
+            if (service == null || system.AllStorage == null || system.FileManager == null) return false;
+            var site = service.Local(domain);
+            if (site == null) return false;
+            for (int index = 0; index < system.AllStorage.Count; index++)
+            {
+                var disk = system.AllStorage[index];
+                if (disk == null || disk.Id != site.disk) continue;
+                File file;
+                if (!system.FileManager.TryGetFile(index, site.diskPath, out file) || file == null || file.isFolder) continue;
+                try
+                {
+                    var doc = SiteDocument.Parse(file.content);
+                    RenderLocalDocument(doc, disk.Id, file.path);
+                    // Serving time is what local hosting is billed for.
+                    servedDomain = site.domain; servedBeat = 0f;
+                    return true;
+                }
+                catch (Exception ex) { ShowError("Site: " + ex.Message); return false; }
+            }
+            ShowError("Сайт " + domain + " не найден на диске этого сохранения");
+            return false;
+        }
         bool OpenLocalAddress(string url)
         {
             if (siteNavigationClosed || system == null || !system.Ready) return false;
@@ -130,6 +160,7 @@ namespace PC.Component.Software
         }
         void ClearLocalContext()
         {
+            servedDomain="";servedBeat=0f;
             ClearCustomContext();localGeneration++;
             if (pendingLocalNavigation != null) { StopCoroutine(pendingLocalNavigation); pendingLocalNavigation = null; }
             localDocument = null;

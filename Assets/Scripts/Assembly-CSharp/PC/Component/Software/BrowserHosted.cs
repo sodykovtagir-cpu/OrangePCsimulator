@@ -12,6 +12,8 @@ namespace PC.Component.Software
   readonly List<GameObject> customRows=new List<GameObject>();float nextCustomResults;bool customResultsBusy;
   void ClearCustomRows(){foreach(var row in customRows)if(row!=null){row.SetActive(false);Destroy(row);}customRows.Clear();}
   int remoteId;string remoteURL="",remoteTicket="",remoteSession=Guid.NewGuid().ToString("N");float remoteBeat;bool remoteBusy,keepRemote;
+  // Domain of the locally hosted publication currently on screen, and its clock.
+  string servedDomain="";float servedBeat;
   void LoadCustomResults(string query)
   {
    if(customResultsBusy)return;customResultsBusy=true;nextCustomResults=Time.unscaledTime+20;
@@ -25,6 +27,8 @@ namespace PC.Component.Software
   void CustomOrResults(string query,string url)
   {
    if(query.IndexOf(' ')>=0||query.IndexOf('.')<0){ShowResults(query.ToLowerInvariant());return;}
+   // A site hosted from this save answers immediately and needs no internet.
+   if(OpenLocalHosted(url))return;
    int generation=localGeneration;
    SiteHostingService.Request("view",new Dictionary<string,string>{{"url",url}},(reply,error)=>{
     if(this==null||generation!=localGeneration||siteNavigationClosed)return;
@@ -61,6 +65,17 @@ namespace PC.Component.Software
   {
    if(system!=null&&system.Board!=null&&!siteNavigationClosed)viewportOwners[system.Board.Id]=this;
    if(siteNavigationClosed)return;
+   // One second of actual serving = one second of local hosting rent.
+   if(!string.IsNullOrEmpty(servedDomain))
+   {
+    var hosting=SiteHostingService.Instance;
+    if(hosting==null||hosting.Local(servedDomain)==null){servedDomain="";servedBeat=0f;}
+    else
+    {
+     servedBeat+=Time.unscaledDeltaTime;
+     while(servedBeat>=1f){servedBeat-=1f;hosting.AddLocalSecond(servedDomain);}
+    }
+   }
    if(remoteId!=0)
    {
     var service=SiteHostingService.Instance;var known=service!=null&&service.Available?service.Items.Find(site=>site.id==remoteId):null;

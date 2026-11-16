@@ -1,8 +1,26 @@
 <?php
 // No account credentials, FTP passwords, or visitor IPs are stored here.
+//
+// Billing v2 ("time bank", seconds):
+//  - SITE_PRICE / SITE_PERIOD is the public price per period: $100 per 30 real
+//    minutes, custom domain $1100 per 30 minutes.
+//  - The backend stores money in *paid seconds* (SITE_SECOND = 1). Everything
+//    is computed in integer micro-dollars so that a period boundary can never
+//    round in the player's favour or against them:
+//      SITE_CUSTOM_PERIOD = SITE_PRICE + SITE_CUSTOM_PRICE = 1100
+//      SITE_CUSTOM_SECOND = SITE_CUSTOM_PERIOD_RATE (integer, see below)
+//  - A site buys seconds from the shared wallet of its owner+save. The cash
+//    ceiling is the last balance snapshot sent by the game, so the backend can
+//    keep charging while the player is offline.
+//  - Money never goes below zero on the client: the wallet simply runs dry,
+//    the site is paused (`paused`) and keeps its domain, package and history.
+//  - Everything is idempotent per wallet generation (`gen`), so a lost save or
+//    a repeated request can never charge twice or resurrect old free time.
 const SITE_PERIOD = 1800;
 const SITE_PRICE = 100;
 const SITE_CUSTOM_PRICE = 1000;
+// Rent is quoted per second internally (see the money core) so that a period
+// never rounds in either direction.
 const SITE_PREFIX = "<?php http_response_code(404); exit; /*\n";
 function site_fail($message, $code=400) { throw new RuntimeException($message, $code); }
 function site_text($value,$max) { if (!is_string($value)||strlen($value)>$max||preg_match('//u',$value)!==1) site_fail('Invalid text'); return $value; }
@@ -43,40 +61,254 @@ function site_validate($json) {
 }
 function site_read($file,$default=[]) {if(!is_file($file))return $default;$raw=file_get_contents($file);if(strncmp($raw,SITE_PREFIX,strlen(SITE_PREFIX))!==0)site_fail('Storage header invalid',503);$data=json_decode(base64_decode(substr($raw,strlen(SITE_PREFIX),-3),true),true);if(!is_array($data))site_fail('Storage unavailable',503);return $data;}
 function site_write($file,$data){$raw=SITE_PREFIX.base64_encode(json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR))."\n*/";$tmp=$file.'.'.bin2hex(random_bytes(6)).'.tmp.php';if(file_put_contents($tmp,$raw,LOCK_EX)!==strlen($raw)||!rename($tmp,$file)){@unlink($tmp);site_fail('Storage write failed',503);}}
-function site_period_price($s){return SITE_PRICE+($s['url']!=='s'.$s['id'].'.sites.pcos'?SITE_CUSTOM_PRICE:0);}
-function site_stop_host(&$db,$owner,$world,$host){foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world&&$s['host']===$host&&$s['active']){$s['active']=false;$s['unpaid']=false;$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}unset($s);}
-function site_transfers(&$s,$now){$active=[];foreach($s['transfers']??[]as $k=>$v)if($v['at']>$now-30)$active[$k]=$v;$s['transfers']=$active;return count($active);}
-function site_bill(&$s,$now){if(empty($s['active']))return;$n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));$s['total']+=$n*site_period_price($s);$s['billed_at']+=$n*SITE_PERIOD;}
-function site_online(&$s,$now){$active=[];foreach($s['sessions']??[]as $key=>$row)if($row['at']>$now-90)$active[$key]=$row;$s['sessions']=$active;return count($active);}
-function site_custom_paid($s){return array_key_exists('custom_paid',$s)?(bool)$s['custom_paid']:$s['url']!=='s'.$s['id'].'.sites.pcos';}
-function site_public(&$s,$now){$online=site_online($s,$now);return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],'downloads'=>$s['downloads']??0,'transferring'=>site_transfers($s,$now),'visits'=>$s['visits'],'online'=>$online,'active'=>(bool)$s['active'],'total'=>$s['total'],'unpaid'=>!empty($s['unpaid']),'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'','cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,'custom_paid'=>site_custom_paid($s),'next_bill'=>$s['active']&&empty($s['unpaid'])&&empty($s['banned'])?$s['billed_at']+SITE_PERIOD:0,'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision']];}
-function site_user($token,$usersFile){if(!is_string($token)||strlen($token)<32||strlen($token)>256)site_fail('Login required',401);$raw=@file_get_contents($usersFile);$users=json_decode($raw?:'[]',true);foreach(is_array($users)?$users:[]as $u)if(!empty($u['token'])&&hash_equals((string)$u['token'],$token)&&!empty($u['verified']))return (string)$u['id'];site_fail('Session expired',401);}
 
+// ---------------------------------------------------------------- money core
+// Billing v2, "time bank":
+//  - Price is still $100 per 1800 real seconds (custom domain $1100 per 1800),
+//    but every site holds a credit of paid seconds and is charged per second,
+//    not per completed period. Integer math only: no period rounding.
+//  - Money is never taken from a site twice: each site has `billed_seconds`
+//    for the current billing window and `credit` for prepaid seconds.
+//  - Available cash of one account+save is `ceiling - sum(total of its sites)`,
+//    where `ceiling` is the last balance snapshot sent by the game
+//    (`balance + already settled`). A site can never push the player below
+//    zero: when the money runs out the site is paused and keeps its domain,
+//    package, visits and billing history.
+//  - A paused or stopped site never accrues rent. The billing window is a
+//    fixed 1800-second UTC slot only so that usage can be measured exactly
+//    once per request, not to charge per period.
+// Rent is quoted per second internally so that no period ever rounds.
+const SITE_RATE_STANDARD = SITE_PRICE;                   // $ per 1800 seconds
+const SITE_RATE_CUSTOM = SITE_PRICE + SITE_CUSTOM_PRICE; // $ per 1800 seconds
+const SITE_EPOCH = 1767225600;                           // 2026-01-01T00:00:00Z
 function site_wallet_key($owner,$world){return $owner.':'.$world;}
-function site_suspend(&$s){if(empty($s['unpaid'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];$s['transfers']=[];}$s['unpaid']=true;}
+function site_rate($s){
+ if(isset($s['rate'])&&!empty($s['rate_locked']))return (int)$s['rate']===SITE_RATE_CUSTOM?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
+ return site_period_price($s)===SITE_RATE_CUSTOM?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
+}
+// A locally hosted site lives in the player's save, not on this web host: it is
+// billed and moderated like any publication but never served over the network.
+function site_local($s){return ($s['kind']??'')==='local';}
+function site_period_price($s){return SITE_PRICE+($s['url']!=='s'.$s['id'].'.sites.pcos'?SITE_CUSTOM_PRICE:0);}
+// Cost of a number of seconds, floor (never invents money).
+function site_cost($rate,$seconds){return intdiv(max(0,(int)$rate)*max(0,(int)$seconds),SITE_PERIOD);}
+// Seconds affordable with an amount of dollars, floor.
+function site_seconds_for($rate,$dollars){$rate=max(1,(int)$rate);return intdiv(max(0,(int)$dollars)*SITE_PERIOD,$rate);}
+function site_running($s){return !empty($s['active'])&&empty($s['paused'])&&empty($s['banned']);}
+function site_total($db,$owner,$world){$sum=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$sum+=(int)$s['total'];return $sum;}
+// Known cash left for this account+save. A wallet that was never snapshotted
+// has no ceiling: money lives in the game save and the bill simply accumulates
+// until the game connects (behaviour kept for saves that never reported).
+function site_available_funds($db,$owner,$world){
+ $key=site_wallet_key($owner,$world);
+ if(!isset($db['wallets'][$key]))return PHP_INT_MAX;
+ return max(0,(int)$db['wallets'][$key]['ceiling']-site_total($db,$owner,$world));
+}
+function site_pause(&$s,$reason){
+ if(empty($s['paused'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];$s['transfers']=[];}
+ $s['paused']=true;$s['pause_reason']=$reason;
+ $s['run_from']=0;$s['run_seconds']=0;$s['billed_seconds']=0;$s['credit']=0;
+ // `unpaid` stays for clients that predate `paused`: a paused site is not
+ // served either way and never accrues new rent.
+ $s['unpaid']=$reason!=='user';
+}
+function site_resume(&$s,$now){
+ $s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;
+ $s['run_from']=$now;$s['run_seconds']=0;$s['billed_seconds']=0;
+}
+// Accrue rent for every running site, once per request. Rent is continuous:
+// seconds since `run_from` are priced at the site's rate, minus prepaid seconds
+// in `credit`, and the difference against `billed_seconds` is what is due now.
+// Money comes from the shared cash ceiling of the owner+save, in publication
+// order, and never goes below zero: when it ends the site is paused and the
+// uncovered part is written off (site_settle_shortfall), so no debt appears.
 function site_reconcile(&$db,$now){
- $totals=[];foreach($db['sites']as $s){$key=site_wallet_key($s['owner'],$s['world']);$totals[$key]=($totals[$key]??0)+$s['total'];}
- foreach($db['sites']as &$s){if(empty($s['active'])||!empty($s['banned']))continue;$key=site_wallet_key($s['owner'],$s['world']);$ceiling=$db['wallets'][$key]['ceiling']??null;$price=site_period_price($s);
-  // Upgrade only future billing boundaries; never retroactively increase old bills.
-  if(!isset($s['recurring_from']))$s['recurring_from']=$s['billed_at']+max(1,(int)floor(($now-$s['billed_at'])/SITE_PERIOD)+1)*SITE_PERIOD;
-  if(!empty($s['unpaid'])){if($ceiling!==null&&$ceiling-$totals[$key]>=$price){$s['unpaid']=false;$s['total']+=$price;$totals[$key]+=$price;$s['billed_at']=$now;}continue;}
-  $n=max(0,intdiv($now-$s['billed_at'],SITE_PERIOD));if(!$n)continue;
-  $legacy=min($n,max(0,(int)ceil(($s['recurring_from']-$s['billed_at'])/SITE_PERIOD)-1));
-  $funds=$ceiling===null?PHP_INT_MAX:max(0,$ceiling-$totals[$key]);
-  $oldPaid=min($legacy,intdiv((int)$funds,SITE_PRICE));$funds-=$oldPaid*SITE_PRICE;
-  $newPaid=$oldPaid===$legacy?min($n-$legacy,intdiv((int)$funds,$price)):0;
-  $paid=$oldPaid+$newPaid;$cost=$oldPaid*SITE_PRICE+$newPaid*$price;
-  $s['total']+=$cost;$totals[$key]+=$cost;$s['billed_at']+=$paid*SITE_PERIOD;
-  if($paid<$n)site_suspend($s);
- }unset($s);
+ $db['wallets']=is_array($db['wallets']??null)?$db['wallets']:[];
+ foreach($db['sites']as &$s){
+  $s['active']=!empty($s['active']);$s['paused']=!empty($s['paused']);
+  $s['credit']=max(0,(int)($s['credit']??0));
+  $s['paid_seconds']=max(0,(int)($s['paid_seconds']??0));
+  $s['total']=max(0,(int)($s['total']??0));
+  $s['billed_seconds']=max(0,(int)($s['billed_seconds']??0));
+  $s['run_seconds']=max(0,(int)($s['run_seconds']??0));
+  if(!array_key_exists('run_from',$s)){
+   // Migrated record: rent used to be billed per completed period. Never
+   // invent retroactive debt and never grant free time: an active site starts
+   // a fresh run now, a site that was already unpaid stays paused.
+   unset($s['billed_at'],$s['recurring_from'],$s['window_used']);
+   $s['custom_paid']=site_custom_paid($s);
+   $s['run_from']=0;$s['run_seconds']=0;$s['billed_seconds']=0;
+   if($s['active']&&empty($s['banned'])&&empty($s['unpaid'])){$s['run_from']=$now;}
+   elseif(!empty($s['unpaid'])&&empty($s['banned'])){$s['paused']=true;$s['pause_reason']='legacy';}
+  }
+  if(!site_running($s)){if(!$s['active'])$s['run_from']=0;continue;}
+  if(site_local($s)){
+   // The game reports how many real seconds it actually served this site.
+   $elapsed=max(0,min(31536000,(int)($s['client_seconds']??0)));
+  }else{
+   if((int)$s['run_from']<=0)$s['run_from']=$now;
+   $elapsed=max(0,$now-(int)$s['run_from']);
+  }
+  $delta=$elapsed-(int)$s['run_seconds'];
+  if($delta<=0){$s['run_seconds']=$elapsed;continue;}
+  // Prepaid seconds are consumed before any cash is asked for.
+  $consume=min((int)$s['credit'],$delta);$s['credit']-=$consume;
+  $billable=(int)$s['billed_seconds']+($delta-$consume);
+  $rate=site_rate($s);
+  $want=site_cost($rate,$billable)-site_cost($rate,(int)$s['billed_seconds']);
+  if($want<=0){$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;$s['paid_seconds']+=$delta-$consume;continue;}
+  $owner=$s['owner'];$world=$s['world'];
+  $available=site_available_funds($db,$owner,$world);
+  if($want<=$available){
+   $s['total']+=$want;$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;$s['paid_seconds']+=$delta-$consume;
+   continue;
+  }
+  // Cash ended during this request: pay only what is known to exist, then pause.
+  $paySeconds=site_seconds_for($rate,$available);
+  $s['total']+=$available;$s['paid_seconds']+=$paySeconds;
+  site_pause($s,'dry');
+ }
+ unset($s);
+ // Fair share of the remaining cash, for the panel's "time left" estimate.
+ $running=[];foreach($db['sites']as $id=>$s)if(site_running($s))$running[$id]=$s;
+ foreach($running as $id=>$s){
+  $key=site_wallet_key($s['owner'],$s['world']);
+  if(!isset($db['wallets'][$key])){$db['sites'][$id]['runway']=0;$db['sites'][$id]['money_known']=false;continue;}
+  $peers=0;foreach($running as $other)if(site_wallet_key($other['owner'],$other['world'])===$key)$peers++;
+  $db['sites'][$id]['money_known']=true;
+  $db['sites'][$id]['runway']=site_seconds_for(site_rate($s),intdiv(site_available_funds($db,$s['owner'],$s['world']),max(1,$peers)));
+ }
+ return $db;
+}
+// Latest balance snapshot from the game: the ceiling of known cash for this
+// account+save. Repeated identical snapshots are harmless.
+// Merge the publications that the game hosts locally into the same wallet, so
+// their rent is deducted from the same money and shares the same ceiling.
+// `seconds` is the total served time reported by the game, not a price.
+function site_locals(&$db,$owner,$world,$entries,$now){
+ if(!is_array($entries)||count($entries)>16)return [];
+ $out=[];
+ foreach($entries as $entry){
+  if(!is_array($entry))continue;
+  $domain=strtolower(trim((string)($entry['domain']??'')));
+  if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$domain)||strlen($domain)>160||strpos($domain,'..')!==false)continue;
+  $seconds=$entry['seconds']??null;$rate=$entry['rate']??SITE_RATE_STANDARD;
+  if(!is_scalar($seconds)||!ctype_digit((string)$seconds)||(int)$seconds>31536000)continue;
+  $rate=(int)$rate===SITE_RATE_CUSTOM?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
+  $key=substr(hash_hmac('sha256',$domain,defined('SITE_DATA_DIR')?SITE_DATA_DIR:__DIR__),0,32);
+  $id=null;
+  foreach($db['sites']as $known=>$s)if($s['owner']===$owner&&$s['world']===$world&&site_local($s)&&$s['url']===$domain){$id=$known;break;}
+  if($id===null){
+   if(count($db['sites'])>=200)continue;
+   $clash=false;foreach($db['sites']as $s)if($s['url']===$domain)$clash=true;
+   if($clash)continue;
+   $id=(string)$db['next']++;
+   $db['sites'][$id]=['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'kind'=>'local','url'=>$domain,
+    'title'=>$domain,'description'=>'','keywords'=>'','visits'=>(int)($entry['visits']??0),'sessions'=>[],'transfers'=>[],
+    'total'=>0,'revision'=>1,'active'=>true,'paused'=>false,'pause_reason'=>'','unpaid'=>false,'banned'=>false,
+    'credit'=>0,'paid_seconds'=>0,'billed_seconds'=>0,'run_seconds'=>0,'client_seconds'=>0,'run_from'=>0,
+    'rate'=>$rate,'rate_locked'=>true,'custom_paid'=>$rate===SITE_RATE_CUSTOM,'host'=>0,'bytes'=>0,
+    'cpu_capacity'=>1000,'cpu_load'=>0,'host_mbps'=>5,'icon_data'=>'','icon_media'=>''];
+  }
+  $s=&$db['sites'][$id];
+  $s['rate']=$rate;$s['rate_locked']=true;$s['custom_paid']=$rate===SITE_RATE_CUSTOM;
+  // Absolute total reported by the game: max() keeps this idempotent.
+  $s['client_seconds']=max((int)($s['client_seconds']??0),max(0,(int)$seconds));
+  $s['visits']=max((int)$s['visits'],(int)($entry['visits']??0));
+  $out[$id]=$s['url'];
+  unset($s);
+ }
+ return $out;
 }
 function site_snapshot(&$db,$owner,$world,$balance,$settled){
  if(!is_scalar($balance)||!is_scalar($settled)||!ctype_digit((string)$balance)||!ctype_digit((string)$settled))site_fail('Invalid balance snapshot');
- $total=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$total+=$s['total'];
- if((float)$balance>9999999||(float)$settled>$total)site_fail('Invalid settled bill');
- $db['wallets'][site_wallet_key($owner,$world)]=['ceiling'=>(int)$balance+(int)$settled];
+ if((float)$balance>9999999)site_fail('Invalid balance snapshot');
+ $key=site_wallet_key($owner,$world);
+ // A save rollback can report more already-paid than the backend billed. Clamp
+ // it instead of rejecting the request: the known cash never exceeds the real
+ // balance plus what this backend has actually charged.
+ $settled=min((int)$settled,(int)site_total($db,$owner,$world));
+ $db['wallets'][$key]=['gen'=>(isset($db['wallets'][$key])?(int)$db['wallets'][$key]['gen']:0)+1,'ceiling'=>(int)$balance+$settled,'at'=>time()];
+ // Fresh money restarts sites that were only paused because the cash ran out.
+ // A site paused by its owner or by moderation stays stopped.
+ foreach($db['sites']as &$s){
+  if($s['owner']!==$owner||$s['world']!==$world||!$s['active']||!empty($s['banned'])||empty($s['paused']))continue;
+  if(($s['pause_reason']??'')!=='dry')continue;
+  if(site_available_funds($db,$owner,$world)>0)site_resume($s,time());
+ }
+ unset($s);
+ return $db;
 }
-function site_available_funds($db,$owner,$world){$key=site_wallet_key($owner,$world);if(!isset($db['wallets'][$key]))return PHP_INT_MAX;$total=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$total+=$s['total'];return max(0,$db['wallets'][$key]['ceiling']-$total);}
+// The player reported a balance and the bill is larger than the cash that is
+// known to exist: the game never goes negative, so the part that cannot be paid
+// is written off instead of becoming debt. Only already-paused sites lose
+// their uncovered part; running sites keep their bill.
+function site_settle_shortfall(&$db,$owner,$world){
+ $key=site_wallet_key($owner,$world);if(!isset($db['wallets'][$key]))return 0;
+ $ceiling=max(0,(int)$db['wallets'][$key]['ceiling']);
+ $over=site_total($db,$owner,$world)-$ceiling;
+ if($over<=0)return 0;
+ $written=0;
+ $ids=[];foreach($db['sites']as $id=>$s)if($s['owner']===$owner&&$s['world']===$world&&!empty($s['paused'])&&empty($s['banned']))$ids[]=$id;
+ rsort($ids);
+ foreach($ids as $id){
+  if($over<=0)break;
+  $cut=min($over,(int)$db['sites'][$id]['total']);
+  if($cut<=0)continue;
+  $db['sites'][$id]['total']-=$cut;$db['sites'][$id]['written_off']=(int)($db['sites'][$id]['written_off']??0)+$cut;
+  $over-=$cut;$written+=$cut;
+ }
+ return $written;
+}
+// Explicitly add money to the hosting wallet from the game balance.
+function site_topup(&$db,$owner,$world,$amount){
+ if(!is_scalar($amount)||!ctype_digit((string)$amount))site_fail('Invalid top-up');
+ $amount=(int)$amount;if($amount<1||$amount>10000000)site_fail('Invalid top-up');
+ $key=site_wallet_key($owner,$world);
+ if(!isset($db['wallets'][$key]))site_fail('Сначала синхронизируй баланс хостинга',409);
+ $db['wallets'][$key]['ceiling']=(int)$db['wallets'][$key]['ceiling']+$amount;
+ $db['wallets'][$key]['gen']=(int)$db['wallets'][$key]['gen']+1;
+ foreach($db['sites']as &$s){
+  if($s['owner']!==$owner||$s['world']!==$world||!$s['active']||!empty($s['banned'])||!$s['paused'])continue;
+  if($s['pause_reason']==='dry')site_resume($s,time());
+ }
+ unset($s);
+ return $amount;
+}
+// Prepay paid seconds with money already on the hosting wallet.
+function site_prepay(&$db,&$s,$seconds,$now){
+ $seconds=max(0,(int)$seconds);if($seconds===0)return 0;
+ $rate=site_rate($s);
+ $affordable=site_seconds_for($rate,site_available_funds($db,$s['owner'],$s['world']));
+ $buy=min($seconds,$affordable);
+ if($buy<=0)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
+ $price=max(1,site_cost($rate,$buy));
+ $s['credit']=(int)($s['credit']??0)+$buy;
+ $s['total']=(int)($s['total']??0)+$price;
+ return $price;
+}
+function site_bill(&$s,$now){ /* legacy hook: rent is continuous now */ }
+function site_suspend(&$s){site_pause($s,'dry');}
+function site_stop_host(&$db,$owner,$world,$host){foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world&&$s['host']===$host&&$s['active']){$s['active']=false;$s['paused']=false;$s['unpaid']=false;$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;$s['run_from']=0;$s['credit']=0;}unset($s);}
+function site_transfers(&$s,$now){$active=[];foreach($s['transfers']??[]as $k=>$v)if($v['at']>$now-30)$active[$k]=$v;$s['transfers']=$active;return count($active);}
+function site_online(&$s,$now){$active=[];foreach($s['sessions']??[]as $key=>$row)if($row['at']>$now-90)$active[$key]=$row;$s['sessions']=$active;return count($active);}
+function site_custom_paid($s){return array_key_exists('custom_paid',$s)?(bool)$s['custom_paid']:$s['url']!=='s'.$s['id'].'.sites.pcos';}
+function site_public(&$s,$now){
+ $online=site_online($s,$now);$paused=!empty($s['paused'])&&empty($s['banned']);
+ return ['id'=>$s['id'],'url'=>$s['url'],'title'=>$s['title'],'description'=>$s['description'],
+  'downloads'=>$s['downloads']??0,'transferring'=>site_transfers($s,$now),'visits'=>$s['visits'],'online'=>$online,
+  'active'=>(bool)$s['active'],'total'=>(int)$s['total'],'unpaid'=>!empty($s['unpaid'])||$paused,'paused'=>$paused,
+  'pause_reason'=>$paused?(string)($s['pause_reason']??''):'',
+  'paid_seconds'=>(int)($s['paid_seconds']??0),'credit'=>(int)($s['credit']??0),
+  'run_seconds'=>(int)($s['window_used']??0),'runway'=>(int)($s['runway']??0),'money_known'=>!empty($s['money_known']),
+  'price'=>site_period_price($s),'rate'=>site_rate($s),
+  'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'',
+  'cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,
+  'custom_paid'=>site_custom_paid($s),
+  'next_bill'=>(site_running($s)&&!empty($s['money_known']))?$now+(int)($s['runway']??0):0,
+  'host'=>$s['host'],'bytes'=>$s['bytes'],'revision'=>$s['revision'],'local'=>site_local($s),'domain'=>$s['url']];
+}
+function site_user($token,$usersFile){if(!is_string($token)||strlen($token)<32||strlen($token)>256)site_fail('Login required',401);$raw=@file_get_contents($usersFile);$users=json_decode($raw?:'[]',true);foreach(is_array($users)?$users:[]as $u)if(!empty($u['token'])&&hash_equals((string)$u['token'],$token)&&!empty($u['verified']))return (string)$u['id'];site_fail('Session expired',401);}
 function site_icon_data($doc){
  foreach($doc['assets']??[]as $a)if(($a['name']??'')===($doc['icon']??'')){
   $raw=base64_decode($a['data'],true);if(!$raw)return ['',''];$size=@getimagesizefromstring($raw);if(!$size)return ['',''];

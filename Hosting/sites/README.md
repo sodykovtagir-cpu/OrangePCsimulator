@@ -18,7 +18,17 @@ requires a signed five-minute ticket; online sessions expire after 90 seconds.
 The service is not a general file execution service or real DNS registrar.
 
 Tariff: $100 per 1800 real seconds, offline included; first period upfront;
-custom game URL +$1000 per 1800 seconds. Backend time controls the cumulative bill. Stopping
+custom game URL +$1000 once, then $1100 per 1800 seconds of hosting. Rent is
+computed per second (integer math), so a period boundary never rounds. The game
+sends its balance and already-paid total; the backend keeps the cash ceiling of
+that save and spends it offline. Money never goes below zero: when the known cash
+ends the site is paused (`paused`, `pause_reason=dry`) and keeps its domain,
+package and visits; the uncovered remainder is written off instead of becoming
+debt. `action=topup` moves money from the game balance to the hosting wallet and
+resumes a paused site. `action=local` registers a publication that stays in the
+player's save (billed by served seconds, never served over the network); its
+domain is reserved like any other, so a domain cannot be taken offline by another
+save. Stopping
 ends future charges; restart starts a new period. Publishing updates is
 idempotent for owner/save/publication key. Domains can be changed on the same
 publication without changing that key or restarting the active rent period.

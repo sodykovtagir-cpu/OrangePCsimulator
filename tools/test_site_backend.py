@@ -21,7 +21,9 @@ with tempfile.TemporaryDirectory() as td:
   return json.loads(p.stdout)
  world='1'*32;key='2'*32;doc={'format':'orange-site','version':1,'title':'Cool game','description':'Example site','keywords':'games','width':960,'height':600,'background':'#FFFFFF','viewportMode':'viewport','elements':[],'assets':[],'pages':[{'path':'/about','title':'About','width':960,'height':600,'background':'#FFFFFF','elements':[]}]}
  def publish(**overrides):
-  vals=dict(_token=token,world=world,key=key,url='www.mycoolsite.com',document=json.dumps(doc),confirm='100/1800/1000',host=123);vals.update(overrides);return call('publish',**vals)
+  # A known cash ceiling: money lives in the save, and the backend may only
+  # charge what the save reported.
+  vals=dict(_token=token,world=world,key=key,url='www.mycoolsite.com',document=json.dumps(doc),confirm='100/1800/1000',host=123,balance='100000',settled='0');vals.update(overrides);return call('publish',**vals)
  check(call('health')['service']=='orange-sites');check(call('list')['items']==[]);check(not publish(_token='')['ok']);check(not publish(confirm='free')['ok'])
  first=publish();check(first['ok']);check(first['charged']==1100 and first['total']==1100);check(first['owner']=='1');id=first['item']['id']
  doc['elements']=[{'id':'nav','kind':'button','actions':[{'command':'GoToPage','arguments':['/about']}]}]
@@ -38,17 +40,19 @@ with tempfile.TemporaryDirectory() as td:
  mine=call('stats',_token=token,world=world);check(mine['items'][0]['publication_key']==key);check(call('stats',_token=other,world=world)['items']==[]);check(not call('stop',_token=other,world=world,id=id)['ok'])
  # Simulate 61 real minutes offline without sleeping or accepting client time.
  lib=json.dumps(str(R/'Hosting/sites/lib.php'));state=json.dumps(str(data/'state.php'))
- script=f"require {lib};$s=site_read({state});foreach($s['sites']as &$x){{$x['billed_at']-=3660;$x['recurring_from']-=3660;}}unset($x);site_write({state},$s);"
+ script=f"require {lib};$s=site_read({state});foreach($s['sites']as &$x){{if(!empty($x['active']))$x['run_from']-=3660;}}unset($x);site_write({state},$s);"
  subprocess.run(['php','-r',script],check=True)
- check(call('stats',_token=token,world=world)['total']==3300)
- check(call('stats',_token=token,world=world)['total']==3300)
+ # Continuous seconds: first $1100 buys 1800 s of hosting, the next 1860 s cost
+ # $1100*1860/1800 = $1136 (long offline runs are no longer a period jump).
+ offline=call('stats',_token=token,world=world);check(abs(offline['total']-(1100+1136))<=2)
+ check(call('stats',_token=token,world=world)['total']==offline['total'])
  check(not call('stop',_token=token,world='9'*32,id=id)['ok'])
  stopped=call('stop',_token=token,world=world,id=id);check(stopped['ok']and not stopped['item']['active']and stopped['item']['online']==0 and stopped['item']['next_bill']==0)
- check(call('stop',_token=token,world=world,id=id)['total']==3300)
+ check(call('stop',_token=token,world=world,id=id)['total']==offline['total'])
  check(call('list')['items']==[]);check(not call('view',url='www.mycoolsite.com/about')['ok'])
  check(not call('visit',id=id,ticket=ticket,session=session)['ok'])
  subprocess.run(['php','-r',script],check=True) # elapsed time while stopped does not accrue rent
- check(call('stats',_token=token,world=world)['total']==3300)
+ check(call('stats',_token=token,world=world)['total']==offline['total'])
  check(publish()['charged']==1100)
  check(not call('visit',id=id,ticket=ticket,session=session)['ok']) # pre-stop ticket stays invalid after restart
  fresh=call('view',url='www.mycoolsite.com');check(call('visit',id=id,ticket=fresh['ticket'],session=session)['ok'])
@@ -62,7 +66,9 @@ with tempfile.TemporaryDirectory() as td:
  # without losing the publication, pages, visit count or paid rent period.
  key2='7'*32;free=publish(key=key2,url='');id2=free['item']['id'];check(free['charged']==100 and not free['item']['custom_paid']);nextbill=free['item']['next_bill']
  origin=free['item']['url'];seen=call('view',url=origin+'/about');check(call('visit',id=id2,ticket=seen['ticket'],session='8'*32)['ok'])
- change=publish(key=key2,url='new-domain.com');check(change['charged']==1000 and change['item']['id']==id2 and change['item']['custom_paid'] and change['item']['next_bill']==nextbill and change['item']['visits']==1 and change['item']['online']==0)
+ change=publish(key=key2,url='new-domain.com');check(change['charged']==1000 and change['item']['id']==id2 and change['item']['custom_paid'] and change['item']['visits']==1 and change['item']['online']==0)
+ # The estimated runway is money/rate for the new custom price, not the old one.
+ check(change['item']['next_bill']>0 and change['item']['money_known'])
  check(not call('view',url=origin+'/about')['ok']);check(not call('visit',id=id2,ticket=seen['ticket'],session='8'*32)['ok'])
  check(json.loads(call('view',url='new-domain.com/about')['document'])['pages'][0]['path']=='/about')
  change=publish(key=key2,url='second-domain.com');check(change['charged']==0 and change['item']['id']==id2 and change['item']['visits']==1)
@@ -78,4 +84,4 @@ with tempfile.TemporaryDirectory() as td:
  # The private storage file is valid non-executable PHP even if titles contain
  # PHP tags. It returns no JSON or secrets when requested/executed directly.
  p=subprocess.run(['php',str(data/'state.php')],capture_output=True,check=True);check(p.stdout==b'')
- print('PASS:',checks,'real PHP API checks: authentication/isolation, publication, routes, URL reservation, idempotent tariff, offline UTC billing, visits/online/leave, stop/restart, validation and private storage')
+ print('PASS:',checks,'real PHP API checks: authentication/isolation, publication, routes, URL reservation, idempotent tariff, per-second offline billing, visits/online/leave, stop/restart, validation and private storage')

@@ -20,7 +20,7 @@ class LifecycleTest {
  Check(SiteHostingService.PublicationCost(new HostedSite{id=3,active=true,url="s3.sites.pcos",custom_paid=false},"custom.com")==1000);
  Check(SiteHostingService.PublicationCost(new HostedSite{id=3,active=true,url="custom.com",custom_paid=true},"another.com")==0);
  // Renaming publishes the same key; no client-side immutable-domain rejection.
- service.Publish(doc.ToJson(),"candidate.com",123,message=>{});Check(calls[calls.Count-1]=="publish"&&args["key"]==doc.hostingKey&&args["url"]=="candidate.com");var renamed=Reply();renamed.items[1].url="candidate.com";renamed.item=renamed.items[1];answer(renamed);Check(service.Items[1].url=="candidate.com"&&service.Items[1].id==2);
+ service.Publish(doc.ToJson(),"candidate.com",123,true,"pass",123,message=>{});Check(calls[calls.Count-1]=="publish"&&args["key"]==doc.hostingKey&&args["url"]=="candidate.com");var renamed=Reply();renamed.items[1].url="candidate.com";renamed.item=renamed.items[1];answer(renamed);Check(service.Items[1].url=="candidate.com"&&service.Items[1].id==2);
  // A stop click with an empty UI list waits for stats and resolves by the
  // current project's stable publication key, never silently returns.
  var emptyEditor=new SiteEditor();Set(emptyEditor,"project",new SiteHistory(doc));Set(emptyEditor,"hostedSites",new Dropdown());Set(emptyEditor,"hostURL",new InputField());Set(emptyEditor,"hostingStats",new Text());Call(emptyEditor,"StopHostedSite");Check(calls[calls.Count-1]=="stats");answer(renamed);Check(calls[calls.Count-1]=="stop"&&args["id"]=="2");answer(Reply(true));

@@ -5,6 +5,8 @@ if(($_SERVER['REQUEST_METHOD']??'')==='OPTIONS'){http_response_code(204);exit;}
 require_once __DIR__.'/lib.php';
 $dir=defined('SITE_DATA_DIR')?SITE_DATA_DIR:__DIR__.'/data';$users=defined('SITE_USERS_FILE')?SITE_USERS_FILE:dirname(__DIR__).'/workshop/users.json';
 $lock=null;
+function site_owned_local($db,$owner,$world){$n=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world&&site_local($s))$n++;return $n;}
+
 try{
  if(($_SERVER['CONTENT_LENGTH']??0)>33554432)site_fail('Request too large',413);
  if(!is_dir($dir)&&!mkdir($dir,0755,true))site_fail('Storage unavailable',503);
@@ -15,19 +17,27 @@ try{
  foreach($db['rates']as $k=>$rate)if($rate[0]<$bucket)unset($db['rates'][$k]);
  $rate=$db['rates'][$rateKey]??[$bucket,0];if(++$rate[1]>180)site_fail('Rate limited',429);$db['rates'][$rateKey]=$rate;
  $db['wallets']=$db['wallets']??[];
- if(in_array($action,['publish','stats','stop','host_stop'],true)){
+ if(in_array($action,['publish','stats','stop','host_stop','topup','local'],true)){
   $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
+  $snapshot=false;
   if(isset($_POST['balance'])){
+   $snapshot=true;
    $settled=$_POST['settled']??null;
    if($settled===null){$ledger=json_decode($_POST['ledgers']??'{}',true);$settled=0;if(is_array($ledger)&&is_array($ledger['items']??null)&&count($ledger['items'])<=1000)foreach($ledger['items']as $entry)if(is_array($entry)&&($entry['owner']??'')===$owner)$settled=$entry['charged']??0;}
    site_snapshot($db,$owner,$world,$_POST['balance'],$settled);
   }
+  // Locally hosted publications (kept in the game save): merged into the same
+  // wallet so their rent is deducted from the same money. Nothing is served.
+  if(isset($_POST['locals'])){try{site_locals($db,$owner,$world,json_decode($_POST['locals'],true),$now);}catch(Throwable $e){}}
   $profiles=json_decode($_POST['hosts']??'{}',true);$profiles=is_array($profiles)?($profiles['items']??[]):[];
   if(is_array($profiles)&&count($profiles)<=200)foreach($profiles as $profile)if(is_array($profile))foreach($db['sites']as &$site)if($site['owner']===$owner&&$site['world']===$world&&$site['host']==($profile['host']??null)){
    foreach(['cpu_capacity'=>[100,1000000],'cpu_load'=>[0,1],'host_mbps'=>[.02,10000]]as $field=>$range){$v=$profile[$field]??null;if(is_numeric($v)&&is_finite((float)$v))$site[$field]=max($range[0],min($range[1],(float)$v));}
   }unset($site);
  }
  site_reconcile($db,$now);
+ // The game balance is the ceiling of real money: anything above it can never
+ // be collected, so it is written off here instead of becoming debt.
+ if(!empty($snapshot))site_settle_shortfall($db,$owner,$world);
  if(isset($owner,$world)){
   $off=explode(',',$_POST['stopped_hosts']??'');if($action==='host_stop')$off[]=$_POST['host']??'';
   foreach(array_slice($off,0,200)as $host)if(ctype_digit((string)$host))site_stop_host($db,$owner,$world,(int)$host);
@@ -45,7 +55,11 @@ try{
   }
   if(!isset($db['sites'][$id])||(!$db['sites'][$id]['active']&&empty($db['sites'][$id]['banned'])))site_fail('Site unavailable',404);$s=&$db['sites'][$id];
   if($action==='view'||$action==='info'){
-   $out['item']=site_public($s,$now);if($action==='view'&&empty($s['unpaid'])&&empty($s['banned'])){$package=site_read($dir.'/p_'.$id.'.php');$out['document']=$package['document'];}
+   $out['item']=site_public($s,$now);
+   // A locally hosted site has no package on this web host: it is only visible
+   // in its owner's save and can never be served from here.
+   if(site_local($s))site_fail('Site unavailable',404);
+   if($action==='view'&&empty($s['unpaid'])&&empty($s['banned'])){$package=site_read($dir.'/p_'.$id.'.php');$out['document']=$package['document'];if(!isset($out['document']))site_fail('Site unavailable',404);}
    $nonce=bin2hex(random_bytes(16));$ticket=$nonce.'.'.($now+300);$out['ticket']=$ticket.'.'.hash_hmac('sha256',$id.'|'.($s['access_epoch']??0).'|'.$ticket,$db['secret']);
   }else{
    if(!empty($s['banned']))site_fail('Сайт заблокирован администрацией',403);
@@ -73,7 +87,7 @@ try{
    }
   }unset($s);
  }
- elseif(in_array($action,['publish','stats','stop','host_stop'],true)){
+ elseif(in_array($action,['publish','stats','stop','host_stop','topup','local'],true)){
   $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$out['owner']=$owner;$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
   if($action==='publish'){
    $key=$_POST['key']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$key))site_fail('Invalid publication identity');$raw=$_POST['document']??'';$doc=site_validate($raw);
@@ -86,20 +100,87 @@ try{
    foreach($db['sites']as $k=>$site)if((string)$k!==$id&&$site['url']===$url)site_fail('URL already taken',409);
    $custom=$url!=='s'.$id.'.sites.pcos';$fresh=!$old||!$old['active']||!empty($old['unpaid']);
    $paid=$old?site_custom_paid($old):false;
-   $cost=($fresh?SITE_PRICE+($custom?SITE_CUSTOM_PRICE:0):($custom&&$old['url']==='s'.$id.'.sites.pcos'?SITE_CUSTOM_PRICE:0));
+   // A fresh or restarted publication prepays one period of hosting as seconds:
+   // $100 / 1800 s, or $1100 / 1800 s with a custom domain (the custom rate
+   // includes the one-time $1000 domain fee, exactly as before). Converting an
+   // already paid publication to a custom domain charges the fee once.
+   $rate=($custom?SITE_RATE_CUSTOM:SITE_RATE_STANDARD);
+   $period=$fresh?$rate:0;
+   $custom_fee=(!$fresh&&$custom&&(!$paid||$old['url']==='s'.$id.'.sites.pcos'))?SITE_CUSTOM_PRICE:0;
+   $cost=$period+$custom_fee;
    // The exact fixed tariff must be confirmed; the client cannot submit price,
    // paid-until timestamps or a negative charge.
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
    if(site_available_funds($db,$owner,$world)<$cost)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
    $s=$old?:['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'visits'=>0,'sessions'=>[],'total'=>0,'revision'=>0];
    if($old&&$old['url']!==$url){$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
-   $s['custom_paid']=$paid||$custom;$s['unpaid']=false;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
-   $s['total']+=$cost;$s['active']=true;if($fresh){$s['billed_at']=$now;$s['recurring_from']=$now;}$s['url']=$url;$s['title']=$doc['title'];$s['description']=$doc['description']??'';$s['keywords']=$doc['keywords']??'';$s['bytes']=strlen($raw);$s['host']=(int)($_POST['host']??0);$s['revision']++;
-   site_write($dir.'/p_'.$id.'.php',['document'=>$raw]);$db['sites'][$id]=$s;$out['item']=site_public($db['sites'][$id],$now);$out['charged']=$cost;
+   $s['custom_paid']=$paid||$custom;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
+   $s['active']=true;$s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;
+   // A fresh publication prepays one period of seconds; an update only adds the
+   // one-time custom-domain fee (if the domain was upgraded just now).
+   if($fresh){
+    $s['run_from']=$now;$s['billed_seconds']=0;$s['window_used']=0;$s['credit']=SITE_PERIOD;
+    $s['total']+=$cost;
+   }else{
+    $s['total']+=$custom_fee;
+   }$s['url']=$url;$s['title']=$doc['title'];$s['description']=$doc['description']??'';$s['keywords']=$doc['keywords']??'';$s['bytes']=strlen($raw);$s['host']=(int)($_POST['host']??0);$s['revision']++;
+   site_write($dir.'/p_'.$id.'.php',['document'=>$raw]);$db['sites'][$id]=$s;$out['charged']=$cost;$published_id=$id;
   }
-  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['unpaid']=false;$db['sites'][$id]['sessions']=[];$db['sites'][$id]['transfers']=[];$db['sites'][$id]['access_epoch']=($db['sites'][$id]['access_epoch']??0)+1;$out['item']=site_public($db['sites'][$id],$now);}
+  // Local hosting: register or update a site that stays on the player's disk.
+  // `action=local` never stores a package on the web host.
+  if($action==='local'){
+   $domain=strtolower(trim($_POST['url']??''));$domain=preg_replace('~^https?://~','',$domain);$domain=rtrim($domain,'/');
+   if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$domain)||strlen($domain)>160||strpos($domain,'..')!==false)site_fail('Invalid game URL');
+   $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);
+   if(in_array($domain,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$domain))site_fail('Reserved URL',409);
+   foreach($db['sites']as $known=>$site)if($site['url']===$domain&&!($site['owner']===$owner&&$site['world']===$world&&site_local($site)))site_fail('URL already taken',409);
+   if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
+   $custom=!preg_match('~^local\.~',$domain);
+   $rate=$custom?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
+   $found=null;foreach($db['sites']as $known=>$site)if($site['owner']===$owner&&$site['world']===$world&&site_local($site)&&$site['url']===$domain){$found=(string)$known;break;}
+   $fresh=$found===null||empty($db['sites'][$found]['active'])||!empty($db['sites'][$found]['unpaid']);
+   $cost=$fresh?$rate:0;
+   if(site_available_funds($db,$owner,$world)<$cost)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
+   if($fresh&&site_owned_local($db,$owner,$world)>=16)site_fail('16 publications per account maximum',409);
+   if($found===null){
+    if(count($db['sites'])>=200)site_fail('Host full',503);
+    $found=(string)$db['next']++;
+    $db['sites'][$found]=['id'=>(int)$found,'owner'=>$owner,'world'=>$world,'key'=>substr(hash_hmac('sha256',$domain,defined('SITE_DATA_DIR')?SITE_DATA_DIR:__DIR__),0,32),
+     'kind'=>'local','url'=>$domain,'title'=>$domain,'description'=>'','keywords'=>'','visits'=>0,'sessions'=>[],'transfers'=>[],
+     'total'=>0,'revision'=>1,'banned'=>false,'banned_reason'=>'','credit'=>0,'paid_seconds'=>0,'billed_seconds'=>0,
+     'run_seconds'=>0,'client_seconds'=>0,'run_from'=>0,'host'=>0,'bytes'=>0,'cpu_capacity'=>1000,'cpu_load'=>0,'host_mbps'=>5,'icon_data'=>'','icon_media'=>''];
+   }
+   $s=&$db['sites'][$found];
+   $s['rate']=$rate;$s['rate_locked']=true;$s['custom_paid']=$custom;
+   // Absolute served total; a repeated request never doubles the rent.
+   $s['client_seconds']=max((int)($s['client_seconds']??0),max(0,(int)($_POST['seconds']??0)));
+   $title=trim((string)($_POST['title']??$domain));if(!is_string($title))$title=$domain;$s['title']=substr($title,0,120);
+   $s['visits']=max((int)$s['visits'],(int)($_POST['visits']??0));
+   if($fresh){$s['active']=true;$s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;$s['run_from']=0;$s['billed_seconds']=0;$s['run_seconds']=0;$s['total']+=$cost;$s['credit']=SITE_PERIOD;}
+   $s['revision']=(int)$s['revision']+1;
+   $published_id=$found;$out['charged']=$cost;
+   unset($s);
+  }
+  if($action==='stop'){$id=(string)($_POST['id']??'');if(!isset($db['sites'][$id])||$db['sites'][$id]['owner']!==$owner||$db['sites'][$id]['world']!==$world)site_fail('Not your publication',403);$db['sites'][$id]['active']=false;$db['sites'][$id]['unpaid']=false;$db['sites'][$id]['paused']=false;$db['sites'][$id]['pause_reason']='';$db['sites'][$id]['run_from']=0;$db['sites'][$id]['credit']=0;$db['sites'][$id]['sessions']=[];$db['sites'][$id]['transfers']=[];$db['sites'][$id]['access_epoch']=($db['sites'][$id]['access_epoch']??0)+1;$out['item']=site_public($db['sites'][$id],$now);}
+  // Explicit top-up: move money from the game balance to the hosting wallet so
+  // rent can keep running while the player is offline. The client sends the new
+  // balance snapshot together with the amount; the amount is added to the
+  // ceiling, so it is charged from the game exactly once.
+  if($action==='topup'){
+   $amount=$_POST['amount']??'';site_topup($db,$owner,$world,$amount);
+   $out['charged']=(int)$amount;$out['balance']=$_POST['balance']??null;
+  }
+  // Re-evaluate runway/pause flags after this request's mutation, so a fresh
+  // publication already reports its "time left" without waiting for a poll.
+  site_reconcile($db,$now);
   $out['items']=[];$out['total']=0;
   foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world){$private=site_public($s,$now);$private['publication_key']=$s['key'];$out['items'][]=$private;$out['total']+=$s['total'];}unset($s);
+  // The published publication is reported with its post-reconcile state.
+  if($action==='publish'&&isset($published_id)&&isset($db['sites'][$published_id])){$item=site_public($db['sites'][$published_id],$now);$item['publication_key']=$db['sites'][$published_id]['key'];$out['item']=$item;}
+  $wallet=$db['wallets'][site_wallet_key($owner,$world)]??null;
+  // `available` is the known cash left for this save; null means "not synced
+  // yet" (money lives in the game save, the backend cannot see it).
+  $out['wallet']=['known'=>$wallet!==null,'ceiling'=>$wallet!==null?(int)$wallet['ceiling']:0,'spent'=>(int)$out['total'],'available'=>$wallet!==null?site_available_funds($db,$owner,$world):0];
  }
  else site_fail('Unknown action',404);
  site_write($dir.'/state.php',$db);flock($lock,LOCK_UN);fclose($lock);$lock=null;echo json_encode($out,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);

@@ -2,6 +2,22 @@
 
 ## Added
 
+### Site hosting — per-second rent, money from the save, pause instead of debt
+
+- Rent is charged per second: $100 per 1800 real seconds, $1100 with a custom domain (same prices, no per-period jump; three offline days cost three days). A fresh publication still prepays one period.
+
+- The game reports its balance and the already-paid total; the backend keeps a cash ceiling and spends it offline too. When the money ends the site is **paused** (domain, package, visits and history stay). No negative balance and no debt: the backend never charges more than the save actually holds.
+
+- Reconciliation on connect: online the client pays the difference once and saves; offline the panel shows the last known state and the estimated time left, and the difference is settled on the next connection. Repeated or lost requests never charge twice.
+
+- **Top up +$100** moves money from the game balance into the hosting wallet and resumes a dry site; a refused request returns the money.
+
+- The hosting panel gained a domain-kind dropdown: generated address, custom domain (one-time $1000), or **local hosting in the save**.
+
+- Local hosting keeps the `.osite` on the player's disk but still bills its served time from the same balance. Publishing a new domain needs the internet (so two saves can never claim one address); enabling an already reserved domain works offline.
+
+- Backend: `lib.php` rewritten with integer per-second billing, `credit`/`billed_seconds`/`runway`, pause-on-dry and safe migration; `api.php` gained `action=local`, `action=topup` and a `wallet` block in `stats`. New tests: `tools/test_site_hosting_seconds.py`, `tools/tests/site_hosting_billing_tests.cs`; updated backend suites.
+
 ### Grid mode (Orange Grid)
 
 - A visible birch grid. When the mode is on, it lies on the surface under the crosshair (floor, wall, table) and highlights the cell the part will land in. Before this, the grid only snapped the part and was invisible.

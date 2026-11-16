@@ -35,18 +35,30 @@ with tempfile.TemporaryDirectory()as td:
  php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)foreach($s['transfers']??[]as $k=>$v)$s['transfers'][$k]['at']-=31;unset($s);site_write({state},$db);")
  check(call('info',url='custom.com')['item']['transferring']==0)
  check(call('info',url='custom.com')['item']['downloads']==2)
- def advance(seconds):php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)if($s['active']){{$s['billed_at']-={seconds};$s['recurring_from']-={seconds};}}unset($s);site_write({state},$db);")
- advance(3660);check(call('stats',_token=token,world=world)['total']==3300)
- call('stats',_token=token,world=world,balance='0',settled='3300');advance(1800)
+ def advance(seconds):php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)if(!empty($s['active'])){{$s['run_from']-={seconds};}}unset($s);site_write({state},$db);")
+ # Continuous per-second rent: $1100 for the first 1800 s, then $1100*1860/1800.
+ advance(3660);first=call('stats',_token=token,world=world)['total'];check(abs(first-(1100+1136))<=2)
+ call('stats',_token=token,world=world,balance='0',settled=str(first));advance(1800)
  unpaid=call('view',url='custom.com/about');check(unpaid['ok']and unpaid['item']['unpaid']and 'document'not in unpaid)
- check(not call('transfer',id=id,ticket=ticket,file='test.txt')['ok']);check(call('stats',_token=token,world=world)['total']==3300)
- advance(86400);check(call('stats',_token=token,world=world)['total']==3300)
- funded=call('stats',_token=token,world=world,balance='1200',settled='3300');check(funded['total']==4400 and not funded['items'][0]['unpaid'])
- check(call('view',url='custom.com')['document']);ledger=json.dumps({'items':[{'owner':'1','charged':4400},{'owner':'another-owner','charged':999999}]});snap=call('stats',_token=token,world=world,balance='100',ledgers=ledger);check(snap['total']==4400);advance(3660);check(call('stats',_token=token,world=world)['total']==4400);check(call('view',url='custom.com')['item']['unpaid'])
- check(not publish(key='3'*32,url='expensive.com',balance='0',settled='4400')['ok'])
+ check(not call('transfer',id=id,ticket=ticket,file='test.txt')['ok']);check(call('stats',_token=token,world=world)['total']==first)
+ # Nothing is charged while paused: a day offline does not create debt.
+ advance(86400);check(call('stats',_token=token,world=world)['total']==first)
+ # New money restarts the paused site with a fresh run.
+ funded=call('stats',_token=token,world=world,balance='1200',settled=str(first));check(not funded['items'][0]['unpaid'] and not funded['items'][0]['paused'])
+ check(call('view',url='custom.com')['document']);total_now=call('stats',_token=token,world=world)['total'];ledger=json.dumps({'items':[{'owner':'1','charged':total_now},{'owner':'another-owner','charged':999999}]});snap=call('stats',_token=token,world=world,balance='100',ledgers=ledger);check(snap['total']==total_now)
+ # Only $100 of real money is left, so only $100 can ever be charged: the site
+ # runs out of paid time and pauses, and the total never exceeds the ceiling.
+ advance(3660);after=call('stats',_token=token,world=world);check(after['total']<=total_now+100);check(call('view',url='custom.com')['item']['unpaid'])
+ advance(86400);again=call('stats',_token=token,world=world);check(again['total']==after['total'])
+ check(not publish(key='3'*32,url='expensive.com',balance='0',settled=str(total_now))['ok'])
  # One shared snapshot cannot fund an unlimited number of simultaneous sites.
  w2='4'*32;p2=publish(world=w2,key='5'*32,url='',balance='200',settled='0');p3=publish(world=w2,key='6'*32,url='',balance='100',settled='100');check(p2['ok']and p3['ok']);advance(1800)
- shared=call('stats',_token=token,world=w2);check(shared['total']==200 and all(s['unpaid']for s in shared['items']))
+ # Two sites share one $200 ceiling: together they can never bill more than $200.
+ shared=call('stats',_token=token,world=w2);check(shared['total']<=200 and len(shared['items'])==2)
+ # The $200 ceiling is shared, not cloned: both sites together billed exactly
+ # $200 and the next second of rent pauses them instead of creating debt.
+ check(shared['total']==200 and shared['wallet']['available']==0)
+ advance(60);dry=call('stats',_token=token,world=w2);check(dry['total']==200 and all(s['unpaid'] for s in dry['items']))
  # A physical PC stop affects all of its own publications, never another host/save/account.
  check(not call('host_stop',world=w2,host=123)['ok'])
  check(call('host_stop',_token=token,world='9'*32,host=123)['items']==[])
@@ -55,7 +67,12 @@ with tempfile.TemporaryDirectory()as td:
  check(publish(world=w2,key='5'*32,url='',balance='100',settled='200')['charged']==100)
  retried=call('stats',_token=token,world=w2,stopped_hosts='123');check(all(not s['active'] for s in retried['items']))
  # Version migration: old overdue boundaries stay $100, next boundary costs $1100.
- code=f"require {lib};$now=time();$s=['id'=>88,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'total'=>1100,'billed_at'=>$now-3660];$db=['sites'=>[$s]];site_reconcile($db,$now);if($db['sites'][0]['total']!==1300)exit(2);site_reconcile($db,$now+1800);if($db['sites'][0]['total']!==2400)exit(3);echo 'ok';"
+ # Migration: a record written by the per-period backend must not get
+ # retroactive debt nor free time; it starts a fresh continuous run.
+ code=f"require {lib};$now=time();$s=['id'=>88,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'total'=>1100,'billed_at'=>$now-3660,'recurring_from'=>$now-3660];$db=['sites'=>[88=>$s]];site_reconcile($db,$now);if($db['sites'][88]['total']!==1100)exit(2);if(!isset($db['sites'][88]['run_from'])||isset($db['sites'][88]['billed_at']))exit(3);site_reconcile($db,$now+1800);if($db['sites'][88]['total']!==2200)exit(4);echo 'ok';"
+ check(php(code)=='ok')
+ # A paused legacy record stays paused and never accrues rent.
+ code=f"require {lib};$now=time();$s=['id'=>89,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'unpaid'=>true,'total'=>900,'billed_at'=>$now-9999];$db=['sites'=>[89=>$s]];site_reconcile($db,$now+86400);if($db['sites'][89]['total']!==900||empty($db['sites'][89]['paused']))exit(5);echo 'ok';"
  check(php(code)=='ok')
  # Execute the real admin controller with a synthetic authenticated session.
  # Wrong CSRF must not change the stored site. No real password/account is used.
@@ -72,4 +89,4 @@ with tempfile.TemporaryDirectory()as td:
  check(not call('transfer',id=id,ticket=ticket,file='test.txt')['ok'])
  admin_action('expected','site_unban');check(not call('view',url='custom.com')['ok']);stats=call('stats',_token=token,world=world);check(not stats['items'][0]['banned']and not stats['items'][0]['active'])
  adminlib=json.dumps(str(workshop/'sites_admin.php'));out=php(f"require {adminlib};echo 'not protected';");check(out=='')
- print('PASS:',checks,'real PHP followup checks: metadata/icons, transfer activity/expiry, host stop/isolation/retry, tariff migration, shared money snapshot, offline unpaid suspension/resume, no unpaid debt, CSRF-gated admin ban/unban and no rename bypass')
+ print('PASS:',checks,'real PHP followup checks: metadata/icons, transfer activity/expiry, host stop/isolation/retry, per-second billing migration, shared money ceiling, offline pause/resume, no debt, CSRF-gated admin ban/unban and no rename bypass')

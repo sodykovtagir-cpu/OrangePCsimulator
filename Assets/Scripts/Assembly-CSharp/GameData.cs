@@ -5,6 +5,10 @@ public class GameData
 {
     public string siteHostingWorld;
     public System.Collections.Generic.List<PC.Component.Software.Sites.SiteHostingLedger> siteHostingLedger;
+    // Locally hosted sites (package lives on the player's disk) and the hosting
+    // wallet bookkeeping: served seconds already reported to the backend.
+    public System.Collections.Generic.List<PC.Component.Software.Sites.LocalHostedSite> siteHostingLocals;
+    public PC.Component.Software.Sites.SiteHostingWallet siteHostingWallet;
 	public string version;
 
 	public string roomName;

@@ -15,7 +15,7 @@ namespace PC.Component.Networking {
   public static InternetService Instance;public int transfers;public float transferDelay;
   public bool CanOpenLocalPanel(object board,out RouterDevice router){router=null;return true;}
   public bool TryTransfer(object board,string url,float mb,out float delay,out string error){transfers++;delay=transferDelay;error=null;return true;}
-  public void SignalTraffic(object board){}public ConnectionStatus Status(object board){return new ConnectionStatus();}
+  public void SignalTraffic(object board){}public void SignalTraffic(){}public ConnectionStatus Status(object board){return new ConnectionStatus();}
  }
 }
 namespace PC.Component.Software {
