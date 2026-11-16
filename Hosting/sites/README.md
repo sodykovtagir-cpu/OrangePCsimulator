@@ -17,29 +17,14 @@ serialized through the lock and files use temporary-write + rename. A visit
 requires a signed five-minute ticket; online sessions expire after 90 seconds.
 The service is not a general file execution service or real DNS registrar.
 
-Tariff: $100 per 1800 real seconds, offline included; first period upfront;
-custom game URL +$1000 once, then $1100 per 1800 seconds of hosting. Rent is
-computed per second (integer math), so a period boundary never rounds. The game
-sends its balance and already-paid total; the backend keeps the cash ceiling of
-that save and spends it offline. Money never goes below zero: when the known cash
-ends the site is paused (`paused`, `pause_reason=dry`) and keeps its domain,
-package and visits; the uncovered remainder is written off instead of becoming
-debt. `action=topup` moves money from the game balance to the hosting wallet and
-resumes a paused site. `action=local` registers a publication that stays in the
-player's save (billed by served seconds, never served over the network); its
-domain is reserved like any other, so a domain cannot be taken offline by another
-save. Stopping
-ends future charges; restart starts a new period. Publishing updates is
-idempotent for owner/save/publication key. Domains can be changed on the same
-publication without changing that key or restarting the active rent period.
-The custom-domain setup fee is charged only once per publication; existing
-custom-domain records are treated as paid. Stops and domain changes revoke
-old visit tickets, clear online sessions and invalidate the old address.
-Stopped sites report next_bill=0, stay out of public search and cannot be viewed
-or visited. A restart still charges one new first period. Up to 16 publications/account and
-200 on this shared installation. These safety limits are not hardware quotas.
-The money balance lives in the game save, not the backend: this is not an
-anti-cheat payment system. See `docs/SITES_EDITOR_RU.md` for settlement details.
+Tariff (v3, wallet model): publishing is free. Rent is $100 per 1800 real
+seconds of hosting ($1100 with a custom domain, +$1000 once for the domain) and
+is paid **only** from the hosting wallet, never from the game balance: the
+wallet is filled exclusively by `action=topup`. On top of the base rent there is
+a traffic surcharge of $20 per 1800 seconds of real serving — the seconds a
+browser session or a download was open. An empty wallet pauses the site without
+creating debt; served time is counted per second, idempotently, and a repeated
+or lost request never bills the same second twice.
 
 Health request: POST `action=health` to `/sites/api.php?i=1`. Expected JSON:
 `ok=true, service=orange-sites, version=1, available=true`. Byethost's browser

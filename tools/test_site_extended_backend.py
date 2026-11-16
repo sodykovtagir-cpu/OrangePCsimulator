@@ -12,7 +12,10 @@ with tempfile.TemporaryDirectory()as td:
  runner=t/'api-runner.php';runner.write_text("<?php $_POST=json_decode(stream_get_contents(STDIN),true);$_SERVER['REQUEST_METHOD']='POST';$_SERVER['REMOTE_ADDR']='127.0.0.1';$_SERVER['HTTP_X_AUTH_TOKEN']=$_POST['_token']??'';require "+json.dumps(str(sites/'api.php'))+";")
  def check(v):
   global checks
-  checks+=1;assert v,checks
+  checks+=1
+  if not v:
+   import inspect
+   raise AssertionError('%d at %s'%(checks,inspect.stack()[1].lineno))
  def call(action,**v):
   p=subprocess.run(['php',str(runner)],input=json.dumps(dict(action=action,**v)),text=True,capture_output=True,check=True);assert not p.stderr,p.stderr;return json.loads(p.stdout)
  def php(code):
@@ -20,7 +23,9 @@ with tempfile.TemporaryDirectory()as td:
  doc={'format':'orange-site','version':1,'title':'Custom title','width':960,'height':600,'background':'#FFFFFF','icon':'icon.png','elements':[],'pages':[{'path':'/about','title':'About','elements':[]}],'assets':[{'name':'icon.png','media':'image/png','data':'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jQ9sAAAAASUVORK5CYII='},{'name':'test.txt','media':'application/x-pcos-file','data':base64.b64encode(b'hello').decode()}]}
  def publish(**v):
   values=dict(_token=token,world=world,key=key,url='custom.com',document=json.dumps(doc),confirm='100/1800/1000',host=123);values.update(v);return call('publish',**values)
- first=publish(balance='4100',settled='0');check(first['ok']and first['total']==1100);id=first['item']['id']
+ # The wallet pays: $4100 is moved into it once, publication itself is free.
+ call('topup',_token=token,world=world,amount='4100',balance='4100',settled='0')
+ first=publish(balance='4100',settled='0');check(first['ok']and first['total']==1000 and first['charged']==1000);id=first['item']['id']
  info=call('info',url='custom.com/about');check(info['ok']and info['item']['title']=='Custom title'and info['item']['icon_data']and 'document'not in info)
  listing=call('list');check(listing['items'][0]['icon_data']==info['item']['icon_data'])
  loaded=call('view',url='custom.com/about');ticket=loaded['ticket'];check(call('transfer',id=id,ticket=ticket,file='test.txt')['ok']);check(not call('transfer',id=id,ticket='forged',file='test.txt')['ok']);check(not call('transfer',id=id,ticket=ticket,file='../test.txt')['ok'])
@@ -35,24 +40,31 @@ with tempfile.TemporaryDirectory()as td:
  php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)foreach($s['transfers']??[]as $k=>$v)$s['transfers'][$k]['at']-=31;unset($s);site_write({state},$db);")
  check(call('info',url='custom.com')['item']['transferring']==0)
  check(call('info',url='custom.com')['item']['downloads']==2)
- def advance(seconds):php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)if(!empty($s['active'])){{$s['run_from']-={seconds};}}unset($s);site_write({state},$db);")
- # Continuous per-second rent: $1100 for the first 1800 s, then $1100*1860/1800.
- advance(3660);first=call('stats',_token=token,world=world)['total'];check(abs(first-(1100+1136))<=2)
- call('stats',_token=token,world=world,balance='0',settled=str(first));advance(1800)
+ def advance(seconds):php(f"require {lib};$db=site_read({state});foreach($db['sites']as &$s)if(!empty($s['active'])){{$s['run_from']-={seconds};if(!empty($s['busy_at']))$s['busy_at']-={seconds};foreach($s['sessions']??[]as $k=>$r)$s['sessions'][$k]['at']-={seconds};foreach($s['transfers']??[]as $k=>$r)$s['transfers'][$k]['at']-={seconds};}}unset($s);site_write({state},$db);")
+ # Continuous per-second rent out of the wallet, plus the traffic surcharge of
+ # the download that is still open: $1100 for 1800 s, then $1100*1860/1800.
+ advance(3660);first=call('stats',_token=token,world=world)['total'];check(first>=1000+1100+1136 and first<=1000+1100+1136+40)
+ # The wallet is finite: it keeps paying until the money ends, then the site
+ # pauses and nothing else is billed.
+ advance(8640);dry=call('stats',_token=token,world=world)
+ check(dry['items'][0]['unpaid'] and dry['items'][0]['paused'] and dry['wallet']['available']==0)
  unpaid=call('view',url='custom.com/about');check(unpaid['ok']and unpaid['item']['unpaid']and 'document'not in unpaid)
- check(not call('transfer',id=id,ticket=ticket,file='test.txt')['ok']);check(call('stats',_token=token,world=world)['total']==first)
- # Nothing is charged while paused: a day offline does not create debt.
- advance(86400);check(call('stats',_token=token,world=world)['total']==first)
- # New money restarts the paused site with a fresh run.
- funded=call('stats',_token=token,world=world,balance='1200',settled=str(first));check(not funded['items'][0]['unpaid'] and not funded['items'][0]['paused'])
- check(call('view',url='custom.com')['document']);total_now=call('stats',_token=token,world=world)['total'];ledger=json.dumps({'items':[{'owner':'1','charged':total_now},{'owner':'another-owner','charged':999999}]});snap=call('stats',_token=token,world=world,balance='100',ledgers=ledger);check(snap['total']==total_now)
- # Only $100 of real money is left, so only $100 can ever be charged: the site
- # runs out of paid time and pauses, and the total never exceeds the ceiling.
- advance(3660);after=call('stats',_token=token,world=world);check(after['total']<=total_now+100);check(call('view',url='custom.com')['item']['unpaid'])
+ check(not call('transfer',id=id,ticket=ticket,file='test.txt')['ok'])
+ frozen=dry['total']
+ advance(86400);check(call('stats',_token=token,world=world)['total']==frozen)
+ # Fresh money in the wallet restarts the paused site with a fresh run.
+ funded=call('topup',_token=token,world=world,amount='1200',balance='1200',settled=str(frozen))
+ check(funded['ok'] and not funded['items'][0]['unpaid'] and not funded['items'][0]['paused'])
+ check(call('view',url='custom.com')['document']);total_now=call('stats',_token=token,world=world)['total']
+ # A game balance snapshot never turns into hosting money.
+ snap=call('stats',_token=token,world=world,balance='9999999',settled=str(total_now))
+ check(snap['total']==total_now and snap['wallet']['available']<=1200)
+ advance(4000);after=call('stats',_token=token,world=world);check(after['total']<=total_now+1200)
  advance(86400);again=call('stats',_token=token,world=world);check(again['total']==after['total'])
  check(not publish(key='3'*32,url='expensive.com',balance='0',settled=str(total_now))['ok'])
- # One shared snapshot cannot fund an unlimited number of simultaneous sites.
- w2='4'*32;p2=publish(world=w2,key='5'*32,url='',balance='200',settled='0');p3=publish(world=w2,key='6'*32,url='',balance='100',settled='100');check(p2['ok']and p3['ok']);advance(1800)
+ # One wallet cannot fund an unlimited number of simultaneous sites.
+ w2='4'*32;call('topup',_token=token,world=w2,amount='200',balance='200',settled='0')
+ p2=publish(world=w2,key='5'*32,url='',balance='200',settled='0');p3=publish(world=w2,key='6'*32,url='',balance='100',settled='100');check(p2['ok']and p3['ok']);advance(1800)
  # Two sites share one $200 ceiling: together they can never bill more than $200.
  shared=call('stats',_token=token,world=w2);check(shared['total']<=200 and len(shared['items'])==2)
  # The $200 ceiling is shared, not cloned: both sites together billed exactly
@@ -64,12 +76,13 @@ with tempfile.TemporaryDirectory()as td:
  check(call('host_stop',_token=token,world='9'*32,host=123)['items']==[])
  stopped=call('host_stop',_token=token,world=w2,host=123);check(stopped['ok'] and all(not s['active'] for s in stopped['items']))
  check(call('view',url='custom.com')['item']['unpaid'])
- check(publish(world=w2,key='5'*32,url='',balance='100',settled='200')['charged']==100)
+ call('topup',_token=token,world=w2,amount='100',balance='100',settled='200')
+ check(publish(world=w2,key='5'*32,url='',balance='100',settled='200')['charged']==0)
  retried=call('stats',_token=token,world=w2,stopped_hosts='123');check(all(not s['active'] for s in retried['items']))
  # Version migration: old overdue boundaries stay $100, next boundary costs $1100.
  # Migration: a record written by the per-period backend must not get
  # retroactive debt nor free time; it starts a fresh continuous run.
- code=f"require {lib};$now=time();$s=['id'=>88,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'total'=>1100,'billed_at'=>$now-3660,'recurring_from'=>$now-3660];$db=['sites'=>[88=>$s]];site_reconcile($db,$now);if($db['sites'][88]['total']!==1100)exit(2);if(!isset($db['sites'][88]['run_from'])||isset($db['sites'][88]['billed_at']))exit(3);site_reconcile($db,$now+1800);if($db['sites'][88]['total']!==2200)exit(4);echo 'ok';"
+ code=f"require {lib};$now=time();$s=['id'=>88,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'total'=>1100,'billed_at'=>$now-3660,'recurring_from'=>$now-3660];$db=['sites'=>[88=>$s],'wallets'=>['1:legacy'=>['gen'=>1,'ceiling'=>5000,'topups'=>5000,'at'=>$now]]];site_reconcile($db,$now);if($db['sites'][88]['total']!==1100)exit(2);if(!isset($db['sites'][88]['run_from'])||isset($db['sites'][88]['billed_at']))exit(3);site_reconcile($db,$now+1800);if($db['sites'][88]['total']!==2200)exit(4);echo 'ok';"
  check(php(code)=='ok')
  # A paused legacy record stays paused and never accrues rent.
  code=f"require {lib};$now=time();$s=['id'=>89,'url'=>'legacy.com','owner'=>'1','world'=>'legacy','active'=>true,'unpaid'=>true,'total'=>900,'billed_at'=>$now-9999];$db=['sites'=>[89=>$s]];site_reconcile($db,$now+86400);if($db['sites'][89]['total']!==900||empty($db['sites'][89]['paused']))exit(5);echo 'ok';"

@@ -104,14 +104,20 @@ try{
    // $100 / 1800 s, or $1100 / 1800 s with a custom domain (the custom rate
    // includes the one-time $1000 domain fee, exactly as before). Converting an
    // already paid publication to a custom domain charges the fee once.
-   $rate=($custom?SITE_RATE_CUSTOM:SITE_RATE_STANDARD);
-   $period=$fresh?$rate:0;
-   $custom_fee=(!$fresh&&$custom&&(!$paid||$old['url']==='s'.$id.'.sites.pcos'))?SITE_CUSTOM_PRICE:0;
-   $cost=$period+$custom_fee;
+   // Publication itself is free: nothing is charged from the game balance when a
+   // site goes live. The only up-front charge is the one-time custom-domain fee,
+   // and even that is paid from the hosting wallet (filled with action=topup),
+   // never straight from the game.
+   $is_default=$old&&$old['url']==='s'.$id.'.sites.pcos';
+   $custom_fee=($custom&&(!$paid||$is_default))?SITE_CUSTOM_PRICE:0;
+   $cost=$custom_fee;
    // The exact fixed tariff must be confirmed; the client cannot submit price,
    // paid-until timestamps or a negative charge.
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
-   if(site_available_funds($db,$owner,$world)<$cost)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
+   // A publication may exist without a wallet: it simply does not run until the
+   // player tops the wallet up (site_reconcile pauses it), but the domain and the
+   // package are kept so nothing is lost. Only a paid domain fee blocks now.
+   if($cost>0&&site_available_funds($db,$owner,$world)<$cost)site_fail('Недостаточно денег в кошельке хостинга: пополни его',402);
    $s=$old?:['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'visits'=>0,'sessions'=>[],'total'=>0,'revision'=>0];
    if($old&&$old['url']!==$url){$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
    $s['custom_paid']=$paid||$custom;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
@@ -119,7 +125,10 @@ try{
    // A fresh publication prepays one period of seconds; an update only adds the
    // one-time custom-domain fee (if the domain was upgraded just now).
    if($fresh){
-    $s['run_from']=$now;$s['billed_seconds']=0;$s['window_used']=0;$s['credit']=SITE_PERIOD;
+    // No prepaid period any more: the wallet pays as the site serves, and it is
+    // the player who decides when to move money into that wallet.
+    $s['run_from']=$now;$s['billed_seconds']=0;$s['run_seconds']=0;$s['credit']=0;
+    $s['traffic_seconds']=0;$s['traffic_billed']=0;$s['traffic_paid']=0;$s['busy_at']=0;
     $s['total']+=$cost;
    }else{
     $s['total']+=$custom_fee;
@@ -135,12 +144,21 @@ try{
    if(in_array($domain,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$domain))site_fail('Reserved URL',409);
    foreach($db['sites']as $known=>$site)if($site['url']===$domain&&!($site['owner']===$owner&&$site['world']===$world&&site_local($site)))site_fail('URL already taken',409);
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
+   // The tariff follows the domain, not the client's claim.
    $custom=!preg_match('~^local\.~',$domain);
    $rate=$custom?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
    $found=null;foreach($db['sites']as $known=>$site)if($site['owner']===$owner&&$site['world']===$world&&site_local($site)&&$site['url']===$domain){$found=(string)$known;break;}
    $fresh=$found===null||empty($db['sites'][$found]['active'])||!empty($db['sites'][$found]['unpaid']);
-   $cost=$fresh?$rate:0;
-   if(site_available_funds($db,$owner,$world)<$cost)site_fail('Хост не оплачен: недостаточно денег на публикацию',402);
+   // Hosting from the local disk costs nothing up front either: only the seconds
+   // the game really serves are billed from the wallet, and the custom-domain
+   // fee stays a one-time charge.
+   $custom_paid=$found!==null&&site_custom_paid($db['sites'][$found]);
+   $custom_fee=($custom&&!$custom_paid)?SITE_CUSTOM_PRICE:0;
+   $cost=$custom_fee;
+   // A publication may exist without a wallet: it simply does not run until the
+   // player tops the wallet up (site_reconcile pauses it), but the domain and the
+   // package are kept so nothing is lost. Only a paid domain fee blocks now.
+   if($cost>0&&site_available_funds($db,$owner,$world)<$cost)site_fail('Недостаточно денег в кошельке хостинга: пополни его',402);
    if($fresh&&site_owned_local($db,$owner,$world)>=16)site_fail('16 publications per account maximum',409);
    if($found===null){
     if(count($db['sites'])>=200)site_fail('Host full',503);
@@ -156,7 +174,7 @@ try{
    $s['client_seconds']=max((int)($s['client_seconds']??0),max(0,(int)($_POST['seconds']??0)));
    $title=trim((string)($_POST['title']??$domain));if(!is_string($title))$title=$domain;$s['title']=substr($title,0,120);
    $s['visits']=max((int)$s['visits'],(int)($_POST['visits']??0));
-   if($fresh){$s['active']=true;$s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;$s['run_from']=0;$s['billed_seconds']=0;$s['run_seconds']=0;$s['total']+=$cost;$s['credit']=SITE_PERIOD;}
+   if($fresh){$s['active']=true;$s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;$s['run_from']=0;$s['billed_seconds']=0;$s['run_seconds']=0;$s['traffic_seconds']=0;$s['traffic_billed']=0;$s['traffic_paid']=0;$s['busy_at']=0;$s['credit']=0;$s['total']+=$cost;}
    $s['revision']=(int)$s['revision']+1;
    $published_id=$found;$out['charged']=$cost;
    unset($s);

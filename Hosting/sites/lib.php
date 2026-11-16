@@ -81,6 +81,11 @@ function site_write($file,$data){$raw=SITE_PREFIX.base64_encode(json_encode($dat
 const SITE_RATE_STANDARD = SITE_PRICE;                   // $ per 1800 seconds
 const SITE_RATE_CUSTOM = SITE_PRICE + SITE_CUSTOM_PRICE; // $ per 1800 seconds
 const SITE_EPOCH = 1767225600;                           // 2026-01-01T00:00:00Z
+// Traffic surcharge: seconds during which the site actually served somebody
+// (an open browser session or a running download). A published site nobody
+// visits pays only the base rent; a busy one pays a little more.
+const SITE_TRAFFIC_RATE = 20;                            // $ per 1800 s of real serving
+const SITE_BUSY_WINDOW = 90;                             // a session is online for 90 s after its beat
 function site_wallet_key($owner,$world){return $owner.':'.$world;}
 function site_rate($s){
  if(isset($s['rate'])&&!empty($s['rate_locked']))return (int)$s['rate']===SITE_RATE_CUSTOM?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
@@ -96,18 +101,21 @@ function site_cost($rate,$seconds){return intdiv(max(0,(int)$rate)*max(0,(int)$s
 function site_seconds_for($rate,$dollars){$rate=max(1,(int)$rate);return intdiv(max(0,(int)$dollars)*SITE_PERIOD,$rate);}
 function site_running($s){return !empty($s['active'])&&empty($s['paused'])&&empty($s['banned']);}
 function site_total($db,$owner,$world){$sum=0;foreach($db['sites']as $s)if($s['owner']===$owner&&$s['world']===$world)$sum+=(int)$s['total'];return $sum;}
-// Known cash left for this account+save. A wallet that was never snapshotted
-// has no ceiling: money lives in the game save and the bill simply accumulates
-// until the game connects (behaviour kept for saves that never reported).
+// Known cash left for this account+save. Money exists only in the wallet the
+// player explicitly filled with action=topup: a wallet that was never created
+// has nothing, so a publication cannot run on credit the game never agreed to.
 function site_available_funds($db,$owner,$world){
  $key=site_wallet_key($owner,$world);
- if(!isset($db['wallets'][$key]))return PHP_INT_MAX;
+ if(!isset($db['wallets'][$key]))return 0;
  return max(0,(int)$db['wallets'][$key]['ceiling']-site_total($db,$owner,$world));
 }
 function site_pause(&$s,$reason){
  if(empty($s['paused'])){$s['access_epoch']=($s['access_epoch']??0)+1;$s['sessions']=[];$s['transfers']=[];}
  $s['paused']=true;$s['pause_reason']=$reason;
  $s['run_from']=0;$s['run_seconds']=0;$s['billed_seconds']=0;$s['credit']=0;
+ // Whatever traffic was already served stays behind us: a pause never turns
+ // past serving into future debt.
+ $s['busy_at']=0;$s['traffic_seconds']=max(0,(int)($s['traffic_seconds']??0));$s['traffic_billed']=$s['traffic_seconds'];
  // `unpaid` stays for clients that predate `paused`: a paused site is not
  // served either way and never accrues new rent.
  $s['unpaid']=$reason!=='user';
@@ -115,6 +123,22 @@ function site_pause(&$s,$reason){
 function site_resume(&$s,$now){
  $s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;
  $s['run_from']=$now;$s['run_seconds']=0;$s['billed_seconds']=0;
+}
+// Seconds of real serving since the site was last reconciled. A browser session
+// counts while its heartbeat is fresh, a download while it is open; the gap
+// between two requests is capped so a long silence never invents traffic.
+function site_busy(&$s,$now){
+ $active=false;$oldest=0;
+ foreach($s['sessions']??[]as $row)if(($row['at']??0)>$now-SITE_BUSY_WINDOW){$active=true;$oldest=$oldest>0?min($oldest,(int)$row['at']):(int)$row['at'];}
+ if(!$active)foreach($s['transfers']??[]as $row)if(($row['at']??0)>$now-30){$active=true;$oldest=$oldest>0?min($oldest,(int)$row['at']):(int)$row['at'];}
+ $busy=max(0,(int)($s['traffic_seconds']??0));$last=(int)($s['busy_at']??0);
+ // A visitor seen for the first time since the last request: the session beat is
+ // the earliest moment we know the site was serving, so the gap starts there.
+ if($active&&$last<=0&&$oldest>0&&$oldest<=$now)$last=max(1,$oldest);
+ if($active&&$last>0&&$last<=$now)$busy+=min(SITE_BUSY_WINDOW,$now-$last);
+ if($active)$s['busy_at']=$now;else $s['busy_at']=0;
+ $s['traffic_seconds']=$busy;
+ return $busy;
 }
 // Accrue rent for every running site, once per request. Rent is continuous:
 // seconds since `run_from` are priced at the site's rate, minus prepaid seconds
@@ -135,37 +159,61 @@ function site_reconcile(&$db,$now){
    // Migrated record: rent used to be billed per completed period. Never
    // invent retroactive debt and never grant free time: an active site starts
    // a fresh run now, a site that was already unpaid stays paused.
+   $legacy_billed=isset($s['billed_at'])?(int)$s['billed_at']:0;
    unset($s['billed_at'],$s['recurring_from'],$s['window_used']);
    $s['custom_paid']=site_custom_paid($s);
    $s['run_from']=0;$s['run_seconds']=0;$s['billed_seconds']=0;
-   if($s['active']&&empty($s['banned'])&&empty($s['unpaid'])){$s['run_from']=$now;}
+   if($s['active']&&empty($s['banned'])&&empty($s['unpaid'])){
+    $s['run_from']=$now;
+    // The old biller charged per completed period, so billed_at+PERIOD was
+    // already paid for. Convert the unconsumed part into seconds of credit: the
+    // price cancels out because both tariffs are linear in time.
+    if($legacy_billed>0)$s['credit']=max(0,min(SITE_PERIOD,$legacy_billed+SITE_PERIOD-(int)$now));
+   }
    elseif(!empty($s['unpaid'])&&empty($s['banned'])){$s['paused']=true;$s['pause_reason']='legacy';}
   }
-  if(!site_running($s)){if(!$s['active'])$s['run_from']=0;continue;}
+  if(!site_running($s)){if(!$s['active'])$s['run_from']=0;$s['busy_at']=0;continue;}
+  // Traffic is billed for every tariff: seconds with a live visitor cost extra.
+  $traffic=site_busy($s,$now);
+  $traffic_due=site_cost(SITE_TRAFFIC_RATE,$traffic)-site_cost(SITE_TRAFFIC_RATE,(int)($s['traffic_billed']??0));
   if(site_local($s)){
-   // The game reports how many real seconds it actually served this site.
+   // A local site lives on the player's disk, so it costs nothing while nobody
+   // hosts it: only the seconds the game really served are billed, plus the
+   // network time somebody actually spent on it.
    $elapsed=max(0,min(31536000,(int)($s['client_seconds']??0)));
   }else{
    if((int)$s['run_from']<=0)$s['run_from']=$now;
    $elapsed=max(0,$now-(int)$s['run_from']);
   }
   $delta=$elapsed-(int)$s['run_seconds'];
-  if($delta<=0){$s['run_seconds']=$elapsed;continue;}
+  if($delta<0){$delta=0;$s['run_seconds']=$elapsed;}
   // Prepaid seconds are consumed before any cash is asked for.
   $consume=min((int)$s['credit'],$delta);$s['credit']-=$consume;
   $billable=(int)$s['billed_seconds']+($delta-$consume);
   $rate=site_rate($s);
-  $want=site_cost($rate,$billable)-site_cost($rate,(int)$s['billed_seconds']);
-  if($want<=0){$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;$s['paid_seconds']+=$delta-$consume;continue;}
+  $base_due=max(0,site_cost($rate,$billable)-site_cost($rate,(int)$s['billed_seconds']));
+  $due=$base_due+$traffic_due;
+  if($due<=0){$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;$s['traffic_billed']=$traffic;$s['paid_seconds']+=$delta-$consume;continue;}
   $owner=$s['owner'];$world=$s['world'];
   $available=site_available_funds($db,$owner,$world);
-  if($want<=$available){
-   $s['total']+=$want;$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;$s['paid_seconds']+=$delta-$consume;
+  if(empty($db['wallets'][site_wallet_key($owner,$world)])){
+   // No wallet at all: nothing is owed and nothing runs. The site keeps its
+   // served seconds so a later top-up continues exactly where it stopped.
+   site_pause($s,'dry');continue;
+  }
+  if($due<=$available){
+   $s['total']+=$due;$s['run_seconds']=$elapsed;$s['billed_seconds']=$billable;
+   $s['traffic_billed']=$traffic;$s['paid_seconds']+=$delta-$consume;
    continue;
   }
   // Cash ended during this request: pay only what is known to exist, then pause.
-  $paySeconds=site_seconds_for($rate,$available);
-  $s['total']+=$available;$s['paid_seconds']+=$paySeconds;
+  // The rent is paid first, the traffic surcharge with what is left.
+  $base_paid=min($base_due,max(0,$available));
+  $traffic_paid=min($traffic_due,max(0,$available-$base_paid));
+  $pay=$base_paid+$traffic_paid;
+  $s['total']+=$pay;
+  $s['paid_seconds']+=site_seconds_for($rate,$base_paid);
+  $s['traffic_paid']=(int)($s['traffic_paid']??0)+site_seconds_for(SITE_TRAFFIC_RATE,$traffic_paid);
   site_pause($s,'dry');
  }
  unset($s);
@@ -176,7 +224,8 @@ function site_reconcile(&$db,$now){
   if(!isset($db['wallets'][$key])){$db['sites'][$id]['runway']=0;$db['sites'][$id]['money_known']=false;continue;}
   $peers=0;foreach($running as $other)if(site_wallet_key($other['owner'],$other['world'])===$key)$peers++;
   $db['sites'][$id]['money_known']=true;
-  $db['sites'][$id]['runway']=site_seconds_for(site_rate($s),intdiv(site_available_funds($db,$s['owner'],$s['world']),max(1,$peers)));
+  // The estimate assumes one visitor per site, so it never over-promises.
+  $db['sites'][$id]['runway']=site_seconds_for(site_rate($s)+SITE_TRAFFIC_RATE,intdiv(site_available_funds($db,$s['owner'],$s['world']),max(1,$peers)));
  }
  return $db;
 }
@@ -194,7 +243,9 @@ function site_locals(&$db,$owner,$world,$entries,$now){
   if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$domain)||strlen($domain)>160||strpos($domain,'..')!==false)continue;
   $seconds=$entry['seconds']??null;$rate=$entry['rate']??SITE_RATE_STANDARD;
   if(!is_scalar($seconds)||!ctype_digit((string)$seconds)||(int)$seconds>31536000)continue;
-  $rate=(int)$rate===SITE_RATE_CUSTOM?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
+  // The tariff follows the domain: a custom address is never billed as a
+  // generated one, whatever the client claims.
+  $rate=preg_match('~^local\.~',$domain)?SITE_RATE_STANDARD:SITE_RATE_CUSTOM;
   $key=substr(hash_hmac('sha256',$domain,defined('SITE_DATA_DIR')?SITE_DATA_DIR:__DIR__),0,32);
   $id=null;
   foreach($db['sites']as $known=>$s)if($s['owner']===$owner&&$s['world']===$world&&site_local($s)&&$s['url']===$domain){$id=$known;break;}
@@ -221,14 +272,29 @@ function site_locals(&$db,$owner,$world,$entries,$now){
  return $out;
 }
 function site_snapshot(&$db,$owner,$world,$balance,$settled){
- if(!is_scalar($balance)||!is_scalar($settled)||!ctype_digit((string)$balance)||!ctype_digit((string)$settled))site_fail('Invalid balance snapshot');
+ if(!is_scalar($balance)||!ctype_digit((string)$balance))site_fail('Invalid balance snapshot');
  if((float)$balance>9999999)site_fail('Invalid balance snapshot');
+ if($settled!==null&&(!is_scalar($settled)||!ctype_digit((string)$settled)))site_fail('Invalid balance snapshot');
  $key=site_wallet_key($owner,$world);
- // A save rollback can report more already-paid than the backend billed. Clamp
- // it instead of rejecting the request: the known cash never exceeds the real
- // balance plus what this backend has actually charged.
- $settled=min((int)$settled,(int)site_total($db,$owner,$world));
- $db['wallets'][$key]=['gen'=>(isset($db['wallets'][$key])?(int)$db['wallets'][$key]['gen']:0)+1,'ceiling'=>(int)$balance+$settled,'at'=>time()];
+ $total=site_total($db,$owner,$world);
+ // The game balance is *not* hosting money any more: only `action=topup` moves
+ // cash into the wallet. The snapshot is used for two things: it tells the
+ // backend how much the save has already paid into hosting, and it lets a save
+ // rollback take that money back (the player really got it back in the game).
+ $paid=$settled===null?null:min((int)$settled,$total);
+ if(!isset($db['wallets'][$key])){
+  $ceiling=$paid===null?0:$paid;
+  $db['wallets'][$key]=['gen'=>1,'ceiling'=>$ceiling,'topups'=>$ceiling,'at'=>time(),'balance'=>(int)$balance];
+ }else{
+  $wallet=&$db['wallets'][$key];
+  $wallet['gen']=(int)$db['wallets'][$key]['gen']+1;$wallet['at']=time();$wallet['balance']=(int)$balance;
+  if(!isset($wallet['topups']))$wallet['topups']=(int)$wallet['ceiling'];
+  // The ceiling never grows from a snapshot: a modified client could claim any
+  // balance. It may shrink, and only down to what the save still records as paid,
+  // so a rollback cannot be used to hand the rent back while keeping the sites.
+  if($paid!==null)$wallet['ceiling']=min((int)$wallet['ceiling'],max($paid,(int)$wallet['topups']));
+  unset($wallet);
+ }
  // Fresh money restarts sites that were only paused because the cash ran out.
  // A site paused by its owner or by moderation stays stopped.
  foreach($db['sites']as &$s){
@@ -265,8 +331,13 @@ function site_topup(&$db,$owner,$world,$amount){
  if(!is_scalar($amount)||!ctype_digit((string)$amount))site_fail('Invalid top-up');
  $amount=(int)$amount;if($amount<1||$amount>10000000)site_fail('Invalid top-up');
  $key=site_wallet_key($owner,$world);
- if(!isset($db['wallets'][$key]))site_fail('Сначала синхронизируй баланс хостинга',409);
+ // The very first top-up creates the wallet: money exists only once the player
+ // has moved it here, so there is nothing to migrate or to trust from the client.
+ if(!isset($db['wallets'][$key]))$db['wallets'][$key]=['gen'=>0,'ceiling'=>0,'topups'=>0,'at'=>time()];
  $db['wallets'][$key]['ceiling']=(int)$db['wallets'][$key]['ceiling']+$amount;
+ // `topups` is the money this backend really received: the ceiling may fall back
+ // to it on a save rollback, never above it.
+ $db['wallets'][$key]['topups']=(isset($db['wallets'][$key]['topups'])?(int)$db['wallets'][$key]['topups']:(int)$db['wallets'][$key]['ceiling']-$amount)+$amount;
  $db['wallets'][$key]['gen']=(int)$db['wallets'][$key]['gen']+1;
  foreach($db['sites']as &$s){
   if($s['owner']!==$owner||$s['world']!==$world||!$s['active']||!empty($s['banned'])||!$s['paused'])continue;
@@ -300,8 +371,10 @@ function site_public(&$s,$now){
   'active'=>(bool)$s['active'],'total'=>(int)$s['total'],'unpaid'=>!empty($s['unpaid'])||$paused,'paused'=>$paused,
   'pause_reason'=>$paused?(string)($s['pause_reason']??''):'',
   'paid_seconds'=>(int)($s['paid_seconds']??0),'credit'=>(int)($s['credit']??0),
-  'run_seconds'=>(int)($s['window_used']??0),'runway'=>(int)($s['runway']??0),'money_known'=>!empty($s['money_known']),
-  'price'=>site_period_price($s),'rate'=>site_rate($s),
+  'run_seconds'=>(int)($s['run_seconds']??0),'runway'=>(int)($s['runway']??0),'money_known'=>!empty($s['money_known']),
+  'price'=>site_period_price($s),'rate'=>site_rate($s),'traffic_rate'=>SITE_TRAFFIC_RATE,
+  'traffic_seconds'=>(int)($s['traffic_seconds']??0),'traffic_billed'=>(int)($s['traffic_billed']??0),
+  'traffic_cost'=>site_cost(SITE_TRAFFIC_RATE,(int)($s['traffic_billed']??0)),
   'banned'=>!empty($s['banned']),'ban_reason'=>$s['ban_reason']??'','icon_data'=>$s['icon_data']??'','icon_media'=>$s['icon_media']??'',
   'cpu_capacity'=>$s['cpu_capacity']??1000,'cpu_load'=>$s['cpu_load']??0,'host_mbps'=>$s['host_mbps']??5,
   'custom_paid'=>site_custom_paid($s),

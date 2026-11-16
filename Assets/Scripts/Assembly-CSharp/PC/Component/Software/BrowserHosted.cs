@@ -16,7 +16,7 @@ namespace PC.Component.Software
   string servedDomain="";float servedBeat;
   void LoadCustomResults(string query)
   {
-   if(customResultsBusy)return;customResultsBusy=true;nextCustomResults=Time.unscaledTime+20;
+   if(customResultsBusy)return;customResultsBusy=true;nextCustomResults=Time.unscaledTime+60;
    int generation=localGeneration;
    SiteHostingService.Request("list",new Dictionary<string,string>{{"query",query}},(reply,error)=>{
     if(this==null||generation!=localGeneration||siteNavigationClosed)return;
@@ -91,7 +91,7 @@ namespace PC.Component.Software
    if(remoteId==0||siteNavigationClosed||system==null||!system.Ready)return;
    var status=InternetService.Instance!=null?InternetService.Instance.Status(system.Board):null;
    if(status==null||status.Quality<=0){ShowError("Нет подключения к интернету");return;}
-   int generation=localGeneration,id=remoteId;remoteBusy=true;remoteBeat=Time.unscaledTime+20;
+   int generation=localGeneration,id=remoteId;remoteBusy=true;remoteBeat=Time.unscaledTime+60;
    SiteHostingService.Request("visit",new Dictionary<string,string>{{"id",id.ToString()},{"ticket",remoteTicket},{"session",remoteSession}},(reply,error)=>{
     if(this==null||generation!=localGeneration||id!=remoteId)return;remoteBusy=false;
     if(error!=null){ShowError("Сайт недоступен: "+error);return;}downloadHost=reply.item;remoteTicket=reply.ticket;

@@ -24,8 +24,13 @@ class LifecycleTest {
  // A stop click with an empty UI list waits for stats and resolves by the
  // current project's stable publication key, never silently returns.
  var emptyEditor=new SiteEditor();Set(emptyEditor,"project",new SiteHistory(doc));Set(emptyEditor,"hostedSites",new Dropdown());Set(emptyEditor,"hostURL",new InputField());Set(emptyEditor,"hostingStats",new Text());Call(emptyEditor,"StopHostedSite");Check(calls[calls.Count-1]=="stats");answer(renamed);Check(calls[calls.Count-1]=="stop"&&args["id"]=="2");answer(Reply(true));
- // Failed requests must not claim a successful stop.
- string error=null;service.Stop(2,message=>error=message);var failed=pending;pending=null;failed(null,"network down");Check(error=="network down"&&!service.Available);
+ // Failed requests must not claim a successful stop, and a lost connection
+ // switches the service to the local mode instead of retrying on every frame.
+ string error=null;service.Stop(2,message=>error=message);var failed=pending;pending=null;failed(null,"network down");
+ Check(error.Contains("связи")||error=="network down");
+ Check(service.Status.Contains("локально"));
+ // Reconnecting restores the online mode and the real publications.
+ service.Refresh(null);answer(Reply());Check(service.Online);
  // Account changes cancel queued writes rather than sending the new account
  // a stop for a publication selected by the old owner.
  service.Refresh(null);int before=calls.Count;string cancelled=null;service.Stop(2,message=>cancelled=message);ServerAccounts.Token="different";answer(Reply());Check(calls.Count==before&&cancelled.Contains("отменена"));

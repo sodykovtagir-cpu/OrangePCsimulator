@@ -1,6 +1,15 @@
-# Orange PC Simulator — Changelog
+# Orange PC Simulator — changelog
 
 ## Added
+
+### Site hosting v3 — wallet, traffic and automatic offline mode
+
+- The game no longer deducts rent from the player's balance and no longer saves on every server reply: syncing only reads state. That per-reply `SaveData()` was what made the game hitch on mobile.
+- Hosting money lives in a **wallet** filled only by the «Пополнить» button ($100 steps). Rent, traffic and the domain fee are paid from it; an empty wallet pauses the site without debt.
+- Tariff: $100 per 30 minutes of hosting ($1100 with a custom domain) plus **$20 per 30 minutes of real serving** — only the seconds with an open session or a running download. A site without visitors pays no traffic.
+- The offline mode switches itself on when the server cannot be reached: the last known state stays visible, local served time is kept and retries back off (60 → 120 → 240 s). Publishing a new domain needs the internet; hosting a site from the save does not.
+- Background polling is 60 s instead of 5 s, page heartbeats 60 s instead of 20 s, so the game hits the server far less often.
+- Publishing is free; only the one-time $1000 custom-domain fee remains. The panel shows the wallet, the online/local mode, the paid rent and the traffic share.
 
 ### Site hosting — per-second rent, money from the save, pause instead of debt
 

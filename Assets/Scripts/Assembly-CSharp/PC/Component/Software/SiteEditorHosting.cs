@@ -34,7 +34,7 @@ namespace PC.Component.Software
   public void RefreshHosting()
   {
    var service=SiteHostingService.Instance;if(service==null){Report("Сервис хостинга не запущен");return;}
-   hostingStats.text="Подключение…";service.Refresh(()=>{if(this!=null)DrawHosting();});
+   hostingStats.text=service.Online?"Подключение…":"Нет связи — работаем локально…";service.Refresh(()=>{if(this!=null)DrawHosting();});
   }
   void PollHostingView()
   {
@@ -56,7 +56,10 @@ namespace PC.Component.Software
     options.Add(site.url+(site.local?" [локально]":"")+state);
     text.Append(site.url).Append(site.local?" [локально в сохранении]":"").Append(state)
      .Append("\nПосещения: ").Append(site.visits).Append(" | Онлайн: ").Append(site.online).Append(" | ПК: ").Append(site.host)
-     .Append("\nНачислено: $").Append(site.total);
+     .Append("\nОплачено аренды: $").Append(site.total);
+    // A published site pays the base rent all the time, and a little extra only
+    // for the seconds a visitor really spent on it.
+    if(site.traffic_rate>0)text.Append(" (из них $").Append(site.traffic_cost).Append(" трафик: ").Append(Duration(site.traffic_seconds)).Append(" обслуживания)");
     // Continuous rent: show how much paid time is left instead of a period clock.
     if(site.active&&!site.unpaid&&site.money_known)
      text.Append(" | Хватит ещё на ").Append(Duration(site.runway>0?site.runway:site.next_bill>0?Math.Max(0,site.next_bill-DateTimeOffset.UtcNow.ToUnixTimeSeconds()):0));
@@ -73,19 +76,23 @@ namespace PC.Component.Software
    hostingBoundDomain=current!=null?current.url:"";hostingProjectKey=project.Document.hostingKey;
    if(current!=null){text.Append("Текущий проект: ").Append(current.url).Append("\n");text.Append(current.url).Append("/\n");foreach(var page in project.Document.pages)text.Append(current.url).Append(page.path).Append("\n");}
    else text.Append("Новый сайт: введите домен или оставьте URL пустым для бесплатного адреса.\n");
-   text.Append("\nАренда: $100 / 30 мин (посекундно). Свой домен: +$1000 один раз.\n");
+   text.Append("\nАренда: $100 / 30 мин за работу сайта + $20 / 30 мин, пока на нём есть посетители и загрузки. Свой домен: +$1000 один раз.\n");
+   text.Append("Аренда идёт только из кошелька хостинга: деньги игры не списываются никогда, ты сам переводишь их кнопкой «Пополнить».\n");
    text.Append(hostDomainMode==2
     ? "Хостинг из сохранения: сайт остаётся на твоём диске, публикуется домен, аренда списывается с общего баланса."
     : hostDomainMode==1
      ? "Свой домен: впиши адрес. Он закрепляется за сохранением и стоит $1000 один раз."
      : "Стандартный адрес: домен вида s<номер>.sites.pcos выдаётся сервером.");
    long available=service.AvailableMoney;
-   text.Append("\nДеньги хостинга: ").Append(available<0?"ещё не сверены с сервером":"$"+available+" свободно");
+   text.Append("\nКошелёк хостинга: ").Append(available<0?"ещё не сверен с сервером":"$"+available+" свободно");
+   // What that money buys, per the current base tariff.
+   if(available>0)text.Append(" (около ").Append(Duration(available*SiteHostingService.Period/SiteHostingService.StandardRate)).Append(" аренды без посетителей)");
+   text.Append("\nРежим: ").Append(service.Online?"онлайн — синхронизация раз в минуту":"локальный — сервер недоступен, аренда копится и уйдёт при подключении");
    if(service.Locals!=null&&service.Locals.Count>0)
    {
     text.Append("\n\nЛокальные сайты в сохранении:\n");
     foreach(var site in service.Locals)
-     if(site!=null)text.Append("  ").Append(site.domain).Append(" — ").Append(site.served_seconds).Append(" c обслуживания")
+     if(site!=null)text.Append("  ").Append(site.domain).Append(" — ").Append(site.served_seconds).Append(" c обслуживания ≈ $").Append(site.served_seconds*Math.Max(1,site.rate)/SiteHostingService.Period)
       .Append(site.listed?"":" (домен ещё не закреплён — нужен интернет)").Append('\n');
    }
    hostedSites.ClearOptions();hostedSites.AddOptions(options);hostedSites.SetValueWithoutNotify(Mathf.Max(0,hostedIds.IndexOf(selected)));hostingStats.text=text.ToString();hostingSeenRevision=service.StateRevision;
@@ -152,12 +159,16 @@ namespace PC.Component.Software
    var connection=InternetService.Instance.Status(system.Board);if(connection==null||connection.Quality<=0){Report("Соединение прервано");yield break;}
    SiteHostingService.Instance.Publish(content,url,host,customDomain,"",system!=null&&system.Board!=null?system.Board.Id:0,message=>{if(this!=null){Report(message);DrawHosting();}});
   }
-  /// <summary>Add one $100 period of hosting money from the game balance.</summary>
+  /// <summary>
+  /// Move $100 from the game balance into the hosting wallet. This is the only
+  /// place where the game balance is spent on hosting — and only on a click.
+  /// </summary>
   public void TopUpHosting()
   {
    var service=SiteHostingService.Instance;if(service==null){Report("Сервис хостинга не запущен");return;}
    if(stopPending){Report("Дождись подтверждения остановки");return;}
-   hostingStats.text="Пополнение хостинга…";
+   if(!service.Online){Report("Нет связи с сервером хостинга: пополнение недоступно, попробуй позже.");return;}
+   hostingStats.text="Пополнение кошелька…";
    service.TopUp(SiteHostingService.StandardRate,message=>{if(this!=null){DrawHosting();Report(message);}});
   }
   public void StopHostedSite()
