@@ -134,8 +134,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -0.5}
-  m_SizeDelta: {x: -20, y: -13}
+  m_AnchoredPosition: {x: -0.75590515, y: 0.22159958}
+  m_SizeDelta: {x: -8.9457, y: -5.6088}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4651926332784864108
 CanvasRenderer:
@@ -167,18 +167,18 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 14
+    m_FontSize: 0
     m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 10
+    m_BestFit: 1
+    m_MinSize: 0
     m_MaxSize: 40
-    m_Alignment: 0
+    m_Alignment: 3
     m_AlignByGeometry: 0
     m_RichText: 0
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 
+  m_Text: '**********'
 --- !u!1 &3962394917064023543
 GameObject:
   m_ObjectHideFlags: 0
@@ -618,7 +618,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 
+  m_Text: 0
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -875,7 +875,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8567327744065050622}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
   m_Name: 
@@ -890,10 +890,10 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 0}
-    m_FontSize: 14
+    m_FontSize: 11
     m_FontStyle: 2
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 1
     m_MaxSize: 40
     m_Alignment: 0
     m_AlignByGeometry: 0
@@ -1004,6 +1004,26 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &1231231231231231231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8731971552345706499}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 476e1d52a5b14f0c885f3d903742484e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ssid: {fileID: 3384195642754583707}
+  description: {fileID: 7493461994340775950}
+  icon: {fileID: 8742002525396167673}
+  passwordPanel: {fileID: 3962394917064023543}
+  password: {fileID: 3916867384816631872}
+  passwordMessage: {fileID: 9086296149697812192}
+  connect: {fileID: 5098720319254387431}
+  connectLabel: {fileID: 4052557318255343642}
 --- !u!1 &8742002525396167673
 GameObject:
   m_ObjectHideFlags: 0
@@ -1100,23 +1120,3 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
---- !u!114 &1231231231231231231
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8731971552345706499}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 476e1d52a5b14f0c885f3d903742484e, type: 3}
-  m_Name: ''
-  m_EditorClassIdentifier: ''
-  ssid: {fileID: 3384195642754583707}
-  description: {fileID: 7493461994340775950}
-  icon: {fileID: 8742002525396167673}
-  passwordPanel: {fileID: 3962394917064023543}
-  password: {fileID: 3916867384816631872}
-  passwordMessage: {fileID: 9086296149697812192}
-  connect: {fileID: 5098720319254387431}
-  connectLabel: {fileID: 4052557318255343642}
