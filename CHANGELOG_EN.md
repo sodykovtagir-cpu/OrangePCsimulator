@@ -6,7 +6,7 @@
 
 - **A custom-painted glass cover ships in the same crate as the regular glass** (`Crate_Cover_ATX(Glass)` / `Crate_Cover_ITX(Glass)` / `Crate_Glass_Cover_ATX_Aquarium`); the hand-made `Box_CustomCover` is gone.
 - **The artwork is already on the glass:** the order crate arrives and opens itself (`Crate.BreakApart`), because the paint is applied the moment the parcel spawns. No hammer needed for a custom order.
-- **Plain (unbreakable) covers ship in a crate too:** black/white metal covers are no longer spit out of the portal — they arrive in the glass crate, which releases them on its own (`CoverItem` component).
+- **Plain (non-glass) covers ship with no crate at all:** black/white metal covers are handed out immediately, as before. Only glass is packaged — and opened with a hammer.
 - **Orders never mix up:** each crate is matched to its own order by prefab, so consecutive orders keep their own artwork and a normal purchase never steals a custom one.
 - **Delivery is not lost when `packagePoint` is unassigned** (Main 4/5 scenes): a fallback `doorPoint` is used, then the portal. Previously such an order vanished into thin air with a console warning.
 
