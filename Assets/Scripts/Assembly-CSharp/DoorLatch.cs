@@ -27,8 +27,11 @@ public class DoorLatch : MonoBehaviour
     public void Latch()
     {
         isLatched = true;
-        rb.velocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
+        if (!rb.isKinematic)
+        {
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
 
         // Заморозить все вращения
         rb.constraints = RigidbodyConstraints.FreezeAll;

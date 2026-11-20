@@ -391,8 +391,11 @@ public class Main : MonoBehaviour
 		if (packagePoint == null)
 		{
 			// Без точки выгрузки очередь доставки молчала бы, и заказ пропадал.
+			// Кладём у doorPoint (если задан), иначе у портала — как обычные
+			// предметы, и обязательно через NotifySpawned, чтобы ящик
+			// наполнился содержимым (см. Spawned).
 			Debug.LogWarning("[Main] packagePoint не назначен — доставка сразу у двери/портала.");
-			return InstantDelivery(prefab);
+			return NotifySpawned(Instantiate(prefab, DeliveryPosition, DeliveryRotation));
 		}
 		orders.Enqueue(prefab);
 		if (!delivering) StartCoroutine(Delivery());

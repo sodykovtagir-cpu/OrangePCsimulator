@@ -16,7 +16,9 @@ public class AddForce : MonoBehaviour
 		if (other == null) return;
 
 		Rigidbody rb = other.GetComponent<Rigidbody>();
-		if (rb != null)
+		// Кинематическому телу velocity задавать нельзя (Unity пишет
+		// "Setting linear velocity of a kinematic body is not supported.")
+		if (rb != null && !rb.isKinematic)
 		{
 			rb.velocity = velocity;
 		}

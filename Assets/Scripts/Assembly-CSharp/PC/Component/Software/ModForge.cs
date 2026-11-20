@@ -150,7 +150,7 @@ public class ModForge : Website
         if (caseCratePrefab != null && caseCratePrefab.name == name)
             return caseCratePrefab.gameObject;
 
-        var asset = Resources.Load<GameObject>(name);
+        var asset = Resources.Load<GameObject>("components/" + name);
         if (asset == null)
         {
             Debug.LogWarning("[ModForge] Нет ящика " + name + ": крышка приедет без него.");
@@ -308,8 +308,8 @@ public class ModForge : Website
         {
             rb.useGravity = false;
             rb.isKinematic = true;
-            rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
+            // rb.velocity/angularVelocity нельзя трогать у кинематического тела:
+            // Unity их игнорирует и пишет "Setting linear/angular velocity of a kinematic body is not supported."
             rb.detectCollisions = false;
         }
         foreach (Transform t in go.transform)
