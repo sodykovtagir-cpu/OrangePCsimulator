@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using PC.Component.Software;
@@ -16,6 +17,12 @@ public class ModForge : Website
     [SerializeField] private Text[] texts;
     [SerializeField] private CustomPaint[] coverPrefabs;
     [SerializeField] private int[] prices;
+
+    [Header("Доставка в коробке")]
+    [Tooltip("Коробка, в которой приезжает купленная крышка (Assets/GameObject/Box_CustomCover.prefab). " +
+             "Пусто — коробка берётся из Resources: Box_CustomCover.")]
+    [SerializeField] private Box caseBoxPrefab;
+    private const string CaseBoxResourcePath = "Box_CustomCover";
 
     [Header("HD (доплата)")]
     [Tooltip("Галочка «HD»: снимает ограничение на размер рисунка и добавляет 500$ к цене.")]
@@ -111,22 +118,53 @@ public class ModForge : Website
         }
 
         m.Spend(price);
-        Spawn(coverPrefabs[selectedProduct], tex);
+        if (!Spawn(coverPrefabs[selectedProduct], tex))
+        {
+            // Рисунок не дошёл — возвращаем деньги, чтобы заказ не пропал.
+            m.AddMoney(price);
+            m.FadeText("<color=red>Крышка не доставлена — деньги возвращены</color>");
+            return;
+        }
         StopPreview();
         ReleasePreviewTexture();
         checkout.SetActive(false);
         thankYou.SetActive(true);
     }
 
-    private void Spawn(CustomPaint prefab, Texture2D texture)
+    private GameObject CaseBox()
     {
-        if (prefab == null || texture == null || Main.Instance == null) return;
+        if (caseBoxPrefab != null) return caseBoxPrefab.gameObject;
+        var asset = Resources.Load<GameObject>(CaseBoxResourcePath);
+        if (asset == null)
+        {
+            Debug.LogWarning("[ModForge] Нет коробки Box_CustomCover: крышка приедет без неё.");
+            return null;
+        }
+        return asset;
+    }
+
+    /// <summary>
+    /// Купленная крышка приезжает в коробке, как любая деталь: сначала
+    /// доставляется коробка, а предмет выкладывается из неё уже с рисунком.
+    /// </summary>
+    private bool Spawn(CustomPaint prefab, Texture2D texture)
+    {
+        if (prefab == null || texture == null || Main.Instance == null) return false;
+        var box = CaseBox();
+        if (box == null) return false;
         byte[] bytes = texture.EncodeToPNG();
         texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
-        var go = Main.Instance.InstantDelivery(prefab.gameObject);
-        if (go == null) return;
-        CustomPaint item = go.GetComponent<CustomPaint>();
-        if (item != null) item.SetTexture(texture, bytes);
+
+        // Рисунок наносим на уже созданный экземпляр, но до того, как коробка
+        // выложит его из себя.
+        Action<GameObject> paint = go =>
+        {
+            if (go == null) return;
+            var item = go.GetComponent<CustomPaint>();
+            if (item != null) item.SetTexture(texture, bytes);
+        };
+
+        return Main.Instance.DeliverCustom(prefab.gameObject, box, paint);
     }
 
     private bool HasProduct(int index)

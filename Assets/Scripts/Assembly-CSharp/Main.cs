@@ -241,6 +241,109 @@ public class Main : MonoBehaviour
 		InstantDelivery(prefab);
 	}
 
+	/// <summary>Событие: в мире только что создали объект доставки.</summary>
+	/// <remarks>
+	/// Нужно кастомным вещам: рисунок известен лишь после Instantiate, а
+	/// выложить предмет из коробки надо раньше, чем игрок её откроет.
+	/// </remarks>
+	public event Action<GameObject> Spawned;
+
+	/// <summary>
+	/// Доставить рисованную вещь (кастомная крышка/стекло) — в коробке, как
+	/// любую покупку.
+	/// </summary>
+	/// <remarks>
+	/// Рисунок наносится уже на созданный экземпляр, поэтому содержимое коробки
+	/// собирается отложенно: <see cref="Box.CustomDelivery"/> отдаёт коробке
+	/// фабрику предмета, событие Spawned сообщает о появлении коробки, а
+	/// <see cref="Box.Release"/> выкладывает предмет уже с рисунком. Порядок
+	/// сохраняется очередью: несколько заказов подряд не перепутают рисунки.
+	/// </remarks>
+	public bool DeliverCustom(GameObject itemPrefab, GameObject boxPrefab, Action<GameObject> configure)
+	{
+		if (itemPrefab == null) return false;
+		if (boxPrefab == null)
+		{
+			// Коробки нет — отдаём предмет сразу, лишь бы заказ не пропал.
+			var direct = NotifySpawned(Instantiate(itemPrefab, transform.position, transform.rotation));
+			if (direct == null) return false;
+			configure?.Invoke(direct);
+			return true;
+		}
+
+		customItems.Enqueue(() => Instantiate(itemPrefab));
+		customConfigures.Enqueue(configure);
+		Box.CustomDelivery = TakeCustomItem;
+		EnsureSpawnHook();
+
+		DeliverPackage(boxPrefab);
+		return true;
+	}
+
+	/// <summary>Содержимое кастомных заказов в порядке покупок (см. DeliverCustom).</summary>
+	private readonly Queue<Func<GameObject>> customItems = new Queue<Func<GameObject>>();
+
+	/// <summary>Нанесение рисунка для каждого кастомного заказа, в том же порядке.</summary>
+	private readonly Queue<Action<GameObject>> customConfigures = new Queue<Action<GameObject>>();
+
+	private bool spawnHookInstalled;
+
+	private GameObject TakeCustomItem()
+	{
+		if (customItems.Count == 0)
+		{
+			Box.CustomDelivery = null;
+			return null;
+		}
+		var make = customItems.Dequeue();
+		Box.CustomDelivery = customItems.Count > 0 ? (Func<GameObject>)TakeCustomItem : null;
+		return make();
+	}
+
+	/// <summary>
+	/// Одна подписка на все доставки: коробка кастомного заказа выкладывает
+	/// предмет уже с рисунком, обычные коробки не трогаем.
+	/// </summary>
+	private void EnsureSpawnHook()
+	{
+		if (spawnHookInstalled) return;
+		spawnHookInstalled = true;
+		Spawned += OnSpawned;
+	}
+
+	private void OnSpawned(GameObject spawned)
+	{
+		// Загрузка сейва: содержимое уже восстановлено отдельной записью.
+		if (Box.Restoring) return;
+		var box = spawned != null ? spawned.GetComponent<Box>() : null;
+		// Обычная коробка со своим prefab: кастомных заказов не касается.
+		if (box == null || !box.NeedsContent) return;
+		if (customConfigures.Count == 0) return;
+		// Содержимое забираем сразу после Instantiate — до Start() коробки,
+		// чтобы рисунок уже был на предмете.
+		box.ReleaseFrom(customConfigures.Dequeue());
+	}
+
+	/// <summary>Отправить коробку той же доставкой, что и купленные детали.</summary>
+	public GameObject DeliverPackage(GameObject prefab)
+	{
+		if (prefab == null) return null;
+		if (packagePoint == null)
+		{
+			Debug.LogWarning("[Main] packagePoint не назначен — коробка появится сразу у портала.");
+			return InstantDelivery(prefab);
+		}
+		orders.Enqueue(prefab);
+		if (!delivering) StartCoroutine(Delivery());
+		return null;
+	}
+
+	private GameObject NotifySpawned(GameObject spawned)
+	{
+		if (spawned != null) Spawned?.Invoke(spawned);
+		return spawned;
+	}
+
 	public GameObject InstantDelivery(GameObject prefab)
 	{
 		if (portal != null)
@@ -248,7 +351,7 @@ public class Main : MonoBehaviour
 			portal.SetTrigger("Show");
 			if (portalPoint != null)
 			{
-				return Instantiate(prefab, portalPoint.position, portalPoint.rotation);
+				return NotifySpawned(Instantiate(prefab, portalPoint.position, portalPoint.rotation));
 			}
 		}
 		return null;
@@ -273,7 +376,7 @@ public class Main : MonoBehaviour
 			var original = orders.Dequeue();
 			if (packagePoint != null)
 			{
-				Instantiate(original, packagePoint.position, packagePoint.rotation);
+				NotifySpawned(Instantiate(original, packagePoint.position, packagePoint.rotation));
 			}
 
 			if (orders.Count == 0)

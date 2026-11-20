@@ -2,6 +2,19 @@
 
 ## Added
 
+### Custom cover arrives in a box
+
+- **A custom-painted cover/glass no longer pops into the room out of nowhere.** Buying on ModForge now goes through normal delivery: a box (`Box_CustomCover`) arrives at the door and the item is taken out of it already carrying the artwork — same as any purchased part.
+- **The artwork is not lost.** The cover used to be created instantly and painted on the fly. The box content is now built lazily (`Box.CustomDelivery` -> `Box.Release`), so the picture is applied to the spawned item before the player opens the box.
+- **Consecutive orders keep their own artwork:** the purchase queue preserves order.
+- **The box behaves like every other one:** `Box` tag (trash bag and box-removal bomb work), hinged lid, and no duplicate on save load (`Box.Restoring`).
+- **If delivery fails** (the box is missing from the build), the money is refunded instead of being lost.
+
+### Wi-Fi password is masked
+
+- **The password field in the PCOS network list hides input.** The prefab had `ContentType.Standard`, so the key was shown as plain text. The prefab now uses `Password` + `InputType.Password`, and the code force-applies the mask (`WifiNetworkEntry.PreparePasswordField`) even for an older prefab.
+- **The router website masks both password fields** ("new Wi-Fi password" and "parent network password for a repeater") through the shared `Secure()` helper.
+
 ### Site hosting v3 — wallet, traffic and automatic offline mode
 
 - The game no longer deducts rent from the player's balance and no longer saves on every server reply: syncing only reads state. That per-reply `SaveData()` was what made the game hitch on mobile.

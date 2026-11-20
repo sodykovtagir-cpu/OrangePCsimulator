@@ -22,9 +22,29 @@ namespace PC.Component.Software.OS
         private InternetService service;
         private bool enteringPassword;
         private Action<WifiNetworkEntry> onSelected;
+
+        // Поле пароля прячет ввод с первого кадра, ещё до Initialize.
+        private void Awake()
+        {
+            PreparePasswordField();
+        }
+
         private Action onRepeaterChanged;
         private RouterDevice repeaterParent;
         private RouterDevice repeaterTarget;
+
+        /// <summary>
+        /// Пароль всегда вводится звёздочками. Тип поля задаётся и в префабе, и
+        /// здесь: если карточку инстанцировали из старого префаба (или поле
+        /// случайно сбросили), пароль всё равно не окажется открытым текстом.
+        /// </summary>
+        private void PreparePasswordField()
+        {
+            if (password == null) return;
+            password.contentType = InputField.ContentType.Password;
+            if (password.asteriskChar != '*') password.asteriskChar = '*';
+            password.ForceLabelUpdate();
+        }
 
         public void Initialize(Motherboard currentBoard, RouterDevice target, InternetService currentService,
             Action<WifiNetworkEntry> selected = null)
@@ -35,7 +55,8 @@ namespace PC.Component.Software.OS
             enteringPassword = false;
             onSelected = selected;
             repeaterParent = repeaterTarget = null;
-            if (password != null) { password.contentType = InputField.ContentType.Password; password.text = ""; }
+            PreparePasswordField();
+            if (password != null) password.text = "";
             if (connect != null) connect.onClick.AddListener(ConnectClicked);
             Refresh();
         }
@@ -53,11 +74,8 @@ namespace PC.Component.Software.OS
             onSelected = selected;
             onRepeaterChanged = changed;
             enteringPassword = false;
-            if (password != null)
-            {
-                password.contentType = InputField.ContentType.Password;
-                password.text = "";
-            }
+            PreparePasswordField();
+            if (password != null) password.text = "";
             if (connect != null)
             {
                 connect.onClick.RemoveAllListeners();
@@ -156,7 +174,7 @@ namespace PC.Component.Software.OS
                 if (password != null) password.text = "";
                 if (passwordMessage != null) passwordMessage.text = "Пароль основной сети:";
                 Refresh();
-                if (password != null) password.ActivateInputField();
+                if (password != null) { PreparePasswordField(); password.ActivateInputField(); }
                 return;
             }
             string key = password != null ? password.text : "";
@@ -196,7 +214,7 @@ namespace PC.Component.Software.OS
                 if (password != null) password.text = "";
                 if (passwordMessage != null) passwordMessage.text = "Enter Password:";
                 Refresh();
-                if (password != null) password.ActivateInputField();
+                if (password != null) { PreparePasswordField(); password.ActivateInputField(); }
                 return;
             }
             // Check THIS router's credentials, not just any AP sharing an SSID.

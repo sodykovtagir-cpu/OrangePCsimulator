@@ -2789,7 +2789,7 @@ check("hardcore" in _sw, "в хардкоре подсказка по-прежн
 _box = _strip_comments(
     (ROOT / "Assets/Scripts/Assembly-CSharp/Box.cs").read_text(encoding="utf-8"))
 check("Restoring" in _box, "коробка знает про режим загрузки")
-check("if (Restoring) return;" in _box,
+check("if (Restoring) return" in _box,
       "во время загрузки коробка ничего не спавнит")
 check("opened" in _box, "коробка не выкладывает содержимое дважды")
 
@@ -3123,7 +3123,7 @@ _gw9 = _mb9.split("public List<Hardware> GetHardwares(HardwareType type)")[1].sp
 check("AddBuiltIn(" in _gw9, "распаянная начинка попадает в поиск железа")
 _bg9 = _mb9.split("private void BootSystem()")[1].split("\n\t\t}")[0]
 check("SwitchBuiltIn(true)" in _bg9, "начинка включается вместе с платой")
-_po9 = _mb9.split("public void PowerOff(bool restart = false)")[1].split("\n\t\t}")[0]
+_po9 = _mb9.split("public void PowerOff(bool restart = false, bool reportHosting = true)")[1].split("\n\t\t}")[0]
 check("SwitchBuiltIn(false)" in _po9, "начинка выключается вместе с платой")
 
 check('type = HardwareType.CPU' in _src9, "в плате распаян процессор")

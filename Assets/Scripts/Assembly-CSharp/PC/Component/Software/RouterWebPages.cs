@@ -85,6 +85,18 @@ namespace PC.Component.Software
             return b;
         }
 
+        /// <summary>
+        /// Поле пароля: ввод закрыт звёздочками. Единая точка, чтобы ни одно
+        /// поле на сайте роутера не показывало пароль открытым текстом.
+        /// </summary>
+        private static void Secure(InputField input)
+        {
+            if (input == null) return;
+            input.contentType = InputField.ContentType.Password;
+            input.asteriskChar = '*';
+            input.ForceLabelUpdate();
+        }
+
         private static InputField Entry(Transform parent, string placeholder, string value = "")
         {
             var o = Make("Input", parent, true);
@@ -168,7 +180,7 @@ namespace PC.Component.Software
             { if (router.SetSsid(ssid.text)) browser.ShowNetworkPage("192.168.1.1");
               else Label(body, "Имя сети должно быть от 1 до 32 символов"); });
             Label(body, "Новый пароль Wi-Fi (8–63 символа)");
-            var key = Entry(body, "Новый пароль"); key.contentType = InputField.ContentType.Password;
+            var key = Entry(body, "Новый пароль"); Secure(key);
             AddButton(body, "Сохранить пароль", () =>
             { if (router.SetPassword(key.text)) browser.ShowNetworkPage("192.168.1.1");
               else Label(body, "Нужен пароль от 8 до 63 символов"); });
@@ -183,7 +195,7 @@ namespace PC.Component.Software
                     " / " + (child.UpstreamId == 0 ? "нет родителя" : "родитель #" + child.UpstreamId));
                 Label(body, "Пароль основной Wi-Fi сети для #" + child.Id);
                 var parentKey = Entry(body, "Введи пароль");
-                parentKey.contentType = InputField.ContentType.Password;
+                Secure(parentKey);
                 AddButton(body, "Подключить #" + child.Id + " как Wi-Fi повторитель", () =>
                 { if (!string.IsNullOrEmpty(parentKey.text) &&
                       child.ConnectUpstream(router.Id, true, parentKey.text))
