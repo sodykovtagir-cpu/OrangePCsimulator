@@ -14,6 +14,13 @@ internal static class BoxTestHooks
     public static void Start(Box box) { typeof(Box).GetMethod("Start",
         BindingFlags.Instance | BindingFlags.NonPublic).Invoke(box, null); }
 
+    /// <summary>Содержимое уже выложено ровно один раз.</summary>
+    public static bool OpenedOnce(Box box)
+    {
+        return (bool)typeof(Box).GetField("opened",
+            BindingFlags.Instance | BindingFlags.NonPublic).GetValue(box);
+    }
+
     /// <summary>Опустела ли очередь кастомных заказов (нет отложенного содержимого).</summary>
     public static bool CustomDeliveryWithoutPending()
     {

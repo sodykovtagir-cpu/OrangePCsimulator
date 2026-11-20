@@ -34,75 +34,86 @@ public class Box : MonoBehaviour
     public static bool Restoring { get; set; }
 
     /// <summary>
-    /// Ставится на время живой доставки кастомной вещи (крышки/стекла).
+    /// Чем наполняется ящик/коробка в живой доставке заказной вещи.
     /// </summary>
     /// <remarks>
-    /// Коробка выкладывает содержимое сразу в Start(), но рисунок покупатель
-    /// выбирает в магазине и наносит уже после Instantiate. Поэтому на время
-    /// такой доставки нужен «отложенный» режим: коробка запоминает, что
-    /// показывать, а Main наносит рисунок (Release) и только потом выпускает
-    /// предмет — ещё до Start(), чтобы игрок не увидел пустую коробку.
+    /// Доставка создаёт ящик раньше, чем Main успевает подготовить предмет с
+    /// рисунком, поэтому способ сборки содержимого живёт в статическом поле:
+    /// ящик забирает его в Start(). Порядок заказов сохраняет Main.
     /// </remarks>
     public static Func<GameObject> CustomDelivery { get; set; }
 
-    /// <summary>Отложенное содержимое живой доставки (см. CustomDelivery).</summary>
+    /// <summary>Отложенный способ сборки содержимого (см. CustomDelivery).</summary>
     private Func<GameObject> pending;
 
     /// <summary>
-    /// Коробка без зашитого содержимого: её наполняет код (Box_CustomCover).
-    /// Обычные коробки везут свой prefab и к очереди заказов не относятся.
+    /// У коробки нет зашитого предмета: содержимое собирает код. У ящика с
+    /// зашитым содержимым (например, обычного стекла) это false, поэтому
+    /// чужие заказы его не трогают.
     /// </summary>
-    public bool NeedsContent { get { return prefab == null; } }
+    public bool NeedsContent { get { return prefab == null && contentFactory == null; } }
+
+    /// <summary>Содержимое ещё не выложено: можно наполнять.</summary>
+    public bool Pending { get { return pending != null; } }
 
     /// <summary>
-    /// Забрать отложенное содержимое и выложить его уже с настройкой
-    /// (рисунком). Вызывается сразу после Instantiate коробки — до Start().
+    /// Готов ли заказ, которому нужна именно эта коробка: содержимое не
+    /// выложено, а код уже знает, что сюда класть.
     /// </summary>
-    public void ReleaseFrom(Action<GameObject> configure)
+    public bool AwaitingContent { get { return awaiting; } }
+
+    /// <summary>Пометить коробку под заказ (до того, как в неё положат предмет).</summary>
+    public void ExpectContent()
+    {
+        awaiting = true;
+        prefab = null;
+    }
+
+    /// <summary>
+    /// Положить в коробку предмет и нанести на него настройку (рисунок).
+    /// Вызывается до Start() коробки, чтобы игрок не увидел пустой ящик.
+    /// </summary>
+    public void FillWith(Func<GameObject> make, Action<GameObject> configure)
+    {
+        awaiting = false;
+        contentFactory = configure;
+        pending = make;
+        Release(null);
+    }
+
+    /// <summary>
+    /// Досрочная выкладка предмета (например, ящик разбили раньше, чем
+    /// доставка успела его наполнить): берём отложенное содержимое, если оно
+    /// есть, и выкладываем без дополнительной настройки.
+    /// </summary>
+    public void Release(Action<GameObject> configure)
     {
         if (pending == null && prefab == null && CustomDelivery != null)
         {
             pending = CustomDelivery;
             CustomDelivery = null;
         }
-        Release(configure);
-    }
-
-    /// <summary>
-    /// Готов ли предмет, который коробка ещё не выложила. По этому признаку
-    /// ModForge наносит рисунок уже после создания экземпляра, но до того, как
-    /// игрок увидит крышку.
-    /// </summary>
-    public bool Pending { get { return pending != null; } }
-
-    /// <summary>
-    /// Собрать отложенный предмет, нанести на него рисунок и выложить из
-    /// коробки. Вызывается один раз — из Main, сразу после того, как доставка
-    /// создала коробку (то есть ДО её Start()).
-    /// </summary>
-    /// <remarks>
-    /// Обычный путь (без коробки) работает как раньше: содержимое спавнится в
-    /// Start() коробки.
-    /// </remarks>
-    public void Release(Action<GameObject> configure)
-    {
         var make = pending;
         if (make == null) return;
         pending = null;
-        Open(make, configure);
+        Open(make, configure ?? contentFactory);
     }
 
-    /// <summary>Уже выложила содержимое — второй раз не надо.</summary>
+    private Action<GameObject> contentFactory;
+    private bool awaiting;
+
+    /// <summary>Содержимое уже выложено — второй раз не надо.</summary>
     private bool opened;
 
     private void Start()
     {
-        // Содержимое уже выложили из доставки (ReleaseFrom) — второй раз не надо.
+        // Содержимое уже выложили из доставки — второй раз не надо.
         if (opened) return;
 
-        // prefab == null — это коробка заказной вещи (Box_CustomCover): у неё
-        // нет зашитого содержимого, его собирает код. Обычная коробка с
-        // зашитым prefab от очереди заказов не зависит.
+        // Заказ ждёт рисунка: сам ничего не выкладываем.
+        if (awaiting) return;
+
+        // Коробка заказной вещи без зашитого предмета: содержимое даёт код.
         var deferred = CustomDelivery;
         if (deferred != null && prefab == null)
         {
@@ -110,9 +121,8 @@ public class Box : MonoBehaviour
             CustomDelivery = null;
         }
 
-        // Main обычно забирает содержимое раньше (сразу после Instantiate),
-        // чтобы нанести рисунок. Если его нет — выкладываем без рисунка,
-        // иначе заказ пропадёт вместе с коробкой.
+        // Если доставка подготовила предмет — выкладываем его сейчас, иначе
+        // заказ пропал бы вместе с коробкой.
         if (pending != null) { Release(null); return; }
 
         Open();
@@ -121,7 +131,9 @@ public class Box : MonoBehaviour
     /// <summary>Выложить содержимое коробки.</summary>
     public void Open()
     {
-        Open(prefab != null ? (Func<GameObject>)(() => Instantiate(prefab, transform.position, transform.rotation)) : null, null);
+        // Ящик с зашитым содержимым, если живого заказа нет.
+        if (prefab != null) pending = pending ?? (() => Instantiate(prefab, transform.position, transform.rotation));
+        Release(null);
     }
 
     private bool Open(Func<GameObject> make, Action<GameObject> configure)
@@ -136,13 +148,17 @@ public class Box : MonoBehaviour
         opened = true;
 
         var obj = make();
-        if (obj == null) return false;
+        // У адресного наполнения (ContentFactory) предмет создаёт сам код.
+        if (obj == null && contentFactory == null) return false;
 
         configure?.Invoke(obj);
 
-        var tr = obj.transform;
-        tr.Translate(position);
-        tr.Rotate(rotation);
+        if (obj != null)
+        {
+            var tr = obj.transform;
+            tr.Translate(position);
+            tr.Rotate(rotation);
+        }
         return true;
     }
 }

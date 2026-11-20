@@ -227,8 +227,28 @@ public class Main : MonoBehaviour
 		Delivery(item.spawn, item.large);
 	}
 
+	/// <summary>
+	/// Доставить покупку обычным путём: коробкой, если она упакована, иначе
+	/// сразу из портала.
+	/// </summary>
+	public GameObject Delivery(GameObject prefab)
+	{
+		Delivery(prefab, false);
+		return prefab;
+	}
+
 	public void Delivery(GameObject prefab, bool large)
 	{
+		if (prefab == null) return;
+		// Обычная (небьющаяся) крышка тоже приезжает в ящике: стеклянная уже
+		// продаётся в Crate_*, а чёрная/белая появлялась прямо из портала.
+		// Такой ящик не разбивают молотком — он выкладывает крышку сам.
+		var cover = prefab.GetComponent<CoverItem>();
+		if (cover != null && !cover.AlreadyBoxed)
+		{
+			var crate = cover.Crate;
+			if (crate != null) { Delivery(crate); return; }
+		}
 		if (!large && packagePoint != null)
 		{
 			orders.Enqueue(prefab);
@@ -249,15 +269,16 @@ public class Main : MonoBehaviour
 	public event Action<GameObject> Spawned;
 
 	/// <summary>
-	/// Доставить рисованную вещь (кастомная крышка/стекло) — в коробке, как
-	/// любую покупку.
+	/// Доставить рисованную вещь (кастомная крышка/стекло) — в её собственной
+	/// коробке, как обычная покупка: ящик приезжает к двери, внутри лежит
+	/// предмет с уже нанесённым рисунком.
 	/// </summary>
 	/// <remarks>
-	/// Рисунок наносится уже на созданный экземпляр, поэтому содержимое коробки
-	/// собирается отложенно: <see cref="Box.CustomDelivery"/> отдаёт коробке
-	/// фабрику предмета, событие Spawned сообщает о появлении коробки, а
-	/// <see cref="Box.Release"/> выкладывает предмет уже с рисунком. Порядок
-	/// сохраняется очередью: несколько заказов подряд не перепутают рисунки.
+	/// Рисунок наносится на созданный экземпляр, поэтому содержимое ящика
+	/// собирает код: доставка помечает коробку (Box.ExpectContent), а в момент
+	/// появления экземпляра Main собирает предмет и наносит рисунок — до Start()
+	/// коробки. Порядок заказов сохраняется очередью, иначе два заказа подряд
+	/// перепутали бы рисунки.
 	/// </remarks>
 	public bool DeliverCustom(GameObject itemPrefab, GameObject boxPrefab, Action<GameObject> configure)
 	{
@@ -265,44 +286,35 @@ public class Main : MonoBehaviour
 		if (boxPrefab == null)
 		{
 			// Коробки нет — отдаём предмет сразу, лишь бы заказ не пропал.
-			var direct = NotifySpawned(Instantiate(itemPrefab, transform.position, transform.rotation));
+			var direct = NotifySpawned(Instantiate(itemPrefab, DeliveryPosition, DeliveryRotation));
 			if (direct == null) return false;
 			configure?.Invoke(direct);
 			return true;
 		}
 
-		customItems.Enqueue(() => Instantiate(itemPrefab));
+		customItems.Enqueue(itemPrefab);
 		customConfigures.Enqueue(configure);
-		Box.CustomDelivery = TakeCustomItem;
+		customBoxes.Enqueue(boxPrefab);
 		EnsureSpawnHook();
 
 		DeliverPackage(boxPrefab);
 		return true;
 	}
 
-	/// <summary>Содержимое кастомных заказов в порядке покупок (см. DeliverCustom).</summary>
-	private readonly Queue<Func<GameObject>> customItems = new Queue<Func<GameObject>>();
+	/// <summary>Предметы кастомных заказов в порядке покупок (см. DeliverCustom).</summary>
+	private readonly Queue<GameObject> customItems = new Queue<GameObject>();
 
 	/// <summary>Нанесение рисунка для каждого кастомного заказа, в том же порядке.</summary>
 	private readonly Queue<Action<GameObject>> customConfigures = new Queue<Action<GameObject>>();
 
+	/// <summary>Ящики заказов, которые ещё должны появиться (см. DeliverCustom).</summary>
+	private readonly Queue<GameObject> customBoxes = new Queue<GameObject>();
+
 	private bool spawnHookInstalled;
 
-	private GameObject TakeCustomItem()
-	{
-		if (customItems.Count == 0)
-		{
-			Box.CustomDelivery = null;
-			return null;
-		}
-		var make = customItems.Dequeue();
-		Box.CustomDelivery = customItems.Count > 0 ? (Func<GameObject>)TakeCustomItem : null;
-		return make();
-	}
-
 	/// <summary>
-	/// Одна подписка на все доставки: коробка кастомного заказа выкладывает
-	/// предмет уже с рисунком, обычные коробки не трогаем.
+	/// Одна подписка на все доставки: коробке заказа подкладывается предмет с
+	/// рисунком, обычные коробки не трогаем.
 	/// </summary>
 	private void EnsureSpawnHook()
 	{
@@ -313,16 +325,69 @@ public class Main : MonoBehaviour
 
 	private void OnSpawned(GameObject spawned)
 	{
+		if (spawned == null || customConfigures.Count == 0) return;
 		// Загрузка сейва: содержимое уже восстановлено отдельной записью.
 		if (Box.Restoring) return;
-		var box = spawned != null ? spawned.GetComponent<Box>() : null;
-		// Обычная коробка со своим prefab: кастомных заказов не касается.
-		if (box == null || !box.NeedsContent) return;
-		if (customConfigures.Count == 0) return;
-		// Содержимое забираем сразу после Instantiate — до Start() коробки,
-		// чтобы рисунок уже был на предмете.
-		box.ReleaseFrom(customConfigures.Dequeue());
+		var box = spawned.GetComponent<Box>();
+		if (box == null) return;
+
+		// Каждый заказ доставляется в СВОЁМ ящике: сверяем по префабу, иначе
+		// обычная покупка «съела» бы рисунок чужого заказа.
+		GameObject expected = customBoxes.Count > 0 ? customBoxes.Peek() : null;
+		if (expected == null || !SamePrefab(spawned, expected)) return;
+		customBoxes.Dequeue();
+		Action<GameObject> configure = customConfigures.Dequeue();
+
+		// Предмет собирается ровно в точке ящика: дальше Box сам подвинет его
+		// на своё смещение, как делает с обычным содержимым.
+		GameObject itemPrefab = customItems.Count > 0 ? customItems.Dequeue() : null;
+		if (itemPrefab == null) return;
+		Transform at = spawned.transform;
+		box.ExpectContent();
+		box.FillWith(() => Instantiate(itemPrefab, at.position, at.rotation), configure);
+		// Ящик стекла открывается сразу: рисунок уже на предмете, иначе игрок
+		// получил бы стекло без картинки.
+		var crate = spawned.GetComponent<Crate>();
+		if (crate != null && crate.CanOpen()) crate.BreakApart();
 	}
+
+	/// <summary>Экземпляр доставлен из этого префаба?</summary>
+	private static bool SamePrefab(GameObject instance, GameObject prefab)
+	{
+		return instance != null && prefab != null && instance.name.StartsWith(prefab.name);
+	}
+
+	/// <summary>
+	/// Куда ставить доставку. Раньше при пустом packagePoint заказ молча
+	/// пропадал (появлялся лишь варнинг), поэтому теперь есть запасная точка:
+	/// у двери, а если и её нет — у портала.
+	/// </summary>
+	private Vector3 DeliveryPosition
+	{
+		get
+		{
+			if (packagePoint != null) return packagePoint.position;
+			if (doorPoint != null) return doorPoint.position;
+			if (portalPoint != null) return portalPoint.position;
+			return transform.position;
+		}
+	}
+
+	private Quaternion DeliveryRotation
+	{
+		get
+		{
+			if (packagePoint != null) return packagePoint.rotation;
+			if (doorPoint != null) return doorPoint.rotation;
+			if (portalPoint != null) return portalPoint.rotation;
+			return transform.rotation;
+		}
+	}
+
+	[Header("Доставка: запасная точка, если packagePoint не назначен в сцене")]
+	[Tooltip("Точка у двери. Используется, когда packagePoint пуст (например, в сценах Main 4/5). Можно оставить пустой — тогда заказ появится у портала.")]
+	[SerializeField]
+	private Transform doorPoint;
 
 	/// <summary>Отправить коробку той же доставкой, что и купленные детали.</summary>
 	public GameObject DeliverPackage(GameObject prefab)
@@ -330,7 +395,8 @@ public class Main : MonoBehaviour
 		if (prefab == null) return null;
 		if (packagePoint == null)
 		{
-			Debug.LogWarning("[Main] packagePoint не назначен — коробка появится сразу у портала.");
+			// Без точки выгрузки очередь доставки молчала бы, и заказ пропадал.
+			Debug.LogWarning("[Main] packagePoint не назначен — доставка сразу у двери/портала.");
 			return InstantDelivery(prefab);
 		}
 		orders.Enqueue(prefab);

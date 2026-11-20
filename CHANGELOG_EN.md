@@ -2,13 +2,13 @@
 
 ## Added
 
-### Custom cover arrives in a box
+### Covers arrive in a crate (custom and plain)
 
-- **A custom-painted cover/glass no longer pops into the room out of nowhere.** Buying on ModForge now goes through normal delivery: a box (`Box_CustomCover`) arrives at the door and the item is taken out of it already carrying the artwork — same as any purchased part.
-- **The artwork is not lost.** The cover used to be created instantly and painted on the fly. The box content is now built lazily (`Box.CustomDelivery` -> `Box.Release`), so the picture is applied to the spawned item before the player opens the box.
-- **Consecutive orders keep their own artwork:** the purchase queue preserves order.
-- **The box behaves like every other one:** `Box` tag (trash bag and box-removal bomb work), hinged lid, and no duplicate on save load (`Box.Restoring`).
-- **If delivery fails** (the box is missing from the build), the money is refunded instead of being lost.
+- **A custom-painted glass cover ships in the same crate as the regular glass** (`Crate_Cover_ATX(Glass)` / `Crate_Cover_ITX(Glass)` / `Crate_Glass_Cover_ATX_Aquarium`); the hand-made `Box_CustomCover` is gone.
+- **The artwork is already on the glass:** the order crate arrives and opens itself (`Crate.BreakApart`), because the paint is applied the moment the parcel spawns. No hammer needed for a custom order.
+- **Plain (unbreakable) covers ship in a crate too:** black/white metal covers are no longer spit out of the portal — they arrive in the glass crate, which releases them on its own (`CoverItem` component).
+- **Orders never mix up:** each crate is matched to its own order by prefab, so consecutive orders keep their own artwork and a normal purchase never steals a custom one.
+- **Delivery is not lost when `packagePoint` is unassigned** (Main 4/5 scenes): a fallback `doorPoint` is used, then the portal. Previously such an order vanished into thin air with a console warning.
 
 ### Wi-Fi password is masked
 

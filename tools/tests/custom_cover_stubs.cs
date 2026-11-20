@@ -96,6 +96,18 @@ namespace UnityEngine
         public byte[] EncodeToPNG() { return new byte[] { 1, 2, 3 }; }
         public void Apply(bool updateMipmaps = true, bool makeNoLongerReadable = false) { readOnly = makeNoLongerReadable; }
     }
+    public class Crate : Component
+    {
+        public bool Opened;
+        public bool CanOpen() { return true; }
+        public void BreakApart()
+        {
+            Opened = true;
+            var box = gameObject.GetComponent<Box>();
+            if (box != null) box.Open();
+        }
+    }
+
     public static class Debug
     {
         public static readonly List<string> Warnings = new List<string>();

@@ -37,28 +37,22 @@ public class GameMain
             return true;
         }
 
-        customItems.Enqueue(() => New(itemPrefab));
+        customItems.Enqueue(itemPrefab);
         customConfigures.Enqueue(configure);
-        Box.CustomDelivery = TakeCustomItem;
+        customBoxes.Enqueue(boxPrefab);
         EnsureSpawnHook();
 
         DeliverPackage(boxPrefab);
         return true;
     }
 
-    private readonly System.Collections.Generic.Queue<Func<GameObject>> customItems =
-        new System.Collections.Generic.Queue<Func<GameObject>>();
+    private readonly System.Collections.Generic.Queue<GameObject> customItems =
+        new System.Collections.Generic.Queue<GameObject>();
     private readonly System.Collections.Generic.Queue<Action<GameObject>> customConfigures =
         new System.Collections.Generic.Queue<Action<GameObject>>();
+    private readonly System.Collections.Generic.Queue<GameObject> customBoxes =
+        new System.Collections.Generic.Queue<GameObject>();
     private bool spawnHookInstalled;
-
-    private GameObject TakeCustomItem()
-    {
-        if (customItems.Count == 0) { Box.CustomDelivery = null; return null; }
-        var make = customItems.Dequeue();
-        Box.CustomDelivery = customItems.Count > 0 ? (Func<GameObject>)TakeCustomItem : null;
-        return make();
-    }
 
     private void EnsureSpawnHook()
     {
@@ -69,11 +63,33 @@ public class GameMain
 
     private void OnSpawned(GameObject spawned)
     {
+        if (spawned == null || customConfigures.Count == 0) return;
         if (Box.Restoring) return;
-        var box = spawned != null ? spawned.GetComponent<Box>() : null;
-        if (box == null || !box.NeedsContent) return;
-        if (customConfigures.Count == 0) return;
-        box.ReleaseFrom(customConfigures.Dequeue());
+        var box = spawned.GetComponent<Box>();
+        if (box == null) return;
+
+        GameObject expected = customBoxes.Count > 0 ? customBoxes.Peek() : null;
+        if (expected == null || !SamePrefab(spawned, expected)) return;
+        customBoxes.Dequeue();
+        Action<GameObject> configure = customConfigures.Dequeue();
+
+        GameObject itemPrefab = customItems.Count > 0 ? customItems.Dequeue() : null;
+        if (itemPrefab == null) return;
+        Transform at = spawned.transform;
+        box.ExpectContent();
+        box.FillWith(() => UnityEngine.Object.Instantiate(itemPrefab, at.position, at.rotation), configure);
+        var crate = spawned.GetComponent<Crate>();
+        if (crate != null && crate.CanOpen()) crate.BreakApart();
+    }
+
+    public bool CustomQueuesEmpty
+    {
+        get { return customItems.Count == 0 && customConfigures.Count == 0 && customBoxes.Count == 0; }
+    }
+
+    private static bool SamePrefab(GameObject instance, GameObject prefab)
+    {
+        return instance != null && prefab != null && instance.name.StartsWith(prefab.name);
     }
 
     public GameObject DeliverPackage(GameObject prefab)

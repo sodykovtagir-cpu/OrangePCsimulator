@@ -18,11 +18,22 @@ public class ModForge : Website
     [SerializeField] private CustomPaint[] coverPrefabs;
     [SerializeField] private int[] prices;
 
-    [Header("Доставка в коробке")]
-    [Tooltip("Коробка, в которой приезжает купленная крышка (Assets/GameObject/Box_CustomCover.prefab). " +
-             "Пусто — коробка берётся из Resources: Box_CustomCover.")]
-    [SerializeField] private Box caseBoxPrefab;
-    private const string CaseBoxResourcePath = "Box_CustomCover";
+    [Header("Доставка в ящике")]
+    [Tooltip("Ящик заказного стекла (Crate_Cover_ATX(Glass)). Пусто — берётся из Resources по индексу товара.")]
+    [SerializeField] private Crate caseCratePrefab;
+
+    /// <summary>
+    /// Тот же ящик, в котором приезжает обычное стекло: крышка заказная или
+    /// нет — неважно, упаковка одинаковая.
+    /// </summary>
+    private static readonly string[] CrateNames =
+    {
+        "Crate_Cover_ATX(Glass)",        // cover_atx_glass_custom
+        "Crate_Cover_ITX(Glass)",        // cover_itx_glass_custom
+        "Crate_Cover_ATX(Glass)",        // cover_atx_custom
+        "Crate_Cover_ITX(Glass)",        // cover_itx_custom
+        "Crate_Glass_Cover_ATX_Aquarium" // Aquarium_Cover_ATX(customGlass)
+    };
 
     [Header("HD (доплата)")]
     [Tooltip("Галочка «HD»: снимает ограничение на размер рисунка и добавляет 500$ к цене.")]
@@ -131,15 +142,21 @@ public class ModForge : Website
         thankYou.SetActive(true);
     }
 
-    private GameObject CaseBox()
+    private GameObject CaseCrate()
     {
-        if (caseBoxPrefab != null) return caseBoxPrefab.gameObject;
-        var asset = Resources.Load<GameObject>(CaseBoxResourcePath);
+        string name = CrateNames[Mathf.Clamp(selectedProduct, 0, CrateNames.Length - 1)];
+        // Назначенный в инспекторе ящик главнее, но только если он подходит
+        // выбранному товару: у ATX и ITX ящики разные.
+        if (caseCratePrefab != null && caseCratePrefab.name == name)
+            return caseCratePrefab.gameObject;
+
+        var asset = Resources.Load<GameObject>(name);
         if (asset == null)
         {
-            Debug.LogWarning("[ModForge] Нет коробки Box_CustomCover: крышка приедет без неё.");
+            Debug.LogWarning("[ModForge] Нет ящика " + name + ": крышка приедет без него.");
             return null;
         }
+        caseCratePrefab = asset.GetComponent<Crate>();
         return asset;
     }
 
@@ -150,7 +167,7 @@ public class ModForge : Website
     private bool Spawn(CustomPaint prefab, Texture2D texture)
     {
         if (prefab == null || texture == null || Main.Instance == null) return false;
-        var box = CaseBox();
+        var box = CaseCrate();
         if (box == null) return false;
         byte[] bytes = texture.EncodeToPNG();
         texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
