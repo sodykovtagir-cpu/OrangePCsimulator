@@ -227,10 +227,7 @@ public class Main : MonoBehaviour
 		Delivery(item.spawn, item.large);
 	}
 
-	/// <summary>
-	/// Доставить покупку обычным путём: коробкой, если она упакована, иначе
-	/// сразу из портала.
-	/// </summary>
+	/// <summary>Доставить покупку обычным путём.</summary>
 	public GameObject Delivery(GameObject prefab)
 	{
 		Delivery(prefab, false);
@@ -240,14 +237,12 @@ public class Main : MonoBehaviour
 	public void Delivery(GameObject prefab, bool large)
 	{
 		if (prefab == null) return;
-		// Обычная (небьющаяся) крышка тоже приезжает в ящике: стеклянная уже
-		// продаётся в Crate_*, а чёрная/белая появлялась прямо из портала.
-		// Такой ящик не разбивают молотком — он выкладывает крышку сам.
-		var cover = prefab.GetComponent<CoverItem>();
-		if (cover != null && !cover.AlreadyBoxed)
+		// Обычная (не стеклянная) крышка едет БЕЗ упаковки: она прочная, ящик
+		// ей не нужен — в упаковке приезжает только стекло.
+		if (IsPlainCover(prefab))
 		{
-			var crate = cover.Crate;
-			if (crate != null) { Delivery(crate); return; }
+			InstantDelivery(prefab);
+			return;
 		}
 		if (!large && packagePoint != null)
 		{
@@ -402,6 +397,16 @@ public class Main : MonoBehaviour
 		orders.Enqueue(prefab);
 		if (!delivering) StartCoroutine(Delivery());
 		return null;
+	}
+
+	/// <summary>
+	/// Обычная (не стеклянная) крышка: <c>Cover_ATX(Black)</c>,
+	/// <c>Cover_ITX(White)</c> и т.п. Стекло в каталоге продаётся ящиком
+	/// (<c>Crate_Cover_*</c>), поэтому такие префабы сюда не попадают.
+	/// </summary>
+	private static bool IsPlainCover(GameObject prefab)
+	{
+		return prefab != null && prefab.name.StartsWith("Cover_");
 	}
 
 	private GameObject NotifySpawned(GameObject spawned)

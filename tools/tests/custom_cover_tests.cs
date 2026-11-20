@@ -87,23 +87,22 @@ internal static class Program
         Check(paintedFor == "B:cover_itx_glass_custom_copy", "второй ящик получил вторую крышку");
     }
 
-    private static void TestPlainCoverInCrate()
+    private static void TestPlainCoverNoCrate()
     {
-        Console.WriteLine("[3] Обычная (небьющаяся) крышка тоже в ящике");
-        Box.Restoring = false;
-        Box.CustomDelivery = (Func<GameObject>)null;
-        var crate = NewCratePrefab("Crate_Cover_ATX(Glass)");
-        UnityEngine.Object.InstantiateCount = 0;
-
-        // Box с зашитым содержимым: так ящик везёт обычную крышку.
-        var plainCover = new GameObject("Cover_ATX(Black)");
-        var box = crate.GetComponent<Box>();
-        BoxTestHooks.SetPrefab(box, plainCover);
-        Check(!box.NeedsContent, "у ящика с зашитой крышкой есть содержимое");
-
-        BoxTestHooks.Start(box);
-        Check(UnityEngine.Object.InstantiateCount == 1, "ящик выложил обычную крышку сам, без молотка");
-        Check(BoxTestHooks.OpenedOnce(box), "повторно содержимое не выкладывается");
+        Console.WriteLine("[3] Обычная (не стеклянная) крышка — вообще без ящика");
+        var main = Read("Assets/Scripts/Assembly-CSharp/Main.cs");
+        var delivery = main.Substring(main.IndexOf("public void Delivery(GameObject prefab, bool large)"));
+        delivery = delivery.Substring(0, delivery.IndexOf("\n\t}"));
+        Check(delivery.Contains("IsPlainCover(prefab)"), "обычная крышка распознаётся в доставке");
+        Check(delivery.Contains("InstantDelivery(prefab)"), "такая крышка выдаётся сразу, без упаковки");
+        Check(!delivery.Contains("caseCrate") && !delivery.Contains("Delivery(crate)"),
+              "для обычной крышки ящик не подставляется");
+        Check(!delivery.Contains("GetComponent<CoverItem>"), "упаковки обычной крышки в доставке нет");
+        Check(main.Contains("private static bool IsPlainCover(GameObject prefab)") &&
+              main.Contains("StartsWith(\"Cover_\")"),
+              "признак обычной крышки — префаб Cover_*, а не стеклянный Crate_*");
+        Check(!System.IO.File.Exists(System.IO.Path.Combine(Root, "Assets/Scripts/Assembly-CSharp/CoverItem.cs")),
+              "компонент CoverItem (упаковка обычных крышек) удалён");
     }
 
     private static void TestRestoringSilence()
@@ -142,15 +141,7 @@ internal static class Program
         Check(!forge.Contains("InstantDelivery") && !forge.Contains("Box_CustomCover"),
               "самодельная коробка и мгновенная выдача убраны");
 
-        var cover = Read("Assets/Scripts/Assembly-CSharp/CoverItem.cs");
-        Check(cover.Contains("class CoverItem"), "есть компонент упаковки обычной крышки");
-        Check(cover.Contains("if (glass) return null;"), "стеклянную крышку не упаковывают второй раз");
-        Check(cover.Contains("Crate_Cover_ATX(Glass)") && cover.Contains("Crate_Cover_ITX(Glass)"),
-              "обычная крышка едет в ящике стекла");
-
         var main = Read("Assets/Scripts/Assembly-CSharp/Main.cs");
-        Check(main.Contains("var cover = prefab.GetComponent<CoverItem>();"),
-              "Main упаковывает обычную крышку при покупке");
         Check(main.Contains("crate.BreakApart()"), "ящик заказа открывается сразу (рисунок уже на стекле)");
         Check(main.Contains("private Transform doorPoint;") && main.Contains("DeliveryPosition"),
               "есть запасная точка доставки, если packagePoint пуст");
@@ -195,8 +186,6 @@ internal static class Program
         var forge = Read("Assets/GameObject/ModForge.prefab");
         Check(forge.Contains("caseCratePrefab: {fileID: 114145850920321883, guid: 0bd7f325f7c3ab148bd437fbeff45c2c"),
               "в ModForge.prefab прописан ящик стекла");
-        var meta = Read("Assets/Scripts/Assembly-CSharp/CoverItem.cs.meta");
-        Check(meta.Contains("guid: 4c1f5d9a7b2e4f6c8d0a1b3e5f709214"), "guid CoverItem стабилен");
         var main = Read("Assets/Scripts/Assembly-CSharp/Main.cs");
         Check(main.Contains("public event Action<GameObject> Spawned"), "событие появления доставки объявлено");
         Check(!System.IO.File.Exists(System.IO.Path.Combine(Root, "Assets/GameObject/Box_CustomCover.prefab")),
@@ -235,13 +224,13 @@ internal static class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         TestCustomCoverInCrate();
         TestTwoOrders();
-        TestPlainCoverInCrate();
+        TestPlainCoverNoCrate();
         TestRestoringSilence();
         TestSources();
         TestWifiMasked();
         TestAssets();
         Console.WriteLine(failures == 0
-            ? "PASS: custom and plain covers arrive in the glass crate; Wi-Fi password is masked"
+            ? "PASS: custom cover ships in the glass crate, plain covers ship without a crate, Wi-Fi password is masked"
             : "FAILED: " + failures);
         return failures == 0 ? 0 : 1;
     }
