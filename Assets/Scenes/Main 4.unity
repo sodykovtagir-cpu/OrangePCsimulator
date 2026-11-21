@@ -3420,7 +3420,6 @@ Transform:
   - {fileID: 194}
   - {fileID: 215}
   - {fileID: 199}
-  - {fileID: 2098000002}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -0, z: 0}
 --- !u!4 &226
@@ -17365,10 +17364,11 @@ MonoBehaviour:
   money: 0
   cashSound: {fileID: 8300000, guid: 3318412b29c606d45bd39645999bef83, type: 3}
   doorBellSound: {fileID: 8300000, guid: 6349a11816d324644b985d907201671d, type: 3}
-  packagePoint: {fileID: 2098000002}
+  packagePoint: {fileID: 0}
   portalPoint: {fileID: 202}
   portal: {fileID: 339}
   focus: {fileID: 115}
+  doorPoint: {fileID: 0}
 --- !u!114 &630
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22295,6 +22295,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 21039015}
   m_CullTransparentMesh: 0
+--- !u!114 &166006407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: MenuButton
+  parentRect: {fileID: 0}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!222 &177306676
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -22446,6 +22462,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 185323205}
   m_CullTransparentMesh: 0
+--- !u!114 &220799478
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 113}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Joystick
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!1 &232339426
 GameObject:
   m_ObjectHideFlags: 0
@@ -24698,6 +24730,22 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1101496756}
   m_CullTransparentMesh: 0
+--- !u!114 &1132660532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 156}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: PanelOpen
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!1 &1155949749
 GameObject:
   m_ObjectHideFlags: 0
@@ -25288,6 +25336,22 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -30}
   m_SizeDelta: {x: 480, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1484621200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  controlId: Run
+  parentRect: {fileID: 600}
+  useSmartAnchors: 1
+  edgeSnapZone: 0.16
 --- !u!224 &1489967431
 RectTransform:
   m_ObjectHideFlags: 0
@@ -26145,98 +26209,3 @@ SceneRoots:
   - {fileID: 236}
   - {fileID: 180188429}
   - {fileID: 302568634}
---- !u!114 &1132660532
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 156}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  controlId: PanelOpen
-  parentRect: {fileID: 600}
-  useSmartAnchors: 1
-  edgeSnapZone: 0.16
---- !u!114 &166006407
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 143}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  controlId: MenuButton
-  parentRect: {fileID: 0}
-  useSmartAnchors: 1
-  edgeSnapZone: 0.16
---- !u!114 &220799478
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 113}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  controlId: Joystick
-  parentRect: {fileID: 600}
-  useSmartAnchors: 1
-  edgeSnapZone: 0.16
---- !u!114 &1484621200
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 179}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c5c785935baa01478a9fbe70f968b02, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  controlId: Run
-  parentRect: {fileID: 600}
-  useSmartAnchors: 1
-  edgeSnapZone: 0.16
---- !u!1 &2098000001
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2098000002}
-  m_Layer: 0
-  m_Name: PackagePoint
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2098000002
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2098000001}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 26.83, y: 0, z: 5.17}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 225}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
