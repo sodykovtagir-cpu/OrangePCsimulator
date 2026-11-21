@@ -281,7 +281,9 @@ public class Main : MonoBehaviour
 		if (boxPrefab == null)
 		{
 			// Коробки нет — отдаём предмет сразу, лишь бы заказ не пропал.
-			var direct = NotifySpawned(Instantiate(itemPrefab, DeliveryPosition, DeliveryRotation));
+			if (portal != null) portal.SetTrigger("Show");
+			Transform at = CustomDeliveryPoint;
+			var direct = NotifySpawned(Instantiate(itemPrefab, at.position, at.rotation));
 			if (direct == null) return false;
 			configure?.Invoke(direct);
 			return true;
@@ -353,53 +355,36 @@ public class Main : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Куда ставить доставку. Раньше при пустом packagePoint заказ молча
-	/// пропадал (появлялся лишь варнинг), поэтому теперь есть запасная точка:
-	/// у двери, а если и её нет — у портала.
+	/// Точка спавна кастомных заказов (крышки ModForge): всегда у портала —
+	/// доставка через дверную очередь (packagePoint) нестабильна. Если портала
+	/// нет — у двери, потом у точки посылки, потом у себя (заказ не пропадёт).
 	/// </summary>
-	private Vector3 DeliveryPosition
+	private Transform CustomDeliveryPoint
 	{
 		get
 		{
-			if (packagePoint != null) return packagePoint.position;
-			if (doorPoint != null) return doorPoint.position;
-			if (portalPoint != null) return portalPoint.position;
-			return transform.position;
+			if (portalPoint != null) return portalPoint;
+			if (doorPoint != null) return doorPoint;
+			if (packagePoint != null) return packagePoint;
+			return transform;
 		}
 	}
 
-	private Quaternion DeliveryRotation
-	{
-		get
-		{
-			if (packagePoint != null) return packagePoint.rotation;
-			if (doorPoint != null) return doorPoint.rotation;
-			if (portalPoint != null) return portalPoint.rotation;
-			return transform.rotation;
-		}
-	}
-
-	[Header("Доставка: запасная точка, если packagePoint не назначен в сцене")]
-	[Tooltip("Точка у двери. Используется, когда packagePoint пуст (например, в сценах Main 4/5). Можно оставить пустой — тогда заказ появится у портала.")]
+	[Header("Доставка: запасная точка, если не назначены portalPoint и packagePoint")]
+	[Tooltip("Точка у двери. Используется для кастомных заказов только если не назначен portalPoint. Можно оставить пустой — тогда заказ появится у портала (или у packagePoint).")]
 	[SerializeField]
 	private Transform doorPoint;
 
-	/// <summary>Отправить коробку той же доставкой, что и купленные детали.</summary>
+	/// <summary>Отправить коробку кастомного заказа (крышки ModForge). Всегда спавним у портала, минуя дверную очередь.</summary>
 	public GameObject DeliverPackage(GameObject prefab)
 	{
 		if (prefab == null) return null;
-		if (packagePoint == null)
-		{
-			// Без точки выгрузки очередь доставки молчала бы, и заказ пропадал.
-			// Кладём у doorPoint (если задан), иначе у портала — как обычные
-			// предметы, и обязательно через NotifySpawned, чтобы ящик
-			// наполнился содержимым (см. Spawned).
-			Debug.LogWarning("[Main] packagePoint не назначен — доставка сразу у двери/портала.");
-			return NotifySpawned(Instantiate(prefab, DeliveryPosition, DeliveryRotation));
-		}
-		orders.Enqueue(prefab);
-		if (!delivering) StartCoroutine(Delivery());
-		return null;
+		// Дверная очередь (packagePoint) для кастомных заказов нестабильна:
+		// спавним ящик сразу у портала, но через NotifySpawned — иначе ящик
+		// не наполнится предметом из DeliverCustom (см. Spawned).
+		if (portal != null) portal.SetTrigger("Show");
+		Transform at = CustomDeliveryPoint;
+		return NotifySpawned(Instantiate(prefab, at.position, at.rotation));
 	}
 
 	/// <summary>
