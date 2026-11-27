@@ -498,6 +498,7 @@ public class Raycast : MonoBehaviour
         // Release that selection before starting a flexible cable drag.
         if (cableHit != null && selectedBody != null) ClearSelection();
 
+        bool serverCoverReleased = false;
         if (dragRigidbody)
         {
             var hitRb = hit.rigidbody;
@@ -551,6 +552,19 @@ public class Raycast : MonoBehaviour
                 {
                     SelectBody(hitRb);
                     return;
+                }
+
+                // The server lid is an independently removable part. Release it
+                // before starting the drag/grid assembly traversal, otherwise the
+                // joint graph includes the chassis and a lid drag moves the case.
+                // Do not defeat glue; grid selection alone also leaves it latched.
+                var grabbedItem = hitRb.GetComponent<Item>();
+                var coverConnector = hitRb.GetComponent<Connector>();
+                if (grabbedItem != null && grabbedItem.SpawnId == "Server Cover" &&
+                    !grabbedItem.glue && coverConnector != null)
+                {
+                    coverConnector.Break();
+                    serverCoverReleased = true;
                 }
 
                 // Holding a connected plug does NOT unplug it. Its FixedJoint
@@ -643,7 +657,7 @@ public class Raycast : MonoBehaviour
 
         if (RemoveMode)
         {
-            if (hit.transform && hit.transform.TryGetComponent<Connector>(out var conn))
+            if (!serverCoverReleased && hit.transform && hit.transform.TryGetComponent<Connector>(out var conn))
                 conn.Break();
 
             var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;

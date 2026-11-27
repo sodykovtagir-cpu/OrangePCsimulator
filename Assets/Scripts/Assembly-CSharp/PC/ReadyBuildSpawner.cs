@@ -195,8 +195,11 @@ namespace PC
 			}
 
 			var baseBody = root.GetComponent<Rigidbody>();
-			bool baseWasKinematic = false;
-			if (baseBody != null)
+			// Do not apply the temporary mass/solver workaround to servers.
+			// It is still needed by large ready miners and other builds.
+			bool useBuildStabilization = root.GetComponent<ServerChassis>() == null;
+			bool baseWasKinematic = baseBody != null && baseBody.isKinematic;
+			if (baseBody != null && useBuildStabilization)
 			{
 				baseWasKinematic = baseBody.isKinematic;
 
@@ -320,7 +323,8 @@ namespace PC
 					//
 					// Раму утяжелять можно и нужно: она основа, входящего
 					// джойнта у неё нет и рвать нечего.
-					StabilizeHost(spawned, part.slotTarget);
+					if (useBuildStabilization)
+						StabilizeHost(spawned, part.slotTarget);
 
 					// Пауза не обязательна для корректности — слоты уже
 					// заняты синхронно, — но даёт материнке отработать
