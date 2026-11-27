@@ -68,8 +68,9 @@ def upgrade():
  p.set(p.data(drop[0])['m_GameObject']['fileID'],'m_Name','Host domain kind')
  layout(drop[1],98,28,x=330,w=-342)
  p.set(drop[0],'m_Value','0')
- event_data=[{'m_Text':'Стандартный адрес'},{'m_Text':'Свой домен'},{'m_Text':'Локально в сохранении'}]
- p.set(drop[0],'m_Options',"\n"+"".join('    - m_Text: %s\n      m_Image: {fileID: 0}\n'%o['m_Text'] for o in event_data))
+ event_data=[{'m_Text':'Стандартный адрес'},{'m_Text':'Свой домен'}]
+ # UGUI stores the option list inside the serialized OptionDataList wrapper.
+ p.set(drop[0],'m_Options',"    m_Options:\n"+"".join('    - m_Text: %s\n      m_Image: {fileID: 0}\n'%o['m_Text'] for o in event_data))
  # The top-up button reuses the authored publish button and its style.
  publish=next(i for i,d in p.objects(114)if any(c.get('m_MethodName')=='PublishSite'for c in d.get('m_OnClick',{}).get('m_PersistentCalls',{}).get('m_Calls',[])))
  top=clone(publish,body)

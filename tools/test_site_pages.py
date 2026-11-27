@@ -5,18 +5,20 @@ import subprocess,tempfile
 from server_assets import ROOT,Prefab
 C=ROOT/'Assets/Scripts/Assembly-CSharp/PC/Component/Software'
 p=Prefab(ROOT/'Assets/Resources/apps/SiteEditor.prefab');_,v=p.mono('SiteEditor')[0]
-for key in ['pageTabs','pagePath','hierarchyMenu','contextBox','contextName','backgroundDropdown','hostingPanel','hostURL','hostedSites','hostingStats','actionEditor','hostDomainKind','topUpButton']:assert v[key]['fileID']in p.blocks,key
-# The domain-kind dropdown offers exactly the three documented choices.
+for key in ['pageTabs','pagePath','hierarchyMenu','contextBox','contextName','backgroundDropdown','hostingPanel','hostURL','hostedSites','hostingStats','actionEditor','hostDomainKind','topUpButton','topUpAmount']:assert v[key]['fileID']in p.blocks,key
+# The address dropdown offers exactly two choices: a reserved temporary address
+# or a custom domain. Offline hosting is automatic, not a mode.
 raw=p.data(v['hostDomainKind']['fileID'])['m_Options']
 opts=raw['m_Options'] if isinstance(raw,dict) else raw
-assert [o['m_Text'] for o in opts]==['Стандартный адрес','Свой домен','Локально в сохранении'],opts
+assert [o['m_Text'] for o in opts]==['Стандартный адрес','Свой домен'],opts
 assert p.data(v['topUpButton']['fileID'])['m_OnClick']['m_PersistentCalls']['m_Calls'][0]['m_MethodName']=='TopUpHosting'
+assert p.data(v['topUpAmount']['fileID'])['m_Text']=='100'
 # Both controls are children of the hosting panel body, not floating outside it.
 names={p.data(d['m_GameObject']['fileID'])['m_Name']:i for i,d in p.objects(224)}
 panel=names['Site hosting panel']
 kids=[p.data(c['fileID'])['m_GameObject']['fileID'] for c in p.data(panel)['m_Children']]
 print_names=[p.data(k)['m_Name'] for k in kids]
-assert 'Host domain kind' in print_names and 'Top up hosting' in print_names,print_names
+assert 'Host domain kind' in print_names and 'Top up hosting' in print_names and 'Top up amount' in print_names,print_names
 assert p.data(v['hostingPanel']['fileID'])['m_IsActive']==0
 assert p.data(v['hierarchyMenu']['fileID'])['m_IsActive']==0
 for _,d in p.objects(114):

@@ -10,17 +10,19 @@ namespace PC.Component.Software
  {
   [SerializeField] GameObject hostingPanel;
   [SerializeField] InputField hostURL;
-  // Dropdown for the domain kind: a generated s<id>.sites.pcos address, a
-  // custom domain typed by the player, or hosting straight from the local disk.
+  [SerializeField] InputField topUpAmount;
+  // Dropdown for the address kind: a temporary standard address reserved by the
+  // server, or a custom domain typed by the player. Offline hosting is automatic.
   [SerializeField] Dropdown hostDomainKind;
   [SerializeField] Dropdown hostedSites;
   [SerializeField] Text hostingStats;
   int hostingSeenRevision=-1,hostingActionEpoch;bool stopPending;
-  /// <summary>0 = standard generated address, 1 = custom domain, 2 = local hosting.</summary>
+  /// <summary>0 = standard reserved address, 1 = custom domain.</summary>
   int hostDomainMode;
   string hostingProjectKey=null,hostingBoundDomain="";
+  string reservedKey=null,reservedDomain="";bool reserveBusy;
   readonly List<int> hostedIds=new List<int>();
-  void OpenHostingPanel(){if(hostingPanel==null)return;hostingPanel.SetActive(true);hostingPanel.transform.SetAsLastSibling();hostingProjectKey=null;RefreshHosting();}
+  void OpenHostingPanel(){if(hostingPanel==null)return;hostingPanel.SetActive(true);hostingPanel.transform.SetAsLastSibling();hostingProjectKey=null;if(hostDomainKind!=null)hostDomainMode=(int)Mathf.Clamp(hostDomainKind.value,0,1);RefreshHosting();}
   public void CloseHosting(){if(hostingPanel!=null)hostingPanel.SetActive(false);}
   /// <summary>"2 ч 05 мин" style duration for the remaining paid time.</summary>
   static string Duration(long seconds)
@@ -34,27 +36,74 @@ namespace PC.Component.Software
   public void RefreshHosting()
   {
    var service=SiteHostingService.Instance;if(service==null){Report("Сервис хостинга не запущен");return;}
-   hostingStats.text=service.Online?"Подключение…":"Нет связи — работаем локально…";service.Refresh(()=>{if(this!=null)DrawHosting();});
+   hostingStats.text=service.Online?"Подключение…":"Нет связи — сайт работает оффлайн…";service.Refresh(()=>{if(this!=null)DrawHosting();});
   }
   void PollHostingView()
   {
    var service=SiteHostingService.Instance;
-   if(hostingPanel!=null&&hostingPanel.activeSelf&&service!=null&&project!=null&&(hostingSeenRevision!=service.StateRevision||hostingProjectKey!=project.Document.hostingKey))DrawHosting();
+   // A dropdown change must repaint at once: the standard address is read-only
+   // and a custom domain arrives prefilled, without waiting for a server poll.
+   if(hostingPanel!=null&&hostingPanel.activeSelf&&service!=null&&project!=null&&
+    (hostingSeenRevision!=service.StateRevision||hostingProjectKey!=project.Document.hostingKey||
+     (hostDomainKind!=null&&(int)Mathf.Clamp(hostDomainKind.value,0,1)!=hostDomainMode)))DrawHosting();
+  }
+  /// <summary>
+  /// The standard address is reserved by the server and shown read-only in the
+  /// domain field. Offline the same stable address is derived from the
+  /// publication key, so the site keeps one address until it is registered.
+  /// </summary>
+  void EnsureStandardDomain(HostedSite current)
+  {
+   var service=SiteHostingService.Instance;if(service==null)return;
+   string key=project.Document.hostingKey;
+   if(string.IsNullOrEmpty(key))return;
+   // Only a real temporary address counts as the reserved one: a cached custom
+   // domain (or a server answer carrying one) must never be shown as standard.
+   if(reservedKey==key&&!SiteHostingService.IsStandardDomain(reservedDomain)){reservedKey=null;reservedDomain="";}
+   if(current!=null&&SiteHostingService.IsStandardDomain(current.url)){reservedKey=key;reservedDomain=current.url;return;}
+   if(!string.IsNullOrEmpty(key)&&reservedKey==key&&!string.IsNullOrEmpty(reservedDomain))return;
+   if(reserveBusy)return;
+   reserveBusy=true;string token=ServerAccounts.Token,world=service.World;
+   service.Reserve(key,project.Document.title,url=>{
+    reserveBusy=false;if(this==null||project==null)return;
+    if(token!=ServerAccounts.Token||world!=service.World)return;
+    if(key!=project.Document.hostingKey)return;
+    // A publication that still has a custom domain keeps it until the player
+    // publishes with the standard tariff, so the standard address is derived
+    // for this key instead of reusing the old custom domain.
+    if(!SiteHostingService.IsStandardDomain(url))url=SiteHostingService.StandardDomain(key);
+    reservedKey=key;reservedDomain=url;
+    if(hostDomainMode==0)hostURL.SetTextWithoutNotify(url);
+    hostingSeenRevision=-1;
+   });
   }
   void DrawHosting()
   {
    var service=SiteHostingService.Instance;if(service==null)return;
    int selected=hostedSites.value>=0&&hostedSites.value<hostedIds.Count?hostedIds[hostedSites.value]:0;
    var current=service.Items.Find(site=>site.publication_key==project.Document.hostingKey);
+   // Whatever address this publication uses today is what "свой домен" must
+   // offer later, even after the standard tariff replaces it.
+   if(current!=null&&!SiteHostingService.IsStandardDomain(current.url))service.RememberCustomDomain(current.url);
    bool changedProject=hostingProjectKey!=project.Document.hostingKey;
    if(changedProject&&current!=null)selected=current.id;
-   hostedIds.Clear();var options=new List<string>();var text=new System.Text.StringBuilder(service.Status).Append("\n\n");
+   if(hostDomainKind!=null)hostDomainMode=(int)Mathf.Clamp(hostDomainKind.value,0,1);
+   else hostDomainMode=current!=null&&!SiteHostingService.IsStandardDomain(current.url)?1:0;
+   if(hostDomainMode==0)EnsureStandardDomain(current);
+   hostedIds.Clear();var options=new List<string>();var text=new System.Text.StringBuilder();
+   if(!service.Online)text.Append("ОФФЛАЙН — интернета нет. Сайт работает из сохранения: его можно открыть в браузере игры. Домены и деньги уйдут на сервер, когда связь появится.\n\n");
+   text.Append(service.Status).Append("\n\n");
    foreach(var site in service.Items)
    {
     hostedIds.Add(site.id);
-    string state=site.banned?" — заблокирован":site.unpaid?(site.pause_reason=="dry"?" — пауза: мало денег":" — хост не оплачен"):site.paused?" — пауза":" — работает";
-    options.Add(site.url+(site.local?" [локально]":"")+state);
-    text.Append(site.url).Append(site.local?" [локально в сохранении]":"").Append(state)
+    // A stopped publication is stopped, whatever its address is: the standard
+    // address may already be released (reserved=false) after it was published.
+    string state=site.banned?" — заблокирован"
+     :!site.active?(site.reserved?" — адрес зарезервирован":" — остановлен")
+     :site.unpaid?(site.pause_reason=="dry"?" — пауза: мало денег":" — хост не оплачен")
+     :site.paused?" — пауза":" — работает";
+    options.Add(site.url+(site.local?" [оффлайн]":"")+state);
+    text.Append(site.url).Append(site.local?" [оффлайн, из сохранения]":"").Append(state)
      .Append("\nПосещения: ").Append(site.visits).Append(" | Онлайн: ").Append(site.online).Append(" | ПК: ").Append(site.host)
      .Append("\nОплачено аренды: $").Append(site.total);
     // A published site pays the base rent all the time, and a little extra only
@@ -67,30 +116,40 @@ namespace PC.Component.Software
     if(site.paused&&site.pause_reason=="user")text.Append(" | Пауза владельца");
     if(site.unpaid&&site.pause_reason=="dry")text.Append(" | Пополни хостинг, чтобы продолжить");
     if(site.banned)text.Append(" | Заблокирован: "+site.ban_reason);
-    if(!site.active)text.Append(" | Аренда остановлена");
+    if(!site.active&&!site.reserved)text.Append(" | Аренда остановлена");
     text.Append("\n\n");
    }
-   hostURL.interactable=!stopPending;
-   // Do not destroy an in-progress domain edit on every background refresh.
-   if(changedProject||hostURL.text==hostingBoundDomain||string.IsNullOrEmpty(hostURL.text))hostURL.SetTextWithoutNotify(current!=null?current.url:"");
+   // The standard address is chosen by the server: the field is read-only and
+   // shows the reserved domain. A custom domain is typed by the player and is
+   // prefilled with the address that was used before.
+   hostURL.interactable=hostDomainMode==1&&!stopPending;
+   if(hostDomainMode==0)
+   {
+    string shown=current!=null&&SiteHostingService.IsStandardDomain(current.url)?current.url
+     :(reservedKey==project.Document.hostingKey&&SiteHostingService.IsStandardDomain(reservedDomain)?reservedDomain:"");
+    hostURL.SetTextWithoutNotify(string.IsNullOrEmpty(shown)?"Резервируем адрес…":shown);
+   }
+   else if(changedProject||hostURL.text==hostingBoundDomain||string.IsNullOrEmpty(hostURL.text)||SiteHostingService.IsStandardDomain(hostURL.text))
+   {
+    hostURL.SetTextWithoutNotify(current!=null&&!SiteHostingService.IsStandardDomain(current.url)?current.url:service.LastCustomDomain);
+   }
    hostingBoundDomain=current!=null?current.url:"";hostingProjectKey=project.Document.hostingKey;
    if(current!=null){text.Append("Текущий проект: ").Append(current.url).Append("\n");text.Append(current.url).Append("/\n");foreach(var page in project.Document.pages)text.Append(current.url).Append(page.path).Append("\n");}
-   else text.Append("Новый сайт: введите домен или оставьте URL пустым для бесплатного адреса.\n");
-   text.Append("\nАренда: $100 / 30 мин за работу сайта + $20 / 30 мин, пока на нём есть посетители и загрузки. Свой домен: +$1000 один раз.\n");
-   text.Append("Аренда идёт только из кошелька хостинга: деньги игры не списываются никогда, ты сам переводишь их кнопкой «Пополнить».\n");
-   text.Append(hostDomainMode==2
-    ? "Хостинг из сохранения: сайт остаётся на твоём диске, публикуется домен, аренда списывается с общего баланса."
-    : hostDomainMode==1
-     ? "Свой домен: впиши адрес. Он закрепляется за сохранением и стоит $1000 один раз."
-     : "Стандартный адрес: домен вида s<номер>.sites.pcos выдаётся сервером.");
+   else text.Append("Новый сайт: стандартный адрес резервируется сам, свой домен впиши в поле.\n");
+   text.Append("\nАренда: $100 / 30 мин за работу сайта + $20 / 30 мин, пока на нём есть посетители и загрузки. Свой домен: +$1000 один раз. Оффлайн сайт работает бесплатно до подключения.\n");
+   text.Append("Аренда идёт только из кошелька хостинга: ты сам переводишь туда деньги кнопкой «Пополнить».\n");
+   text.Append(hostDomainMode==1
+    ? "Свой домен: впиши адрес. Он закрепляется за сохранением и стоит $1000 один раз."
+    : "Стандартный адрес: сервер резервирует временный домен вида s<номер>.sites.pcos, поле только для чтения.");
    long available=service.AvailableMoney;
    text.Append("\nКошелёк хостинга: ").Append(available<0?"ещё не сверен с сервером":"$"+available+" свободно");
+   if(service.PendingTopUp>0)text.Append(" (+$"+service.PendingTopUp+" ждут подключения)");
    // What that money buys, per the current base tariff.
    if(available>0)text.Append(" (около ").Append(Duration(available*SiteHostingService.Period/SiteHostingService.StandardRate)).Append(" аренды без посетителей)");
-   text.Append("\nРежим: ").Append(service.Online?"онлайн — синхронизация раз в минуту":"локальный — сервер недоступен, аренда копится и уйдёт при подключении");
+   text.Append("\nРежим: ").Append(service.Online?"онлайн — синхронизация раз в минуту":"оффлайн — аренда и домены уйдут при подключении");
    if(service.Locals!=null&&service.Locals.Count>0)
    {
-    text.Append("\n\nЛокальные сайты в сохранении:\n");
+    text.Append("\n\nСайты, работающие из сохранения:\n");
     foreach(var site in service.Locals)
      if(site!=null)text.Append("  ").Append(site.domain).Append(" — ").Append(site.served_seconds).Append(" c обслуживания ≈ $").Append(site.served_seconds*Math.Max(1,site.rate)/SiteHostingService.Period)
       .Append(site.listed?"":" (домен ещё не закреплён — нужен интернет)").Append('\n');
@@ -98,7 +157,7 @@ namespace PC.Component.Software
    hostedSites.ClearOptions();hostedSites.AddOptions(options);hostedSites.SetValueWithoutNotify(Mathf.Max(0,hostedIds.IndexOf(selected)));hostingStats.text=text.ToString();hostingSeenRevision=service.StateRevision;
    if(hostDomainKind!=null)
    {
-    var labels=new List<string>{"Стандартный адрес","Свой домен","Локально в сохранении"};
+    var labels=new List<string>{"Стандартный адрес","Свой домен"};
     if(hostDomainKind.options==null||hostDomainKind.options.Count!=labels.Count){hostDomainKind.ClearOptions();hostDomainKind.AddOptions(labels);}
     hostDomainKind.SetValueWithoutNotify(hostDomainMode);
    }
@@ -106,70 +165,87 @@ namespace PC.Component.Software
   public void PublishSite()
   {
    var service=SiteHostingService.Instance;if(service==null||system==null||!system.Ready)return;
-   if(stopPending){Report("Дождись подтверждения остановки");return;}int operation=++hostingActionEpoch;
+   if(stopPending){Report("Дождись подтверждения остановки");return;}hostingActionEpoch++;
    if(string.IsNullOrEmpty(project.Document.hostingKey))project.Change(d=>d.hostingKey=Guid.NewGuid().ToString("N"));
-   hostDomainMode=hostDomainKind!=null?(int)Mathf.Clamp(hostDomainKind.value,0,2):0;
-   string url=hostURL.text.Trim();int host=system.Board!=null?system.Board.Id:0;
-   if(hostDomainMode==2){PublishLocal(url);return;}
-   // A custom domain must be typed by the player; the generated address is chosen
-   // by the backend, so the field must stay empty for mode 0.
-   if(hostDomainMode==1&&string.IsNullOrEmpty(url)){Report("Впиши свой домен или выбери стандартный адрес");return;}
-   if(hostDomainMode==0)url="";
-   SaveProject(file=>{if(file!=null)StartCoroutine(PublishTransfer(file.content,url,host,editEpoch,ServerAccounts.Token,operation,hostDomainMode==1));});
+   hostDomainMode=hostDomainKind!=null?(int)Mathf.Clamp(hostDomainKind.value,0,1):hostDomainMode;
+   int host=system.Board!=null?system.Board.Id:0;
+   if(hostDomainMode==1)
+   {
+    // A custom domain must be typed by the player and is remembered for later.
+    string custom=hostURL.text.Trim();
+    if(string.IsNullOrEmpty(custom)||SiteHostingService.IsStandardDomain(custom)){Report("Впиши свой домен или выбери стандартный адрес");return;}
+    service.RememberCustomDomain(custom);
+    PublishAddress(custom,host,true);return;
+   }
+   string key=project.Document.hostingKey;
+   var current=service.Items.Find(site=>site.publication_key==key);
+   if(current!=null&&SiteHostingService.IsStandardDomain(current.url)){reservedKey=key;reservedDomain=current.url;}
+   if(reservedKey==key&&!string.IsNullOrEmpty(reservedDomain)){PublishAddress(reservedDomain,host,false);return;}
+   // Reserving is a server request; do it now and publish the answer.
+   string token=ServerAccounts.Token,world=service.World;reserveBusy=true;
+   hostingStats.text=service.Online?"Резервируем адрес…":"Оффлайн: адрес резервируется локально…";
+   service.Reserve(key,project.Document.title,url=>{
+    reserveBusy=false;if(this==null)return;
+    if(token!=ServerAccounts.Token||world!=service.World||key!=project.Document.hostingKey){Report("Аккаунт или проект изменились");return;}
+    reservedKey=key;reservedDomain=url;hostURL.SetTextWithoutNotify(url);
+    PublishAddress(url,host,false);
+   });
   }
-  /// <summary>
-  /// Local hosting: the .osite stays on the player's disk and is only published
-  /// by domain. The rent is still billed from the shared hosting balance.
-  /// </summary>
-  void PublishLocal(string requested)
+  /// <summary>Save the .osite package and publish it online, or host it from the save offline.</summary>
+  void PublishAddress(string url,int host,bool custom)
   {
    var service=SiteHostingService.Instance;if(service==null)return;
-   if(string.IsNullOrEmpty(requested)){Report("Впиши домен локального сайта, например mygame.local");return;}
-   string domain;
-   try{domain=SiteDocument.NormalizeUrl(requested);}catch(ArgumentException ex){Report(ex.Message);return;}
-   int disk=system.FileManager!=null?0:-1;string path="";
+   int operation=hostingActionEpoch;
    SaveProject(file=>{
-    if(file!=null&&system!=null&&system.AllStorage!=null)
+    if(file==null||this==null||system==null)return;
+    int disk=-1;string path="";
+    if(system.AllStorage!=null)
      for(int i=0;i<system.AllStorage.Count;i++)
      {
       var storage=system.AllStorage[i];if(storage==null||storage.files==null||!storage.files.Contains(file))continue;
       disk=i;path=file.path;break;
      }
-    bool custom=!domain.StartsWith("local.",StringComparison.Ordinal);
-    if(service.HostLocal(domain,path,disk,custom,project.Document.title,Report))
+    if(!service.Online)
     {
-     string token=ServerAccounts.Token,world=service.World;
-     // The domain is reserved online straight away. Offline it stays pending and
-     // is reserved by the next report, so two saves can never both own it.
-     service.RegisterLocal(domain,message=>{
-      if(this!=null){Report(message);DrawHosting();}
-      if(token==ServerAccounts.Token&&world==service.World&&!service.Available)Report("Домен закрепится при подключении к интернету.");
-     });
+     service.HostLocal(url,path,disk,custom,project.Document.title,message=>{if(this!=null){Report(message);DrawHosting();}});
+     if(this!=null)DrawHosting();return;
     }
-    if(this!=null)DrawHosting();
+    StartCoroutine(PublishTransfer(file.content,url,host,editEpoch,ServerAccounts.Token,operation,custom,path,disk));
    });
   }
-  System.Collections.IEnumerator PublishTransfer(string content,string url,int host,int epoch,string token,int operation,bool customDomain=false)
+  System.Collections.IEnumerator PublishTransfer(string content,string url,int host,int epoch,string token,int operation,bool customDomain,string diskPath,int diskId)
   {
    if(operation!=hostingActionEpoch)yield break;
    float delay=0;string error=null;
-   if(InternetService.Instance==null||!InternetService.Instance.TryTransfer(system.Board,"sites.pcos",Mathf.Max(.01f,System.Text.Encoding.UTF8.GetByteCount(content)/1048576f),out delay,out error)){Report(error??"Нужен игровой интернет");yield break;}
+   // Without a game connection the publication is simulated locally, exactly as
+   // if the real internet had dropped: the site keeps working in-game.
+   if(InternetService.Instance==null||!InternetService.Instance.TryTransfer(system.Board,"sites.pcos",Mathf.Max(.01f,System.Text.Encoding.UTF8.GetByteCount(content)/1048576f),out delay,out error))
+   {
+    SiteHostingService.Instance.HostLocal(url,diskPath,diskId,customDomain,project.Document.title,message=>{if(this!=null){Report(message);DrawHosting();}});
+    yield break;
+   }
    yield return new WaitForSecondsRealtime(delay);
    if(operation!=hostingActionEpoch||epoch!=editEpoch||token!=ServerAccounts.Token||system==null||!system.Ready)yield break;
-   var connection=InternetService.Instance.Status(system.Board);if(connection==null||connection.Quality<=0){Report("Соединение прервано");yield break;}
-   SiteHostingService.Instance.Publish(content,url,host,customDomain,"",system!=null&&system.Board!=null?system.Board.Id:0,message=>{if(this!=null){Report(message);DrawHosting();}});
+   var connection=InternetService.Instance.Status(system.Board);if(connection==null||connection.Quality<=0)
+   {
+    SiteHostingService.Instance.HostLocal(url,diskPath,diskId,customDomain,project.Document.title,message=>{if(this!=null){Report(message);DrawHosting();}});
+    yield break;
+   }
+   SiteHostingService.Instance.Publish(content,url,host,customDomain,diskPath,diskId,message=>{if(this!=null){Report(message);DrawHosting();}});
   }
   /// <summary>
-  /// Move $100 from the game balance into the hosting wallet. This is the only
-  /// place where the game balance is spent on hosting — and only on a click.
+  /// Move any amount the player typed from the game balance into the hosting
+  /// wallet. Works offline too: the amount is queued and sent on reconnect.
   /// </summary>
   public void TopUpHosting()
   {
    var service=SiteHostingService.Instance;if(service==null){Report("Сервис хостинга не запущен");return;}
    if(stopPending){Report("Дождись подтверждения остановки");return;}
-   if(!service.Online){Report("Нет связи с сервером хостинга: пополнение недоступно, попробуй позже.");return;}
-   hostingStats.text="Пополнение кошелька…";
-   service.TopUp(SiteHostingService.StandardRate,message=>{if(this!=null){DrawHosting();Report(message);}});
+   int amount=SiteHostingService.StandardRate;
+   if(topUpAmount!=null&&(!int.TryParse(topUpAmount.text.Trim(),out amount)||amount<=0))
+   {Report("Впиши сумму пополнения в долларах");return;}
+   hostingStats.text="Пополнение кошелька на $"+amount+"…";
+   service.TopUp(amount,message=>{if(this!=null){DrawHosting();Report(message);}});
   }
   public void StopHostedSite()
   {

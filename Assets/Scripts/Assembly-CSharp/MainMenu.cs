@@ -165,6 +165,9 @@ public class MainMenu : MonoBehaviour
     }
     private IEnumerator OpenSavedFile(string path)
     {
+        // A background write of the current world must finish before another
+        // save is loaded over it.
+        SaveManagement.SaveWriter.Flush();
         openingSave = true; menuManager.ShowMenu("Loading");
         loadingText.text = Localization.GetText("Loading...");
         // Render the loading screen before validating/decompressing the world.

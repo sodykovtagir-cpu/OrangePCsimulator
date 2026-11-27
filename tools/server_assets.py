@@ -6,7 +6,7 @@ COMP=ROOT/'Assets/Resources/components'
 HEADER='%YAML 1.1\n%TAG !u! tag:unity3d.com,2011:\n'
 
 def guid(key):return hashlib.md5(('orange-server-catalog-v1:'+key).encode()).hexdigest()
-def read_guid(path):return re.search(r'^guid: (\w+)',Path(str(path)+'.meta').read_text(),re.M)[1]
+def read_guid(path):return re.search(r'^guid: (\w+)',Path(str(path)+'.meta').read_text(encoding='utf-8'),re.M)[1]
 def meta(path,kind='PrefabImporter'):
     p=Path(str(path)+'.meta')
     if p.exists():return read_guid(path)
@@ -19,7 +19,7 @@ def ref(i):return '{fileID: '+str(i)+'}'
 class Prefab:
     def __init__(self,path=None,text=None):
         self.path=Path(path) if path else None
-        s=text if text is not None else self.path.read_text()
+        s=text if text is not None else self.path.read_text(encoding='utf-8')
         self.blocks={int(m[2]):m[0] for m in re.finditer(r'^--- !u!(\d+) &(-?\d+)(?: stripped)?\n.*?(?=^--- !u!|\Z)',s,re.M|re.S)}
         self.next=920000000000000000
         self._parsed={}
@@ -63,7 +63,7 @@ class Prefab:
     def render(self):return HEADER+''.join(self.blocks.values())
     def save(self,path=None):
         p=Path(path or self.path);p.parent.mkdir(parents=True,exist_ok=True)
-        p.write_text('\n'.join(s.rstrip() for s in self.render().splitlines())+'\n')
+        p.write_text('\n'.join(s.rstrip() for s in self.render().splitlines())+'\n',encoding='utf-8')
     def clone_into(self,source,parent):
         sub=Prefab(source);mapping={i:self.alloc() for i in sub.blocks}
         for i,b in sub.blocks.items():

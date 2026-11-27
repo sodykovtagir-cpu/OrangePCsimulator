@@ -16,7 +16,7 @@ slot = (scripts / 'Slot.cs').read_text(encoding='utf-8')
 meta = (root / 'Assets/Texture2D/3DMork.png.meta').read_text(encoding='utf-8')
 
 assert 'public int hostId;' in data and 'public string slotPath;' in data
-writing = save.split('public bool SaveData()')[1].split('public int LoadData()')[0]
+writing = save.split('public bool SaveData(')[1].split('public int LoadData()')[0]
 reading = save.split('public int LoadData()')[1].split('private static bool HasSavedHost(')[0]
 assert 'connector.slot' in writing and 'GetSlotPath(host.transform, slot.transform)' in writing
 assert 'hostId = hostId' in writing and 'slotPath = slotPath' in writing

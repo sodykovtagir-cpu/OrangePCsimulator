@@ -7,7 +7,7 @@ namespace PC.Component.Software.Sites
  [Serializable] public sealed class HostedSite
  {
   public int id,host,online,visits,bytes,revision,transferring,downloads;
-  public bool active,custom_paid,unpaid,banned,paused,local,money_known;
+  public bool active,custom_paid,unpaid,banned,paused,local,reserved,money_known;
   public float cpu_capacity=1000,cpu_load,host_mbps=5;
   public long total,next_bill,paid_seconds,credit,run_seconds,runway;
   public int price,rate,traffic_rate,traffic_seconds,traffic_billed,traffic_cost;
@@ -70,6 +70,8 @@ namespace PC.Component.Software.Sites
   /// <summary>Failures in a row; the next retry waits OfflineBackoff(attempt).</summary>
   public int FailureStreak {get;private set;}
   public string Status="Хостинг ещё не проверен";
+  /// <summary>Money the player moved to the wallet while offline; sent on reconnect.</summary>
+  public long PendingTopUp {get;private set;}
   public List<HostedSite> Items=new List<HostedSite>();
   /// <summary>Local publications of the current save, as kept on disk.</summary>
   public List<LocalHostedSite> Locals=new List<LocalHostedSite>();
@@ -104,6 +106,22 @@ namespace PC.Component.Software.Sites
   readonly HashSet<int> queuedHostStops=new HashSet<int>();
   readonly Dictionary<int,SiteHostProfile> hosts=new Dictionary<int,SiteHostProfile>();
   void Awake(){Instance=this;LoadLocals();}
+  /// <summary>
+  /// A standard publication address has the shape s&lt;number&gt;.sites.pcos.
+  /// The server reserves one per publication, and the same shape is generated
+  /// locally while offline so the site keeps one stable address.
+  /// </summary>
+  public static bool IsStandardDomain(string url)
+  {
+   if(string.IsNullOrEmpty(url)||!url.StartsWith("s",StringComparison.Ordinal)||!url.EndsWith(".sites.pcos",StringComparison.Ordinal))return false;
+   for(int i=1;i<url.Length-11;i++)if(url[i]<'0'||url[i]>'9')return false;
+   return url.Length>12;
+  }
+  public static string StandardDomain(string key)
+  {
+   uint hash=2166136261;if(!string.IsNullOrEmpty(key))foreach(char c in key)hash=(hash^(byte)c)*16777619;
+   return "s"+(100000+hash%900000).ToString()+ ".sites.pcos";
+  }
   void OnDestroy(){if(Instance==this)Instance=null;}
   void OnApplicationQuit(){LeavingWorld=true;}
   public bool Hosting(int host){return !stoppedHosts.Contains(host)&&Items.Exists(s=>s.host==host&&s.active&&!s.unpaid&&!s.banned);}
@@ -154,7 +172,13 @@ namespace PC.Component.Software.Sites
    // unreachable: the game must never stutter because of the hosting service.
    if(busy||Main.Instance==null||SaveManager.RestoringSave||string.IsNullOrEmpty(World))return;
    float now=Time.unscaledTime;
-   if(Time.unscaledTime>=nextRetry&&now>=nextPoll)Refresh(null);
+   if(Time.unscaledTime<nextRetry||now<nextPoll)return;
+   // After reconnecting, queued money and offline domains settle first: the
+   // panel then shows the real wallet balance as soon as the server answers.
+   if(Online&&PendingTopUp>0){nextPoll=now+PollInterval;FlushPendingTopUp();return;}
+   var unlisted=Locals!=null?Locals.Find(site=>site!=null&&!site.listed):null;
+   if(Online&&unlisted!=null){nextPoll=now+PollInterval;RegisterLocal(unlisted.domain,message=>{Status=message;StateRevision++;});return;}
+   Refresh(null);
   }
   Dictionary<string,string> Funds(Dictionary<string,string> values)
   {
@@ -166,6 +190,10 @@ namespace PC.Component.Software.Sites
     long settled=0;var ledger=game.siteHostingLedger;if(ledger!=null)foreach(var row in ledger)if(row.owner==lastOwner)settled=row.charged;
     if(!string.IsNullOrEmpty(lastOwner))values["settled"]=settled.ToString();
     values["balance"]=Math.Max(0,Main.Instance.Money).ToString();
+    // The save itself reports how much it moved into hosting. Without it the
+    // backend cannot notice a rolled back save, and the same dollars would stay
+    // in the game balance and in the wallet at once.
+    if(game.siteHostingDeposited>=0)values["deposited"]=game.siteHostingDeposited.ToString();
    }
    values["stopped_hosts"]=string.Join(",",new List<int>(stoppedHosts).ConvertAll(i=>i.ToString()).ToArray());
    var local=LocalReport();if(local!="")values["locals"]=local;
@@ -251,6 +279,9 @@ namespace PC.Component.Software.Sites
    foreach(var pair in counts){int before;visits.TryGetValue(pair.Key,out before);float rate=lastStats>0?Mathf.Max(0,pair.Value-before)*60/Mathf.Max(1,Time.unscaledTime-lastStats):0;int previousDownloads;lastDownloads.TryGetValue(pair.Key,out previousDownloads);int burst=lastStats>0?Math.Max(0,downloads[pair.Key]-previousDownloads):0;downloadBursts[pair.Key]=burst;lastDownloads[pair.Key]=downloads[pair.Key];demand[pair.Key]+=online[pair.Key]*35+rate*4+burst*120;visits[pair.Key]=pair.Value;}
    lastStats=Time.unscaledTime;
    AvailableMoney=reply.wallet!=null&&reply.wallet.known?reply.wallet.available:-1;
+   var walletGame=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   // A save written before the deposits journal starts from what the wallet holds.
+   if(walletGame!=null&&walletGame.siteHostingDeposited<0&&reply.wallet!=null&&reply.wallet.known)walletGame.siteHostingDeposited=Math.Max(0,reply.wallet.ceiling);
    // Rent is billed by the wallet, never by the game balance: nothing is deducted
    // here, so a stats answer never has to write the save file.
    lastTotal=reply.total;
@@ -295,28 +326,116 @@ namespace PC.Component.Software.Sites
   public static int PublicationCost(HostedSite existing,string requested){return PublicationCost(existing,true,requested);}
   /* ------------------------------------------------------------------ wallet */
   /// <summary>
-  /// Move money from the game balance into the hosting wallet. This is the only
-  /// place where the game balance is spent, and it needs the player's click.
+  /// Move any amount from the game balance into the hosting wallet. This is the
+  /// only place where the game balance is spent, and it needs the player's
+  /// click. Without a connection the amount is queued in the save and sent on
+  /// its own as soon as the server is reachable again.
   /// </summary>
   public void TopUp(int amount,Action<string> done)
   {
    if(amount<=0){done("Укажи сумму пополнения");return;}
    if(Main.Instance==null||Main.Instance.Money<amount){done("На балансе нет $"+amount);return;}
-   if(!Online){done("Нет связи с сервером хостинга. Пополнение уйдёт при подключении: попробуй ещё раз позже.");return;}
    string token=ServerAccounts.Token,world=World;
    if(!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done("Нужны аккаунт и сохранение игры");return;}
    int money=Main.Instance.Money;
+   // The journal moves together with the money, so a failure anywhere rolls
+   // both back together.
+   bool journaled=JournalTopUp(amount);
    Main.Instance.SetMoney(money-amount,true);
-   if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){Main.Instance.SetMoney(money,true);done("Не удалось сохранить игру");return;}
+   Action rollback=()=>{Main.Instance.SetMoney(money,true);UnjournalTopUp(amount,journaled);SavePending();};
+   // A top-up is a background chore of the hosting service, not a reason to
+   // freeze the game. Nothing is written to disk here: building a snapshot
+   // costs a main-thread pass over the whole save (1,5 s of it, and ~0,4 s even
+   // for the bare header of a big save), which the player feels as a hitch on
+   // the click. The money and the journal live in the save in memory, the next
+   // ordinary save writes them, and the wallet on the server is the authority
+   // meanwhile: a save rolled back to before the top-up reports the older
+   // journal and the backend takes the same dollars back out of the wallet, so
+   // the two never disagree and nothing is duplicated.
+   if(!Online)
+   {
+    QueueTopUp(amount);
+    done("Нет интернета: $"+amount+" уйдёт в кошелёк при подключении.");
+    return;
+   }
+   // One top-up at a time: a second click must not start a parallel request.
    busy=true;
+   SavePending();
    Request("topup",Funds(new Dictionary<string,string>{{"world",world},{"amount",amount.ToString()}}),(reply,error)=>{
     if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт изменился"));return;}
     if(error!=null){
-     // The wallet was not filled: give the money back and roll the save with it.
-     Main.Instance.SetMoney(money,true);SaveManager.Instance?.SaveData();
-     Apply(null,error);Complete(()=>done("Пополнение не принято: "+error));return;
+     if(IsOfflineError(error)){
+      // The connection dropped: keep the money and deliver it on reconnect.
+      QueueTopUp(amount);Apply(null,error);
+      Complete(()=>done("Связь пропала: $"+amount+" уйдёт в кошелёк при подключении."));return;
+     }
+     // The wallet was not filled: give the money and the journal back together.
+     rollback();Apply(null,error);Complete(()=>done("Пополнение не принято: "+error));return;
     }
     Apply(reply,null);Complete(()=>done("Кошелёк хостинга пополнен на $"+amount+". Доступно: $"+(reply.wallet!=null?reply.wallet.available:0)+"."));
+   });
+  }
+  /// <summary>
+  /// Journal money moved into hosting before it is written and sent. The server
+  /// bounds the wallet by this number, so a save loaded back to before the
+  /// top-up takes the money off the server too: the same dollars never exist in
+  /// both places. Returns false for a save written before the journal existed;
+  /// such a save keeps the old, unbounded wallet.
+  /// </summary>
+  bool JournalTopUp(long amount)
+  {
+   var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   if(game==null||game.siteHostingDeposited<0)return false;
+   game.siteHostingDeposited+=amount;return true;
+  }
+  void UnjournalTopUp(long amount,bool journaled)
+  {
+   if(!journaled)return;
+   var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   if(game!=null&&game.siteHostingDeposited>=0)game.siteHostingDeposited=Math.Max(0,game.siteHostingDeposited-amount);
+  }
+  void QueueTopUp(int amount){PendingTopUp=Math.Max(0,PendingTopUp+amount);SavePending();}
+  void SavePending()
+  {
+   var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   if(game!=null)game.siteHostingPendingTopUp=PendingTopUp;
+  }
+  /// <summary>Send money queued while offline; it is removed only on an accepted reply.</summary>
+  void FlushPendingTopUp()
+  {
+   long amount=PendingTopUp;if(amount<=0)return;
+   string token=ServerAccounts.Token,world=World;
+   busy=true;
+   Request("topup",Funds(new Dictionary<string,string>{{"world",world},{"amount",amount.ToString()}}),(reply,error)=>{
+    if(error==null&&token==ServerAccounts.Token&&world==World)
+    {PendingTopUp=Math.Max(0,PendingTopUp-amount);SavePending();Apply(reply,null);}
+    else Apply(null,error);
+    Complete();
+   });
+  }
+  /// <summary>Last custom domain the player used, offered again in the editor.</summary>
+  public string LastCustomDomain
+  {
+   get{var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;return game!=null&&game.siteHostingCustomDomain!=null?game.siteHostingCustomDomain:"";}
+  }
+  public void RememberCustomDomain(string domain)
+  {
+   var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
+   if(game==null)return;game.siteHostingCustomDomain=domain??"";SavePending();
+  }
+  /// <summary>
+  /// Reserve the standard address of a publication. Online the backend keeps it
+  /// on the publication record; offline the same stable address is derived from
+  /// the publication key and registered when the connection returns.
+  /// </summary>
+  public void Reserve(string key,string title,Action<string> done)
+  {
+   string offline=StandardDomain(key),world=World,token=ServerAccounts.Token;
+   if(!Online||!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done(offline);return;}
+   Request("reserve",Funds(new Dictionary<string,string>{{"world",world},{"key",key},{"title",title??""}}),(reply,error)=>{
+    if(error!=null){Apply(null,error);done(offline);return;}
+    if(token==ServerAccounts.Token&&world==World)Apply(reply,null);
+    done(reply!=null&&reply.item!=null&&!string.IsNullOrEmpty(reply.item.url)?reply.item.url:offline);
    });
   }
   /* --------------------------------------------------------------- publishing */
@@ -326,7 +445,9 @@ namespace PC.Component.Software.Sites
    var doc=SiteDocument.Parse(document);string token=ServerAccounts.Token,world=World;if(!ServerAccounts.LoggedIn||string.IsNullOrEmpty(world)){done("Нужны аккаунт и сохранение игры");return;}
    if(string.IsNullOrWhiteSpace(url)){done("Укажи домен сайта");return;}
    if(Main.Instance==null){done("Игра не готова");return;}
-   if(!Online){done("Без интернета можно опубликовать только сайт из сохранения (режим «Локально в сохранении»).");return;}
+   // No connection: the game simulates the publication by hosting the site from
+   // the save, so it keeps working in-game and is synced on reconnect.
+   if(!Online){HostLocal(url,diskPath,diskId,customDomain,"",done);return;}
    // Publishing the package is free; the server bills the rent from the wallet.
    var existing=FindExisting(doc.hostingKey);
    string domain=SiteDocument.NormalizeUrl(url);
@@ -337,7 +458,10 @@ namespace PC.Component.Software.Sites
    busy=true;
    Request("publish",Funds(new Dictionary<string,string>{{"world",world},{"key",doc.hostingKey},{"url",domain},{"host",host.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"document",document},{"confirm","100/1800/1000"}}),(reply,error)=>{
     if(token!=ServerAccounts.Token||world!=World){Complete(()=>done("Аккаунт или сохранение изменились"));return;}
-    if(error!=null){Complete();Refresh(()=>{if(token==ServerAccounts.Token&&world==World){Status=error;StateRevision++;done(error);}});return;}
+    if(error!=null){
+     if(IsOfflineError(error)){Complete();HostLocal(domain,diskPath,diskId,customDomain,"",done);return;}
+     Complete();Refresh(()=>{if(token==ServerAccounts.Token&&world==World){Status=error;StateRevision++;done(error);}});return;
+    }
     stoppedHosts.Remove(host);Apply(reply,null);Complete(()=>done("Опубликовано: "+reply.item.url+". "+Status));
    });
   }
@@ -366,6 +490,7 @@ namespace PC.Component.Software.Sites
    var game=SaveManager.Loader!=null?SaveManager.Loader.GameData:null;
    if(game!=null&&game.siteHostingLocals!=null)foreach(var site in game.siteHostingLocals)if(site!=null)Locals.Add(site);
    if(game!=null&&game.siteHostingWallet!=null)PendingLocalSeconds=Math.Max(0,game.siteHostingWallet.servedSeconds-game.siteHostingWallet.localSecondsBase);
+   PendingTopUp=game!=null?Math.Max(0,game.siteHostingPendingTopUp):0;
   }
   void SaveLocals()
   {
@@ -401,20 +526,26 @@ namespace PC.Component.Software.Sites
    if(site==null){site=new LocalHostedSite{domain=normalized,registered=DateTimeOffset.UtcNow.ToUnixTimeSeconds()};Locals.Add(site);}
    site.diskPath=diskPath??"";site.disk=diskId;site.rate=custom?CustomRate:StandardRate;
    if(!string.IsNullOrEmpty(title))site.title=title;
-   site.listed=true;
-   // Keep the save before the server knows about the publication, so a crash
-   // cannot leave a billed site that the player cannot stop.
-   if(SaveManager.Instance==null||!SaveManager.Instance.SaveData()){done("Не удалось сохранить игру");return false;}
+   // Offline the domain is only reserved locally; it is registered on reconnect.
+   site.listed=Online;
+   // The locals list belongs to the save in memory and is written by the next
+   // ordinary save. Publishing must not freeze the game: a snapshot of a big
+   // save costs over a second on the main thread (see TopUp), which the player
+   // feels as a hitch on the click. The server bills only the seconds this save
+   // reports, so a crash before that save leaves no charged site behind.
    SaveLocals();StateRevision++;
-   done("Локальный хостинг включён: "+normalized+". Сайт живёт в сохранении; аренда $"+site.rate+" / 30 мин за реальное обслуживание.");
+   done(Online
+    ? "Сайт "+normalized+" работает из сохранения; аренда $"+site.rate+" / 30 мин за реальное обслуживание."
+    : "Оффлайн: сайт "+normalized+" уже работает в игре из сохранения. Домен закрепится и деньги уйдут на сервер при подключении.");
    return true;
   }
   /// <summary>Stop a local publication and forget its served time.</summary>
   public bool StopLocal(string domain,Action<string> done)
   {
    var site=Local(domain);if(site==null){done("Локальный сайт не найден");return false;}
+   // Same as publishing: the record is dropped from the save in memory and the
+   // next ordinary save writes it, so the stop button answers immediately.
    Locals.Remove(site);SaveLocals();StateRevision++;
-   if(SaveManager.Instance!=null)SaveManager.Instance.SaveData();
    done("Локальный хостинг остановлен: "+domain);
    return true;
   }

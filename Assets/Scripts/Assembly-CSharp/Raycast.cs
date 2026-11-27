@@ -25,12 +25,23 @@ public class Raycast : MonoBehaviour
 
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
+        // Взяли предмет. Перенос начинается только с реального движения
+        // прицела: на ПК курсор залочен (Input.mousePosition стоит на месте),
+        // поэтому смотрим на поворот камеры, а на тач — на сдвиг пальца.
+        public Quaternion viewStart;
+        public Vector2 pointerStart;
+        public bool pullStarted;
         public PC.Component.Cabling.CableItem grabbedCable;
         // Populated once when grabbing a connected case, not every frame.
         public List<PC.Component.Cabling.CableItem> wiredCables;
         public Vector3 wiredCaseStartPosition;
 
     }
+
+    // Пока прицел не повернулся на 2¬∞ (ПК) или палец не сдвинулся на 12 px
+    // (тач) — это клик, а не перенос: якорь пружины стоит на месте.
+    private const float AimDeadzoneDegrees = 2f;
+    private const float TouchDeadzoneSqr = 144f;
 
     [SerializeField]
     private LayerMask layer;
@@ -503,6 +514,21 @@ public class Raycast : MonoBehaviour
             }
             // ===============================================
 
+            // Крышка и HDD-корзины сервера закреплены прямо на корпусе
+            // (Slot держит их FixedJoint'ом с breakForce 200). Клик попадал в
+            // саму деталь, пружина тянула только её, джойнт передавал рывок
+            // корпусу — и вся сборка тряслась секундами. Такую деталь не
+            // выдёргиваем: переносим корпус, деталь едет вместе с ним.
+            // Комплектуха (CPU/RAM/HDD) висит на своей плате, а не на корпусе,
+            // поэтому её захват не меняется.
+            if (hitRb != null)
+            {
+                var mount = hitRb.GetComponent<FixedJoint>();
+                if (mount != null && mount.connectedBody != null &&
+                    mount.connectedBody.GetComponent<PC.Component.Case>() != null)
+                    hitRb = mount.connectedBody;
+            }
+
             // Нажали на то, что нельзя подвинуть (стена, пол, кинематика,
             // закреплённое тело) — выбор снимаем, как и при клике в пустоту.
             // Во время переноса кнопка зажата, сюда не попадаем.
@@ -592,6 +618,12 @@ public class Raycast : MonoBehaviour
                     hitRb.worldCenterOfMass - sTr.position);
 
                 spring.connectedBody = hitRb;
+                // В режиме сетки предмет сразу держит снап (шаг стрелками).
+                // Без сетки перенос начинается только после движения прицела:
+                // до этого якорь пружины стоит на месте (см. DragObject).
+                drag.viewStart = cam != null ? cam.transform.rotation : Quaternion.identity;
+                drag.pointerStart = pointer != null ? pointer.position : Vector2.zero;
+                drag.pullStarted = GridMode();
                 StartCoroutine("DragObject");
             }
             else if (hitRb && hitRb.isKinematic)
@@ -2096,7 +2128,13 @@ public class Raycast : MonoBehaviour
     private IEnumerator DragObject()
     {
         var j = spring;
-        var rb = j ? j.connectedBody : null;
+        if (j == null) yield break;
+
+        var drag = currentDrag;
+        if (drag == null)
+            yield break;
+
+        var rb = j.connectedBody;
         if (rb == null) yield break;
 
         rb.drag = targetDrag;
@@ -2105,10 +2143,6 @@ public class Raycast : MonoBehaviour
         if (distanceObj)
             distanceObj.SetActive(true);
 
-        var drag = currentDrag;
-        if (drag == null)
-            yield break;
-
         // Состояние сетки — на один перенос: прошлый перенос мог оборваться
         // без End() (цель уничтожена), и тогда старые значения не должны влиять.
         pendingGridMove = Vector3.zero;
@@ -2116,14 +2150,6 @@ public class Raycast : MonoBehaviour
         if (distanceScroll)
             distanceScroll.verticalNormalizedPosition =
                 Conversion.Map(drag.distance, 2f, maxDistance, 1f, 0f);
-
-        if (LockRotation)
-        {
-            rb.constraints |=
-                RigidbodyConstraints.FreezeRotationX |
-                RigidbodyConstraints.FreezeRotationY |
-                RigidbodyConstraints.FreezeRotationZ;
-        }
 
         var t = drag.target;
         if (!t) yield break;
@@ -2141,8 +2167,13 @@ public class Raycast : MonoBehaviour
 
         while (currentDrag != null && currentDrag.target)
         {
+            // Перенос начинается с движения точки прицела, а не с нажатия:
+            // пока она стоит на месте, пружина не прицеплена и сборка не
+            // дрожит. В режиме сетки пружина прицеплена с самого захвата.
+            bool pulling = drag.pullStarted;
+
             // В режиме сетки ориентация меняется только стрелками — автоповорот бы мешал
-            if (!GridMode())
+            if (!GridMode() && pulling)
                 AutoRotate();
 
             if (cam != null && spring)
@@ -2296,7 +2327,22 @@ public class Raycast : MonoBehaviour
                     RestoreSpring();
                 }
 
-                spring.transform.position = point;
+                if (!pulling && AimMoved(drag))
+                {
+                    drag.pullStarted = true;
+                    pulling = true;
+                }
+
+                if (pulling)
+                {
+                    // Сборка могла уснуть (физика усыпляет покоящееся тело).
+                    // Реальный перенос обязан её разбудить: иначе пружина
+                    // движется, а корпус стоит.
+                    var pulled = spring.connectedBody;
+                    if (pulled != null && pulled.IsSleeping()) pulled.WakeUp();
+
+                    spring.transform.position = point;
+                }
 
                 var curGo = currentDrag.target
                     ? currentDrag.target.gameObject
@@ -2386,16 +2432,41 @@ public class Raycast : MonoBehaviour
         if (selectedBody == rb) ClearSelection();
     }
 
+    /// <summary>
+    /// Отпустили, так и не сдвинув прицел: это был клик, а не перенос.
+    /// </summary>
+    private bool IsStationaryClick(Drag drag)
+    {
+        return drag != null && !drag.pullStarted && !drag.gridTouched && !GridMode();
+    }
+
+    /// <summary>
+    /// Прицел/палец уже сдвинулись после взятия. На ПК мышь залочена, поэтому
+    /// смотрим на поворот камеры; на тач-управлении — на сдвиг пальца.
+    /// </summary>
+    private bool AimMoved(Drag drag)
+    {
+        if (drag == null) return false;
+        if (pointer != null)
+            return (pointer.position - drag.pointerStart).sqrMagnitude >= TouchDeadzoneSqr;
+        if (cam == null) return false;
+        return Quaternion.Angle(cam.transform.rotation, drag.viewStart) >= AimDeadzoneDegrees;
+    }
+
     public void End()
     {
         // Обычную мягкую пружину вернём до того, как отпустим тело
         RestoreSpring();
 
+        // Сборку запоминаем ДО OnDragEnded: он очищает DragAssemblyBodies.
+        var placementGrid = PlacementGrid.Instance;
+        var assembly = placementGrid != null ? placementGrid.DragAssemblyBodies : null;
+
         // OnDragEnded отпускает замок (кинематику) сборки. Вызываем его только
         // когда был ПЕРЕНОС: отпускание кнопки после простого клика-выбора не
         // должно размораживать выбранный предмет — его замок держит ClearSelection.
-        if (currentDrag != null && PlacementGrid.Instance != null)
-            PlacementGrid.Instance.OnDragEnded();
+        if (currentDrag != null && placementGrid != null)
+            placementGrid.OnDragEnded();
 
         if (currentDrag != null)
         {
@@ -2417,6 +2488,26 @@ public class Raycast : MonoBehaviour
                 {
                     rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
+                }
+                else if (assembly != null && assembly.Length > 1 && IsStationaryClick(d))
+                {
+                    // Клик без движения по многодетальной сборке (сервер):
+                    // пружина дёргала корпус, импульс уходил в джойнты, и
+                    // сборка дрожала ещё секунды после отпускания. Гасим её
+                    // целиком. Настоящий перенос/бросок мыши сюда не попадает:
+                    // курсор за время жеста уходит заметно дальше допуска.
+                    for (int i = 0; i < assembly.Length; i++)
+                    {
+                        var body = assembly[i];
+                        if (body == null) continue;
+                        body.velocity = Vector3.zero;
+                        body.angularVelocity = Vector3.zero;
+                        // Обнулённой скорости мало: джойнты сборки после
+                        // клика ещё пару секунд «дышат» на 3–4 мм. Сон
+                        // убирает дрожь сразу; тело проснётся от первого
+                        // реального касания, так что физика не меняется.
+                        body.Sleep();
+                    }
                 }
                 // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
                 var latch = rb.GetComponent<DoorLatch>();

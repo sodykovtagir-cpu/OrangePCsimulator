@@ -71,14 +71,15 @@ public class Box : MonoBehaviour
 
     /// <summary>
     /// Положить в коробку предмет и нанести на него настройку (рисунок).
-    /// Вызывается до Start() коробки, чтобы игрок не увидел пустой ящик.
+    /// Содержимое остаётся отложенным до Start() коробки: у ящика стекла Box
+    /// лежит в выключенном BrokenCrate, поэтому Start() случается, когда ящик
+    /// разбивают молотком. До этого ящик стоит целым, как обычная коробка.
     /// </summary>
     public void FillWith(Func<GameObject> make, Action<GameObject> configure)
     {
         awaiting = false;
         contentFactory = configure;
         pending = make;
-        Release(null);
     }
 
     /// <summary>

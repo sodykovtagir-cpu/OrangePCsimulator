@@ -26,6 +26,7 @@ namespace PC.Component.Software
         [SerializeField] private Button rowTemplate;
         [SerializeField] private Dropdown commandDropdown;
         [SerializeField] private Text argumentHint;
+        ScrollRect inspectorScroll;
         int selectedAction = -1;
         SiteHistory project;
         string selected = "", filePath = "";
@@ -68,6 +69,7 @@ namespace PC.Component.Software
             foreach (var command in SiteCommands.All) commands.Add(command.Name);
             commandDropdown.AddOptions(commands); commandDropdown.onValueChanged.AddListener(index => CommandChanged());
             InitInspector();
+            EnsureInspectorScrollbar();
             view.Selected = SelectElement;
             view.Moved = (id, x, y) => Change(d => { var e = d.Find(id); e.x = x; e.y = y; });
             view.TextEdited = (id, text) => Change(d => d.Find(id).text = text);
@@ -77,6 +79,34 @@ namespace PC.Component.Software
             view.OpenFile = asset => Report("Preview OpenFile: " + asset.name + " (корень сайта)");
             bound = true;
             return true;
+        }
+        // The prefab ships a ScrollRect without a visible handle, so the right
+        // panel scrolled only by wheel. Build the bar once, in code, to keep the
+        // prefab layout untouched.
+        void EnsureInspectorScrollbar()
+        {
+            if (inspectorScroll != null || inspector == null) return;
+            inspectorScroll = inspector.GetComponentInParent<ScrollRect>(true);
+            if (inspectorScroll == null || inspectorScroll.verticalScrollbar != null) return;
+            var host = inspectorScroll.transform as RectTransform;
+            if (host == null) return;
+            var track = new GameObject("Inspector scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
+            var trackRect = (RectTransform)track.transform; trackRect.SetParent(host, false);
+            trackRect.anchorMin = new Vector2(1, 0); trackRect.anchorMax = new Vector2(1, 1);
+            trackRect.pivot = new Vector2(1, .5f); trackRect.anchoredPosition = Vector2.zero; trackRect.sizeDelta = new Vector2(12, 0);
+            track.GetComponent<Image>().color = new Color(.6f, .6f, .6f, 1f);
+            var sliding = new GameObject("Sliding Area", typeof(RectTransform));
+            var slidingRect = (RectTransform)sliding.transform; slidingRect.SetParent(trackRect, false);
+            slidingRect.anchorMin = Vector2.zero; slidingRect.anchorMax = Vector2.one; slidingRect.offsetMin = new Vector2(2, 2); slidingRect.offsetMax = new Vector2(-2, -2);
+            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+            var handleRect = (RectTransform)handle.transform; handleRect.SetParent(slidingRect, false);
+            handleRect.anchorMin = Vector2.zero; handleRect.anchorMax = Vector2.one; handleRect.offsetMin = Vector2.zero; handleRect.offsetMax = Vector2.zero;
+            var handleImage = handle.GetComponent<Image>(); handleImage.color = new Color(.3f, .3f, .3f, 1f);
+            var bar = track.GetComponent<Scrollbar>();
+            bar.handleRect = handleRect; bar.targetGraphic = handleImage; bar.direction = Scrollbar.Direction.BottomToTop; bar.value = 1; bar.size = .3f;
+            inspectorScroll.verticalScrollbar = bar;
+            inspectorScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            if (inspectorScroll.viewport != null) { var viewport = (RectTransform)inspectorScroll.viewport; viewport.offsetMax = new Vector2(-14, 0); }
         }
         // Window coordinates are LOCAL PCOS app-parent units, not screen pixels.
         // The prefab owns all internal layout; only the top-level window is fitted.

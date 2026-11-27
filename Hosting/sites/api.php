@@ -17,14 +17,14 @@ try{
  foreach($db['rates']as $k=>$rate)if($rate[0]<$bucket)unset($db['rates'][$k]);
  $rate=$db['rates'][$rateKey]??[$bucket,0];if(++$rate[1]>180)site_fail('Rate limited',429);$db['rates'][$rateKey]=$rate;
  $db['wallets']=$db['wallets']??[];
- if(in_array($action,['publish','stats','stop','host_stop','topup','local'],true)){
+ if(in_array($action,['publish','reserve','stats','stop','host_stop','topup','local'],true)){
   $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
   $snapshot=false;
   if(isset($_POST['balance'])){
    $snapshot=true;
    $settled=$_POST['settled']??null;
    if($settled===null){$ledger=json_decode($_POST['ledgers']??'{}',true);$settled=0;if(is_array($ledger)&&is_array($ledger['items']??null)&&count($ledger['items'])<=1000)foreach($ledger['items']as $entry)if(is_array($entry)&&($entry['owner']??'')===$owner)$settled=$entry['charged']??0;}
-   site_snapshot($db,$owner,$world,$_POST['balance'],$settled);
+   site_snapshot($db,$owner,$world,$_POST['balance'],$settled,$_POST['deposited']??null);
   }
   // Locally hosted publications (kept in the game save): merged into the same
   // wallet so their rent is deducted from the same money. Nothing is served.
@@ -87,8 +87,31 @@ try{
    }
   }unset($s);
  }
- elseif(in_array($action,['publish','stats','stop','host_stop','topup','local'],true)){
-  $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);$out['owner']=$owner;$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
+ elseif(in_array($action,['publish','reserve','stats','stop','host_stop','topup','local'],true)){
+  $owner=site_user($_SERVER['HTTP_X_AUTH_TOKEN']??$_POST['token']??'',$users);  $out['owner']=$owner;$world=$_POST['world']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$world))site_fail('Invalid save identity');
+  // The game picks the standard address and asks the server to keep it before
+  // publishing, so the player sees the reserved temporary domain right away.
+  if($action==='reserve'){
+   $key=$_POST['key']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$key))site_fail('Invalid publication identity');
+   $found='';foreach($db['sites']as $k=>$site)if($site['owner']===$owner&&$site['world']===$world&&($site['key']??'')===$key){$found=(string)$k;break;}
+   if($found===''){
+    $owned=0;foreach($db['sites']as $entry)if($entry['owner']===$owner)$owned++;if($owned>=16)site_fail('16 publications per account maximum',409);
+    if(count($db['sites'])>=200)site_fail('Host full',503);
+    $found=(string)$db['next']++;
+    $title=trim((string)($_POST['title']??''));if(!is_string($title))$title='';
+    $db['sites'][$found]=['id'=>(int)$found,'owner'=>$owner,'world'=>$world,'key'=>$key,'kind'=>'cloud',
+     'url'=>'s'.$found.'.sites.pcos','title'=>substr($title,0,120),'description'=>'','keywords'=>'','visits'=>0,'sessions'=>[],'transfers'=>[],
+     'total'=>0,'revision'=>1,'active'=>false,'paused'=>false,'pause_reason'=>'','unpaid'=>false,'banned'=>false,'banned_reason'=>'',
+     'credit'=>0,'paid_seconds'=>0,'billed_seconds'=>0,'run_seconds'=>0,'client_seconds'=>0,'run_from'=>0,'host'=>0,'bytes'=>0,
+     'cpu_capacity'=>1000,'cpu_load'=>0,'host_mbps'=>5,'icon_data'=>'','icon_media'=>'','downloads'=>0,'custom_paid'=>false,'reserved'=>true];
+   }
+   $s=&$db['sites'][$found];if(empty($s['active']))$s['reserved']=true;
+   // The temporary address of this publication is only reported, never written
+   // here: the publication keeps its current domain until the player publishes
+   // with the standard tariff, so the old custom domain stays remembered.
+   $reserve_url='s'.$found.'.sites.pcos';
+   site_reconcile($db,$now);$published_id=$found;unset($s);
+  }
   if($action==='publish'){
    $key=$_POST['key']??'';if(!preg_match('/^[a-f0-9]{32}$/D',$key))site_fail('Invalid publication identity');$raw=$_POST['document']??'';$doc=site_validate($raw);
    $id='';foreach($db['sites']as $k=>$site)if($site['owner']===$owner&&$site['world']===$world&&$site['key']===$key){$id=(string)$k;break;}
@@ -96,9 +119,11 @@ try{
    $old=$db['sites'][$id]??null;if($old&&!empty($old['banned']))site_fail('Сайт заблокирован администрацией',403);$url=strtolower(trim($_POST['url']??''));$url=preg_replace('~^https?://~','',$url);$url=rtrim($url,'/');
    if($url==='')$url=$old?$old['url']:'s'.$id.'.sites.pcos';
    if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$url)||strlen($url)>160||strpos($url,'..')!==false)site_fail('Invalid game URL');
-   $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);if(in_array($url,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$url)&&$url!=='s'.$id.'.sites.pcos')site_fail('Reserved URL',409);
+   // Temporary standard addresses are kept per publication, not per id: an
+   // offline publication may already carry one and must keep it on reconnect.
+   $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);if(in_array($url,$reserved?:[],true)||preg_match('/(?:^|\.)byethost\d*\.com$/D',$url))site_fail('Reserved URL',409);
    foreach($db['sites']as $k=>$site)if((string)$k!==$id&&$site['url']===$url)site_fail('URL already taken',409);
-   $custom=$url!=='s'.$id.'.sites.pcos';$fresh=!$old||!$old['active']||!empty($old['unpaid']);
+   $custom=!preg_match('~^s\d+\.sites\.pcos$~',$url);$fresh=!$old||!$old['active']||!empty($old['unpaid']);
    $paid=$old?site_custom_paid($old):false;
    // A fresh or restarted publication prepays one period of hosting as seconds:
    // $100 / 1800 s, or $1100 / 1800 s with a custom domain (the custom rate
@@ -108,7 +133,7 @@ try{
    // site goes live. The only up-front charge is the one-time custom-domain fee,
    // and even that is paid from the hosting wallet (filled with action=topup),
    // never straight from the game.
-   $is_default=$old&&$old['url']==='s'.$id.'.sites.pcos';
+   $is_default=$old&&preg_match('~^s\d+\.sites\.pcos$~',$old['url']);
    $custom_fee=($custom&&(!$paid||$is_default))?SITE_CUSTOM_PRICE:0;
    $cost=$custom_fee;
    // The exact fixed tariff must be confirmed; the client cannot submit price,
@@ -120,7 +145,7 @@ try{
    if($cost>0&&site_available_funds($db,$owner,$world)<$cost)site_fail('Недостаточно денег в кошельке хостинга: пополни его',402);
    $s=$old?:['id'=>(int)$id,'owner'=>$owner,'world'=>$world,'key'=>$key,'visits'=>0,'sessions'=>[],'total'=>0,'revision'=>0];
    if($old&&$old['url']!==$url){$s['sessions']=[];$s['transfers']=[];$s['access_epoch']=($s['access_epoch']??0)+1;}
-   $s['custom_paid']=$paid||$custom;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
+   $s['custom_paid']=$paid||$custom;$s['reserved']=false;[$s['icon_data'],$s['icon_media']]=site_icon_data($doc);
    $s['active']=true;$s['paused']=false;$s['pause_reason']='';$s['unpaid']=false;
    // A fresh publication prepays one period of seconds; an update only adds the
    // one-time custom-domain fee (if the domain was upgraded just now).
@@ -141,11 +166,11 @@ try{
    $domain=strtolower(trim($_POST['url']??''));$domain=preg_replace('~^https?://~','',$domain);$domain=rtrim($domain,'/');
    if(!preg_match('/^(?:www\.)?[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/D',$domain)||strlen($domain)>160||strpos($domain,'..')!==false)site_fail('Invalid game URL');
    $reserved=json_decode(file_get_contents(__DIR__.'/reserved.json'),true);
-   if(in_array($domain,$reserved?:[],true)||preg_match('/(?:^|\.)(?:byethost\d*\.com|sites\.pcos)$/D',$domain))site_fail('Reserved URL',409);
+   if(in_array($domain,$reserved?:[],true)||preg_match('/(?:^|\.)byethost\d*\.com$/D',$domain))site_fail('Reserved URL',409);
    foreach($db['sites']as $known=>$site)if($site['url']===$domain&&!($site['owner']===$owner&&$site['world']===$world&&site_local($site)))site_fail('URL already taken',409);
    if(($_POST['confirm']??'')!=='100/1800/1000')site_fail('Confirm tariff first',409);
    // The tariff follows the domain, not the client's claim.
-   $custom=!preg_match('~^local\.~',$domain);
+   $custom=!preg_match('~^(?:local\.|s\d+\.sites\.pcos$)~',$domain);
    $rate=$custom?SITE_RATE_CUSTOM:SITE_RATE_STANDARD;
    $found=null;foreach($db['sites']as $known=>$site)if($site['owner']===$owner&&$site['world']===$world&&site_local($site)&&$site['url']===$domain){$found=(string)$known;break;}
    $fresh=$found===null||empty($db['sites'][$found]['active'])||!empty($db['sites'][$found]['unpaid']);
@@ -192,9 +217,14 @@ try{
   // publication already reports its "time left" without waiting for a poll.
   site_reconcile($db,$now);
   $out['items']=[];$out['total']=0;
-  foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world){$private=site_public($s,$now);$private['publication_key']=$s['key'];$out['items'][]=$private;$out['total']+=$s['total'];}unset($s);
+  // A reservation reports the temporary address of that publication, so the game
+  // shows the reserved domain even while a live custom domain is still in place.
+  foreach($db['sites']as &$s)if($s['owner']===$owner&&$s['world']===$world){$private=site_public($s,$now);if(isset($reserve_url)&&(int)$s['id']===(int)$published_id)$private['url']=$reserve_url;$private['publication_key']=$s['key'];
+   // The owner's own list needs no icon payload: sending it every minute only
+   // costs the game a large JSON parse it never draws.
+   unset($private['icon_data'],$private['icon_media']);$out['items'][]=$private;$out['total']+=$s['total'];}unset($s);
   // The published publication is reported with its post-reconcile state.
-  if($action==='publish'&&isset($published_id)&&isset($db['sites'][$published_id])){$item=site_public($db['sites'][$published_id],$now);$item['publication_key']=$db['sites'][$published_id]['key'];$out['item']=$item;}
+  if(in_array($action,['publish','reserve'],true)&&isset($published_id)&&isset($db['sites'][$published_id])){$item=site_public($db['sites'][$published_id],$now);if(isset($reserve_url))$item['url']=$reserve_url;$item['publication_key']=$db['sites'][$published_id]['key'];unset($item['icon_data'],$item['icon_media']);$out['item']=$item;}
   $wallet=$db['wallets'][site_wallet_key($owner,$world)]??null;
   // `available` is the known cash left for this save; null means "not synced
   // yet" (money lives in the game save, the backend cannot see it).

@@ -9,8 +9,29 @@ namespace PC.Component.Software
 {
  public partial class Browser
  {
-  readonly List<GameObject> customRows=new List<GameObject>();float nextCustomResults;bool customResultsBusy;
-  void ClearCustomRows(){foreach(var row in customRows)if(row!=null){row.SetActive(false);Destroy(row);}customRows.Clear();}
+  readonly List<GameObject> customRows=new List<GameObject>(),offlineRows=new List<GameObject>();float nextCustomResults;bool customResultsBusy;
+  void ClearRemoteRows(){foreach(var row in customRows)if(row!=null){row.SetActive(false);Destroy(row);}customRows.Clear();}
+  void ClearOfflineRows(){foreach(var row in offlineRows)if(row!=null){row.SetActive(false);Destroy(row);}offlineRows.Clear();}
+  void ClearCustomRows(){ClearRemoteRows();ClearOfflineRows();}
+  /// <summary>
+  /// Publications hosted from this save are searched first and marked offline:
+  /// without a connection they are the only sites that still work.
+  /// </summary>
+  void LoadOfflineResults(string query)
+  {
+   ClearOfflineRows();
+   var service=SiteHostingService.Instance;if(service==null||service.Locals==null)return;
+   string q=query==null?"":query.ToLowerInvariant();
+   foreach(var site in service.Locals)
+   {
+    if(site==null||string.IsNullOrEmpty(site.domain))continue;
+    if(q!=""&&site.domain.ToLowerInvariant().IndexOf(q)<0&&(site.title??"").ToLowerInvariant().IndexOf(q)<0)continue;
+    var copy=site;var row=Instantiate(oggleResultPrefab,resultsContainer);offlineRows.Add(row);var item=row.GetComponent<OggleResultItem>();
+    item.title.text=string.IsNullOrWhiteSpace(site.title)?site.domain:site.title;
+    item.description.text=site.domain+" — оффлайн, сайт работает из сохранения";
+    row.GetComponent<Button>().onClick.AddListener(()=>{addressBar.text=copy.domain;Search();});
+   }
+  }
   int remoteId;string remoteURL="",remoteTicket="",remoteSession=Guid.NewGuid().ToString("N");float remoteBeat;bool remoteBusy,keepRemote;
   // Domain of the locally hosted publication currently on screen, and its clock.
   string servedDomain="";float servedBeat;
@@ -18,9 +39,10 @@ namespace PC.Component.Software
   {
    if(customResultsBusy)return;customResultsBusy=true;nextCustomResults=Time.unscaledTime+60;
    int generation=localGeneration;
+   LoadOfflineResults(query);
    SiteHostingService.Request("list",new Dictionary<string,string>{{"query",query}},(reply,error)=>{
     if(this==null||generation!=localGeneration||siteNavigationClosed)return;
-    customResultsBusy=false;ClearCustomRows();if(error!=null||reply.items==null)return;
+    customResultsBusy=false;ClearRemoteRows();if(error!=null||reply.items==null)return;
     foreach(var site in reply.items){if(!site.active)continue;var copy=site;var row=Instantiate(oggleResultPrefab,resultsContainer);customRows.Add(row);var item=row.GetComponent<OggleResultItem>();item.title.text=string.IsNullOrWhiteSpace(site.title)?site.url:site.title;item.description.text=site.url+" — "+site.description;item.SetIcon(HostedIcon(site));row.GetComponent<Button>().onClick.AddListener(()=>{addressBar.text=copy.url;Search();});}
    });
   }

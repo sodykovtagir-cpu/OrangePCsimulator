@@ -132,8 +132,11 @@ namespace PC.Component.Software
             if(siteNavigationClosed||localDocument==null||localDocument.Asset(asset.name)!=asset)return;
             try
             {
-                string content = asset.media.StartsWith("image/", StringComparison.Ordinal) ? asset.data : new UTF8Encoding(false, true).GetString(asset.Bytes());
-                string extension = System.IO.Path.GetExtension(asset.name);
+                // PCOS stores pictures as .pic (base64 of the image bytes); Viewer
+                // only decodes that format, so never hand back .jpg/.png names.
+                bool image = asset.media.StartsWith("image/", StringComparison.Ordinal);
+                string content = image ? asset.data : new UTF8Encoding(false, true).GetString(asset.Bytes());
+                string extension = image ? ".pic" : System.IO.Path.GetExtension(asset.name);
                 if (string.IsNullOrEmpty(extension)) extension = ".txt";
                 string title = System.IO.Path.GetFileNameWithoutExtension(asset.name);
                 // SaveDialog requires a user-confirmed destination. Always normal

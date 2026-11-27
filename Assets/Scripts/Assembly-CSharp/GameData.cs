@@ -9,6 +9,14 @@ public class GameData
     // wallet bookkeeping: served seconds already reported to the backend.
     public System.Collections.Generic.List<PC.Component.Software.Sites.LocalHostedSite> siteHostingLocals;
     public PC.Component.Software.Sites.SiteHostingWallet siteHostingWallet;
+    // Money moved to the hosting wallet while offline; sent on reconnect.
+    public long siteHostingPendingTopUp;
+    // Total money this save has moved into the hosting wallet. The server bounds
+    // the wallet by it, so loading an older save takes the money back from both
+    // places at once instead of leaving it duplicated on the server.
+    public long siteHostingDeposited = -1;
+    // Last custom domain the player used, offered again when switching modes.
+    public string siteHostingCustomDomain;
 	public string version;
 
 	public string roomName;

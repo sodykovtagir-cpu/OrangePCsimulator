@@ -63,7 +63,12 @@ public class SaveManager : MonoBehaviour
 		}
 	}
 
-    public bool SaveData()
+    /// <param name="written">
+    /// Called on the main thread once the background writer really finished, with
+    /// the actual outcome. The snapshot is only queued when this method returns
+    /// true, so anything telling the player "saved" must wait for this callback.
+    /// </param>
+    public bool SaveData(Action<bool, string> written = null)
     {
         // Never write a half-restored cable whose saved port owners are still
         // frozen/unattached (for example when Save is clicked during loading).
@@ -149,8 +154,36 @@ public class SaveManager : MonoBehaviour
             scene = content.scene,
             itemData = items.ToArray()
         });
-        loader.WriteToFile();
+        // The snapshot above is the only part that needs the main thread; the
+        // gzip of a large save takes seconds and used to freeze the game here.
+        loader.WriteToFileAsync(written);
         return true;
+    }
+
+    private void Update()
+    {
+        // Background writes report their real outcome here, on the main thread:
+        // this is what turns a failed save into something the player can see.
+        SaveManagement.SaveWriter.Pump();
+    }
+
+    private void OnApplicationQuit()
+    {
+        // Nothing may be lost because the game closed while the writer worked.
+        SaveManagement.SaveWriter.Flush();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        // Mobile can kill a paused application between writes.
+        if (paused) SaveManagement.SaveWriter.Flush();
+    }
+
+    private void OnDisable()
+    {
+        // Loading another save reloads the scene: the pending file must land
+        // before the world it describes is torn down.
+        SaveManagement.SaveWriter.Flush();
     }
 
     public int LoadData()

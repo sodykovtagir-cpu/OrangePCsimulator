@@ -26,6 +26,12 @@ browser session or a download was open. An empty wallet pauses the site without
 creating debt; served time is counted per second, idempotently, and a repeated
 or lost request never bills the same second twice.
 
+Wallet safety: every authenticated request also carries `deposited` — the total
+money that save has moved into hosting. The wallet ceiling is bounded by it and
+never grows from a balance snapshot, so loading an older save takes the money
+back from the wallet exactly as it takes it back in the game; the same dollars
+never exist in both places. Rent already billed stays billed.
+
 Health request: POST `action=health` to `/sites/api.php?i=1`. Expected JSON:
 `ok=true, service=orange-sites, version=1, available=true`. Byethost's browser
 challenge must be solved before calling PHP; the game reuses the workshop

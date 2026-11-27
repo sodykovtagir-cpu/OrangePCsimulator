@@ -15,13 +15,41 @@ internal static class Program
         if (!ok) failures++;
     }
 
-    // Ящик стекла: Crate + Box без зашитого содержимого, как Crate_Cover_ATX(Glass).
+    // Ящик стекла как в Assets/Resources/components/Crate_Cover_ATX(Glass).prefab:
+    // на корне только Crate, а Box лежит в выключенном BrokenCrate.
     private static GameObject NewCratePrefab(string name)
     {
         var go = new GameObject(name);
-        go.AddComponent<Crate>();
-        go.AddComponent<Box>();
+        var crate = go.AddComponent<Crate>();
+        var broken = new GameObject("BrokenCrate");
+        broken.activeSelf = false;
+        go.AddChild(broken);
+        broken.AddComponent<Box>();
+        crate.broken = broken;
         return go;
+    }
+
+    // Игрок ударил ящик молотком: Crate включает BrokenCrate, Unity вызывает
+    // Start() его Box.
+    private static void BreakCrate(GameObject live)
+    {
+        var crate = live.GetComponent<Crate>();
+        var box = ContentBox(live);
+        // Заглушка копирует компоненты детей, но не ссылки внутри них,
+        // поэтому BrokenCrate у клона ищем так же, как в префабе.
+        if (crate.broken == null) crate.broken = box.gameObject;
+        // В Unity SetParent(null) сохраняет мировую позу, заглушка — нет.
+        box.transform.position = live.transform.position;
+        box.transform.rotation = live.transform.rotation;
+        crate.BreakApart();
+        BoxTestHooks.Start(box);
+    }
+
+    // Box, который выкладывает содержимое ящика: корень или выключенный BrokenCrate.
+    private static Box ContentBox(GameObject crate)
+    {
+        var box = crate.GetComponent<Box>();
+        return box != null ? box : crate.GetComponentInChildren<Box>(true);
     }
 
     private static GameObject NewCoverPrefab(string name)
@@ -59,9 +87,23 @@ internal static class Program
         Check(!painted, "рисунок не наносится в момент заказа");
 
         var live = m.SpawnFromQueue(cratePrefab);
-        Check(painted, "стекло покрашено в момент появления ящика");
-        Check(UnityEngine.Object.InstantiateCount == start + 2, "созданы два объекта: ящик и стекло внутри");
-        Check(live.GetComponent<Crate>() != null && live.GetComponent<Crate>().Opened, "ящик сразу открылся — рисунок уже на стекле");
+        Check(!painted, "пока ящик целый, рисунок не наносится");
+        Check(UnityEngine.Object.InstantiateCount == start + 1, "создан только ящик — он приехал целым");
+        Check(live.GetComponent<Crate>() != null && !live.GetComponent<Crate>().Opened, "ящик не открыт сам по себе");
+        Check(ContentBox(live) != null && !BoxTestHooks.OpenedOnce(ContentBox(live)),
+              "содержимое ящика ещё не выложено");
+
+        // Пока ящик лежал, он успел сдвинуться с точки доставки.
+        live.transform.position = new Vector3(4f, 1f, 4f);
+
+        BreakCrate(live);
+        Check(painted, "стекло покрашено в момент, когда ящик разбили");
+        Check(UnityEngine.Object.InstantiateCount == start + 2, "разбитый ящик выложил стекло");
+        Check(UnityEngine.Object.LastInstantiatePosition.x == 4f && UnityEngine.Object.LastInstantiatePosition.z == 4f,
+              "стекло выпало у разбитого ящика, а не в точке доставки");
+        Check(live.GetComponent<Crate>().Opened, "ящик открылся ударом молотка");
+        Check(ContentBox(live) != null && BoxTestHooks.OpenedOnce(ContentBox(live)),
+              "Box внутри BrokenCrate перехвачен: обычное стекло не выкладывается");
         Check(m.CustomQueuesEmpty, "очереди заказов пусты");
     }
 
@@ -81,9 +123,13 @@ internal static class Program
         m.DeliverCustom(second, itxCrate, go => paintedFor = "B:" + (go.name ?? ""));
 
         Check(m.Queue.Count == 2, "оба ящика в очереди доставки");
-        m.SpawnFromQueue(atxCrate);
+        var atxLive = m.SpawnFromQueue(atxCrate);
+        Check(paintedFor == null, "пока ящики целые, рисунки не нанесены");
+        BreakCrate(atxLive);
         Check(paintedFor == "A:cover_atx_glass_custom_copy", "первый ящик получил первую крышку");
-        m.SpawnFromQueue(itxCrate);
+        var itxLive = m.SpawnFromQueue(itxCrate);
+        Check(paintedFor == "A:cover_atx_glass_custom_copy", "второй ящик сам по себе ничего не покрасил");
+        BreakCrate(itxLive);
         Check(paintedFor == "B:cover_itx_glass_custom_copy", "второй ящик получил вторую крышку");
     }
 
@@ -103,6 +149,16 @@ internal static class Program
               "признак обычной крышки — префаб Cover_*, а не стеклянный Crate_*");
         Check(!System.IO.File.Exists(System.IO.Path.Combine(Root, "Assets/Scripts/Assembly-CSharp/CoverItem.cs")),
               "компонент CoverItem (упаковка обычных крышек) удалён");
+
+        // ModForge: обычные (не стеклянные) крышки тоже без ящика.
+        var forge = Read("Assets/Scripts/Assembly-CSharp/PC/Component/Software/ModForge.cs");
+        Check(forge.Contains("null,                            // cover_atx_custom") &&
+              forge.Contains("null,                            // cover_itx_custom"),
+              "у простых крышек в ModForge нет ящика — сразу у портала");
+        Check(forge.Contains("if (name == null) return null;"),
+              "для простой крышки CaseCrate возвращает пусто");
+        Check(!forge.Contains("if (box == null) return false;"),
+              "отсутствие ящика не отменяет заказ — предмет всё равно доставляется");
     }
 
     private static void TestRestoringSilence()
@@ -115,7 +171,7 @@ internal static class Program
         m.DeliverCustom(NewCoverPrefab("cover_atx_glass_custom"), cratePrefab, go => { });
         int before = UnityEngine.Object.InstantiateCount;
         var live = m.SpawnFromQueue(cratePrefab);
-        BoxTestHooks.Start(live.GetComponent<Box>());
+        BreakCrate(live);
         Check(UnityEngine.Object.InstantiateCount == before + 1, "во время Restoring создан только сам ящик");
         Box.Restoring = false;
 
@@ -135,15 +191,26 @@ internal static class Program
         Check(forge.Contains("Main.Instance.DeliverCustom("), "покупка идёт через DeliverCustom");
         Check(forge.Contains("Crate_Cover_ATX(Glass)") && forge.Contains("Crate_Cover_ITX(Glass)"),
               "ящик — тот же, в котором приезжает обычное стекло");
-        Check(forge.Contains("Resources.Load<GameObject>(name)"), "ящик берётся из Resources");
+        Check(forge.Contains("Resources.Load<GameObject>(\"components/\" + name)"), "ящик берётся из Resources");
         Check(forge.Contains("caseCratePrefab"), "ящик можно назначить в инспекторе");
         Check(forge.Contains("m.AddMoney(price)"), "неудачная доставка возвращает деньги");
         Check(!forge.Contains("InstantDelivery") && !forge.Contains("Box_CustomCover"),
               "самодельная коробка и мгновенная выдача убраны");
 
         var main = Read("Assets/Scripts/Assembly-CSharp/Main.cs");
-        Check(main.Contains("crate.BreakApart()"), "ящик заказа открывается сразу (рисунок уже на стекле)");
-        Check(main.Contains("private Transform doorPoint;") && main.Contains("DeliveryPosition"),
+        Check(!main.Contains("crate.BreakApart()"),
+              "ящик заказа не открывается сам — его разбивают молотком, как обычный");
+        Check(main.Contains("box.transform.position"),
+              "позиция стекла берётся у ящика в момент поломки, а не у точки доставки");
+        Check(main.Contains("GetComponentInChildren<Box>(true)"),
+              "Box ящика ищется и в выключенном BrokenCrate (как в реальном префабе)");
+
+        var boxSrc = Read("Assets/Scripts/Assembly-CSharp/Box.cs");
+        var fill = boxSrc.Substring(boxSrc.IndexOf("public void FillWith"));
+        fill = fill.Substring(0, fill.IndexOf("\n    }"));
+        Check(!fill.Contains("Release(null)"),
+              "FillWith не выкладывает предмет сразу — ждёт Start() разбитого ящика");
+        Check(main.Contains("private Transform doorPoint;") && main.Contains("CustomDeliveryPoint"),
               "есть запасная точка доставки, если packagePoint пуст");
         Check(!main.Contains("коробка появится сразу у портала"), "старый варнинг про пустой packagePoint убран");
         Check(main.Contains("NotifySpawned(Instantiate(original, packagePoint.position"), "очередь доставки сообщает о появлении");

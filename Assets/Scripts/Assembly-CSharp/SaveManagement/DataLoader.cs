@@ -126,5 +126,24 @@ namespace SaveManagement
             SaveStorage.WriteAtomic(Path, encrypted);
             SaveCatalog.Invalidate(Path);
         }
+
+        /// <summary>
+        /// Тот же файл, но сжатие и запись идут в фоне.
+        /// </summary>
+        /// <remarks>
+        /// Снимок (GameData + контент сцены) снимается здесь, на главном потоке:
+        /// только он знает актуальные позиции предметов. Всё дорогое после
+        /// него — gzip 42 МБ и запись на диск — уходит в <see cref="SaveWriter"/>,
+        /// иначе игра замирает на несколько секунд посреди сцены.
+        /// </remarks>
+        public void WriteToFileAsync(Action<bool, string> written = null)
+        {
+            if (IsPreviewOnly)
+                throw new InvalidOperationException("Menu preview must be hydrated from the authenticated save before editing.");
+            if (GameData == null)
+                throw new InvalidOperationException("GameData is null.");
+
+            SaveWriter.Enqueue(Path, JsonUtility.ToJson(GameData), Content, written);
+        }
     }
 }

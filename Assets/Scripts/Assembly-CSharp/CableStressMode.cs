@@ -300,7 +300,9 @@ public sealed class CableStressMode : MonoBehaviour
                 yield return new WaitForFixedUpdate();
                 if (!Observe("baseline settle step " + step)) yield break;
             }
-            if (!SaveManager.Instance.SaveData() || !File.Exists(savePath))
+            var written = SaveManager.Instance.SaveData();
+            // The write itself runs on a background thread: wait for the file.
+            if (!written || !SaveManagement.SaveWriter.Flush() || !File.Exists(savePath))
             { Fail("Test save could not be written"); yield break; }
             Write("BASELINE SAVED 8 PSU + 8 GPU + 8 monitors + 8 outlets; 48 ends verified. Bytes=" + new FileInfo(savePath).Length);
             for (cycle = 1; cycle <= Reloads; cycle++)

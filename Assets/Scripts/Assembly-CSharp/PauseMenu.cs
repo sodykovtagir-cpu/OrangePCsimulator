@@ -81,12 +81,28 @@ public class PauseMenu : MonoBehaviour
 		warningDialog.Show(MainMenu);
 	}
 
+	private bool savingHome;
+
 	public void Home()
 	{
-		if (SaveManager.Instance.SaveData())
-        {
+		if (savingHome) return;
+		var manager = SaveManager.Instance;
+		if (manager == null)
+		{
 			MainMenu();
-        }
+			return;
+		}
+		savingHome = true;
+		// The snapshot is compressed in the background. Leave the world only when
+		// the file is really on disk: a failed write keeps the player here, and
+		// the red save banner explains why instead of a silent older save.
+		if (!manager.SaveData(HomeWritten)) savingHome = false;
+	}
+
+	private void HomeWritten(bool ok, string error)
+	{
+		savingHome = false;
+		if (ok) MainMenu();
 	}
 
 	public void MainMenu()

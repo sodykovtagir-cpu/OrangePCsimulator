@@ -65,7 +65,10 @@ public class GameMain
     {
         if (spawned == null || customConfigures.Count == 0) return;
         if (Box.Restoring) return;
+        // Mirrors Main.OnSpawned: the glass crate keeps its Box on the inactive
+        // BrokenCrate child, not on the crate root.
         var box = spawned.GetComponent<Box>();
+        if (box == null) box = spawned.GetComponentInChildren<Box>(true);
         if (box == null) return;
 
         GameObject expected = customBoxes.Count > 0 ? customBoxes.Peek() : null;
@@ -75,11 +78,10 @@ public class GameMain
 
         GameObject itemPrefab = customItems.Count > 0 ? customItems.Dequeue() : null;
         if (itemPrefab == null) return;
-        Transform at = spawned.transform;
         box.ExpectContent();
-        box.FillWith(() => UnityEngine.Object.Instantiate(itemPrefab, at.position, at.rotation), configure);
-        var crate = spawned.GetComponent<Crate>();
-        if (crate != null && crate.CanOpen()) crate.BreakApart();
+        // Mirrors Main: position is read from the Box when the crate is broken.
+        box.FillWith(() => UnityEngine.Object.Instantiate(itemPrefab, box.transform.position, box.transform.rotation), configure);
+        // Mirrors Main: the crate arrives whole and is broken with the hammer.
     }
 
     public bool CustomQueuesEmpty

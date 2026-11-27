@@ -23,15 +23,16 @@ public class ModForge : Website
     [SerializeField] private Crate caseCratePrefab;
 
     /// <summary>
-    /// Тот же ящик, в котором приезжает обычное стекло: крышка заказная или
-    /// нет — неважно, упаковка одинаковая.
+    /// Ящик, в котором приезжает стекло: та же упаковка, что у магазинного
+    /// стекла. У простых (не стеклянных) крышек ящика нет — null, такой заказ
+    /// появляется сразу у портала, без разбивания.
     /// </summary>
     private static readonly string[] CrateNames =
     {
         "Crate_Cover_ATX(Glass)",        // cover_atx_glass_custom
         "Crate_Cover_ITX(Glass)",        // cover_itx_glass_custom
-        "Crate_Cover_ATX(Glass)",        // cover_atx_custom
-        "Crate_Cover_ITX(Glass)",        // cover_itx_custom
+        null,                            // cover_atx_custom — простая крышка, без упаковки
+        null,                            // cover_itx_custom — простая крышка, без упаковки
         "Crate_Glass_Cover_ATX_Aquarium" // Aquarium_Cover_ATX(customGlass)
     };
 
@@ -145,6 +146,8 @@ public class ModForge : Website
     private GameObject CaseCrate()
     {
         string name = CrateNames[Mathf.Clamp(selectedProduct, 0, CrateNames.Length - 1)];
+        // Простая крышка едет без упаковки.
+        if (name == null) return null;
         // Назначенный в инспекторе ящик главнее, но только если он подходит
         // выбранному товару: у ATX и ITX ящики разные.
         if (caseCratePrefab != null && caseCratePrefab.name == name)
@@ -161,14 +164,14 @@ public class ModForge : Website
     }
 
     /// <summary>
-    /// Купленная крышка приезжает в коробке, как любая деталь: сначала
-    /// доставляется коробка, а предмет выкладывается из неё уже с рисунком.
+    /// Стекло приезжает в коробке, как любая деталь: сначала доставляется
+    /// коробка, а предмет выкладывается из неё уже с рисунком. Простая
+    /// крышка ящика не требует — она сразу появляется у портала.
     /// </summary>
     private bool Spawn(CustomPaint prefab, Texture2D texture)
     {
         if (prefab == null || texture == null || Main.Instance == null) return false;
         var box = CaseCrate();
-        if (box == null) return false;
         byte[] bytes = texture.EncodeToPNG();
         texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
 

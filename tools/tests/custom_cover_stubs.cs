@@ -17,12 +17,15 @@ namespace UnityEngine
         public string name;
         public static readonly List<Object> Destroyed = new List<Object>();
         public static int InstantiateCount;
+        public static Vector3 LastInstantiatePosition;
         public static GameObject Instantiate(GameObject source, Vector3 p, Quaternion q)
         {
             InstantiateCount++;
+            LastInstantiatePosition = p;
             if (source == null) return null;
             var clone = new GameObject((source.name ?? "clone") + "_copy") { Template = source };
             clone.CopyComponentsFrom(source);
+            clone.CopyChildrenFrom(source);
             return clone;
         }
         public static void Destroy(Object o) { Destroyed.Add(o); }
@@ -34,6 +37,10 @@ namespace UnityEngine
         public Transform transform { get { return gameObject != null ? gameObject.transform : null; } }
         public T GetComponent<T>() where T : Component { return gameObject != null ? gameObject.GetComponent<T>() : null; }
         public T GetComponentInChildren<T>() where T : Component { return GetComponent<T>(); }
+        public T GetComponentInChildren<T>(bool includeInactive) where T : Component
+        {
+            return gameObject != null ? gameObject.GetComponentInChildren<T>(includeInactive) : null;
+        }
     }
 
     public class MonoBehaviour : Component { }
@@ -51,6 +58,8 @@ namespace UnityEngine
     public class GameObject : Object
     {
         private readonly Dictionary<Type, Component> parts = new Dictionary<Type, Component>();
+        public readonly List<GameObject> Children = new List<GameObject>();
+        public bool activeSelf = true;
         public GameObject Template;
         public Transform transform;
         public GameObject(string n) { name = n; transform = new Transform { gameObject = this, name = n }; }
@@ -66,6 +75,30 @@ namespace UnityEngine
             return parts.TryGetValue(typeof(T), out c) ? (T)c : null;
         }
         public System.Collections.Generic.IEnumerable<Component> All { get { return parts.Values; } }
+        public void AddChild(GameObject child) { Children.Add(child); }
+        public T GetComponentInChildren<T>(bool includeInactive) where T : Component
+        {
+            var own = GetComponent<T>();
+            if (own != null) return own;
+            foreach (var child in Children)
+            {
+                if (!includeInactive && !child.activeSelf) continue;
+                var found = child.GetComponentInChildren<T>(includeInactive);
+                if (found != null) return found;
+            }
+            return null;
+        }
+        public void CopyChildrenFrom(GameObject source)
+        {
+            foreach (var child in source.Children)
+            {
+                var copy = new GameObject(child.name) { activeSelf = child.activeSelf };
+                copy.CopyComponentsFrom(child);
+                copy.CopyChildrenFrom(child);
+                Children.Add(copy);
+            }
+        }
+
         public void CopyComponentsFrom(GameObject source)
         {
             foreach (var type in new System.Collections.Generic.List<Type>(source.parts.Keys))
@@ -98,13 +131,16 @@ namespace UnityEngine
     }
     public class Crate : Component
     {
-        public bool Opened;
-        public bool CanOpen() { return true; }
-        public void BreakApart()
+        // Mirrors Crate.cs: корень — целый ящик, broken — выключенная сборка
+        // с Box, которая включается ударом молотка.
+        public GameObject broken;
+        public bool Opened { get { return broken != null && broken.activeSelf; } }
+        public bool CanOpen() { return broken != null; }
+        public void BreakApart() { Open(); }
+        public void Open()
         {
-            Opened = true;
-            var box = gameObject.GetComponent<Box>();
-            if (box != null) box.Open();
+            if (broken == null) return;
+            broken.activeSelf = true;
         }
     }
 

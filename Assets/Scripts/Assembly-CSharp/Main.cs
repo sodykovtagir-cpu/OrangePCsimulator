@@ -325,7 +325,12 @@ public class Main : MonoBehaviour
 		if (spawned == null || customConfigures.Count == 0) return;
 		// Загрузка сейва: содержимое уже восстановлено отдельной записью.
 		if (Box.Restoring) return;
+		// В ящике стекла (Crate_Cover_*) Box лежит не на корне, а на выключенном
+		// BrokenCrate: корень ящика — это Crate + Item. Раньше заказ искал Box
+		// только на корне, не находил его, ящик не наполнялся — и из него
+		// выкладывалось обычное стекло вместо крышки с рисунком.
 		var box = spawned.GetComponent<Box>();
+		if (box == null) box = spawned.GetComponentInChildren<Box>(true);
 		if (box == null) return;
 
 		// Каждый заказ доставляется в СВОЁМ ящике: сверяем по префабу, иначе
@@ -339,13 +344,14 @@ public class Main : MonoBehaviour
 		// на своё смещение, как делает с обычным содержимым.
 		GameObject itemPrefab = customItems.Count > 0 ? customItems.Dequeue() : null;
 		if (itemPrefab == null) return;
-		Transform at = spawned.transform;
 		box.ExpectContent();
-		box.FillWith(() => Instantiate(itemPrefab, at.position, at.rotation), configure);
-		// Ящик стекла открывается сразу: рисунок уже на предмете, иначе игрок
-		// получил бы стекло без картинки.
-		var crate = spawned.GetComponent<Crate>();
-		if (crate != null && crate.CanOpen()) crate.BreakApart();
+		// Позиция берётся у Box в момент поломки, а не у точки доставки: пока
+		// ящик ехал и падал, он давно сдвинулся, и запомненная точка выбросила
+		// бы стекло отдельно от ящика.
+		box.FillWith(() => Instantiate(itemPrefab, box.transform.position, box.transform.rotation), configure);
+		// Ящик не трогаем: он приезжает целым, как любая другая коробка. Стекло
+		// с рисунком Box выложит, когда игрок разобьёт ящик молотком — к этому
+		// моменту рисунок уже подготовлен (см. Box.FillWith).
 	}
 
 	/// <summary>Экземпляр доставлен из этого префаба?</summary>

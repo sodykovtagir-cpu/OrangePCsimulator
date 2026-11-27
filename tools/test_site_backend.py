@@ -154,10 +154,26 @@ with tempfile.TemporaryDirectory() as td:
  quiet_local=call('stats',_token=token,world=lworld2)
  check(quiet_local['total']==0 and quiet_local['items'][0]['active'] and quiet_local['items'][0]['traffic_seconds']==0)
 
+ # --- 11. The server reserves the temporary standard address before publishing,
+ # and an address generated offline is accepted as a standard publication.
+ rworld='8'*32;okey='d'*32
+ res=call('reserve',_token=token,world=rworld,key=okey,title='Reserved',balance='1000',settled='0')
+ check(res['ok'] and res['item']['reserved'] and not res['item']['active'])
+ check(res['item']['url']=='s%d.sites.pcos'%res['item']['id'])
+ again=call('reserve',_token=token,world=rworld,key=okey);check(again['item']['url']==res['item']['url'] and again['item']['id']==res['item']['id'])
+ kept=publish(world=rworld,key=okey,url=res['item']['url'],balance='1000',settled='0')
+ check(kept['ok'] and kept['item']['url']==res['item']['url'] and kept['charged']==0)
+ check(kept['item']['rate']==100 and kept['item']['price']==100 and not kept['item']['reserved'])
+ off='s424242.sites.pcos'
+ offpub=call('publish',_token=token,world='5'*32,key=okey,url=off,document=json.dumps(doc),confirm='100/1800/1000',host=1,balance='1000',settled='0')
+ check(offpub['ok'] and offpub['item']['url']==off and offpub['item']['rate']==100 and offpub['item']['price']==100)
+ # A standard address may also be hosted from the save (offline mode).
+ loc2=call('local',_token=token,world=rworld,url='s777777.sites.pcos',confirm='100/1800/1000',seconds=0,balance='1000',settled='0')
+ check(loc2['ok'] and any(s['url']=='s777777.sites.pcos' and s['rate']==100 for s in loc2['items']))
  # --- 10. Reserved names, private storage and generated addresses.
  reserved=json.loads((R/'Hosting/sites/reserved.json').read_text())
  check(not publish(key='5'*32,url=reserved[0])['ok'])
- check(not publish(key='6'*32,url='s999.sites.pcos')['ok'])
+ check(not publish(key='6'*32,url='www.byethost4.com')['ok'])
  check(not publish(key='6'*32,url='a..b.com')['ok'])
  p=subprocess.run(['php',str(data/'state.php')],capture_output=True,check=True);check(p.stdout==b'')
  print('PASS:',checks,'real PHP API checks: wallet-only rent, free publication, one-time domain fee, per-second base rent with traffic surcharge, pause without debt, snapshot cannot mint money, rollback, stop/restart, local hosting, validation and private storage')
