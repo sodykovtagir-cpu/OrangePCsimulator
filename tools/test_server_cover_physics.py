@@ -21,3 +21,12 @@ assert 'serverLid ?' not in grid
 sp=(R/'Assets/Scripts/Assembly-CSharp/PC/ReadyBuildSpawner.cs').read_text()
 assert 'root.GetComponent<ServerChassis>() == null' in sp
 print('PASS: restored authored colliders and grid assembly; remove mode uses collider body; Play Mode required')
+# The attachable runner must compile into the runtime assembly, not Editor.
+runner=(R/'Assets/Scripts/Assembly-CSharp/ServerPhysicsDiagnostic.cs').read_text()
+menu=(R/'Assets/Editor/ServerPhysicsDiagnosticMenu.cs').read_text()
+assert 'class ServerPhysicsDiagnostic : MonoBehaviour' in runner
+assert 'using UnityEditor;' not in runner
+assert 'ServerPhysicsDiagnostic.RequestRun();' in menu
+assert '#if UNITY_EDITOR' in runner and '#if UNITY_EDITOR' in menu
+assert not (R/'Assets/Editor/ServerPhysicsDiagnostic.cs').exists()
+print('PASS: editor menu delegates to attachable runtime-assembly runner')

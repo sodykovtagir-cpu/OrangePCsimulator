@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using PC.Component;
-using UnityEditor;
 using UnityEngine;
 
 // Play-mode diagnostic: uses the actual shop spawner, game raycast and PhysX.
@@ -17,13 +16,19 @@ public sealed class ServerPhysicsDiagnostic : MonoBehaviour
     private const float MaxRelativeAngle = 4f;
     private readonly List<GameObject> cleanup = new List<GameObject>();
 
-    [MenuItem("Tools/OrangePC/Server physics diagnostic")]
-    private static void RunFromMenu()
+    public static void RequestRun()
     {
-        if (!EditorApplication.isPlaying) { Debug.LogWarning("[ServerPhysics] Enter Play Mode and load a room first."); return; }
+        if (!Application.isPlaying) { Debug.LogWarning("[ServerPhysics] Enter Play Mode and load a room first."); return; }
         if (running) { Debug.LogWarning("[ServerPhysics] Already running."); return; }
         var go = new GameObject("Server physics diagnostic");
-        go.AddComponent<ServerPhysicsDiagnostic>().StartCoroutine("Run");
+        var runner = go.AddComponent<ServerPhysicsDiagnostic>();
+        if (runner == null)
+        {
+            Debug.LogError("[ServerPhysics] Failed to create the runtime diagnostic component.");
+            Destroy(go);
+            return;
+        }
+        runner.StartCoroutine(runner.Run());
     }
 
     private IEnumerator Run()
