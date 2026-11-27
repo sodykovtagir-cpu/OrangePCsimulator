@@ -392,12 +392,7 @@ public class PlacementGrid : MonoBehaviour
         if (startRb != null)
         {
             // Сборка по джойнтам + свободные предметы, которые лежат на ней
-            // A server lid is a removable item, not a request to select and
-            // lock its whole joint-connected case. In particular selection in
-            // grid mode happens before the lid is detached on the second click.
-            var item = startRb.GetComponent<Item>();
-            bool serverLid = item != null && item.SpawnId == "Server Cover";
-            pcBodies = serverLid ? new[] { startRb } : AddLooseStack(CollectAssembly(startRb));
+            pcBodies = AddLooseStack(CollectAssembly(startRb));
             DragAssemblyBodies = pcBodies;
         }
 
@@ -407,9 +402,7 @@ public class PlacementGrid : MonoBehaviour
         // Джойнты сборки не рвём, пока тащишь. В режиме сетки — всегда,
         // без сетки — только когда схватили сам корпус: деталь по-прежнему
         // можно вырвать силой.
-        var selectedItem = startRb != null ? startRb.GetComponent<Item>() : null;
-        bool isServerLid = selectedItem != null && selectedItem.SpawnId == "Server Cover";
-        if (!isServerLid && pcBodies != null && (SnapEnabled || (pcCase != null && IsCaseBody(target, pcCase))))
+        if (pcBodies != null && (SnapEnabled || (pcCase != null && IsCaseBody(target, pcCase))))
             ProtectAssemblyJoints();
 
         // В режиме сетки — блокировка ориентации: поворот только стрелками,

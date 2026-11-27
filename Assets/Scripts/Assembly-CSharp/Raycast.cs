@@ -498,7 +498,7 @@ public class Raycast : MonoBehaviour
         // Release that selection before starting a flexible cable drag.
         if (cableHit != null && selectedBody != null) ClearSelection();
 
-        bool serverCoverReleased = false;
+        bool serverPartReleased = false;
         if (dragRigidbody)
         {
             var hitRb = hit.rigidbody;
@@ -554,17 +554,17 @@ public class Raycast : MonoBehaviour
                     return;
                 }
 
-                // The server lid is an independently removable part. Release it
-                // before starting the drag/grid assembly traversal, otherwise the
-                // joint graph includes the chassis and a lid drag moves the case.
-                // Do not defeat glue; grid selection alone also leaves it latched.
-                var grabbedItem = hitRb.GetComponent<Item>();
-                var coverConnector = hitRb.GetComponent<Connector>();
-                if (grabbedItem != null && grabbedItem.SpawnId == "Server Cover" &&
-                    !grabbedItem.glue && coverConnector != null)
+                // Outside grid mode the player is grabbing this server part,
+                // not the whole joint-connected chassis. Keep glued parts and
+                // the grid's intentionally whole-assembly movement intact.
+                var serverItem = hitRb.GetComponent<Item>();
+                var serverConnector = hitRb.GetComponent<Connector>();
+                if (!GridMode() && serverItem != null && !serverItem.glue &&
+                    serverConnector != null && serverConnector.slot != null &&
+                    serverConnector.slot.GetComponentInParent<ServerChassis>() != null)
                 {
-                    coverConnector.Break();
-                    serverCoverReleased = true;
+                    serverConnector.Break();
+                    serverPartReleased = true;
                 }
 
                 // Holding a connected plug does NOT unplug it. Its FixedJoint
@@ -589,7 +589,9 @@ public class Raycast : MonoBehaviour
 
                 var drag = new Drag
                 {
-                    target = hit.transform,
+                    // The collider may be a child of the actual item. All drag
+                    // and grid operations must follow the body that was hit.
+                    target = hitRb.transform,
                     oldDrag = hitRb.drag,
                     oldAngularDrag = hitRb.angularDrag,
                     oldConstrains = hitRb.constraints,
@@ -657,7 +659,10 @@ public class Raycast : MonoBehaviour
 
         if (RemoveMode)
         {
-            if (!serverCoverReleased && hit.transform && hit.transform.TryGetComponent<Connector>(out var conn))
+            // Parts such as a motherboard have colliders on child objects.
+            // The connector lives on the item's Rigidbody, not that child.
+            var conn = hit.rigidbody != null ? hit.rigidbody.GetComponent<Connector>() : null;
+            if (conn != null && !serverPartReleased)
                 conn.Break();
 
             var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
