@@ -10,6 +10,21 @@ public class TextureLoader : MonoBehaviour, ISave
     private int matIndex;
 
     private byte[] data;
+    private bool dakimakuraTwoSided;
+
+    private void SetDakimakuraTwoSided(bool value, int width = 1)
+    {
+        dakimakuraTwoSided = value;
+        var uv = GetComponentInChildren<PC.Component.Software.DakimakuraPrintUV>(true);
+        if (uv != null) uv.SetTwoSided(value, width);
+    }
+
+    public void SetTwoSidedTexture(Texture2D tex, byte[] imageData)
+    {
+        if (tex == null || rend == null) return;
+        SetDakimakuraTwoSided(true, tex.width / 2);
+        ApplyTexture(tex, imageData);
+    }
 
     // Imported models may create their renderer in Awake. Bind that renderer
     // before a saved texture is restored or a new purchase is painted.
@@ -31,10 +46,17 @@ public class TextureLoader : MonoBehaviour, ISave
 
         data = (byte[])loader.data.Clone();
         Texture2D tex = FormatConverter.BytesToTexture(data, true);
-        SetTexture(tex, data);
+        if (loader.dakimakuraTwoSided) SetTwoSidedTexture(tex, data);
+        else SetTexture(tex, data);
     }
 
     public void SetTexture(Texture2D tex, byte[] data)
+    {
+        SetDakimakuraTwoSided(false);
+        ApplyTexture(tex, data);
+    }
+
+    private void ApplyTexture(Texture2D tex, byte[] data)
     {
         if (tex == null || rend == null)
             return;
@@ -54,7 +76,10 @@ public class TextureLoader : MonoBehaviour, ISave
             JToken jtoken = jObject["dat"];
             byte[] array = System.Convert.FromBase64String(jtoken.ToString());
             Texture2D tex = FormatConverter.BytesToTexture(array, true);
-            SetTexture(tex, array);
+            if (jObject.Value<bool?>("dakimakuraTwoSided") == true)
+                SetTwoSidedTexture(tex, array);
+            else
+                SetTexture(tex, array);
         }
     }
 
@@ -64,6 +89,7 @@ public class TextureLoader : MonoBehaviour, ISave
         {
             JToken value = System.Convert.ToBase64String(data);
             jObject["dat"] = value;
+            if (dakimakuraTwoSided) jObject["dakimakuraTwoSided"] = true;
         }
     }
 }

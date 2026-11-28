@@ -12,6 +12,8 @@ namespace PC.Component.Software
 		[SerializeField]
 		private Text fileNameText;
 
+		[SerializeField] private Text backFileNameText;
+
 		[SerializeField]
 		private GameObject home;
 
@@ -43,6 +45,9 @@ namespace PC.Component.Software
 		[SerializeField] private GameObject previewRigPrefab;
 
 		private File selectedFile;
+		private File selectedBackFile;
+		private bool IsDakimakura => bannerPrefab != null &&
+			bannerPrefab.GetComponentInChildren<DakimakuraPrintUV>(true) != null;
 
 		private GameObject previewInstance;
 		private GameObject runtimeRig;
@@ -98,23 +103,31 @@ namespace PC.Component.Software
 			StopPreview();
 		}
 
-		public void SelectFile()
+		public void SelectFile() { SelectSide(false); }
+
+		public void SelectBackFile() { SelectSide(true); }
+
+		private void SelectSide(bool back)
 		{
 			var o = os;
 			if (o == null) return;
-
 			System.Action<File> cb = file =>
 			{
-				// Страницу могли закрыть, пока был открыт выбор файла.
 				if (this == null || file == null) return;
-				if (fileNameText != null) fileNameText.text = file.path;
-				selectedFile = file;
+				if (back)
+				{
+					selectedBackFile = file;
+					if (backFileNameText != null) backFileNameText.text = file.path;
+				}
+				else
+				{
+					selectedFile = file;
+					if (fileNameText != null) fileNameText.text = file.path;
+				}
 				if (alertText != null) alertText.text = string.Empty;
-				var btn = purchaseButton;
-				if (btn != null) btn.interactable = true;
-				if (isActiveAndEnabled) StartPreview();
+				if (purchaseButton != null) purchaseButton.interactable = selectedFile != null;
+				if (isActiveAndEnabled && selectedFile != null) StartPreview();
 			};
-
 			o.SelectFile(".pic", cb);
 		}
 
@@ -134,6 +147,23 @@ namespace PC.Component.Software
 					alertText.text = string.Format(Localization.GetText("Only supports {0}x{1} resolution"), needW, needH);
 				Destroy(tex);
 				return;
+			}
+
+			// A missing back image deliberately repeats the front, preserving
+			// existing one-image orders. Both chosen images use the same HD mode.
+			if (IsDakimakura)
+			{
+				var back = selectedBackFile != null ? LoadTexture(selectedBackFile) : null;
+				if (selectedBackFile != null && back == null) { Destroy(tex); return; }
+				if (back != null && (back.width != needW || back.height != needH))
+				{
+					if (alertText != null) alertText.text = string.Format(Localization.GetText("Only supports {0}x{1} resolution"), needW, needH);
+					Destroy(back); Destroy(tex); return;
+				}
+				var atlas = BuildAtlas(tex, back != null ? back : tex);
+				if (back != null) Destroy(back);
+				Destroy(tex);
+				tex = atlas;
 			}
 
 			var m = Main.Instance;
@@ -181,7 +211,8 @@ namespace PC.Component.Software
 			}
 
 			tex.Apply(false, true);
-			loader.SetTexture(tex, data);
+			if (IsDakimakura) loader.SetTwoSidedTexture(tex, data);
+			else loader.SetTexture(tex, data);
 			m.Spend(price);
 			StopPreview();
 			if (home != null) home.SetActive(false);
@@ -190,16 +221,32 @@ namespace PC.Component.Software
 
 		private Texture2D LoadSelectedTexture()
 		{
-			if (selectedFile == null || string.IsNullOrEmpty(selectedFile.content)) return null;
+			return LoadTexture(selectedFile);
+		}
+
+		private Texture2D LoadTexture(File file)
+		{
+			if (file == null || string.IsNullOrEmpty(file.content)) return null;
 			try
 			{
-				return FormatConverter.StringToTexture(selectedFile.content);
+				return FormatConverter.StringToTexture(file.content);
 			}
 			catch (System.FormatException)
 			{
 				if (alertText != null) alertText.text = Localization.GetText("Invalid picture");
 				return null;
 			}
+		}
+
+		private static Texture2D BuildAtlas(Texture2D front, Texture2D back)
+		{
+			var atlas = new Texture2D(front.width * 2, front.height, TextureFormat.RGBA32, false);
+			atlas.filterMode = FilterMode.Point;
+			atlas.wrapMode = TextureWrapMode.Clamp;
+			atlas.SetPixels32(0, 0, front.width, front.height, front.GetPixels32());
+			atlas.SetPixels32(front.width, 0, back.width, back.height, back.GetPixels32());
+			atlas.Apply();
+			return atlas;
 		}
 
 		private void StartPreview()
@@ -210,6 +257,20 @@ namespace PC.Component.Software
 
 			previewTexture = LoadSelectedTexture();
 			if (previewTexture == null) return;
+			if (IsDakimakura)
+			{
+				var back = selectedBackFile != null ? LoadTexture(selectedBackFile) : null;
+				if (selectedBackFile != null && back == null) { StopPreview(); return; }
+				if (back != null && (back.width != previewTexture.width || back.height != previewTexture.height))
+				{
+					if (alertText != null) alertText.text = string.Format(Localization.GetText("Only supports {0}x{1} resolution"), previewTexture.width, previewTexture.height);
+					Destroy(back); StopPreview(); return;
+				}
+				var atlas = BuildAtlas(previewTexture, back != null ? back : previewTexture);
+				if (back != null) Destroy(back);
+				Destroy(previewTexture);
+				previewTexture = atlas;
+			}
 			if (!EnsureRig())
 			{
 				StopPreview();
@@ -246,7 +307,8 @@ namespace PC.Component.Software
 						previewMaterials.Add(material);
 
 			// Для витрины PNG/данные сохранения не нужны — только тот же TextureLoader.
-			loader.SetTexture(previewTexture, null);
+			if (IsDakimakura) loader.SetTwoSidedTexture(previewTexture, null);
+			else loader.SetTexture(previewTexture, null);
 			FitPreviewModel();
 			previewImage.texture = previewRT;
 			activePreviewCamera.Render();
