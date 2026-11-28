@@ -148,6 +148,12 @@ public class Slot : MonoBehaviour
 			addj.breakForce = breakForce;
 		addj.connectedBody = gameObject.GetComponentInParent<Rigidbody>();
 
+		// Серверная сборка — это десяток тел на FixedJoint'ах; при штатных
+		// итерациях решателя новая деталь отстаёт от корпуса и сборка дрожит.
+		// Для остальных слотов вызов ничего не делает (см. ServerChassis).
+		PC.Component.ServerChassis.StabilizeIfServerPart(
+			addj.connectedBody, item.GetComponent<Rigidbody>());
+
 		attachedTransform = itrans;
 		attachedItem = item;
 

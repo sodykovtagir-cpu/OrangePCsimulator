@@ -1,0 +1,11 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "unity-mcp": {
+      "type": "local",
+      "command": ["uvx", "mcp-for-unity"],
+      "enabled": true
+    }
+  },
+  "snapshot": false
+}

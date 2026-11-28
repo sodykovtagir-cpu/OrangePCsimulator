@@ -25,23 +25,15 @@ public class Raycast : MonoBehaviour
 
         // Сетка уже вела этот перенос (пружина выключена, предмет держит снап).
         public bool gridTouched;
-        // Взяли предмет. Перенос начинается только с реального движения
-        // прицела: на ПК курсор залочен (Input.mousePosition стоит на месте),
-        // поэтому смотрим на поворот камеры, а на тач — на сдвиг пальца.
-        public Quaternion viewStart;
-        public Vector2 pointerStart;
-        public bool pullStarted;
+
+        // Пружина уже пересчитана под массу серверной сборки (см. ScaleSpringForAssembly).
+        public bool massScaled;
         public PC.Component.Cabling.CableItem grabbedCable;
         // Populated once when grabbing a connected case, not every frame.
         public List<PC.Component.Cabling.CableItem> wiredCables;
         public Vector3 wiredCaseStartPosition;
 
     }
-
-    // Пока прицел не повернулся на 2¬∞ (ПК) или палец не сдвинулся на 12 px
-    // (тач) — это клик, а не перенос: якорь пружины стоит на месте.
-    private const float AimDeadzoneDegrees = 2f;
-    private const float TouchDeadzoneSqr = 144f;
 
     [SerializeField]
     private LayerMask layer;
@@ -60,6 +52,15 @@ public class Raycast : MonoBehaviour
 
     [SerializeField]
     private float targetAngularDrag = 5f;
+
+    // Масса, под которую подобраны targetSpring/targetDamper: обычный
+    // системный блок (корпус 2 кг + БП 2 + крышка 1 + SSD 1). Тяжёлая
+    // серверная сборка (22 кг) при той же жёсткости отстаёт от прицела в
+    // разы и скребёт пол вместо того, чтобы ехать, поэтому для неё сила
+    // пружины масштабируется по массе — отклик получается как у эталонного
+    // корпуса, без изменения масс тел и без отключения физики.
+    [SerializeField]
+    private float dragReferenceMass = 6f;
 
     [Header("Поворот предмета")]
     [Tooltip("Шаг и квант поворота стрелками, градусов: угол всегда кратен шагу. " +
@@ -498,7 +499,6 @@ public class Raycast : MonoBehaviour
         // Release that selection before starting a flexible cable drag.
         if (cableHit != null && selectedBody != null) ClearSelection();
 
-        bool serverPartReleased = false;
         if (dragRigidbody)
         {
             var hitRb = hit.rigidbody;
@@ -514,21 +514,6 @@ public class Raycast : MonoBehaviour
                 }
             }
             // ===============================================
-
-            // Крышка и HDD-корзины сервера закреплены прямо на корпусе
-            // (Slot держит их FixedJoint'ом с breakForce 200). Клик попадал в
-            // саму деталь, пружина тянула только её, джойнт передавал рывок
-            // корпусу — и вся сборка тряслась секундами. Такую деталь не
-            // выдёргиваем: переносим корпус, деталь едет вместе с ним.
-            // Комплектуха (CPU/RAM/HDD) висит на своей плате, а не на корпусе,
-            // поэтому её захват не меняется.
-            if (hitRb != null)
-            {
-                var mount = hitRb.GetComponent<FixedJoint>();
-                if (mount != null && mount.connectedBody != null &&
-                    mount.connectedBody.GetComponent<PC.Component.Case>() != null)
-                    hitRb = mount.connectedBody;
-            }
 
             // Нажали на то, что нельзя подвинуть (стена, пол, кинематика,
             // закреплённое тело) — выбор снимаем, как и при клике в пустоту.
@@ -554,19 +539,6 @@ public class Raycast : MonoBehaviour
                     return;
                 }
 
-                // Outside grid mode the player is grabbing this server part,
-                // not the whole joint-connected chassis. Keep glued parts and
-                // the grid's intentionally whole-assembly movement intact.
-                var serverItem = hitRb.GetComponent<Item>();
-                var serverConnector = hitRb.GetComponent<Connector>();
-                if (!GridMode() && serverItem != null && !serverItem.glue &&
-                    serverConnector != null && serverConnector.slot != null &&
-                    serverConnector.slot.GetComponentInParent<ServerChassis>() != null)
-                {
-                    serverConnector.Break();
-                    serverPartReleased = true;
-                }
-
                 // Holding a connected plug does NOT unplug it. Its FixedJoint
                 // has the same break force as Slot; pulling can move light
                 // hardware before the connection finally yields.
@@ -589,9 +561,7 @@ public class Raycast : MonoBehaviour
 
                 var drag = new Drag
                 {
-                    // The collider may be a child of the actual item. All drag
-                    // and grid operations must follow the body that was hit.
-                    target = hitRb.transform,
+                    target = hit.transform,
                     oldDrag = hitRb.drag,
                     oldAngularDrag = hitRb.angularDrag,
                     oldConstrains = hitRb.constraints,
@@ -633,13 +603,11 @@ public class Raycast : MonoBehaviour
                 drag.grabOffsetLocal = hitRb.transform.InverseTransformDirection(
                     hitRb.worldCenterOfMass - sTr.position);
 
+                // Прошлый перенос мог закончиться без End (цель уничтожили),
+                // и пружина осталась с масштабом под массивную сборку.
+                spring.spring = targetSpring;
+                spring.damper = targetDamper;
                 spring.connectedBody = hitRb;
-                // В режиме сетки предмет сразу держит снап (шаг стрелками).
-                // Без сетки перенос начинается только после движения прицела:
-                // до этого якорь пружины стоит на месте (см. DragObject).
-                drag.viewStart = cam != null ? cam.transform.rotation : Quaternion.identity;
-                drag.pointerStart = pointer != null ? pointer.position : Vector2.zero;
-                drag.pullStarted = GridMode();
                 StartCoroutine("DragObject");
             }
             else if (hitRb && hitRb.isKinematic)
@@ -659,10 +627,7 @@ public class Raycast : MonoBehaviour
 
         if (RemoveMode)
         {
-            // Parts such as a motherboard have colliders on child objects.
-            // The connector lives on the item's Rigidbody, not that child.
-            var conn = hit.rigidbody != null ? hit.rigidbody.GetComponent<Connector>() : null;
-            if (conn != null && !serverPartReleased)
+            if (hit.transform && hit.transform.TryGetComponent<Connector>(out var conn))
                 conn.Break();
 
             var hook = hit.transform ? hit.transform.GetComponentInParent<Hook>() : null;
@@ -2147,13 +2112,7 @@ public class Raycast : MonoBehaviour
     private IEnumerator DragObject()
     {
         var j = spring;
-        if (j == null) yield break;
-
-        var drag = currentDrag;
-        if (drag == null)
-            yield break;
-
-        var rb = j.connectedBody;
+        var rb = j ? j.connectedBody : null;
         if (rb == null) yield break;
 
         rb.drag = targetDrag;
@@ -2162,6 +2121,10 @@ public class Raycast : MonoBehaviour
         if (distanceObj)
             distanceObj.SetActive(true);
 
+        var drag = currentDrag;
+        if (drag == null)
+            yield break;
+
         // Состояние сетки — на один перенос: прошлый перенос мог оборваться
         // без End() (цель уничтожена), и тогда старые значения не должны влиять.
         pendingGridMove = Vector3.zero;
@@ -2169,6 +2132,14 @@ public class Raycast : MonoBehaviour
         if (distanceScroll)
             distanceScroll.verticalNormalizedPosition =
                 Conversion.Map(drag.distance, 2f, maxDistance, 1f, 0f);
+
+        if (LockRotation)
+        {
+            rb.constraints |=
+                RigidbodyConstraints.FreezeRotationX |
+                RigidbodyConstraints.FreezeRotationY |
+                RigidbodyConstraints.FreezeRotationZ;
+        }
 
         var t = drag.target;
         if (!t) yield break;
@@ -2182,17 +2153,15 @@ public class Raycast : MonoBehaviour
         // Freezing its Rigidbody here makes the spring grab appear unresponsive.
         bool cableDrag = t.GetComponentInParent<PC.Component.Cabling.CableItem>() != null;
         if (PlacementGrid.Instance != null && !cableDrag)
+        {
             PlacementGrid.Instance.OnDragStarted(t);
+            ScaleSpringForAssembly(spring, drag);
+        }
 
         while (currentDrag != null && currentDrag.target)
         {
-            // Перенос начинается с движения точки прицела, а не с нажатия:
-            // пока она стоит на месте, пружина не прицеплена и сборка не
-            // дрожит. В режиме сетки пружина прицеплена с самого захвата.
-            bool pulling = drag.pullStarted;
-
             // В режиме сетки ориентация меняется только стрелками — автоповорот бы мешал
-            if (!GridMode() && pulling)
+            if (!GridMode())
                 AutoRotate();
 
             if (cam != null && spring)
@@ -2346,22 +2315,7 @@ public class Raycast : MonoBehaviour
                     RestoreSpring();
                 }
 
-                if (!pulling && AimMoved(drag))
-                {
-                    drag.pullStarted = true;
-                    pulling = true;
-                }
-
-                if (pulling)
-                {
-                    // Сборка могла уснуть (физика усыпляет покоящееся тело).
-                    // Реальный перенос обязан её разбудить: иначе пружина
-                    // движется, а корпус стоит.
-                    var pulled = spring.connectedBody;
-                    if (pulled != null && pulled.IsSleeping()) pulled.WakeUp();
-
-                    spring.transform.position = point;
-                }
+                spring.transform.position = point;
 
                 var curGo = currentDrag.target
                     ? currentDrag.target.gameObject
@@ -2388,6 +2342,42 @@ public class Raycast : MonoBehaviour
 
             yield return null;
         }
+    }
+
+    /// <summary>
+    /// Уравнивает перенос сборок по массе. Пружина переноса настроена под
+    /// обычный корпус (~6 кг); серверная сборка весит 22 кг, и с той же
+    /// жёсткостью она отстаёт от прицела, волочится по полу и дрожит на
+    /// контактах. Здесь сила пружины и демпфер масштабируются по массе, так
+    /// что ускорение и темп отклика получаются как у эталонного корпуса.
+    /// Массы тел, джойнты и физика не меняются. Только сервер: остальные
+    /// сборки (в том числе BigMiner) тащатся как раньше.
+    /// </summary>
+    private void ScaleSpringForAssembly(SpringJoint joint, Drag drag)
+    {
+        if (joint == null || drag == null || drag.massScaled) return;
+
+        var grid = PlacementGrid.Instance;
+        var bodies = grid != null ? grid.DragAssemblyBodies : null;
+        if (bodies == null || bodies.Length < 2) return;
+
+        bool server = false;
+        float mass = 0f;
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            var body = bodies[i];
+            if (body == null) continue;
+
+            mass += body.mass;
+            if (body.GetComponent<ServerChassis>() != null) server = true;
+        }
+
+        if (!server || mass <= dragReferenceMass) return;
+
+        float scale = mass / dragReferenceMass;
+        joint.spring = targetSpring * scale;
+        joint.damper = targetDamper * scale;
+        drag.massScaled = true;
     }
 
     public void AutoRotate()
@@ -2451,41 +2441,24 @@ public class Raycast : MonoBehaviour
         if (selectedBody == rb) ClearSelection();
     }
 
-    /// <summary>
-    /// Отпустили, так и не сдвинув прицел: это был клик, а не перенос.
-    /// </summary>
-    private bool IsStationaryClick(Drag drag)
-    {
-        return drag != null && !drag.pullStarted && !drag.gridTouched && !GridMode();
-    }
-
-    /// <summary>
-    /// Прицел/палец уже сдвинулись после взятия. На ПК мышь залочена, поэтому
-    /// смотрим на поворот камеры; на тач-управлении — на сдвиг пальца.
-    /// </summary>
-    private bool AimMoved(Drag drag)
-    {
-        if (drag == null) return false;
-        if (pointer != null)
-            return (pointer.position - drag.pointerStart).sqrMagnitude >= TouchDeadzoneSqr;
-        if (cam == null) return false;
-        return Quaternion.Angle(cam.transform.rotation, drag.viewStart) >= AimDeadzoneDegrees;
-    }
-
     public void End()
     {
         // Обычную мягкую пружину вернём до того, как отпустим тело
         RestoreSpring();
 
-        // Сборку запоминаем ДО OnDragEnded: он очищает DragAssemblyBodies.
-        var placementGrid = PlacementGrid.Instance;
-        var assembly = placementGrid != null ? placementGrid.DragAssemblyBodies : null;
+        // Сборка могла масштабировать жёсткость под свою массу — следующий
+        // предмет должен снова тянуться эталонной пружиной (см. ScaleSpringForAssembly).
+        if (spring != null)
+        {
+            spring.spring = targetSpring;
+            spring.damper = targetDamper;
+        }
 
         // OnDragEnded отпускает замок (кинематику) сборки. Вызываем его только
         // когда был ПЕРЕНОС: отпускание кнопки после простого клика-выбора не
         // должно размораживать выбранный предмет — его замок держит ClearSelection.
-        if (currentDrag != null && placementGrid != null)
-            placementGrid.OnDragEnded();
+        if (currentDrag != null && PlacementGrid.Instance != null)
+            PlacementGrid.Instance.OnDragEnded();
 
         if (currentDrag != null)
         {
@@ -2507,26 +2480,6 @@ public class Raycast : MonoBehaviour
                 {
                     rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
-                }
-                else if (assembly != null && assembly.Length > 1 && IsStationaryClick(d))
-                {
-                    // Клик без движения по многодетальной сборке (сервер):
-                    // пружина дёргала корпус, импульс уходил в джойнты, и
-                    // сборка дрожала ещё секунды после отпускания. Гасим её
-                    // целиком. Настоящий перенос/бросок мыши сюда не попадает:
-                    // курсор за время жеста уходит заметно дальше допуска.
-                    for (int i = 0; i < assembly.Length; i++)
-                    {
-                        var body = assembly[i];
-                        if (body == null) continue;
-                        body.velocity = Vector3.zero;
-                        body.angularVelocity = Vector3.zero;
-                        // Обнулённой скорости мало: джойнты сборки после
-                        // клика ещё пару секунд «дышат» на 3–4 мм. Сон
-                        // убирает дрожь сразу; тело проснётся от первого
-                        // реального касания, так что физика не меняется.
-                        body.Sleep();
-                    }
                 }
                 // ====== ЗАЩЁЛКНУТЬ ДВЕРЬ ЕСЛИ ЭТО ОНА ======
                 var latch = rb.GetComponent<DoorLatch>();
