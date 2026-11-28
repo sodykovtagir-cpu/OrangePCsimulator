@@ -279,9 +279,12 @@ namespace PC.Component.Software
 
 			const int size = 256; // То же разрешение рендера, что и в ModForge.
 			previewRT = new RenderTexture(size, size, 24, RenderTextureFormat.ARGB32);
-			previewRT.antiAliasing = 4;
+			// Four-sample render targets are not supported on every mobile GPU.
+			// A plain render texture is preferable to a blank preview.
+			previewRT.antiAliasing = 1;
 			if (!previewRT.Create())
 			{
+				Debug.LogWarning("PrintExpert: could not create preview render texture.");
 				StopPreview();
 				return;
 			}
@@ -299,6 +302,7 @@ namespace PC.Component.Software
 				return;
 			}
 			MakePreviewOnly();
+			OrientDakimakuraPreview();
 
 			// materials создаёт локальные копии: общие материалы товара не изменяем.
 			foreach (var renderer in previewInstance.GetComponentsInChildren<Renderer>(true))
@@ -336,6 +340,7 @@ namespace PC.Component.Software
 			{
 				cameraWasEnabled = activePreviewCamera.enabled;
 				previousCameraTarget = activePreviewCamera.targetTexture;
+				if (runtimeRig != null) activePreviewCamera.useOcclusionCulling = false;
 				activePreviewCamera.enabled = false; // Только явный Render, не вывод на основной экран.
 			}
 			return activePreviewCamera != null && activePreviewStage != null;
@@ -361,6 +366,15 @@ namespace PC.Component.Software
 			foreach (var collider in previewInstance.GetComponentsInChildren<Collider>(true))
 				collider.enabled = false;
 
+			// Impact effects are not part of the product. Particle bounds can
+			// be empty or far from the mesh and corrupt preview framing.
+			foreach (var particle in previewInstance.GetComponentsInChildren<ParticleSystem>(true))
+			{
+				particle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+				var particleRenderer = particle.GetComponent<ParticleSystemRenderer>();
+				if (particleRenderer != null) particleRenderer.enabled = false;
+			}
+
 			// Item.Start регистрирует предмет в Main; витрина не должна попасть в игру/сейв.
 			foreach (var item in previewInstance.GetComponentsInChildren<Item>(true))
 			{
@@ -370,13 +384,26 @@ namespace PC.Component.Software
 			}
 		}
 
+		private void OrientDakimakuraPreview()
+		{
+			if (!IsDakimakura) return;
+			var mesh = previewInstance.GetComponentInChildren<MeshFilter>(true);
+			if (mesh == null || mesh.sharedMesh == null) return;
+			var size = mesh.sharedMesh.bounds.size;
+			// The actual FBX lies in the YZ plane: its thin X axis points
+			// sideways. Turn that broad face towards the camera at startup;
+			// the stage still rotates to show both sides afterwards.
+			if (size.x < size.z && size.x < size.y)
+				previewInstance.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+		}
+
 		private bool TryGetPreviewBounds(out Bounds bounds)
 		{
 			bounds = new Bounds();
 			bool found = false;
 			foreach (var renderer in previewInstance.GetComponentsInChildren<Renderer>())
 			{
-				if (!renderer.enabled) continue;
+				if (!renderer.enabled || renderer is ParticleSystemRenderer) continue;
 				if (found) bounds.Encapsulate(renderer.bounds);
 				else bounds = renderer.bounds;
 				found = true;
